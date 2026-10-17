@@ -32,8 +32,59 @@ body {
   min-height: 100dvh;
 }
 
+/* Native dialog reset so Tailwind positioning applies cleanly */
+dialog {
+  border: none;
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.4);
+}
+
+/*
+ * Closed <dialog> must stay display:none. Tailwind `flex` would override that
+ * and leave a full-size invisible (but click-blocking) code panel on the page.
+ */
+dialog.css-export-dialog:not([open]) {
+  display: none;
+}
+
+dialog.css-export-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  height: min(80dvh, calc(100dvh - 1.5rem));
+  width: min(85vw, 1100px);
+  max-width: calc(100vw - 1.5rem);
+}
+
+@media (max-width: 639px) {
+  dialog.css-export-dialog[open] {
+    height: calc(100dvh - 1rem);
+    width: calc(100vw - 1rem);
+  }
+}
+
 button,
 input,
 textarea {
   font: inherit;
+}
+
+/* Override global textarea font inherit for readable CSS export */
+textarea.css-export-code {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
 }

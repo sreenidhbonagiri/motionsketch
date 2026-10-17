@@ -1,24 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-
-async function dragActor(
-  page: Page,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-) {
-  const actor = page.getByTestId('actor')
-  const box = await actor.boundingBox()
-  expect(box).toBeTruthy()
-
-  const startX = box!.x + box!.width / 2
-  const startY = box!.y + box!.height / 2
-
-  await page.mouse.move(startX, startY)
-  await page.mouse.down()
-  await page.mouse.move(startX + from.x, startY + from.y, { steps: 8 })
-  await page.mouse.move(startX + to.x, startY + to.y, { steps: 12 })
-  await page.waitForTimeout(80)
-  await page.mouse.up()
-}
+import { expect, test } from '@playwright/test'
+import { dragActor, readExportedCss } from './helpers'
 
 test.describe('MotionSketch editor', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -55,13 +36,13 @@ test.describe('MotionSketch editor', () => {
       Math.abs(mid!.x - before!.x) > 2 || Math.abs(mid!.y - before!.y) > 2
     expect(moved).toBeTruthy()
 
-    const css = await page.getByTestId('css-output').inputValue()
+    const css = await readExportedCss(page)
     expect(css).toContain('@keyframes')
     expect(css).toContain('linear')
     expect(css).not.toMatch(/\bease\b/)
 
     await page.getByTestId('btn-copy-css').click()
-    await expect(page.getByTestId('btn-copy-css')).toHaveText(/Copied|Copy/)
+    await expect(page.getByTestId('btn-copy-css')).toHaveText(/Copied|Copy CSS/)
   })
 
   test('smoothing slider updates exported CSS', async ({ page }) => {
@@ -69,9 +50,9 @@ test.describe('MotionSketch editor', () => {
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 20, y: 40 }, { x: 160, y: -30 })
 
-    const before = await page.getByTestId('css-output').inputValue()
+    const before = await readExportedCss(page)
     await page.getByTestId('smoothing-slider').fill('0.9')
-    const after = await page.getByTestId('css-output').inputValue()
+    const after = await readExportedCss(page)
     expect(after).toContain('@keyframes')
     expect(after).toContain('translate3d(')
     expect(after).toContain('cqw')
@@ -104,7 +85,7 @@ test.describe('MotionSketch editor', () => {
     await page.getByTestId('steady-speed-slider').fill('0.7')
     await expect(page.getByTestId('steady-speed-value')).toHaveText('70%')
 
-    const css = await page.getByTestId('css-output').inputValue()
+    const css = await readExportedCss(page)
     expect(css).toContain('linear forwards')
     expect(css).toContain('(N / 100) * stageWidth')
     expect(css).not.toMatch(/\bease\b/)

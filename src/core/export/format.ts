@@ -1,5 +1,5 @@
-import { processForCss } from '../process'
-import type { Keyframe, MotionSample } from '../types'
+import { processForCss, simplifyRdp } from '../process'
+import { CSS_MAX_KEYFRAMES, type Keyframe, type MotionSample } from '../types'
 
 export function samplesToKeyframes(samples: MotionSample[]): Keyframe[] {
   if (samples.length === 0) return []
@@ -20,4 +20,12 @@ export function buildKeyframes(
 ): Keyframe[] {
   const processed = processForCss(rawSamples, smoothing, steadySpeed)
   return samplesToKeyframes(processed)
+}
+
+/** Keyframes from an already-processed playback path (keeps edit/export parity). */
+export function buildKeyframesFromProcessed(
+  processed: MotionSample[],
+): Keyframe[] {
+  const simplified = simplifyRdp(processed, 0.002, CSS_MAX_KEYFRAMES)
+  return samplesToKeyframes(simplified)
 }

@@ -42,7 +42,24 @@ export interface Project {
   playback: PlaybackSettings
 }
 
-export type EditorMode = 'idle' | 'armed' | 'recording' | 'playing'
+export type EditorMode =
+  | 'idle'
+  | 'armed'
+  | 'recording'
+  | 'playing'
+  | 'editing'
+
+/**
+ * Baked editable geometry. Created when entering Edit path mode.
+ * Original recording.samples stay untouched. While this exists, spatial
+ * smoothing is not reapplied (so handle moves are not erased); Steady Speed
+ * may still retime the path for playback/export.
+ */
+export interface GeometryEdit {
+  samples: MotionSample[]
+  /** Smoothing value used when this geometry was baked. */
+  bakedSmoothing: number
+}
 
 export interface Keyframe {
   /** 0..1 along the animation */

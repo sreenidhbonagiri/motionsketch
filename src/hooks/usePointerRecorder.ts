@@ -34,7 +34,7 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
 
   const onActorPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (mode === 'playing') return
+      if (mode === 'playing' || mode === 'editing') return
       // After a take exists, only armed recording may move the actor.
       if (hasRecording && mode !== 'armed') return
 

@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { evaluate } from '../core/playback'
 import type { MotionSample, Vec2 } from '../core/types'
+import { usePathEditor } from '../hooks/usePathEditor'
 import { usePointerRecorder } from '../hooks/usePointerRecorder'
 import { useStageSize } from '../hooks/useStageSize'
 import { selectActorPosition, selectProcessedPath } from '../state/selectors'
 import { useEditorStore } from '../state/store'
 import { Actor } from './Actor'
+import { PathHandles } from './PathHandles'
 
 function drawGrid(
   ctx: CanvasRenderingContext2D,
@@ -79,23 +81,37 @@ export function CanvasStage() {
   const livePosition = useEditorStore((s) => s.livePosition)
   const liveTrail = useEditorStore((s) => s.liveTrail)
   const showPathComparison = useEditorStore((s) => s.showPathComparison)
+  const geometryEdit = useEditorStore((s) => s.geometryEdit)
+  const editSession = useEditorStore((s) => s.editSession)
+  const editPreview = useEditorStore((s) => s.editPreview)
+
+  const pathView = { geometryEdit, editSession, editPreview }
 
   const {
     onActorPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel,
+    onPointerMove: onRecordPointerMove,
+    onPointerUp: onRecordPointerUp,
+    onPointerCancel: onRecordPointerCancel,
   } = usePointerRecorder({ stageRef })
+
+  const {
+    workingSamples,
+    handleIndices,
+    selectedHandleIndex,
+    onHandlePointerDown,
+  } = usePathEditor({ stageRef })
 
   const position = selectActorPosition(
     project,
     playbackHead,
     livePosition,
     mode,
+    pathView,
   )
 
-  const processed = selectProcessedPath(project)
+  const processed = selectProcessedPath(project, pathView)
   const rawSamples = project.recording?.samples ?? []
+  const editing = mode === 'editing'
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -116,7 +132,7 @@ export function CanvasStage() {
     if (mode === 'recording' && liveTrail.length >= 2) {
       drawPath(ctx, size.width, size.height, liveTrail, '#ef4444', 2.5, 0.9)
     } else if (rawSamples.length >= 2) {
-      if (showPathComparison) {
+      if (showPathComparison && !editing) {
         drawPath(
           ctx,
           size.width,
@@ -139,8 +155,10 @@ export function CanvasStage() {
           0.95,
           false,
         )
-        const head = evaluate(processed, playbackHead)
-        drawPlayhead(ctx, size.width, size.height, head)
+        if (!editing) {
+          const head = evaluate(processed, playbackHead)
+          drawPlayhead(ctx, size.width, size.height, head)
+        }
       }
     }
   }, [
@@ -151,19 +169,20 @@ export function CanvasStage() {
     processed,
     showPathComparison,
     playbackHead,
+    editing,
   ])
 
   return (
     <div
       ref={stageRef}
       data-testid="stage"
-      className="relative aspect-[16/10] w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-50 shadow-[0_24px_80px_rgba(15,23,42,0.08)] touch-none"
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      className="relative aspect-[16/10] w-full max-w-full overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-50 shadow-[0_24px_80px_rgba(15,23,42,0.08)] touch-none lg:h-auto lg:max-h-full lg:w-[min(100cqi,calc(100cqb*16/10))]"
+      onPointerMove={editing ? undefined : onRecordPointerMove}
+      onPointerUp={editing ? undefined : onRecordPointerUp}
+      onPointerCancel={editing ? undefined : onRecordPointerCancel}
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-      {size.width > 0 && (
+      {size.width > 0 && !editing && (
         <Actor
           actor={project.actor}
           position={position}
@@ -172,6 +191,14 @@ export function CanvasStage() {
           armed={mode === 'armed'}
           recording={mode === 'recording'}
           onPointerDown={onActorPointerDown}
+        />
+      )}
+      {editing && workingSamples && size.width > 0 && (
+        <PathHandles
+          samples={workingSamples}
+          handleIndices={handleIndices}
+          selectedIndex={selectedHandleIndex}
+          onHandlePointerDown={onHandlePointerDown}
         />
       )}
     </div>

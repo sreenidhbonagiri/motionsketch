@@ -1,6 +1,6 @@
-import type { Actor, Keyframe } from '../types'
 import { clamp01 } from '../coords'
-import { buildKeyframes } from './format'
+import type { Actor, Keyframe, MotionSample } from '../types'
+import { buildKeyframes, buildKeyframesFromProcessed } from './format'
 
 function formatOffset(offset: number): string {
   const pct = offset * 100
@@ -99,17 +99,21 @@ ${frames}
 }
 
 export function exportCssFromRecording(options: {
-  samples: import('../types').MotionSample[]
+  samples: MotionSample[]
   smoothing: number
   steadySpeed?: number
   durationMs: number
   actor: Actor
+  /** When set, export this processed path (edit-aware) instead of reprocessing raw. */
+  processedPath?: MotionSample[] | null
 }): string {
-  const keyframes = buildKeyframes(
-    options.samples,
-    options.smoothing,
-    options.steadySpeed ?? 0,
-  )
+  const keyframes = options.processedPath?.length
+    ? buildKeyframesFromProcessed(options.processedPath)
+    : buildKeyframes(
+        options.samples,
+        options.smoothing,
+        options.steadySpeed ?? 0,
+      )
   return generateCssSnippet({
     keyframes,
     durationMs: options.durationMs,
