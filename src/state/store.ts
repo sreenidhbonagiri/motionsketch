@@ -2,12 +2,15 @@ import { create } from 'zustand'
 import {
   clampActorBorderRadius,
   clampActorSize,
+  cloneActor,
   normalizeActorColor,
 } from '../core/actor'
+import type { ActorImageAsset } from '../core/imageAsset'
 import { copyPath } from '../core/edit'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
+import { captureViewportStageAspect, clampStageAspect } from '../core/stageAspect'
 import {
   DEFAULT_PROJECT,
   MAX_PLAYBACK_DURATION_MS,
@@ -94,9 +97,13 @@ interface EditorStore {
   setLoopMode: (loopMode: LoopMode) => void
   setShowPathComparison: (show: boolean) => void
   setActorColor: (color: string) => void
-  /** Square tile size as a fraction of the stage min-side. */
+  /** Bounding-box longer edge as a fraction of the stage min-side. */
   setActorSize: (size: number) => void
   setActorBorderRadius: (radius: number) => void
+  setActorKind: (kind: 'shape' | 'image') => void
+  setActorImage: (image: ActorImageAsset) => void
+  clearActorImage: () => void
+  setActorImageLabel: (label: string) => void
   resetRecording: () => void
 
   /** Full wipe to defaults (separate from Reset, which only clears the take). */
@@ -135,8 +142,9 @@ function clearEditState() {
 export const useEditorStore = create<EditorStore>((set, get) => ({
   project: {
     ...DEFAULT_PROJECT,
-    actor: { ...DEFAULT_PROJECT.actor },
+    actor: cloneActor(DEFAULT_PROJECT.actor),
     playback: { ...DEFAULT_PROJECT.playback },
+    stageAspect: DEFAULT_PROJECT.stageAspect,
   },
   mode: 'idle',
   pointerId: null,
@@ -402,6 +410,75 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       },
     })),
 
+  setActorKind: (kind) =>
+    set((state) => {
+      const actor = state.project.actor
+      if (kind === 'image') {
+        // Require an asset — UI uploads first, then switches kind.
+        if (!actor.image) return state
+        return {
+          project: {
+            ...state.project,
+            actor: { ...actor, kind: 'image', height: actor.width },
+          },
+        }
+      }
+      // Back to shape: keep color/radius/size; drop active image display.
+      return {
+        project: {
+          ...state.project,
+          actor: {
+            ...actor,
+            kind: 'shape',
+            height: actor.width,
+            image: actor.image,
+          },
+        },
+      }
+    }),
+
+  setActorImage: (image) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        actor: {
+          ...state.project.actor,
+          kind: 'image',
+          height: state.project.actor.width,
+          image: { ...image },
+        },
+      },
+    })),
+
+  clearActorImage: () =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        actor: {
+          ...state.project.actor,
+          kind: 'shape',
+          height: state.project.actor.width,
+          image: null,
+        },
+      },
+    })),
+
+  setActorImageLabel: (label) =>
+    set((state) => {
+      const image = state.project.actor.image
+      if (!image) return state
+      const next = label.trim().slice(0, 64) || 'Image'
+      return {
+        project: {
+          ...state.project,
+          actor: {
+            ...state.project.actor,
+            image: { ...image, label: next },
+          },
+        },
+      }
+    }),
+
   resetRecording: () =>
     set((state) => ({
       mode: 'idle',
@@ -431,9 +508,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       ...clearEditState(),
       project: {
         version: 1,
-        actor: { ...DEFAULT_PROJECT.actor },
+        actor: cloneActor(DEFAULT_PROJECT.actor),
         recording: null,
         playback: { ...DEFAULT_PROJECT.playback },
+        // Capture available viewport once; never rewrite on later resize.
+        stageAspect: captureViewportStageAspect(),
       },
     }),
 
@@ -465,7 +544,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       editPreview: null,
       project: {
         version: 1,
-        actor: { ...snapshot.project.actor },
+        actor: cloneActor(snapshot.project.actor),
         recording: recording
           ? {
               recordedDurationMs: recording.recordedDurationMs,
@@ -473,6 +552,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
             }
           : null,
         playback: { ...snapshot.project.playback },
+        stageAspect: clampStageAspect(snapshot.project.stageAspect),
       },
     })
   },

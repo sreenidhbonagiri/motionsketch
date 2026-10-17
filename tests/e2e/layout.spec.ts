@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { openCssDialog, recordSimplePath } from './helpers'
+import { openCssDialog, openPanel, recordSimplePath } from './helpers'
 
 async function assertFullyInViewport(
   page: import('@playwright/test').Page,
@@ -22,29 +22,59 @@ test.describe('workspace layout', () => {
     { width: 1366, height: 768 },
     { width: 1280, height: 720 },
   ]) {
-    test(`desktop ${viewport.width}x${viewport.height}: stage, toolbar, export reachable without page scroll`, async ({
+    test(`desktop ${viewport.width}x${viewport.height}: full-bleed stage + labeled chrome`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport)
       await page.goto('/')
       await recordSimplePath(page)
 
+      await expect(page.getByTestId('app-shell')).toBeVisible()
+      await expect(page.getByTestId('btn-project')).toBeVisible()
+      await expect(page.getByTestId('btn-adjust')).toBeVisible()
+      await expect(page.getByTestId('btn-appearance')).toBeVisible()
+      await expect(page.getByTestId('btn-export')).toBeVisible()
+      await expect(page.getByTestId('btn-settings')).toHaveCount(0)
+
+      // Stage fills the viewport (no inset card).
+      const stageFill = await page.evaluate(() => {
+        const stage = document.querySelector('[data-testid="stage"]')
+        if (!stage) return null
+        const r = stage.getBoundingClientRect()
+        return {
+          top: r.top,
+          left: r.left,
+          right: window.innerWidth - r.right,
+          bottom: window.innerHeight - r.bottom,
+          width: r.width,
+          height: r.height,
+        }
+      })
+      expect(stageFill).toBeTruthy()
+      expect(Math.abs(stageFill!.top)).toBeLessThan(2)
+      expect(Math.abs(stageFill!.left)).toBeLessThan(2)
+      expect(Math.abs(stageFill!.right)).toBeLessThan(2)
+      expect(Math.abs(stageFill!.bottom)).toBeLessThan(2)
+      expect(stageFill!.width).toBeGreaterThan(viewport.width * 0.95)
+      expect(stageFill!.height).toBeGreaterThan(viewport.height * 0.95)
+
+      await openPanel(page, 'adjust')
       await page.getByTestId('path-compare-toggle').check()
       await expect(page.getByTestId('path-compare-legend')).toBeVisible()
 
-      await expect(page.getByTestId('playback-timeline')).toBeVisible()
-      await assertFullyInViewport(page, 'stage')
+      await expect(page.getByTestId('playback-dock')).toBeVisible()
       await assertFullyInViewport(page, 'toolbar')
       await assertFullyInViewport(page, 'playback-timeline')
 
       await page.getByTestId('btn-edit-path').click()
       await expect(page.getByTestId('edit-mode-hint')).toBeVisible()
 
-      // Prefer keyboard nudge — dense stages can stack handles and block hover.
       const handle = page.locator('[data-testid^="path-handle-"]').first()
       await handle.click({ force: true })
       await page.keyboard.press('ArrowUp')
       await page.keyboard.press('ArrowUp')
+
+      await openPanel(page, 'adjust')
       await expect(page.getByTestId('smoothing-help')).toContainText(
         'baked into your path edit',
       )
@@ -56,31 +86,10 @@ test.describe('workspace layout', () => {
       })
       expect(noPageScroll).toBeTruthy()
 
-      await assertFullyInViewport(page, 'stage')
-      await assertFullyInViewport(page, 'toolbar')
-      await expect(page.getByTestId('playback-timeline')).toBeVisible()
-      await assertFullyInViewport(page, 'playback-timeline')
-
-      // Export controls must be reachable via sidebar scroll if needed.
+      await openPanel(page, 'export')
       await page.getByTestId('btn-view-css').scrollIntoViewIfNeeded()
       await expect(page.getByTestId('btn-view-css')).toBeVisible()
       await expect(page.getByTestId('btn-copy-css')).toBeVisible()
-
-      // Toolbar must not overlap the stage.
-      const overlap = await page.evaluate(() => {
-        const stage = document.querySelector('[data-testid="stage"]')
-        const toolbar = document.querySelector('[data-testid="toolbar"]')
-        if (!stage || !toolbar) return true
-        const a = stage.getBoundingClientRect()
-        const b = toolbar.getBoundingClientRect()
-        return !(
-          b.top >= a.bottom - 1 ||
-          b.bottom <= a.top + 1 ||
-          b.left >= a.right - 1 ||
-          b.right <= a.left + 1
-        )
-      })
-      expect(overlap).toBeFalsy()
 
       await openCssDialog(page)
       await expect(page.getByTestId('css-output')).toBeVisible()
@@ -94,18 +103,20 @@ test.describe('workspace layout', () => {
     })
   }
 
-  test('mobile 390x844: stacked layout remains reachable with page scroll', async ({
-    page,
-  }) => {
+  test('mobile 390x844: labeled menus stay reachable', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     await recordSimplePath(page)
 
     await expect(page.getByTestId('stage')).toBeVisible()
     await expect(page.getByTestId('toolbar')).toBeVisible()
+    await assertFullyInViewport(page, 'toolbar')
 
+    await openPanel(page, 'export')
     await page.getByTestId('btn-view-css').scrollIntoViewIfNeeded()
     await expect(page.getByTestId('btn-view-css')).toBeVisible()
+
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-help')).toBeVisible()
 
     await openCssDialog(page)

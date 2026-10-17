@@ -43,10 +43,12 @@ function makeProject(overrides?: Partial<Project>): Project {
   return {
     version: 1,
     actor: {
+      kind: 'shape',
       width: 0.12,
       height: 0.12,
       borderRadius: 0.28,
       color: '#4f46e5',
+      image: null,
     },
     recording: makeRecording(),
     playback: {
@@ -56,6 +58,7 @@ function makeProject(overrides?: Partial<Project>): Project {
       loop: true,
       loopMode: 'repeat',
     },
+    stageAspect: 1.6,
     ...overrides,
   }
 }
@@ -154,6 +157,25 @@ describe('persist document validation', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.snapshot.project.playback.loopMode).toBe('repeat')
+  })
+
+  it('migrates format v1 projects to stageAspect 16/10 without rewriting samples', () => {
+    const project = makeProject()
+    const { stageAspect: _drop, ...projectWithoutAspect } = project
+    void _drop
+    const result = validateSnapshot({
+      formatVersion: 1,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      project: projectWithoutAspect,
+      geometryEdit: null,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
+    expect(result.snapshot.project.stageAspect).toBeCloseTo(1.6, 5)
+    expect(result.snapshot.project.recording?.samples).toEqual(
+      project.recording?.samples,
+    )
   })
 
   it('rejects geometryEdit without a recording', () => {

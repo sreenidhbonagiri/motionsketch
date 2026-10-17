@@ -10,6 +10,7 @@ import {
   writeStoredSnapshot,
   type StorageAdapter,
 } from '../core/persist/storage'
+import { captureViewportStageAspect } from '../core/stageAspect'
 import type { GeometryEdit, Project } from '../core/types'
 import { downloadTextFile, stampFilename } from './download'
 import { useEditorStore } from '../state/store'
@@ -228,6 +229,13 @@ export function createPersistenceController(options?: {
 
       const loaded = loadStoredSnapshot(storage)
       if (loaded.status === 'empty') {
+        // Fresh session: lock logical stage to the available viewport once.
+        useEditorStore.setState((state) => ({
+          project: {
+            ...state.project,
+            stageAspect: captureViewportStageAspect(),
+          },
+        }))
         lastWrittenFingerprint = fingerprint(
           pickPersistable(useEditorStore.getState()),
         )

@@ -20,10 +20,12 @@ describe('playback store controls', () => {
       project: {
         version: 1,
         actor: {
+          kind: 'shape',
           width: 0.12,
           height: 0.12,
           borderRadius: 0.28,
           color: '#4f46e5',
+          image: null,
         },
         recording: makeRecording(),
         playback: {
@@ -33,6 +35,7 @@ describe('playback store controls', () => {
           loop: false,
           loopMode: 'repeat',
         },
+      stageAspect: 1.6,
       },
       mode: 'idle',
       pointerId: null,

@@ -38,6 +38,8 @@ export function ExportPanel() {
     [project, geometryEdit, editSession, editPreview],
   )
 
+  const stageAspect = project.stageAspect
+
   const exportOptions = useMemo(() => {
     if (!recording) return null
     return {
@@ -48,6 +50,7 @@ export function ExportPanel() {
       actor,
       loop,
       loopMode,
+      stageAspect,
       processedPath,
     }
   }, [
@@ -58,6 +61,7 @@ export function ExportPanel() {
     actor,
     loop,
     loopMode,
+    stageAspect,
     processedPath,
   ])
 
@@ -136,9 +140,6 @@ export function ExportPanel() {
 
   return (
     <div data-testid="export-panel" className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Export
-      </h3>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"

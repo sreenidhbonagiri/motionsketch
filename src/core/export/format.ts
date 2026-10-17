@@ -17,8 +17,14 @@ export function buildKeyframes(
   rawSamples: MotionSample[],
   smoothing: number,
   steadySpeed = 0,
+  stageAspect = 1,
 ): Keyframe[] {
-  const processed = processForCss(rawSamples, smoothing, steadySpeed)
+  const processed = processForCss(
+    rawSamples,
+    smoothing,
+    steadySpeed,
+    stageAspect,
+  )
   return samplesToKeyframes(processed)
 }
 

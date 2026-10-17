@@ -51,6 +51,10 @@ export function grabOffsetFromPointer(
   }
 }
 
+/**
+ * Legacy square helper (shape tiles). Prefer actorDisplaySizePx for actors
+ * that may be images.
+ */
 export function actorSizePx(
   stageWidth: number,
   stageHeight: number,

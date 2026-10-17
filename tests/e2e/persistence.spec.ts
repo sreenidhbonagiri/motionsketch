@@ -1,13 +1,15 @@
 import { expect, test, type Page } from '@playwright/test'
-import { readExportedCss, recordSimplePath } from './helpers'
+import { openPanel, readExportedCss, recordSimplePath } from './helpers'
 
 async function waitForSaved(page: Page) {
+  await openPanel(page, 'project')
   await expect(page.getByTestId('save-status')).toHaveText(
     'Saved on this device',
   )
 }
 
 async function confirmNewProject(page: Page) {
+  await openPanel(page, 'project')
   await page.getByTestId('btn-new-project').click()
   await expect(page.getByTestId('new-project-confirm')).toBeVisible()
   await expect(page.getByTestId('new-project-confirm-copy')).toContainText(
@@ -28,6 +30,7 @@ test.describe('project persistence', () => {
   }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('loop-toggle').check()
     await page.getByTestId('duration-slider').fill('2400')
     await expect(page.getByTestId('duration-value')).toHaveText('2.40 s')
@@ -37,11 +40,14 @@ test.describe('project persistence', () => {
     const cssBefore = await readExportedCss(page)
 
     await page.reload()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toBeVisible()
+    await openPanel(page, 'project')
     await expect(page.getByTestId('save-status')).toHaveText(
       'Saved on this device',
     )
     await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
     await expect(page.getByTestId('duration-value')).toHaveText('2.40 s')
 
@@ -76,6 +82,7 @@ test.describe('project persistence', () => {
 
     const cssBefore = await readExportedCss(page)
     await page.reload()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toBeVisible()
     const cssAfter = await readExportedCss(page)
     expect(cssAfter).toBe(cssBefore)
@@ -107,8 +114,10 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('btn-new-project')).toBeFocused()
 
     await page.reload()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
+    await openPanel(page, 'project')
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
   })
 
@@ -117,28 +126,35 @@ test.describe('project persistence', () => {
     await recordSimplePath(page)
     await waitForSaved(page)
 
+    await openPanel(page, 'project')
     await page.getByTestId('btn-new-project').click()
     await expect(page.getByTestId('new-project-confirm')).toBeVisible()
     await page.getByTestId('btn-new-project-cancel').click()
     await expect(page.getByTestId('new-project-confirm')).toBeHidden()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toBeVisible()
   })
 
   test('Reset remains separate from New project', async ({ page }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('3000')
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await page.getByTestId('loop-toggle').check()
 
     await page.getByTestId('btn-reset').click()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
 
     // No animation left — New project does not open the replace confirm.
+    await openPanel(page, 'project')
     await page.getByTestId('btn-new-project').click()
     await expect(page.getByTestId('new-project-confirm')).toBeHidden()
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('1.20 s')
     await expect(page.getByTestId('loop-toggle')).not.toBeChecked()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
@@ -150,6 +166,7 @@ test.describe('project persistence', () => {
     page,
   }) => {
     await page.goto('/')
+    await openPanel(page, 'project')
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
     await expect(page.getByTestId('btn-download-project')).toHaveText(
       'Download current project',
@@ -193,12 +210,14 @@ test.describe('project persistence', () => {
     mutated.savedAt = new Date().toISOString()
 
     page.once('dialog', (dialog) => dialog.accept())
+    await openPanel(page, 'project')
     await page.getByTestId('project-file-input').setInputFiles({
       name: 'import.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(mutated), 'utf-8'),
     })
 
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('4.00 s')
     const cssImported = await readExportedCss(page)
     expect(cssImported).not.toBe(cssOriginal)
@@ -212,6 +231,7 @@ test.describe('project persistence', () => {
     await recordSimplePath(page)
     await waitForSaved(page)
 
+    await openPanel(page, 'project')
     await page.getByTestId('project-file-input').setInputFiles({
       name: 'bad.json',
       mimeType: 'application/json',
@@ -219,6 +239,7 @@ test.describe('project persistence', () => {
     })
 
     await expect(page.getByTestId('import-error')).toBeVisible()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toBeVisible()
   })
 })

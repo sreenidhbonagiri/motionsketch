@@ -38,7 +38,7 @@ export function statusLabel(status: PersistenceStatus): string | null {
     case 'saved':
       return 'Saved on this device'
     case 'save-error':
-      return "Couldn't save on this device."
+      return "Couldn't save on this device (storage full or unavailable)."
     case 'restore-error':
       return "Couldn't restore the saved project."
     default:

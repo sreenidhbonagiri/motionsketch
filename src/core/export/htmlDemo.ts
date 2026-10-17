@@ -1,4 +1,8 @@
 import { coerceActor } from '../actor'
+import {
+  clampStageAspect,
+  LEGACY_STAGE_ASPECT,
+} from '../stageAspect'
 import type { Actor, LoopMode, MotionSample } from '../types'
 import { exportCssFromRecording } from './css'
 
@@ -10,6 +14,7 @@ export interface HtmlDemoOptions {
   actor: Actor
   loop?: boolean
   loopMode?: LoopMode
+  stageAspect?: number
   processedPath?: MotionSample[] | null
 }
 
@@ -37,10 +42,15 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
       ? Math.max(0, Math.round(options.durationMs))
       : 0
 
+  const stageAspect = clampStageAspect(
+    options.stageAspect ?? LEGACY_STAGE_ASPECT,
+  )
+
   const css = exportCssFromRecording({
     ...options,
     actor,
     durationMs,
+    stageAspect,
   })
 
   if (!isSafeCssForEmbed(css)) {
@@ -48,6 +58,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
   }
 
   // Page chrome only — motion comes entirely from the embedded exporter CSS.
+  // Fit the project's stored aspect inside the viewport without cropping.
   const chromeCss = `*,
 *::before,
 *::after {
@@ -82,9 +93,9 @@ body {
   max-width: 100%;
 }
 
-/* Fit 16/10 stage inside the viewport without cropping. */
+/* Fit the project's stored stage aspect inside the viewport without cropping. */
 .demo-frame {
-  width: min(100%, calc((100dvh - 5.5rem) * 16 / 10));
+  width: min(100%, calc((100dvh - 5.5rem) * ${stageAspect}));
   max-height: calc(100dvh - 5.5rem);
 }
 
@@ -120,6 +131,13 @@ body {
   outline-offset: 2px;
 }`
 
+  const isImage = actor.kind === 'image' && !!actor.image
+  // Embed image as data URL inside <img> — offline, no external requests.
+  // Never inject raw SVG markup into the document.
+  const actorMarkup = isImage
+    ? `<img class="actor" data-testid="demo-actor" src="${actor.image!.dataUrl.replace(/"/g, '')}" alt="${actor.image!.label.replace(/"/g, '&quot;')}" />`
+    : `<div class="actor" data-testid="demo-actor"></div>`
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -137,7 +155,7 @@ ${css}
   <div class="demo-shell">
     <div class="demo-frame">
       <div class="stage" data-testid="demo-stage">
-        <div class="actor" data-testid="demo-actor"></div>
+        ${actorMarkup}
       </div>
     </div>
     <button type="button" class="demo-replay" data-testid="demo-replay" id="replay">Replay</button>

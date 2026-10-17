@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { readExportedCss, recordSimplePath } from './helpers'
+import { openPanel, readExportedCss, recordSimplePath } from './helpers'
 
 test.describe('actor customization', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -18,6 +18,7 @@ test.describe('actor customization', () => {
       y: before!.y + before!.height / 2,
     }
 
+    await openPanel(page, 'appearance')
     await page.getByTestId('actor-size-slider').fill('0.28')
     await expect(page.getByTestId('actor-size-value')).toHaveText(
       '28% of stage',
@@ -46,15 +47,18 @@ test.describe('actor customization', () => {
   test('actor settings survive reload via autosave', async ({ page }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'appearance')
     await page.getByTestId('actor-size-slider').fill('0.2')
     await page.getByTestId('actor-radius-slider').fill('0')
     await page.getByTestId('actor-color').fill('#0f766e')
     await page.waitForTimeout(400)
+    await openPanel(page, 'project')
     await expect(page.getByTestId('save-status')).toHaveText(
       'Saved on this device',
     )
 
     await page.reload()
+    await openPanel(page, 'appearance')
     await expect(page.getByTestId('actor-size-value')).toHaveText(
       '20% of stage',
     )

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { readExportedCss, recordSimplePath } from './helpers'
+import { openPanel, readExportedCss, recordSimplePath } from './helpers'
 
 async function readDownloadText(download: import('@playwright/test').Download) {
   const path = await download.path()
@@ -37,10 +37,13 @@ test.describe('downloadable exports', () => {
   }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('800')
-    await page.getByTestId('actor-color').fill('#0f766e')
     await page.getByTestId('loop-toggle').check()
     await page.getByTestId('loop-mode-alternate').check()
+    await openPanel(page, 'appearance')
+    await page.getByTestId('actor-color').fill('#0f766e')
+    await openPanel(page, 'export')
 
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
@@ -101,6 +104,7 @@ test.describe('downloadable exports', () => {
     page,
   }) => {
     await page.goto('/')
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-css')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-html-demo')).toHaveCount(0)

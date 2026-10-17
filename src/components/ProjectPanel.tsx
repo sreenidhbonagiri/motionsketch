@@ -127,11 +127,8 @@ export function ProjectPanel() {
   }
 
   return (
-    <div data-testid="project-panel" className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Project
-      </h3>
-      <p className="text-[11px] leading-relaxed text-slate-500">
+    <div data-testid="project-panel" className="space-y-3 p-3">
+      <p className="text-xs leading-relaxed text-slate-500">
         Autosaves in this browser on this device. Download a project file for a
         portable backup you can open later.
       </p>

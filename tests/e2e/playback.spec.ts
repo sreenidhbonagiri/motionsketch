@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { readExportedCss, recordSimplePath } from './helpers'
+import { openPanel, readExportedCss, recordSimplePath } from './helpers'
 
 test.describe('playback inspection', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -9,6 +9,7 @@ test.describe('playback inspection', () => {
   }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
     await expect(page.getByTestId('playback-timeline')).toBeVisible()
     await expect(page.getByTestId('playback-total')).toHaveText('2.00 s')
@@ -61,6 +62,7 @@ test.describe('playback inspection', () => {
   }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('400')
     await page.getByTestId('btn-play').click()
     await expect
@@ -86,6 +88,7 @@ test.describe('playback inspection', () => {
   }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('400')
     await page.getByTestId('loop-toggle').check()
     await expect(page.getByTestId('loop-mode-repeat')).toBeChecked()
@@ -102,6 +105,7 @@ test.describe('playback inspection', () => {
   }) => {
     await page.goto('/')
     await recordSimplePath(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('600')
     await page.getByTestId('loop-toggle').check()
     await page.getByTestId('loop-mode-alternate').check()

@@ -34,8 +34,8 @@ export function PathHandles({
             tabIndex={0}
             className={`pointer-events-auto absolute size-3.5 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 shadow-sm transition ${
               selected
-                ? 'border-indigo-700 bg-white ring-2 ring-indigo-300'
-                : 'border-indigo-500 bg-white hover:border-indigo-600'
+                ? 'border-teal-800 bg-white ring-2 ring-teal-300'
+                : 'border-teal-600 bg-white hover:border-teal-700'
             }`}
             style={{
               left: `${sample.x * 100}%`,

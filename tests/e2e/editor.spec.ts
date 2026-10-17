@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { dragActor, readExportedCss } from './helpers'
+import { dragActor, openPanel, readExportedCss } from './helpers'
 
 test.describe('MotionSketch editor', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -7,7 +7,9 @@ test.describe('MotionSketch editor', () => {
   test('drag without record does not show export panel', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByTestId('actor')).toBeVisible()
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
+    await expect(page.getByTestId('export-empty')).toBeVisible()
 
     await dragActor(page, { x: 40, y: 0 }, { x: 120, y: 40 })
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
@@ -21,6 +23,7 @@ test.describe('MotionSketch editor', () => {
 
     await dragActor(page, { x: 30, y: -20 }, { x: 180, y: 60 })
 
+    await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toBeVisible()
     await expect(page.getByTestId('btn-play')).toBeEnabled()
 
@@ -51,6 +54,7 @@ test.describe('MotionSketch editor', () => {
     await dragActor(page, { x: 20, y: 40 }, { x: 160, y: -30 })
 
     const before = await readExportedCss(page)
+    await openPanel(page, 'adjust')
     await page.getByTestId('smoothing-slider').fill('0.9')
     const after = await readExportedCss(page)
     expect(after).toContain('@keyframes')
@@ -64,6 +68,7 @@ test.describe('MotionSketch editor', () => {
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 20, y: 30 }, { x: 140, y: 50 })
 
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('path-compare-legend')).toHaveCount(0)
     await page.getByTestId('path-compare-toggle').check()
     await expect(page.getByTestId('path-compare-legend')).toBeVisible()
@@ -81,6 +86,7 @@ test.describe('MotionSketch editor', () => {
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 25, y: -15 }, { x: 170, y: 55 })
 
+    await openPanel(page, 'adjust')
     await expect(page.getByTestId('steady-speed-slider')).toBeEnabled()
     await page.getByTestId('steady-speed-slider').fill('0.7')
     await expect(page.getByTestId('steady-speed-value')).toHaveText('70%')

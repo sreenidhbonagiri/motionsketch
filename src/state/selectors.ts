@@ -32,14 +32,17 @@ export function selectProcessedPath(
     view.geometryEdit?.samples ??
     null
 
+  const aspect = project.stageAspect
+
   if (spatial) {
-    return applySteadySpeed(spatial, project.playback.steadySpeed)
+    return applySteadySpeed(spatial, project.playback.steadySpeed, aspect)
   }
 
   return processMotion(
     recording.samples,
     project.playback.smoothing,
     project.playback.steadySpeed,
+    aspect,
   )
 }
 
@@ -47,7 +50,12 @@ export function selectProcessedPath(
 export function bakeEditablePath(project: Project): MotionSample[] {
   const recording = project.recording
   if (!recording) return []
-  return processMotion(recording.samples, project.playback.smoothing, 0)
+  return processMotion(
+    recording.samples,
+    project.playback.smoothing,
+    0,
+    project.stageAspect,
+  )
 }
 
 export function selectActorPosition(

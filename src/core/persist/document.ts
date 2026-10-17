@@ -1,7 +1,12 @@
-import { coerceActor } from '../actor'
+import { cloneActor, coerceActor } from '../actor'
+import {
+  clampStageAspect,
+  LEGACY_STAGE_ASPECT,
+} from '../stageAspect'
 import {
   DEFAULT_ACTOR,
   DEFAULT_PLAYBACK,
+  DEFAULT_STAGE_ASPECT,
   MAX_PLAYBACK_DURATION_MS,
   MIN_PLAYBACK_DURATION_MS,
   type GeometryEdit,
@@ -12,8 +17,14 @@ import {
   type Recording,
 } from '../types'
 
-/** Envelope version for localStorage / download files (independent of Project.version). */
-export const PERSIST_FORMAT_VERSION = 1 as const
+/**
+ * Envelope version for localStorage / download files.
+ * v1 → v2: adds project.stageAspect (migrated to 16/10 when missing).
+ * v2 → v3: actor.kind / actor.image for custom image actors (coerced on older files).
+ */
+export const PERSIST_FORMAT_VERSION = 3 as const
+export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
+export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -69,10 +80,15 @@ export function validateSnapshot(data: unknown): PersistParseResult {
     return { ok: false, error: 'Invalid formatVersion.' }
   }
 
-  if (data.formatVersion !== PERSIST_FORMAT_VERSION) {
+  const formatVersion = data.formatVersion
+  if (
+    formatVersion !== PERSIST_FORMAT_VERSION &&
+    formatVersion !== PERSIST_FORMAT_VERSION_V2 &&
+    formatVersion !== PERSIST_FORMAT_VERSION_LEGACY
+  ) {
     return {
       ok: false,
-      error: `Unsupported project format version ${data.formatVersion}. This app supports version ${PERSIST_FORMAT_VERSION}.`,
+      error: `Unsupported project format version ${formatVersion}. This app supports versions ${PERSIST_FORMAT_VERSION_LEGACY}–${PERSIST_FORMAT_VERSION}.`,
     }
   }
 
@@ -80,7 +96,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
     return { ok: false, error: 'Missing or invalid savedAt.' }
   }
 
-  const projectResult = validateProject(data.project)
+  const projectResult = validateProject(data.project, formatVersion)
   if (!projectResult.ok) return projectResult
 
   const geometryResult = validateGeometryEdit(data.geometryEdit)
@@ -107,6 +123,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
 
 function validateProject(
   value: unknown,
+  formatVersion: number,
 ): { ok: true; value: Project } | PersistParseErr {
   if (!isRecord(value)) {
     return { ok: false, error: 'Missing or invalid project.' }
@@ -128,6 +145,9 @@ function validateProject(
   const playback = validatePlayback(value.playback)
   if (!playback.ok) return playback
 
+  const stageAspect = coerceStageAspect(value.stageAspect, formatVersion)
+  if (!stageAspect.ok) return stageAspect
+
   // Actor is coerced with defaults so older / partial files still load.
   return {
     ok: true,
@@ -136,8 +156,26 @@ function validateProject(
       actor: coerceActor(value.actor),
       recording: recording.value,
       playback: playback.value,
+      stageAspect: stageAspect.value,
     },
   }
+}
+
+function coerceStageAspect(
+  value: unknown,
+  formatVersion: number,
+): { ok: true; value: number } | PersistParseErr {
+  // Missing on v1 (and tolerant v2) → historical 16:10 reference geometry.
+  if (value === undefined || value === null) {
+    return { ok: true, value: LEGACY_STAGE_ASPECT }
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    if (formatVersion === PERSIST_FORMAT_VERSION_LEGACY) {
+      return { ok: true, value: LEGACY_STAGE_ASPECT }
+    }
+    return { ok: false, error: 'stageAspect must be a positive finite number.' }
+  }
+  return { ok: true, value: clampStageAspect(value) }
 }
 
 function validateRecording(
@@ -293,7 +331,7 @@ function validateSamples(
 function cloneProject(project: Project): Project {
   return {
     version: 1,
-    actor: { ...project.actor },
+    actor: cloneActor(project.actor),
     recording: project.recording
       ? {
           recordedDurationMs: project.recording.recordedDurationMs,
@@ -301,6 +339,7 @@ function cloneProject(project: Project): Project {
         }
       : null,
     playback: { ...project.playback },
+    stageAspect: clampStageAspect(project.stageAspect),
   }
 }
 
@@ -311,12 +350,15 @@ function cloneGeometryEdit(edit: GeometryEdit): GeometryEdit {
   }
 }
 
-export function createEmptyPersistableProject(): Project {
+export function createEmptyPersistableProject(
+  stageAspect: number = DEFAULT_STAGE_ASPECT,
+): Project {
   return {
     version: 1,
-    actor: { ...DEFAULT_ACTOR },
+    actor: cloneActor(DEFAULT_ACTOR),
     recording: null,
     playback: { ...DEFAULT_PLAYBACK },
+    stageAspect: clampStageAspect(stageAspect),
   }
 }
 

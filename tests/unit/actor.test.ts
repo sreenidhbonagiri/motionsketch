@@ -79,6 +79,7 @@ describe('actor store + export consistency', () => {
           loop: false,
           loopMode: 'repeat',
         },
+      stageAspect: 1.6,
       },
       playbackHead: 0.4,
     })
@@ -139,6 +140,7 @@ describe('actor persistence compatibility', () => {
           loop: false,
           loopMode: 'repeat',
         },
+      stageAspect: 1.6,
       },
       geometryEdit: null,
     })
@@ -146,10 +148,12 @@ describe('actor persistence compatibility', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
     expect(parsed.snapshot.project.actor).toEqual({
+      kind: 'shape',
       width: 0.2,
       height: 0.2,
       borderRadius: 0.5,
       color: '#00aa88',
+      image: null,
     })
   })
 
@@ -170,6 +174,7 @@ describe('actor persistence compatibility', () => {
           loop: false,
           loopMode: 'repeat',
         },
+      stageAspect: 1.6,
       },
       geometryEdit: null,
     })

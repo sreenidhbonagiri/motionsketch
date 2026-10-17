@@ -15,14 +15,14 @@ function drawGrid(
   height: number,
 ) {
   const step = 28
-  ctx.fillStyle = '#f8fafc'
+  ctx.fillStyle = '#eef1f6'
   ctx.fillRect(0, 0, width, height)
 
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.45)'
+  ctx.fillStyle = 'rgba(100, 116, 139, 0.28)'
   for (let x = step; x < width; x += step) {
     for (let y = step; y < height; y += step) {
       ctx.beginPath()
-      ctx.arc(x, y, 1.1, 0, Math.PI * 2)
+      ctx.arc(x, y, 1.05, 0, Math.PI * 2)
       ctx.fill()
     }
   }
@@ -63,13 +63,14 @@ function drawPlayhead(
   pos: Vec2,
 ) {
   ctx.save()
-  ctx.fillStyle = '#4f46e5'
+  ctx.fillStyle = '#0f766e'
   ctx.beginPath()
   ctx.arc(pos.x * width, pos.y * height, 4.5, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 }
 
+/** Full-viewport interactive stage — no inset card or aspect box. */
 export function CanvasStage() {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -84,8 +85,7 @@ export function CanvasStage() {
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const editSession = useEditorStore((s) => s.editSession)
   const editPreview = useEditorStore((s) => s.editPreview)
-
-  const pathView = { geometryEdit, editSession, editPreview }
+  const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
 
   const {
     onActorPointerDown,
@@ -94,13 +94,14 @@ export function CanvasStage() {
     onPointerCancel: onRecordPointerCancel,
   } = usePointerRecorder({ stageRef })
 
-  const {
-    workingSamples,
-    handleIndices,
-    selectedHandleIndex,
-    onHandlePointerDown,
-  } = usePathEditor({ stageRef })
+  const { handleIndices, workingSamples, onHandlePointerDown } = usePathEditor({
+    stageRef,
+  })
 
+  const editing = mode === 'editing'
+  const pathView = { geometryEdit, editSession, editPreview }
+  const processed = selectProcessedPath(project, pathView)
+  const rawSamples = project.recording?.samples ?? []
   const position = selectActorPosition(
     project,
     playbackHead,
@@ -109,28 +110,22 @@ export function CanvasStage() {
     pathView,
   )
 
-  const processed = selectProcessedPath(project, pathView)
-  const rawSamples = project.recording?.samples ?? []
-  const editing = mode === 'editing'
-
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || size.width <= 0 || size.height <= 0) return
-
-    const dpr = size.dpr
+    const dpr = window.devicePixelRatio || 1
     canvas.width = Math.floor(size.width * dpr)
     canvas.height = Math.floor(size.height * dpr)
-    canvas.style.width = `${size.width}px`
-    canvas.style.height = `${size.height}px`
-
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
     drawGrid(ctx, size.width, size.height)
 
-    if (mode === 'recording' && liveTrail.length >= 2) {
-      drawPath(ctx, size.width, size.height, liveTrail, '#ef4444', 2.5, 0.9)
+    if (mode === 'recording' || mode === 'armed') {
+      if (liveTrail.length >= 2) {
+        drawPath(ctx, size.width, size.height, liveTrail, '#0f766e', 2.5, 0.85)
+      }
     } else if (rawSamples.length >= 2) {
       if (showPathComparison && !editing) {
         drawPath(
@@ -139,7 +134,7 @@ export function CanvasStage() {
           size.height,
           rawSamples,
           '#94a3b8',
-          1.75,
+          2,
           0.7,
           true,
         )
@@ -150,14 +145,17 @@ export function CanvasStage() {
           size.width,
           size.height,
           processed,
-          '#4f46e5',
-          2.5,
+          '#0f766e',
+          2.75,
           0.95,
-          false,
         )
         if (!editing) {
-          const head = evaluate(processed, playbackHead)
-          drawPlayhead(ctx, size.width, size.height, head)
+          drawPlayhead(
+            ctx,
+            size.width,
+            size.height,
+            evaluate(processed, playbackHead),
+          )
         }
       }
     }
@@ -176,7 +174,7 @@ export function CanvasStage() {
     <div
       ref={stageRef}
       data-testid="stage"
-      className="relative aspect-[16/10] w-full max-w-full overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-50 shadow-[0_24px_80px_rgba(15,23,42,0.08)] touch-none lg:h-auto lg:max-h-full lg:w-[min(100cqi,calc(100cqb*16/10))]"
+      className="absolute inset-0 touch-none overflow-hidden bg-[#eef1f6]"
       onPointerMove={editing ? undefined : onRecordPointerMove}
       onPointerUp={editing ? undefined : onRecordPointerUp}
       onPointerCancel={editing ? undefined : onRecordPointerCancel}

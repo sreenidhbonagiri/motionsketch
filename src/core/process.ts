@@ -1,4 +1,5 @@
 import { clamp, clamp01 } from './coords'
+import { aspectDistance, clampStageAspect } from './stageAspect'
 import {
   CANONICAL_SAMPLE_COUNT,
   CSS_MAX_KEYFRAMES,
@@ -33,23 +34,35 @@ export function isInStationaryRun(
   samples: MotionSample[],
   index: number,
   minDurationMs: number = PAUSE_MIN_MS,
+  stageAspect = 1,
 ): boolean {
   const origin = samples[index]
+  const aspect = clampStageAspect(stageAspect)
   let lo = index
   let hi = index
 
   while (
     lo > 0 &&
-    Math.hypot(samples[lo - 1].x - origin.x, samples[lo - 1].y - origin.y) <=
-      STATIONARY_EPSILON
+    aspectDistance(
+      samples[lo - 1].x,
+      samples[lo - 1].y,
+      origin.x,
+      origin.y,
+      aspect,
+    ) <= STATIONARY_EPSILON
   ) {
     lo -= 1
   }
 
   while (
     hi < samples.length - 1 &&
-    Math.hypot(samples[hi + 1].x - origin.x, samples[hi + 1].y - origin.y) <=
-      STATIONARY_EPSILON
+    aspectDistance(
+      samples[hi + 1].x,
+      samples[hi + 1].y,
+      origin.x,
+      origin.y,
+      aspect,
+    ) <= STATIONARY_EPSILON
   ) {
     hi += 1
   }
@@ -61,7 +74,11 @@ export function isInStationaryRun(
  * How strongly to keep the original sample near sharp turns (0..1).
  * Uses a short baseline so micro-wobble is not mistaken for intentional corners.
  */
-function cornerRetain(samples: MotionSample[], index: number): number {
+function cornerRetain(
+  samples: MotionSample[],
+  index: number,
+  stageAspect: number,
+): number {
   if (index <= 0 || index >= samples.length - 1) return 1
 
   // Look a couple samples out so high-frequency shake does not look like a corner.
@@ -69,10 +86,11 @@ function cornerRetain(samples: MotionSample[], index: number): number {
   const a = samples[Math.max(0, index - span)]
   const b = samples[index]
   const c = samples[Math.min(samples.length - 1, index + span)]
+  const aspect = clampStageAspect(stageAspect)
 
-  const v1x = b.x - a.x
+  const v1x = (b.x - a.x) * aspect
   const v1y = b.y - a.y
-  const v2x = c.x - b.x
+  const v2x = (c.x - b.x) * aspect
   const v2y = c.y - b.y
   const n1 = Math.hypot(v1x, v1y)
   const n2 = Math.hypot(v2x, v2y)
@@ -93,8 +111,10 @@ function boundDeviation(
   x: number,
   y: number,
   maxDev: number,
+  stageAspect: number,
 ): { x: number; y: number } {
-  const dx = x - original.x
+  const aspect = clampStageAspect(stageAspect)
+  const dx = (x - original.x) * aspect
   const dy = y - original.y
   const dist = Math.hypot(dx, dy)
   if (dist <= maxDev || dist === 0) {
@@ -102,7 +122,7 @@ function boundDeviation(
   }
   const scale = maxDev / dist
   return {
-    x: clamp01(original.x + dx * scale),
+    x: clamp01(original.x + (dx * scale) / aspect),
     y: clamp01(original.y + dy * scale),
   }
 }
@@ -136,6 +156,7 @@ function pinEndpoints(
 export function gaussianSmooth(
   samples: MotionSample[],
   smoothing: number,
+  stageAspect = 1,
 ): MotionSample[] {
   if (samples.length === 0 || smoothing <= 0) {
     return copySamples(samples)
@@ -144,6 +165,8 @@ export function gaussianSmooth(
   if (samples.length === 1) {
     return copySamples(samples)
   }
+
+  const aspect = clampStageAspect(stageAspect)
 
   // Milder than ^2 at the top so high smoothing actually clears wobble.
   const sigmaMs = lerp(0, MAX_SIGMA_MS, Math.pow(smoothing, 1.35))
@@ -161,7 +184,7 @@ export function gaussianSmooth(
       return { ...sample }
     }
 
-    if (isInStationaryRun(samples, i, PAUSE_MIN_MS)) {
+    if (isInStationaryRun(samples, i, PAUSE_MIN_MS, aspect)) {
       return { ...sample }
     }
 
@@ -190,8 +213,9 @@ export function gaussianSmooth(
       xSum / weightSum,
       ySum / weightSum,
       maxDev,
+      aspect,
     )
-    const retain = cornerRetain(samples, i)
+    const retain = cornerRetain(samples, i, aspect)
 
     return {
       t: sample.t,
@@ -210,18 +234,22 @@ export function gaussianSmooth(
 export function applySteadySpeed(
   samples: MotionSample[],
   amount: number,
+  stageAspect = 1,
 ): MotionSample[] {
   if (samples.length < 2 || amount <= 0) {
     return copySamples(samples)
   }
 
+  const aspect = clampStageAspect(stageAspect)
   const n = samples.length
   const duration = samples[n - 1].t
   if (duration <= 0) {
     return copySamples(samples)
   }
 
-  const pause = samples.map((_, i) => isInStationaryRun(samples, i, PAUSE_MIN_MS))
+  const pause = samples.map((_, i) =>
+    isInStationaryRun(samples, i, PAUSE_MIN_MS, aspect),
+  )
 
   type Segment = { start: number; end: number; isPause: boolean }
   const segments: Segment[] = []
@@ -249,9 +277,12 @@ export function applySteadySpeed(
     for (let k = start + 1; k <= end; k++) {
       dist.push(
         dist[dist.length - 1] +
-          Math.hypot(
-            samples[k].x - samples[k - 1].x,
-            samples[k].y - samples[k - 1].y,
+          aspectDistance(
+            samples[k].x,
+            samples[k].y,
+            samples[k - 1].x,
+            samples[k - 1].y,
+            aspect,
           ),
       )
     }
@@ -447,10 +478,12 @@ export function processMotion(
   samples: MotionSample[],
   smoothing: number,
   steadySpeed = 0,
+  stageAspect = 1,
 ): MotionSample[] {
   if (samples.length === 0) return []
-  const smoothed = gaussianSmooth(samples, smoothing)
-  const timed = applySteadySpeed(smoothed, steadySpeed)
+  const aspect = clampStageAspect(stageAspect)
+  const smoothed = gaussianSmooth(samples, smoothing, aspect)
+  const timed = applySteadySpeed(smoothed, steadySpeed, aspect)
   const resampled = resampleUniform(timed, CANONICAL_SAMPLE_COUNT)
   return pinEndpoints(resampled, samples)
 }
@@ -459,7 +492,8 @@ export function processForCss(
   samples: MotionSample[],
   smoothing: number,
   steadySpeed = 0,
+  stageAspect = 1,
 ): MotionSample[] {
-  const canonical = processMotion(samples, smoothing, steadySpeed)
+  const canonical = processMotion(samples, smoothing, steadySpeed, stageAspect)
   return simplifyRdp(canonical, 0.002, CSS_MAX_KEYFRAMES)
 }
