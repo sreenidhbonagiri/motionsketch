@@ -8,6 +8,7 @@ export function ExportPanel() {
   const actor = useEditorStore((s) => s.project.actor)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const smoothing = useEditorStore((s) => s.project.playback.smoothing)
+  const steadySpeed = useEditorStore((s) => s.project.playback.steadySpeed)
   const [copied, setCopied] = useState(false)
 
   const css = useMemo(() => {
@@ -15,10 +16,11 @@ export function ExportPanel() {
     return exportCssFromRecording({
       samples: recording.samples,
       smoothing,
+      steadySpeed,
       durationMs,
       actor,
     })
-  }, [recording, smoothing, durationMs, actor])
+  }, [recording, smoothing, steadySpeed, durationMs, actor])
 
   if (!recording) return null
 

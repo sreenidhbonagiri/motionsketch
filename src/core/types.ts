@@ -28,8 +28,10 @@ export interface Recording {
 
 export interface PlaybackSettings {
   durationMs: number
-  /** 0..1 UI control */
+  /** 0..1 path cleanup (spatial) */
   smoothing: number
+  /** 0..1 soften accidental speed spikes; preserves pauses */
+  steadySpeed: number
   loop: boolean
 }
 
@@ -59,6 +61,7 @@ export const DEFAULT_ACTOR: Actor = {
 export const DEFAULT_PLAYBACK: PlaybackSettings = {
   durationMs: 1200,
   smoothing: 0.35,
+  steadySpeed: 0,
   loop: false,
 }
 

@@ -93,6 +93,23 @@ test.describe('MotionSketch editor', () => {
     await expect(page.getByTestId('path-compare-legend')).toHaveCount(0)
   })
 
+  test('steady speed control updates export without adding easing', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 25, y: -15 }, { x: 170, y: 55 })
+
+    await expect(page.getByTestId('steady-speed-slider')).toBeEnabled()
+    await page.getByTestId('steady-speed-slider').fill('0.7')
+    await expect(page.getByTestId('steady-speed-value')).toHaveText('70%')
+
+    const css = await page.getByTestId('css-output').inputValue()
+    expect(css).toContain('linear forwards')
+    expect(css).toContain('(N / 100) * stageWidth')
+    expect(css).not.toMatch(/\bease\b/)
+  })
+
   test('pointer cancel during record does not crash', async ({ page }) => {
     await page.goto('/')
     await page.getByTestId('btn-record').click()

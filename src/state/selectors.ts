@@ -5,7 +5,11 @@ import type { MotionSample, Project, Vec2 } from '../core/types'
 export function selectProcessedPath(project: Project): MotionSample[] {
   const recording = project.recording
   if (!recording) return []
-  return processMotion(recording.samples, project.playback.smoothing)
+  return processMotion(
+    recording.samples,
+    project.playback.smoothing,
+    project.playback.steadySpeed,
+  )
 }
 
 export function selectActorPosition(

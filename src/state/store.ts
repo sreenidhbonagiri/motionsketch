@@ -38,6 +38,7 @@ interface EditorStore {
 
   setDurationMs: (ms: number) => void
   setSmoothing: (value: number) => void
+  setSteadySpeed: (value: number) => void
   setLoop: (loop: boolean) => void
   setShowPathComparison: (show: boolean) => void
   resetRecording: () => void
@@ -151,6 +152,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         playback: {
           ...state.project.playback,
           smoothing: clamp(value, 0, 1),
+        },
+      },
+    })),
+
+  setSteadySpeed: (value) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        playback: {
+          ...state.project.playback,
+          steadySpeed: clamp(value, 0, 1),
         },
       },
     })),

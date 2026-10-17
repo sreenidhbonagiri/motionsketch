@@ -61,8 +61,12 @@ export function generateCssSnippet(options: {
  * - Actor width uses cqmin (fraction of the stage's shorter axis), matching the editor.
  * - Animation uses transform only (compositor-friendly); timing-function is linear.
  *
- * Browser support: container query units (cqw/cqh/cqmin). Fallback: use a fixed-size
- * stage and replace cqw/cqh with px (value * stageWidth/Height).
+ * Browser support: container query units (cqw/cqh/cqmin).
+ * Fallback for a fixed-size stage (replace the cq* lengths with px):
+ *   Ncqw  → (N / 100) * stageWidth
+ *   Ncqh  → (N / 100) * stageHeight
+ *   Ncqmin → (N / 100) * min(stageWidth, stageHeight)
+ * Example: 24.209cqh on a 600px-tall stage → (24.209 / 100) * 600 = 145.254px
  *
  * Example HTML:
  * <div class="stage"><div class="actor"></div></div>
@@ -97,10 +101,15 @@ ${frames}
 export function exportCssFromRecording(options: {
   samples: import('../types').MotionSample[]
   smoothing: number
+  steadySpeed?: number
   durationMs: number
   actor: Actor
 }): string {
-  const keyframes = buildKeyframes(options.samples, options.smoothing)
+  const keyframes = buildKeyframes(
+    options.samples,
+    options.smoothing,
+    options.steadySpeed ?? 0,
+  )
   return generateCssSnippet({
     keyframes,
     durationMs: options.durationMs,

@@ -16,7 +16,8 @@ export function samplesToKeyframes(samples: MotionSample[]): Keyframe[] {
 export function buildKeyframes(
   rawSamples: MotionSample[],
   smoothing: number,
+  steadySpeed = 0,
 ): Keyframe[] {
-  const processed = processForCss(rawSamples, smoothing)
+  const processed = processForCss(rawSamples, smoothing, steadySpeed)
   return samplesToKeyframes(processed)
 }

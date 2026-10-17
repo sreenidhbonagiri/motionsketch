@@ -5,16 +5,25 @@ import {
 import { useEditorStore } from '../state/store'
 import { ExportPanel } from './ExportPanel'
 
+function formatDurationSeconds(durationMs: number): string {
+  return `${(durationMs / 1000).toFixed(2)} s`
+}
+
 export function Inspector() {
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const smoothing = useEditorStore((s) => s.project.playback.smoothing)
+  const steadySpeed = useEditorStore((s) => s.project.playback.steadySpeed)
   const loop = useEditorStore((s) => s.project.playback.loop)
   const showPathComparison = useEditorStore((s) => s.showPathComparison)
   const hasRecording = useEditorStore((s) => !!s.project.recording)
   const setDurationMs = useEditorStore((s) => s.setDurationMs)
   const setSmoothing = useEditorStore((s) => s.setSmoothing)
+  const setSteadySpeed = useEditorStore((s) => s.setSteadySpeed)
   const setLoop = useEditorStore((s) => s.setLoop)
   const setShowPathComparison = useEditorStore((s) => s.setShowPathComparison)
+
+  const steadySpeedLabel =
+    steadySpeed <= 0 ? 'Off' : `${Math.round(steadySpeed * 100)}%`
 
   return (
     <aside
@@ -28,12 +37,18 @@ export function Inspector() {
         </p>
       </div>
 
-      <label className="block space-y-2">
-        <div className="flex items-center justify-between text-xs text-slate-600">
+      <div className="space-y-2">
+        <label
+          htmlFor="duration-slider"
+          className="flex items-center justify-between text-xs text-slate-600"
+        >
           <span>Duration</span>
-          <span data-testid="duration-value">{(durationMs / 1000).toFixed(1)}s</span>
-        </div>
+          <span data-testid="duration-value">
+            {formatDurationSeconds(durationMs)}
+          </span>
+        </label>
         <input
+          id="duration-slider"
           data-testid="duration-slider"
           type="range"
           min={MIN_PLAYBACK_DURATION_MS}
@@ -41,17 +56,31 @@ export function Inspector() {
           step={50}
           value={durationMs}
           disabled={!hasRecording}
+          aria-describedby="duration-help"
           onChange={(e) => setDurationMs(Number(e.target.value))}
           className="w-full accent-indigo-600 disabled:opacity-40"
         />
-      </label>
+        <p
+          id="duration-help"
+          data-testid="duration-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          Sets the total playback time. Longer is slower.
+        </p>
+      </div>
 
-      <label className="block space-y-2">
-        <div className="flex items-center justify-between text-xs text-slate-600">
+      <div className="space-y-2">
+        <label
+          htmlFor="smoothing-slider"
+          className="flex items-center justify-between text-xs text-slate-600"
+        >
           <span>Smoothing</span>
-          <span data-testid="smoothing-value">{Math.round(smoothing * 100)}%</span>
-        </div>
+          <span data-testid="smoothing-value">
+            {Math.round(smoothing * 100)}%
+          </span>
+        </label>
         <input
+          id="smoothing-slider"
           data-testid="smoothing-slider"
           type="range"
           min={0}
@@ -59,10 +88,48 @@ export function Inspector() {
           step={0.01}
           value={smoothing}
           disabled={!hasRecording}
+          aria-describedby="smoothing-help"
           onChange={(e) => setSmoothing(Number(e.target.value))}
           className="w-full accent-indigo-600 disabled:opacity-40"
         />
-      </label>
+        <p
+          id="smoothing-help"
+          data-testid="smoothing-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          Reduces wobble in your drawn path.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          htmlFor="steady-speed-slider"
+          className="flex items-center justify-between text-xs text-slate-600"
+        >
+          <span>Steady Speed</span>
+          <span data-testid="steady-speed-value">{steadySpeedLabel}</span>
+        </label>
+        <input
+          id="steady-speed-slider"
+          data-testid="steady-speed-slider"
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={steadySpeed}
+          disabled={!hasRecording}
+          aria-describedby="steady-speed-help"
+          onChange={(e) => setSteadySpeed(Number(e.target.value))}
+          className="w-full accent-indigo-600 disabled:opacity-40"
+        />
+        <p
+          id="steady-speed-help"
+          data-testid="steady-speed-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          Evens out movement speed while keeping pauses.
+        </p>
+      </div>
 
       <label className="flex items-center justify-between text-xs text-slate-600">
         <span>Loop</span>

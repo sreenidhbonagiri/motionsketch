@@ -28,6 +28,7 @@ describe('css export', () => {
     const css = exportCssFromRecording({
       samples,
       smoothing: 0.35,
+      steadySpeed: 0.4,
       durationMs: 1200,
       actor: DEFAULT_ACTOR,
     })
@@ -39,13 +40,26 @@ describe('css export', () => {
     expect(css).toContain('cqw')
     expect(css).toContain('cqh')
     expect(css).toContain('cqmin')
-    // Motion is transform-driven; keyframes must not animate left/top.
     const keyframeBlock = css.slice(css.indexOf('@keyframes'))
     expect(keyframeBlock).toContain('transform:')
     expect(keyframeBlock).not.toMatch(/\bleft\s*:/)
     expect(keyframeBlock).not.toMatch(/\btop\s*:/)
     expect(css).not.toMatch(/\bease\b/)
     expect(css).toContain('<div class="stage"><div class="actor"></div></div>')
+  })
+
+  it('documents correct px fallback conversion for cq units', () => {
+    const css = exportCssFromRecording({
+      samples,
+      smoothing: 0,
+      durationMs: 1000,
+      actor: DEFAULT_ACTOR,
+    })
+    expect(css).toContain('Ncqw  → (N / 100) * stageWidth')
+    expect(css).toContain('Ncqh  → (N / 100) * stageHeight')
+    expect(css).toContain('Ncqmin → (N / 100) * min(stageWidth, stageHeight)')
+    // Guard against the old incorrect guidance.
+    expect(css).not.toContain('value * stageWidth/Height')
   })
 
   it('returns a comment when there are no samples', () => {
@@ -58,18 +72,19 @@ describe('css export', () => {
     expect(css).toContain('No recording')
   })
 
-  it('keeps playback and export paths consistent within a small error', () => {
+  it('keeps playback and export paths consistent with steady speed', () => {
     const raw = densePath()
     const smoothing = 0.4
-    const playback = processMotion(raw, smoothing)
-    const keyframes = buildKeyframes(raw, smoothing)
+    const steadySpeed = 0.6
+    const playback = processMotion(raw, smoothing, steadySpeed)
+    const keyframes = buildKeyframes(raw, smoothing, steadySpeed)
     const err = maxPlaybackExportError(playback, keyframes, 48)
     expect(err).toBeLessThan(0.03)
   })
 
   it('preserves keyframe endpoint coordinates', () => {
     const raw = densePath()
-    const keyframes = buildKeyframes(raw, 0.5)
+    const keyframes = buildKeyframes(raw, 0.5, 0.5)
     expect(keyframes[0].x).toBeCloseTo(raw[0].x, 5)
     expect(keyframes[0].y).toBeCloseTo(raw[0].y, 5)
     expect(keyframes[keyframes.length - 1].x).toBeCloseTo(
@@ -80,5 +95,21 @@ describe('css export', () => {
       raw[raw.length - 1].y,
       5,
     )
+  })
+
+  it('scales exported cq lengths consistently across stage sizes', () => {
+    const css = exportCssFromRecording({
+      samples: [
+        { t: 0, x: 0.25, y: 0.5 },
+        { t: 100, x: 0.75, y: 0.5 },
+      ],
+      smoothing: 0,
+      durationMs: 800,
+      actor: DEFAULT_ACTOR,
+    })
+    // 25cqw on 400px and 800px stages → 100px and 200px (N/100 * W)
+    expect((25 / 100) * 400).toBe(100)
+    expect((25 / 100) * 800).toBe(200)
+    expect(css).toMatch(/25\.000cqw/)
   })
 })

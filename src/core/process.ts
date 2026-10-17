@@ -5,11 +5,17 @@ import {
   type MotionSample,
 } from './types'
 
-/** Max Gaussian sigma at smoothing = 1 (ms). Kept modest to limit corner mush. */
-const MAX_SIGMA_MS = 56
+/**
+ * Max Gaussian sigma at smoothing = 1 (ms).
+ * Raised so the upper slider range can clear small wobbles; deviation is capped.
+ */
+const MAX_SIGMA_MS = 96
 
-/** Normalized displacement below this is treated as stationary. */
+/** Normalized displacement below this is treated as co-located. */
 const STATIONARY_EPSILON = 0.003
+
+/** Minimum hold duration to treat as an intentional pause. */
+const PAUSE_MIN_MS = 40
 
 function copySamples(samples: MotionSample[]): MotionSample[] {
   return samples.map((s) => ({ ...s }))
@@ -23,10 +29,10 @@ function lerp(a: number, b: number, t: number): number {
  * True when this sample sits in a held pose long enough that smoothing
  * should not pull it toward motion before/after the pause.
  */
-function isInStationaryRun(
+export function isInStationaryRun(
   samples: MotionSample[],
   index: number,
-  minDurationMs: number,
+  minDurationMs: number = PAUSE_MIN_MS,
 ): boolean {
   const origin = samples[index]
   let lo = index
@@ -53,14 +59,16 @@ function isInStationaryRun(
 
 /**
  * How strongly to keep the original sample near sharp turns (0..1).
- * Straight sections stay fully smoothed; hard corners retain more of the raw path.
+ * Uses a short baseline so micro-wobble is not mistaken for intentional corners.
  */
 function cornerRetain(samples: MotionSample[], index: number): number {
   if (index <= 0 || index >= samples.length - 1) return 1
 
-  const a = samples[index - 1]
+  // Look a couple samples out so high-frequency shake does not look like a corner.
+  const span = 2
+  const a = samples[Math.max(0, index - span)]
   const b = samples[index]
-  const c = samples[index + 1]
+  const c = samples[Math.min(samples.length - 1, index + span)]
 
   const v1x = b.x - a.x
   const v1y = b.y - a.y
@@ -69,12 +77,34 @@ function cornerRetain(samples: MotionSample[], index: number): number {
   const n1 = Math.hypot(v1x, v1y)
   const n2 = Math.hypot(v2x, v2y)
 
-  if (n1 < 1e-6 || n2 < 1e-6) return 0
+  // Ignore tiny arms — those are jitter, not gesture corners.
+  const minArm = 0.02
+  if (n1 < minArm || n2 < minArm) return 0
 
   const dot = clamp((v1x * v2x + v1y * v2y) / (n1 * n2), -1, 1)
   const angle = Math.acos(dot)
-  // Begin retaining above ~25°, full retain near a hard bend.
-  return clamp((angle - 0.45) / 1.1, 0, 1)
+  // Begin retaining above ~35°, full retain near a hard bend.
+  return clamp((angle - 0.6) / 1.0, 0, 1)
+}
+
+/** Cap how far a smoothed point may leave its recorded position. */
+function boundDeviation(
+  original: MotionSample,
+  x: number,
+  y: number,
+  maxDev: number,
+): { x: number; y: number } {
+  const dx = x - original.x
+  const dy = y - original.y
+  const dist = Math.hypot(dx, dy)
+  if (dist <= maxDev || dist === 0) {
+    return { x: clamp01(x), y: clamp01(y) }
+  }
+  const scale = maxDev / dist
+  return {
+    x: clamp01(original.x + dx * scale),
+    y: clamp01(original.y + dy * scale),
+  }
 }
 
 function pinEndpoints(
@@ -100,8 +130,8 @@ function pinEndpoints(
 
 /**
  * Time-aware Gaussian smooth on x(t) and y(t).
- * Preserves endpoints, stationary segments, and sharp corners better than a
- * naive kernel by re-anchoring and blending back toward the raw path.
+ * Upper slider values use a wider kernel, but path deviation stays bounded so
+ * the overall gesture is preserved. Endpoints, pauses, and sharp corners win.
  */
 export function gaussianSmooth(
   samples: MotionSample[],
@@ -115,22 +145,23 @@ export function gaussianSmooth(
     return copySamples(samples)
   }
 
-  const sigmaMs = lerp(0, MAX_SIGMA_MS, smoothing * smoothing)
+  // Milder than ^2 at the top so high smoothing actually clears wobble.
+  const sigmaMs = lerp(0, MAX_SIGMA_MS, Math.pow(smoothing, 1.35))
   if (sigmaMs < 0.5) {
     return copySamples(samples)
   }
 
   const radius = sigmaMs * 3
   const twoSigmaSq = 2 * sigmaMs * sigmaMs
+  // Bound gesture drift: stronger cleanup is allowed, but not a rewrite.
+  const maxDev = lerp(0.005, 0.03, smoothing)
 
   const blurred = samples.map((sample, i) => {
-    // Endpoints are pinned after the pass; skip work.
     if (i === 0 || i === samples.length - 1) {
       return { ...sample }
     }
 
-    // Hold pauses (~40ms+) so timing plateaus do not drift spatially.
-    if (isInStationaryRun(samples, i, 40)) {
+    if (isInStationaryRun(samples, i, PAUSE_MIN_MS)) {
       return { ...sample }
     }
 
@@ -154,18 +185,100 @@ export function gaussianSmooth(
       return { ...sample }
     }
 
-    const sx = clamp01(xSum / weightSum)
-    const sy = clamp01(ySum / weightSum)
+    const bounded = boundDeviation(
+      sample,
+      xSum / weightSum,
+      ySum / weightSum,
+      maxDev,
+    )
     const retain = cornerRetain(samples, i)
 
     return {
       t: sample.t,
-      x: clamp01(lerp(sx, sample.x, retain)),
-      y: clamp01(lerp(sy, sample.y, retain)),
+      x: clamp01(lerp(bounded.x, sample.x, retain)),
+      y: clamp01(lerp(bounded.y, sample.y, retain)),
     }
   })
 
   return pinEndpoints(blurred, samples)
+}
+
+/**
+ * Soften accidental speed spikes by blending toward arc-length timing within
+ * each moving segment. Intentional pauses (held poses) keep their durations.
+ */
+export function applySteadySpeed(
+  samples: MotionSample[],
+  amount: number,
+): MotionSample[] {
+  if (samples.length < 2 || amount <= 0) {
+    return copySamples(samples)
+  }
+
+  const n = samples.length
+  const duration = samples[n - 1].t
+  if (duration <= 0) {
+    return copySamples(samples)
+  }
+
+  const pause = samples.map((_, i) => isInStationaryRun(samples, i, PAUSE_MIN_MS))
+
+  type Segment = { start: number; end: number; isPause: boolean }
+  const segments: Segment[] = []
+  let cursor = 0
+  while (cursor < n) {
+    const flag = pause[cursor]
+    let end = cursor
+    while (end + 1 < n && pause[end + 1] === flag) end += 1
+    segments.push({ start: cursor, end, isPause: flag })
+    cursor = end + 1
+  }
+
+  const newT = samples.map((s) => s.t)
+
+  for (const seg of segments) {
+    const { start, end, isPause } = seg
+    if (isPause || start === end) continue
+
+    const t0 = samples[start].t
+    const t1 = samples[end].t
+    const segDur = t1 - t0
+    if (segDur <= 0) continue
+
+    const dist: number[] = [0]
+    for (let k = start + 1; k <= end; k++) {
+      dist.push(
+        dist[dist.length - 1] +
+          Math.hypot(
+            samples[k].x - samples[k - 1].x,
+            samples[k].y - samples[k - 1].y,
+          ),
+      )
+    }
+    const totalDist = dist[dist.length - 1]
+    if (totalDist < 1e-9) continue
+
+    for (let k = start; k <= end; k++) {
+      const u = dist[k - start] / totalDist
+      const tUniform = t0 + u * segDur
+      newT[k] = lerp(samples[k].t, tUniform, amount)
+    }
+  }
+
+  for (let k = 1; k < n; k++) {
+    if (newT[k] < newT[k - 1]) newT[k] = newT[k - 1]
+  }
+
+  const endT = newT[n - 1]
+  const scale = endT > 0 ? duration / endT : 1
+  const out = samples.map((s, i) => ({
+    t: newT[i] * scale,
+    x: s.x,
+    y: s.y,
+  }))
+  out[0].t = 0
+  out[n - 1].t = duration
+  return out
 }
 
 /** Linear interpolate sample at absolute time t (ms). */
@@ -227,7 +340,6 @@ export function resampleUniform(
     result.push(sampleAtTime(samples, t))
   }
 
-  // Resampling can reintroduce tiny endpoint drift via float math; pin again.
   return pinEndpoints(result, samples)
 }
 
@@ -317,7 +429,9 @@ export function simplifyRdp(
         thinnedInner.push(...inner)
       } else {
         for (let i = 0; i < innerBudget; i++) {
-          const idx = Math.round((i / (innerBudget - 1 || 1)) * (inner.length - 1))
+          const idx = Math.round(
+            (i / (innerBudget - 1 || 1)) * (inner.length - 1),
+          )
           thinnedInner.push(inner[idx])
         }
       }
@@ -332,18 +446,20 @@ export function simplifyRdp(
 export function processMotion(
   samples: MotionSample[],
   smoothing: number,
+  steadySpeed = 0,
 ): MotionSample[] {
   if (samples.length === 0) return []
   const smoothed = gaussianSmooth(samples, smoothing)
-  const resampled = resampleUniform(smoothed, CANONICAL_SAMPLE_COUNT)
-  // Guarantee playback ends exactly where the user started/stopped.
+  const timed = applySteadySpeed(smoothed, steadySpeed)
+  const resampled = resampleUniform(timed, CANONICAL_SAMPLE_COUNT)
   return pinEndpoints(resampled, samples)
 }
 
 export function processForCss(
   samples: MotionSample[],
   smoothing: number,
+  steadySpeed = 0,
 ): MotionSample[] {
-  const canonical = processMotion(samples, smoothing)
+  const canonical = processMotion(samples, smoothing, steadySpeed)
   return simplifyRdp(canonical, 0.002, CSS_MAX_KEYFRAMES)
 }
