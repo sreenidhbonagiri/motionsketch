@@ -42,6 +42,10 @@ dialog::backdrop {
   background: rgb(15 23 42 / 0.4);
 }
 
+dialog.confirm-dialog:not([open]) {
+  display: none;
+}
+
 /*
  * Closed <dialog> must stay display:none. Tailwind `flex` would override that
  * and leave a full-size invisible (but click-blocking) code panel on the page.

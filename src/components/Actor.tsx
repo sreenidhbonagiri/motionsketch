@@ -28,7 +28,8 @@ export function Actor({
     actor.height,
   )
 
-  const radius = actor.borderRadius * Math.min(width, height)
+  // Match CSS export: borderRadius 0..1 → 0%..50% of the tile (square → circle).
+  const radius = actor.borderRadius * 0.5 * Math.min(width, height)
 
   const style: CSSProperties = {
     left: `${position.x * 100}%`,

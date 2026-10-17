@@ -1,12 +1,20 @@
 import { create } from 'zustand'
+import {
+  clampActorBorderRadius,
+  clampActorSize,
+  normalizeActorColor,
+} from '../core/actor'
 import { copyPath } from '../core/edit'
 import { clamp } from '../core/coords'
+import type { PlaybackDirection } from '../core/playback'
+import type { PersistedSnapshot } from '../core/persist/document'
 import {
   DEFAULT_PROJECT,
   MAX_PLAYBACK_DURATION_MS,
   MIN_PLAYBACK_DURATION_MS,
   type EditorMode,
   type GeometryEdit,
+  type LoopMode,
   type MotionSample,
   type Project,
   type Recording,
@@ -21,6 +29,16 @@ interface EditorStore {
   mode: EditorMode
   pointerId: number | null
   playbackHead: number
+  /**
+   * Path traversal direction for alternate looping (1 forward, -1 backward).
+   * Transient — not persisted.
+   */
+  playbackDirection: PlaybackDirection
+  /**
+   * Bumped when playback should re-anchor the RAF clock (Play from end,
+   * Restart while already playing) without relying on a mode flicker.
+   */
+  playbackEpoch: number
   livePosition: Vec2
   liveTrail: Vec2[]
   showPathComparison: boolean
@@ -38,6 +56,14 @@ interface EditorStore {
   /** Live preview while a handle drag is in progress. */
   editPreview: MotionSample[] | null
 
+  /**
+   * Transient stage tip after New project (not persisted).
+   * Cleared when the user starts recording again.
+   */
+  stageHint: 'default' | 'new-project'
+  /** Brief action feedback for a polite live region (not persisted). */
+  actionAnnouncement: string | null
+
   armRecording: () => void
   cancelArm: () => void
   beginRecording: (pointerId: number, position: Vec2) => void
@@ -50,15 +76,36 @@ interface EditorStore {
 
   play: () => void
   pause: () => void
+  /** Jump to the start and begin playing. */
+  restartPlayback: () => void
+  /**
+   * Seek the playhead (0..1). Pauses if currently playing so the actor
+   * stays on the scrubbed frame instead of being overwritten by the clock.
+   */
+  scrubPlayback: (tNorm: number) => void
   setPlaybackHead: (tNorm: number) => void
+  setPlaybackDirection: (direction: PlaybackDirection) => void
   stopPlayback: () => void
 
   setDurationMs: (ms: number) => void
   setSmoothing: (value: number) => void
   setSteadySpeed: (value: number) => void
   setLoop: (loop: boolean) => void
+  setLoopMode: (loopMode: LoopMode) => void
   setShowPathComparison: (show: boolean) => void
+  setActorColor: (color: string) => void
+  /** Square tile size as a fraction of the stage min-side. */
+  setActorSize: (size: number) => void
+  setActorBorderRadius: (radius: number) => void
   resetRecording: () => void
+
+  /** Full wipe to defaults (separate from Reset, which only clears the take). */
+  newProject: () => void
+  /** Replace project + committed edits from a validated snapshot; paused at t=0. */
+  applyPersistedSnapshot: (snapshot: PersistedSnapshot) => void
+  /** True when opening/importing/new would replace an existing animation. */
+  hasReplaceableAnimation: () => boolean
+  announceAction: (message: string | null) => void
 
   enterEditMode: () => void
   exitEditMode: () => void
@@ -94,15 +141,19 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   mode: 'idle',
   pointerId: null,
   playbackHead: 0,
+  playbackDirection: 1,
+  playbackEpoch: 0,
   livePosition: initialPosition,
   liveTrail: [],
   showPathComparison: false,
+  stageHint: 'default',
+  actionAnnouncement: null,
   ...clearEditState(),
 
   armRecording: () => {
     const { mode } = get()
     if (mode === 'playing' || mode === 'editing') return
-    set({ mode: 'armed', liveTrail: [] })
+    set({ mode: 'armed', liveTrail: [], stageHint: 'default' })
   },
 
   cancelArm: () => {
@@ -118,6 +169,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       livePosition: position,
       liveTrail: [position],
       playbackHead: 0,
+      playbackDirection: 1,
+      stageHint: 'default',
       ...clearEditState(),
     })
   },
@@ -175,7 +228,16 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     ) {
       return
     }
-    set({ mode: 'playing' })
+    // End of a non-looping take: Play starts over from the beginning.
+    const atEnd =
+      !state.project.playback.loop && state.playbackHead >= 1
+    const head = atEnd ? 0 : state.playbackHead
+    set({
+      mode: 'playing',
+      playbackHead: head,
+      playbackDirection: atEnd ? 1 : state.playbackDirection,
+      playbackEpoch: state.playbackEpoch + 1,
+    })
   },
 
   pause: () => {
@@ -184,7 +246,46 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
   },
 
+  restartPlayback: () => {
+    const state = get()
+    if (!state.project.recording) return
+    if (
+      state.mode === 'editing' ||
+      state.mode === 'armed' ||
+      state.mode === 'recording'
+    ) {
+      return
+    }
+    set({
+      mode: 'playing',
+      playbackHead: 0,
+      playbackDirection: 1,
+      playbackEpoch: state.playbackEpoch + 1,
+    })
+  },
+
+  scrubPlayback: (tNorm) => {
+    const state = get()
+    if (!state.project.recording) return
+    if (
+      state.mode === 'editing' ||
+      state.mode === 'armed' ||
+      state.mode === 'recording'
+    ) {
+      return
+    }
+    // Scrubber is path position (0=start, 1=end). Seeking pauses and
+    // resumes forward from that point — even if we were playing backward.
+    set({
+      mode: 'idle',
+      playbackHead: clamp(tNorm, 0, 1),
+      playbackDirection: 1,
+    })
+  },
+
   setPlaybackHead: (tNorm) => set({ playbackHead: clamp(tNorm, 0, 1) }),
+
+  setPlaybackDirection: (direction) => set({ playbackDirection: direction }),
 
   stopPlayback: () => set({ mode: 'idle' }),
 
@@ -238,15 +339,75 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           loop,
         },
       },
+      // Re-anchor if currently playing so the clock picks up the new mode.
+      playbackEpoch:
+        state.mode === 'playing'
+          ? state.playbackEpoch + 1
+          : state.playbackEpoch,
+      playbackDirection: loop ? state.playbackDirection : 1,
+    })),
+
+  setLoopMode: (loopMode) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        playback: {
+          ...state.project.playback,
+          loopMode,
+        },
+      },
+      playbackEpoch:
+        state.mode === 'playing'
+          ? state.playbackEpoch + 1
+          : state.playbackEpoch,
+      // Switching to repeat always travels forward from the current head.
+      playbackDirection: loopMode === 'repeat' ? 1 : state.playbackDirection,
     })),
 
   setShowPathComparison: (show) => set({ showPathComparison: show }),
+
+  setActorColor: (color) => {
+    const normalized = normalizeActorColor(color)
+    if (!normalized) return
+    set((state) => ({
+      project: {
+        ...state.project,
+        actor: { ...state.project.actor, color: normalized },
+      },
+    }))
+  },
+
+  setActorSize: (size) => {
+    const next = clampActorSize(size)
+    set((state) => ({
+      project: {
+        ...state.project,
+        actor: {
+          ...state.project.actor,
+          width: next,
+          height: next,
+        },
+      },
+    }))
+  },
+
+  setActorBorderRadius: (radius) =>
+    set((state) => ({
+      project: {
+        ...state.project,
+        actor: {
+          ...state.project.actor,
+          borderRadius: clampActorBorderRadius(radius),
+        },
+      },
+    })),
 
   resetRecording: () =>
     set((state) => ({
       mode: 'idle',
       pointerId: null,
       playbackHead: 0,
+      playbackDirection: 1,
       liveTrail: [],
       livePosition: initialPosition,
       ...clearEditState(),
@@ -255,6 +416,70 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         recording: null,
       },
     })),
+
+  newProject: () =>
+    set({
+      mode: 'idle',
+      pointerId: null,
+      playbackHead: 0,
+      playbackDirection: 1,
+      liveTrail: [],
+      livePosition: initialPosition,
+      showPathComparison: false,
+      stageHint: 'new-project',
+      actionAnnouncement: 'New project created.',
+      ...clearEditState(),
+      project: {
+        version: 1,
+        actor: { ...DEFAULT_PROJECT.actor },
+        recording: null,
+        playback: { ...DEFAULT_PROJECT.playback },
+      },
+    }),
+
+  applyPersistedSnapshot: (snapshot) => {
+    const recording = snapshot.project.recording
+    const start = recording
+      ? { x: recording.samples[0].x, y: recording.samples[0].y }
+      : initialPosition
+
+    set({
+      mode: 'idle',
+      pointerId: null,
+      playbackHead: 0,
+      playbackDirection: 1,
+      liveTrail: [],
+      livePosition: start,
+      showPathComparison: false,
+      stageHint: 'default',
+      geometryEdit: snapshot.geometryEdit
+        ? {
+            bakedSmoothing: snapshot.geometryEdit.bakedSmoothing,
+            samples: copyPath(snapshot.geometryEdit.samples),
+          }
+        : null,
+      editSession: null,
+      undoStack: [],
+      redoStack: [],
+      selectedHandleIndex: null,
+      editPreview: null,
+      project: {
+        version: 1,
+        actor: { ...snapshot.project.actor },
+        recording: recording
+          ? {
+              recordedDurationMs: recording.recordedDurationMs,
+              samples: copyPath(recording.samples),
+            }
+          : null,
+        playback: { ...snapshot.project.playback },
+      },
+    })
+  },
+
+  hasReplaceableAnimation: () => !!get().project.recording,
+
+  announceAction: (message) => set({ actionAnnouncement: message }),
 
   enterEditMode: () => {
     const state = get()

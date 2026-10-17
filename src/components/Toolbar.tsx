@@ -10,6 +10,7 @@ export function Toolbar() {
   const armRecording = useEditorStore((s) => s.armRecording)
   const play = useEditorStore((s) => s.play)
   const pause = useEditorStore((s) => s.pause)
+  const restartPlayback = useEditorStore((s) => s.restartPlayback)
   const resetRecording = useEditorStore((s) => s.resetRecording)
   const setPlaybackHead = useEditorStore((s) => s.setPlaybackHead)
   const enterEditMode = useEditorStore((s) => s.enterEditMode)
@@ -21,6 +22,7 @@ export function Toolbar() {
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
   const hasRecording = !!recording
+  const playbackDisabled = !hasRecording || isRecordingLike
 
   return (
     <div
@@ -97,7 +99,7 @@ export function Toolbar() {
               type="button"
               data-testid="btn-pause"
               onClick={pause}
-              disabled={!recording}
+              disabled={playbackDisabled}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-40"
             >
               Pause
@@ -106,18 +108,23 @@ export function Toolbar() {
             <button
               type="button"
               data-testid="btn-play"
-              onClick={() => {
-                if (useEditorStore.getState().playbackHead >= 1) {
-                  setPlaybackHead(0)
-                }
-                play()
-              }}
-              disabled={!recording || isRecordingLike}
+              onClick={() => play()}
+              disabled={playbackDisabled}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-40"
             >
               Play
             </button>
           )}
+
+          <button
+            type="button"
+            data-testid="btn-restart"
+            onClick={() => restartPlayback()}
+            disabled={playbackDisabled}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-40"
+          >
+            Restart
+          </button>
 
           <button
             type="button"

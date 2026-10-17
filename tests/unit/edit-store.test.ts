@@ -33,11 +33,14 @@ describe('edit store', () => {
           smoothing: 0.35,
           steadySpeed: 0,
           loop: false,
+          loopMode: 'repeat',
         },
       },
       mode: 'idle',
       pointerId: null,
       playbackHead: 0,
+      playbackDirection: 1,
+      playbackEpoch: 0,
       livePosition: { x: 0.2, y: 0.4 },
       liveTrail: [],
       showPathComparison: false,
@@ -47,6 +50,8 @@ describe('edit store', () => {
       redoStack: [],
       selectedHandleIndex: null,
       editPreview: null,
+      stageHint: 'default',
+      actionAnnouncement: null,
     })
   })
 

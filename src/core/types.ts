@@ -13,10 +13,13 @@ export interface MotionSample {
 }
 
 export interface Actor {
-  /** Fraction of stage min-side */
+  /** Fraction of stage min-side (cqmin); width/height stay equal for a square tile */
   width: number
   height: number
-  /** 0..1 of min(width, height) in CSS terms */
+  /**
+   * Corner roundness: 0 = square, 1 = circle.
+   * Editor uses 50% of min(side) at 1; CSS export uses the same as border-radius %.
+   */
   borderRadius: number
   color: string
 }
@@ -26,6 +29,9 @@ export interface Recording {
   recordedDurationMs: number
 }
 
+/** How looping repeats when `loop` is true. */
+export type LoopMode = 'repeat' | 'alternate'
+
 export interface PlaybackSettings {
   durationMs: number
   /** 0..1 path cleanup (spatial) */
@@ -33,6 +39,13 @@ export interface PlaybackSettings {
   /** 0..1 soften accidental speed spikes; preserves pauses */
   steadySpeed: number
   loop: boolean
+  /**
+   * Used when `loop` is true.
+   * - repeat: jump back to the start each cycle
+   * - alternate: reverse at endpoints (ping-pong)
+   * Older projects without this field default to `repeat`.
+   */
+  loopMode: LoopMode
 }
 
 export interface Project {
@@ -75,11 +88,16 @@ export const DEFAULT_ACTOR: Actor = {
   color: '#4f46e5',
 }
 
+/** Fraction of the stage’s shorter side */
+export const MIN_ACTOR_SIZE = 0.06
+export const MAX_ACTOR_SIZE = 0.4
+
 export const DEFAULT_PLAYBACK: PlaybackSettings = {
   durationMs: 1200,
   smoothing: 0.35,
   steadySpeed: 0,
   loop: false,
+  loopMode: 'repeat',
 }
 
 export const DEFAULT_PROJECT: Project = {

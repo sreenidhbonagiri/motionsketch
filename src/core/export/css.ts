@@ -1,5 +1,6 @@
+import { actorBorderRadiusCssPercent } from '../actor'
 import { clamp01 } from '../coords'
-import type { Actor, Keyframe, MotionSample } from '../types'
+import type { Actor, Keyframe, LoopMode, MotionSample } from '../types'
 import { buildKeyframes, buildKeyframesFromProcessed } from './format'
 
 function formatOffset(offset: number): string {
@@ -10,6 +11,22 @@ function formatOffset(offset: number): string {
 
 function formatCq(value: number, unit: 'cqw' | 'cqh', digits = 3): string {
   return `${(clamp01(value) * 100).toFixed(digits)}${unit}`
+}
+
+function animationTiming(
+  durationMs: number,
+  loop: boolean,
+  loopMode: LoopMode,
+): string {
+  const duration = `${Math.round(durationMs)}ms`
+  if (!loop) {
+    return `${duration} linear forwards`
+  }
+  if (loopMode === 'alternate') {
+    // infinite alternate reverses keyframe timing (including pauses) each pass.
+    return `${duration} linear infinite alternate`
+  }
+  return `${duration} linear infinite`
 }
 
 /**
@@ -28,12 +45,16 @@ export function generateCssSnippet(options: {
   keyframes: Keyframe[]
   durationMs: number
   actor: Actor
+  loop?: boolean
+  loopMode?: LoopMode
   animationName?: string
 }): string {
   const {
     keyframes,
     durationMs,
     actor,
+    loop = false,
+    loopMode = 'repeat',
     animationName = 'motionsketch',
   } = options
 
@@ -42,8 +63,15 @@ export function generateCssSnippet(options: {
   }
 
   const widthCq = (actor.width * 100).toFixed(2)
-  const radiusPct = (actor.borderRadius * 50).toFixed(2)
+  const radiusPct = actorBorderRadiusCssPercent(actor.borderRadius).toFixed(2)
   const start = keyframes[0]
+  const timing = animationTiming(durationMs, loop, loopMode)
+
+  const loopNote = !loop
+    ? ' * Loop: off (plays once, forwards).'
+    : loopMode === 'alternate'
+      ? ' * Loop: back and forth (animation-direction: alternate). Duration is one way; a full cycle is 2×.'
+      : ' * Loop: repeat (infinite). End and start may jump if they differ — no bridging segment is added.'
 
   const frames = keyframes
     .map((kf) => {
@@ -60,6 +88,7 @@ export function generateCssSnippet(options: {
  * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
  * - Actor width uses cqmin (fraction of the stage's shorter axis), matching the editor.
  * - Animation uses transform only (compositor-friendly); timing-function is linear.
+${loopNote}
  *
  * Browser support: container query units (cqw/cqh/cqmin).
  * Fallback for a fixed-size stage (replace the cq* lengths with px):
@@ -88,7 +117,7 @@ export function generateCssSnippet(options: {
   border-radius: ${radiusPct}%;
   background: ${actor.color};
   transform: translate3d(${formatCq(start.x, 'cqw')}, ${formatCq(start.y, 'cqh')}, 0) translate(-50%, -50%);
-  animation: ${animationName} ${Math.round(durationMs)}ms linear forwards;
+  animation: ${animationName} ${timing};
   will-change: transform;
 }
 
@@ -104,6 +133,8 @@ export function exportCssFromRecording(options: {
   steadySpeed?: number
   durationMs: number
   actor: Actor
+  loop?: boolean
+  loopMode?: LoopMode
   /** When set, export this processed path (edit-aware) instead of reprocessing raw. */
   processedPath?: MotionSample[] | null
 }): string {
@@ -118,5 +149,7 @@ export function exportCssFromRecording(options: {
     keyframes,
     durationMs: options.durationMs,
     actor: options.actor,
+    loop: options.loop ?? false,
+    loopMode: options.loopMode ?? 'repeat',
   })
 }

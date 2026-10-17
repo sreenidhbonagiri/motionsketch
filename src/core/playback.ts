@@ -1,5 +1,5 @@
 import { clamp01 } from './coords'
-import type { MotionSample, Vec2 } from './types'
+import type { LoopMode, MotionSample, Vec2 } from './types'
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
@@ -53,23 +53,97 @@ export function evaluate(samples: MotionSample[], tNorm: number): Vec2 {
   }
 }
 
+export type PlaybackDirection = 1 | -1
+
+export interface PlayheadSample {
+  /** Path position in [0, 1] (start → end). */
+  tNorm: number
+  finished: boolean
+  direction: PlaybackDirection
+}
+
+/**
+ * Map wall-clock elapsed time onto a path playhead.
+ *
+ * - Loop off: one forward pass; finishes at t=1.
+ * - Repeat: wraps 0→1→0… (may jump if endpoints differ).
+ * - Alternate: triangle wave 0→1→0… with no position jump; one-way
+ *   duration is `durationMs`, full cycle is `2 * durationMs`.
+ */
 export function tNormFromElapsed(
   elapsedMs: number,
   durationMs: number,
   loop: boolean,
-): { tNorm: number; finished: boolean } {
+  loopMode: LoopMode = 'repeat',
+): PlayheadSample {
   if (durationMs <= 0) {
-    return { tNorm: 1, finished: !loop }
+    return { tNorm: 1, finished: !loop, direction: 1 }
   }
 
-  if (loop) {
-    const mod = elapsedMs % durationMs
-    return { tNorm: mod / durationMs, finished: false }
+  if (!loop) {
+    if (elapsedMs >= durationMs) {
+      return { tNorm: 1, finished: true, direction: 1 }
+    }
+    const t = Math.max(0, elapsedMs) / durationMs
+    return { tNorm: t, finished: false, direction: 1 }
   }
 
-  if (elapsedMs >= durationMs) {
-    return { tNorm: 1, finished: true }
+  if (loopMode === 'repeat') {
+    const mod = positiveMod(elapsedMs, durationMs)
+    return { tNorm: mod / durationMs, finished: false, direction: 1 }
   }
 
-  return { tNorm: elapsedMs / durationMs, finished: false }
+  // alternate (back and forth)
+  const cycle = durationMs * 2
+  const mod = positiveMod(elapsedMs, cycle)
+  if (mod <= durationMs) {
+    // Forward half, including the end endpoint (mod === durationMs → tNorm 1).
+    return {
+      tNorm: mod / durationMs,
+      finished: false,
+      direction: 1,
+    }
+  }
+  const back = mod - durationMs
+  return {
+    tNorm: 1 - back / durationMs,
+    finished: false,
+    direction: -1,
+  }
+}
+
+/**
+ * Convert a playhead + direction into an elapsed offset so pause/resume
+ * continues in the same direction without a jump.
+ */
+export function elapsedFromPlayhead(
+  tNorm: number,
+  direction: PlaybackDirection,
+  durationMs: number,
+  loop: boolean,
+  loopMode: LoopMode,
+): number {
+  const t = clamp01(tNorm)
+  if (durationMs <= 0) return 0
+
+  if (!loop || loopMode === 'repeat' || direction === 1) {
+    return t * durationMs
+  }
+
+  // Backward half of an alternate cycle.
+  return durationMs + (1 - t) * durationMs
+}
+
+/** Elapsed within the current one-way traversal (0 at each turnaround). */
+export function traversalElapsedMs(
+  tNorm: number,
+  direction: PlaybackDirection,
+  durationMs: number,
+): number {
+  const t = clamp01(tNorm)
+  return direction === 1 ? t * durationMs : (1 - t) * durationMs
+}
+
+function positiveMod(value: number, modulus: number): number {
+  return ((value % modulus) + modulus) % modulus
 }

@@ -1,16 +1,22 @@
 import { useEffect, useRef } from 'react'
-import { tNormFromElapsed } from '../core/playback'
+import {
+  elapsedFromPlayhead,
+  tNormFromElapsed,
+  type PlaybackDirection,
+} from '../core/playback'
 import { useEditorStore } from '../state/store'
 
 export function usePlaybackClock(): void {
   const mode = useEditorStore((s) => s.mode)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const loop = useEditorStore((s) => s.project.playback.loop)
-  const playbackHead = useEditorStore((s) => s.playbackHead)
+  const loopMode = useEditorStore((s) => s.project.playback.loopMode)
+  const playbackEpoch = useEditorStore((s) => s.playbackEpoch)
   const setPlaybackHead = useEditorStore((s) => s.setPlaybackHead)
+  const setPlaybackDirection = useEditorStore((s) => s.setPlaybackDirection)
   const stopPlayback = useEditorStore((s) => s.stopPlayback)
 
-  const originHeadRef = useRef(0)
+  const originElapsedRef = useRef(0)
   const startedAtRef = useRef(0)
   const rafRef = useRef<number | null>(null)
 
@@ -23,16 +29,23 @@ export function usePlaybackClock(): void {
       return
     }
 
-    originHeadRef.current = playbackHead
+    const state = useEditorStore.getState()
+    originElapsedRef.current = elapsedFromPlayhead(
+      state.playbackHead,
+      state.playbackDirection,
+      durationMs,
+      loop,
+      loopMode,
+    )
     startedAtRef.current = performance.now()
 
     const tick = (now: number) => {
-      const elapsed =
-        (now - startedAtRef.current) + originHeadRef.current * durationMs
-      const { tNorm, finished } = tNormFromElapsed(elapsed, durationMs, loop)
-      setPlaybackHead(tNorm)
+      const elapsed = now - startedAtRef.current + originElapsedRef.current
+      const sample = tNormFromElapsed(elapsed, durationMs, loop, loopMode)
+      setPlaybackHead(sample.tNorm)
+      setPlaybackDirection(sample.direction)
 
-      if (finished) {
+      if (sample.finished) {
         stopPlayback()
         return
       }
@@ -48,7 +61,17 @@ export function usePlaybackClock(): void {
         rafRef.current = null
       }
     }
-    // Intentionally only restart clock when entering play or duration/loop change mid-play.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, durationMs, loop, setPlaybackHead, stopPlayback])
+  }, [
+    mode,
+    durationMs,
+    loop,
+    loopMode,
+    playbackEpoch,
+    setPlaybackHead,
+    setPlaybackDirection,
+    stopPlayback,
+  ])
 }
+
+export type { PlaybackDirection }

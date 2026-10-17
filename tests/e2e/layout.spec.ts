@@ -32,19 +32,23 @@ test.describe('workspace layout', () => {
       await page.getByTestId('path-compare-toggle').check()
       await expect(page.getByTestId('path-compare-legend')).toBeVisible()
 
+      await expect(page.getByTestId('playback-timeline')).toBeVisible()
+      await assertFullyInViewport(page, 'stage')
+      await assertFullyInViewport(page, 'toolbar')
+      await assertFullyInViewport(page, 'playback-timeline')
+
       await page.getByTestId('btn-edit-path').click()
       await expect(page.getByTestId('edit-mode-hint')).toBeVisible()
 
-      const handle = page.locator('[data-testid^="path-handle-"]').nth(2)
-      const box = await handle.boundingBox()
-      expect(box).toBeTruthy()
-      await handle.hover()
-      await page.mouse.down()
-      await page.mouse.move(box!.x + 36, box!.y - 24, { steps: 6 })
-      await page.mouse.up()
+      // Prefer keyboard nudge — dense stages can stack handles and block hover.
+      const handle = page.locator('[data-testid^="path-handle-"]').first()
+      await handle.click({ force: true })
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowUp')
       await expect(page.getByTestId('smoothing-help')).toContainText(
         'baked into your path edit',
       )
+      await page.getByTestId('btn-done-edit').click()
 
       const noPageScroll = await page.evaluate(() => {
         const root = document.documentElement
@@ -54,6 +58,8 @@ test.describe('workspace layout', () => {
 
       await assertFullyInViewport(page, 'stage')
       await assertFullyInViewport(page, 'toolbar')
+      await expect(page.getByTestId('playback-timeline')).toBeVisible()
+      await assertFullyInViewport(page, 'playback-timeline')
 
       // Export controls must be reachable via sidebar scroll if needed.
       await page.getByTestId('btn-view-css').scrollIntoViewIfNeeded()

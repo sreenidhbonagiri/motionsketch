@@ -112,4 +112,39 @@ describe('css export', () => {
     expect((25 / 100) * 800).toBe(200)
     expect(css).toMatch(/25\.000cqw/)
   })
+
+  it('exports matching iteration and direction for loop modes', () => {
+    const once = exportCssFromRecording({
+      samples,
+      smoothing: 0,
+      durationMs: 1000,
+      actor: DEFAULT_ACTOR,
+      loop: false,
+    })
+    expect(once).toContain('1000ms linear forwards')
+    expect(once).not.toContain('infinite')
+
+    const repeat = exportCssFromRecording({
+      samples,
+      smoothing: 0,
+      durationMs: 1000,
+      actor: DEFAULT_ACTOR,
+      loop: true,
+      loopMode: 'repeat',
+    })
+    expect(repeat).toContain('1000ms linear infinite')
+    expect(repeat).not.toContain('alternate')
+    expect(repeat).toContain('End and start may jump')
+
+    const alternate = exportCssFromRecording({
+      samples,
+      smoothing: 0,
+      durationMs: 1000,
+      actor: DEFAULT_ACTOR,
+      loop: true,
+      loopMode: 'alternate',
+    })
+    expect(alternate).toContain('1000ms linear infinite alternate')
+    expect(alternate).toContain('full cycle is 2×')
+  })
 })

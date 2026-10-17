@@ -1,5 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { exportCssFromRecording } from '../core/export/css'
+import { buildHtmlDemo } from '../core/export/htmlDemo'
+import { downloadTextFile, stampFilename } from '../lib/download'
 import { copyText } from '../lib/clipboard'
 import { selectProcessedPath } from '../state/selectors'
 import { useEditorStore } from '../state/store'
@@ -11,12 +13,16 @@ export function ExportPanel() {
   const durationMs = project.playback.durationMs
   const smoothing = project.playback.smoothing
   const steadySpeed = project.playback.steadySpeed
+  const loop = project.playback.loop
+  const loopMode = project.playback.loopMode
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const editSession = useEditorStore((s) => s.editSession)
   const editPreview = useEditorStore((s) => s.editPreview)
+  const announceAction = useEditorStore((s) => s.announceAction)
 
   const [copiedInline, setCopiedInline] = useState(false)
   const [copiedDialog, setCopiedDialog] = useState(false)
+  const [actionStatus, setActionStatus] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const viewBtnRef = useRef<HTMLButtonElement>(null)
   const codeRef = useRef<HTMLTextAreaElement>(null)
@@ -32,17 +38,33 @@ export function ExportPanel() {
     [project, geometryEdit, editSession, editPreview],
   )
 
-  const css = useMemo(() => {
-    if (!recording) return ''
-    return exportCssFromRecording({
+  const exportOptions = useMemo(() => {
+    if (!recording) return null
+    return {
       samples: recording.samples,
       smoothing,
       steadySpeed,
       durationMs,
       actor,
+      loop,
+      loopMode,
       processedPath,
-    })
-  }, [recording, smoothing, steadySpeed, durationMs, actor, processedPath])
+    }
+  }, [
+    recording,
+    smoothing,
+    steadySpeed,
+    durationMs,
+    actor,
+    loop,
+    loopMode,
+    processedPath,
+  ])
+
+  const css = useMemo(() => {
+    if (!exportOptions) return ''
+    return exportCssFromRecording(exportOptions)
+  }, [exportOptions])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -54,7 +76,12 @@ export function ExportPanel() {
     return () => dialog.removeEventListener('close', onClose)
   }, [])
 
-  if (!recording) return null
+  if (!recording || !exportOptions) return null
+
+  const announce = (message: string) => {
+    setActionStatus(message)
+    announceAction(message)
+  }
 
   const copyCss = async (where: 'inline' | 'dialog') => {
     const ok = await copyText(css)
@@ -68,9 +95,32 @@ export function ExportPanel() {
     }
   }
 
+  const downloadCss = () => {
+    const ok = downloadTextFile(
+      css,
+      stampFilename('motionsketch', 'css'),
+      'text/css;charset=utf-8',
+    )
+    if (ok) announce('CSS download started.')
+  }
+
+  const downloadHtmlDemo = () => {
+    try {
+      const html = buildHtmlDemo(exportOptions)
+      const ok = downloadTextFile(
+        html,
+        stampFilename('motionsketch-demo', 'html'),
+        'text/html;charset=utf-8',
+      )
+      if (ok) announce('HTML demo download started.')
+    } catch {
+      setActionStatus('Couldn’t build the HTML demo.')
+      announceAction('Couldn’t build the HTML demo.')
+    }
+  }
+
   const openDialog = () => {
     dialogRef.current?.showModal()
-    // Reset after open so layout has applied; rAF covers first paint.
     requestAnimationFrame(() => {
       const code = codeRef.current
       if (code) {
@@ -107,7 +157,32 @@ export function ExportPanel() {
         >
           View CSS
         </button>
+        <button
+          type="button"
+          data-testid="btn-download-css"
+          onClick={downloadCss}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+        >
+          Download CSS
+        </button>
+        <button
+          type="button"
+          data-testid="btn-download-html-demo"
+          onClick={downloadHtmlDemo}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+        >
+          Download HTML demo
+        </button>
       </div>
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        CSS matches View/Copy. The HTML demo is standalone — open the file
+        locally, no server needed.
+      </p>
+      {actionStatus && (
+        <p data-testid="export-action-status" className="text-[11px] text-slate-600">
+          {actionStatus}
+        </p>
+      )}
 
       <dialog
         ref={dialogRef}
