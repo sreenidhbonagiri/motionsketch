@@ -18,15 +18,22 @@ import {
   resizeClipEnd,
   resizeClipStart,
   validateClipSecondsDraft,
+  validateClipStartMoveForDraft,
 } from '../core/clip'
 import type { ActorClip } from '../core/types'
 import { useEditorStore } from '../state/store'
 
 type DragKind = 'move' | 'start' | 'end'
 
+const SEQUENCE_HINT_KEY = 'motionsketch.sequenceHintDismissed'
+
+function formatSec(sec: number): string {
+  return sec.toFixed(2)
+}
+
 /**
- * Collapsible per-actor clip rows on the shared project timeline.
- * Timing controls when each actor moves; optional visibility hides outside the clip.
+ * Collapsible Sequence panel: when each actor moves on the shared Duration.
+ * Local Start at / Move for drafts commit together via Apply or Enter.
  */
 export function ClipTimeline() {
   const actors = useEditorStore((s) => s.project.actors)
@@ -42,16 +49,25 @@ export function ClipTimeline() {
 
   // Collapsed by default so the dock stays reachable; expand on demand.
   const [open, setOpen] = useState(false)
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(SEQUENCE_HINT_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
 
   const busy =
     mode === 'recording' || mode === 'armed' || mode === 'editing'
   const hasAnyRecording = actors.some((a) => !!a.recording)
   const selected = actors.find((a) => a.id === selectedActorId) ?? actors[0]
+  const durationSec = durationMs / 1000
   const selectedSecs = selected
     ? clipToSeconds(selected.clip, durationMs)
     : { startSec: 0, endSec: 0 }
+  const selectedMoveFor = selectedSecs.endSec - selectedSecs.startSec
   const startFieldId = useId()
-  const endFieldId = useId()
+  const moveForFieldId = useId()
   const draftHelpId = useId()
   const draftErrorId = useId()
 
@@ -62,20 +78,22 @@ export function ClipTimeline() {
     trackWidth: number
     baseline: ActorClip
   } | null>(null)
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(null)
 
-  // Local Start/End draft — commit only via Apply or Enter (not blur).
+  // Local Start at / Move for draft — commit only via Apply or Enter (not blur).
   const [startDraft, setStartDraft] = useState('0.00')
-  const [endDraft, setEndDraft] = useState('0.00')
+  const [moveForDraft, setMoveForDraft] = useState('0.00')
   const [draftDirty, setDraftDirty] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
   const draftActorIdRef = useRef<string | null>(null)
 
   const syncDraftFromCommitted = useCallback(() => {
-    setStartDraft(selectedSecs.startSec.toFixed(2))
-    setEndDraft(selectedSecs.endSec.toFixed(2))
+    setStartDraft(formatSec(selectedSecs.startSec))
+    setMoveForDraft(formatSec(selectedMoveFor))
     setDraftDirty(false)
     setDraftError(null)
-  }, [selectedSecs.startSec, selectedSecs.endSec])
+  }, [selectedSecs.startSec, selectedMoveFor])
 
   // Actor switch: discard any uncommitted draft (never apply to the new actor).
   useEffect(() => {
@@ -89,14 +107,30 @@ export function ClipTimeline() {
   useEffect(() => {
     if (!selected || draftDirty) return
     if (draftActorIdRef.current !== selected.id) return
-    setStartDraft(selectedSecs.startSec.toFixed(2))
-    setEndDraft(selectedSecs.endSec.toFixed(2))
+    setStartDraft(formatSec(selectedSecs.startSec))
+    setMoveForDraft(formatSec(selectedMoveFor))
   }, [
     selected?.id,
     selectedSecs.startSec,
-    selectedSecs.endSec,
+    selectedMoveFor,
     draftDirty,
   ])
+
+  const draftEndsAt = (() => {
+    const start = Number(startDraft)
+    const moveFor = Number(moveForDraft)
+    if (!Number.isFinite(start) || !Number.isFinite(moveFor)) return null
+    return start + moveFor
+  })()
+
+  const dismissHint = () => {
+    setHintDismissed(true)
+    try {
+      sessionStorage.setItem(SEQUENCE_HINT_KEY, '1')
+    } catch {
+      // ignore quota / private mode
+    }
+  }
 
   const onPointerDownClip = (
     actorId: string,
@@ -119,6 +153,7 @@ export function ClipTimeline() {
       trackWidth: rect.width,
       baseline: cloneClip(actor.clip),
     }
+    setActiveDragId(actorId)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -145,6 +180,7 @@ export function ClipTimeline() {
     event.preventDefault()
     event.stopPropagation()
     dragRef.current = null
+    setActiveDragId(null)
     try {
       event.currentTarget.releasePointerCapture(event.pointerId)
     } catch {
@@ -158,7 +194,11 @@ export function ClipTimeline() {
 
   const applyDraft = useCallback(() => {
     if (!selected || busy) return false
-    const parsed = validateClipSecondsDraft(startDraft, endDraft, durationMs)
+    const parsed = validateClipStartMoveForDraft(
+      startDraft,
+      moveForDraft,
+      durationMs,
+    )
     if (!parsed.ok) {
       setDraftError(parsed.error)
       return false
@@ -172,19 +212,12 @@ export function ClipTimeline() {
         selected.clip,
       ),
     )
-    setStartDraft(parsed.startSec.toFixed(2))
-    setEndDraft(parsed.endSec.toFixed(2))
+    setStartDraft(formatSec(parsed.startSec))
+    setMoveForDraft(formatSec(parsed.endSec - parsed.startSec))
     setDraftDirty(false)
     setDraftError(null)
     return true
-  }, [
-    selected,
-    busy,
-    startDraft,
-    endDraft,
-    durationMs,
-    commitActorClip,
-  ])
+  }, [selected, busy, startDraft, moveForDraft, durationMs, commitActorClip])
 
   const restoreDraft = useCallback(() => {
     syncDraftFromCommitted()
@@ -261,21 +294,20 @@ export function ClipTimeline() {
     }
   }
 
-  const markDraft = (start: string, end: string) => {
+  const markDraft = (start: string, moveFor: string) => {
     setStartDraft(start)
-    setEndDraft(end)
+    setMoveForDraft(moveFor)
     setDraftDirty(true)
     setDraftError(null)
   }
 
   if (!hasAnyRecording || !selected) return null
 
-  const draftDescribedBy = [
-    draftHelpId,
-    draftError ? draftErrorId : null,
-  ]
+  const draftDescribedBy = [draftHelpId, draftError ? draftErrorId : null]
     .filter(Boolean)
     .join(' ')
+
+  const rulerTicks = [0, 0.5, 1] as const
 
   return (
     <div
@@ -290,7 +322,7 @@ export function ClipTimeline() {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-800"
       >
-        <span>Clips</span>
+        <span>Sequence</span>
         <span aria-hidden className="text-slate-400">
           {open ? '▾' : '▸'}
         </span>
@@ -300,52 +332,109 @@ export function ClipTimeline() {
         <div className="space-y-2 border-t border-slate-100 px-2.5 pb-2.5 pt-2">
           <p
             data-testid="clip-timeline-help"
-            className="text-[10px] leading-relaxed text-slate-500"
+            className="text-xs text-slate-600"
           >
-            Timing controls when each actor moves on the shared timeline.
-            Outside its clip the actor holds its first or last pose unless you
-            hide it below. Minimum clip length is{' '}
-            {Math.round(MIN_CLIP_SPAN * 100)}% of the project. Arrow keys nudge
-            the selected clip; [ ] resize ends.
+            Choose when each actor moves.
           </p>
+
+          {!hintDismissed && (
+            <div
+              data-testid="sequence-first-use-hint"
+              className="flex items-start gap-2 rounded-lg border border-teal-200/80 bg-teal-50/90 px-2.5 py-1.5 text-xs text-teal-950"
+            >
+              <p className="min-w-0 flex-1 leading-snug">
+                Drag a bar to change its start. Drag an edge to change its
+                duration.
+              </p>
+              <button
+                type="button"
+                data-testid="btn-dismiss-sequence-hint"
+                aria-label="Dismiss sequence hint"
+                onClick={dismissHint}
+                className="shrink-0 rounded px-1.5 py-0.5 font-medium text-teal-900 hover:bg-teal-100"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div
+            data-testid="sequence-ruler"
+            className="relative mx-1 h-4 text-[11px] tabular-nums text-slate-500"
+            aria-hidden
+          >
+            {rulerTicks.map((t) => (
+              <span
+                key={t}
+                className="absolute -translate-x-1/2"
+                style={{ left: `${t * 100}%` }}
+              >
+                {formatSec(t * durationSec)}s
+              </span>
+            ))}
+          </div>
 
           <div
             data-testid="clip-timeline-rows"
-            className="max-h-40 space-y-1.5 overflow-auto"
+            className="max-h-44 space-y-1.5 overflow-auto"
             role="list"
-            aria-label="Actor clips"
+            aria-label="Actor sequence"
           >
             {actors.map((actor) => {
               const selectedRow = actor.id === selectedActorId
               const clip = clampClip(actor.clip)
               const left = clip.start * 100
               const width = (clip.end - clip.start) * 100
+              const startSec = clip.start * durationSec
+              const endSec = clip.end * durationSec
+              const showTimes =
+                selectedRow ||
+                focusedRowId === actor.id ||
+                activeDragId === actor.id
+              const stationary = !actor.recording
               return (
                 <div
                   key={actor.id}
                   role="listitem"
                   data-testid={`clip-row-${actor.id}`}
                   data-selected={selectedRow ? 'true' : 'false'}
+                  data-stationary={stationary ? 'true' : 'false'}
                   tabIndex={0}
                   onClick={() => selectActor(actor.id)}
+                  onFocus={() => setFocusedRowId(actor.id)}
+                  onBlur={() =>
+                    setFocusedRowId((id) => (id === actor.id ? null : id))
+                  }
                   onKeyDown={(e) => onRowKeyDown(actor.id, e)}
                   className={`rounded-lg px-1.5 py-1 ${
                     selectedRow ? 'bg-slate-900/5 ring-1 ring-slate-300' : ''
                   }`}
                 >
-                  <div className="mb-0.5 flex items-center justify-between gap-2 text-[11px] text-slate-600">
+                  <div className="mb-0.5 flex items-center justify-between gap-2 text-xs text-slate-600">
                     <span className="min-w-0 truncate font-medium text-slate-800">
                       {actor.name}
+                      {stationary && (
+                        <span
+                          data-testid={`sequence-stationary-${actor.id}`}
+                          className="ml-1.5 font-normal text-slate-500"
+                        >
+                          Stationary
+                        </span>
+                      )}
                     </span>
-                    <span className="shrink-0 tabular-nums text-slate-500">
-                      {(clip.start * (durationMs / 1000)).toFixed(2)}s–
-                      {(clip.end * (durationMs / 1000)).toFixed(2)}s
-                    </span>
+                    {showTimes && (
+                      <span
+                        data-testid={`sequence-interval-${actor.id}`}
+                        className="shrink-0 tabular-nums text-slate-600"
+                      >
+                        {formatSec(startSec)}s–{formatSec(endSec)}s
+                      </span>
+                    )}
                   </div>
                   <div
                     data-clip-track
                     data-testid={`clip-track-${actor.id}`}
-                    className="relative h-5 w-full rounded-md bg-slate-100"
+                    className="relative h-6 w-full rounded-md bg-slate-100"
                   >
                     <div
                       className="absolute inset-y-0 w-px bg-teal-600/70"
@@ -354,11 +443,18 @@ export function ClipTimeline() {
                     />
                     <div
                       data-testid={`clip-bar-${actor.id}`}
-                      className={`absolute top-0.5 bottom-0.5 rounded ${
+                      title={
+                        stationary
+                          ? 'Stationary — no recorded movement'
+                          : 'Drag to change start time'
+                      }
+                      className={`absolute top-0.5 bottom-0.5 touch-none rounded ${
                         selectedRow ? 'bg-teal-600' : 'bg-slate-400'
-                      }`}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                      onPointerDown={(e) => onPointerDownClip(actor.id, 'move', e)}
+                      } ${stationary ? 'opacity-70' : ''}`}
+                      style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
+                      onPointerDown={(e) =>
+                        onPointerDownClip(actor.id, 'move', e)
+                      }
                       onPointerMove={onPointerMoveClip}
                       onPointerUp={onPointerUpClip}
                       onPointerCancel={onPointerUpClip}
@@ -366,9 +462,10 @@ export function ClipTimeline() {
                       <button
                         type="button"
                         data-testid={`clip-handle-start-${actor.id}`}
-                        aria-label={`Resize start of ${actor.name}`}
+                        aria-label={`Change how long ${actor.name} moves (start edge)`}
                         disabled={busy}
-                        className="absolute inset-y-0 left-0 w-2 cursor-ew-resize rounded-l bg-black/20"
+                        title="Drag edge to change duration"
+                        className="absolute inset-y-0 left-0 w-3.5 cursor-ew-resize touch-none rounded-l bg-black/25 sm:w-3"
                         onPointerDown={(e) =>
                           onPointerDownClip(actor.id, 'start', e)
                         }
@@ -379,9 +476,10 @@ export function ClipTimeline() {
                       <button
                         type="button"
                         data-testid={`clip-handle-end-${actor.id}`}
-                        aria-label={`Resize end of ${actor.name}`}
+                        aria-label={`Change how long ${actor.name} moves (end edge)`}
                         disabled={busy}
-                        className="absolute inset-y-0 right-0 w-2 cursor-ew-resize rounded-r bg-black/20"
+                        title="Drag edge to change duration"
+                        className="absolute inset-y-0 right-0 w-3.5 cursor-ew-resize touch-none rounded-r bg-black/25 sm:w-3"
                         onPointerDown={(e) =>
                           onPointerDownClip(actor.id, 'end', e)
                         }
@@ -396,11 +494,19 @@ export function ClipTimeline() {
             })}
           </div>
 
+          <p
+            data-testid="sequence-gesture-help"
+            className="text-xs leading-snug text-slate-500"
+          >
+            Moving a bar changes its start. Resizing an edge changes Move for —
+            it does not trim the recording. Arrows nudge; [ ] resize.
+          </p>
+
           {selected && (
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <label className="space-y-0.5">
-                  <span className="text-[11px] text-slate-500">Start (s)</span>
+                  <span className="text-xs text-slate-500">Start at</span>
                   <input
                     id={startFieldId}
                     data-testid="clip-start-input"
@@ -408,28 +514,28 @@ export function ClipTimeline() {
                     inputMode="decimal"
                     step={0.05}
                     min={0}
-                    max={durationMs / 1000}
+                    max={durationSec}
                     disabled={busy}
                     value={startDraft}
                     aria-invalid={draftError ? true : undefined}
                     aria-describedby={draftDescribedBy}
-                    onChange={(e) => markDraft(e.target.value, endDraft)}
+                    onChange={(e) => markDraft(e.target.value, moveForDraft)}
                     onKeyDown={onDraftKeyDown}
                     className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>
                 <label className="space-y-0.5">
-                  <span className="text-[11px] text-slate-500">End (s)</span>
+                  <span className="text-xs text-slate-500">Move for</span>
                   <input
-                    id={endFieldId}
-                    data-testid="clip-end-input"
+                    id={moveForFieldId}
+                    data-testid="clip-move-for-input"
                     type="number"
                     inputMode="decimal"
                     step={0.05}
-                    min={0}
-                    max={durationMs / 1000}
+                    min={MIN_CLIP_SPAN * durationSec}
+                    max={durationSec}
                     disabled={busy}
-                    value={endDraft}
+                    value={moveForDraft}
                     aria-invalid={draftError ? true : undefined}
                     aria-describedby={draftDescribedBy}
                     onChange={(e) => markDraft(startDraft, e.target.value)}
@@ -438,6 +544,18 @@ export function ClipTimeline() {
                   />
                 </label>
               </div>
+
+              <p
+                data-testid="clip-ends-at"
+                className="text-xs tabular-nums text-slate-600"
+              >
+                Ends at{' '}
+                <span className="font-medium text-slate-800">
+                  {draftEndsAt !== null && Number.isFinite(draftEndsAt)
+                    ? `${formatSec(draftEndsAt)} s`
+                    : '—'}
+                </span>
+              </p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -452,11 +570,10 @@ export function ClipTimeline() {
                 <p
                   id={draftHelpId}
                   data-testid="clip-times-help"
-                  className="text-[10px] leading-relaxed text-slate-500"
+                  className="text-xs leading-snug text-slate-500"
                 >
-                  Apply or Enter commits Start and End together. Escape restores
-                  the last committed times. Leaving the fields or switching
-                  actors discards an unapplied draft.
+                  Apply or Enter commits Start at and Move for together. Escape
+                  restores committed values.
                 </p>
               </div>
 
@@ -465,7 +582,7 @@ export function ClipTimeline() {
                   id={draftErrorId}
                   data-testid="clip-times-error"
                   role="alert"
-                  className="text-[11px] font-medium text-amber-900"
+                  className="text-xs font-medium text-amber-900"
                 >
                   {draftError}
                 </p>
@@ -473,47 +590,99 @@ export function ClipTimeline() {
 
               <fieldset
                 data-testid="clip-visibility-options"
-                className="space-y-1.5 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2"
+                className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2"
                 disabled={busy}
               >
-                <legend className="px-0.5 text-[11px] font-medium text-slate-600">
-                  Visibility
+                <legend className="px-0.5 text-xs font-medium text-slate-600">
+                  Before and after
                 </legend>
-                <p className="text-[10px] leading-relaxed text-slate-500">
-                  Off by default (holds the first/last pose). Hide-before hides
-                  until the start time (visible at start). Hide-after hides from
-                  the end time onward (hidden at end).
-                </p>
-                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    data-testid="clip-hide-before"
-                    className="mt-0.5"
-                    checked={!!selected.clip.hideBeforeStart}
-                    disabled={busy}
-                    onChange={(e) =>
-                      commitVisibility({ hideBeforeStart: e.target.checked })
-                    }
-                  />
-                  <span>Hide before clip starts</span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    data-testid="clip-hide-after"
-                    className="mt-0.5"
-                    checked={!!selected.clip.hideAfterEnd}
-                    disabled={busy}
-                    onChange={(e) =>
-                      commitVisibility({ hideAfterEnd: e.target.checked })
-                    }
-                  />
-                  <span>Hide after clip ends</span>
-                </label>
+
+                <div
+                  data-testid="sequence-before-movement"
+                  className="space-y-1"
+                  role="group"
+                  aria-label="Before movement"
+                >
+                  <p className="text-xs font-medium text-slate-700">
+                    Before movement
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                      <input
+                        type="radio"
+                        name={`before-${selected.id}`}
+                        data-testid="clip-show-before"
+                        className="accent-teal-700"
+                        checked={!selected.clip.hideBeforeStart}
+                        disabled={busy}
+                        onChange={() =>
+                          commitVisibility({ hideBeforeStart: false })
+                        }
+                      />
+                      Show starting pose
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                      <input
+                        type="radio"
+                        name={`before-${selected.id}`}
+                        data-testid="clip-hide-before"
+                        className="accent-teal-700"
+                        checked={!!selected.clip.hideBeforeStart}
+                        disabled={busy}
+                        onChange={() =>
+                          commitVisibility({ hideBeforeStart: true })
+                        }
+                      />
+                      Hide
+                    </label>
+                  </div>
+                </div>
+
+                <div
+                  data-testid="sequence-after-movement"
+                  className="space-y-1"
+                  role="group"
+                  aria-label="After movement"
+                >
+                  <p className="text-xs font-medium text-slate-700">
+                    After movement
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                      <input
+                        type="radio"
+                        name={`after-${selected.id}`}
+                        data-testid="clip-hold-after"
+                        className="accent-teal-700"
+                        checked={!selected.clip.hideAfterEnd}
+                        disabled={busy}
+                        onChange={() =>
+                          commitVisibility({ hideAfterEnd: false })
+                        }
+                      />
+                      Hold final pose
+                    </label>
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                      <input
+                        type="radio"
+                        name={`after-${selected.id}`}
+                        data-testid="clip-hide-after"
+                        className="accent-teal-700"
+                        checked={!!selected.clip.hideAfterEnd}
+                        disabled={busy}
+                        onChange={() =>
+                          commitVisibility({ hideAfterEnd: true })
+                        }
+                      />
+                      Hide
+                    </label>
+                  </div>
+                </div>
+
                 {!isActorVisibleAt(playbackHead, selected.clip) && (
                   <p
                     data-testid="clip-hidden-now-hint"
-                    className="text-[10px] font-medium text-amber-800"
+                    className="text-xs font-medium text-amber-800"
                   >
                     Hidden at the current time.
                   </p>

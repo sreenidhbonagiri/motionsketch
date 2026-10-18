@@ -120,6 +120,14 @@ export function PolishPanel() {
               </span>
             </span>
           </label>
+          {session.allowRoundingAtPoint && roundingEnabled && (
+            <p
+              data-testid="polish-rounding-timing-note"
+              className="text-xs leading-relaxed text-amber-900/90"
+            >
+              Timing stays unchanged while rounding this point.
+            </p>
+          )}
         </div>
       )}
 
@@ -130,7 +138,7 @@ export function PolishPanel() {
       >
         {session.changed
           ? session.allowRoundingAtPoint
-            ? 'Preview ready. Selected turn may soften within the safe bound.'
+            ? 'Preview ready. Selected turn may soften within the safe bound. Timing stays unchanged while rounding this point.'
             : session.timingAdjusted
               ? 'Preview ready. Applying may redistribute speed within moving sections.'
               : 'Preview ready. Geometry cleanup within the safe bound.'

@@ -75,7 +75,9 @@ export function AdjustPanel() {
           data-testid="duration-help"
           className="text-xs leading-relaxed text-slate-500"
         >
-          Sets the total playback time. Longer is slower.
+          Total playback time for the project. Changing Duration scales the
+          Sequence proportionally — each actor keeps the same relative start and
+          Move for. Longer Duration plays the same motions more slowly.
         </p>
       </div>
 

@@ -8,6 +8,7 @@ import {
   resizeClipEnd,
   resizeClipStart,
   validateClipSecondsDraft,
+  validateClipStartMoveForDraft,
 } from '../../src/core/clip'
 import {
   exportCssFromProject,
@@ -56,6 +57,25 @@ describe('clip mapping', () => {
     expect(validateClipSecondsDraft('-0.1', '1', 2000).ok).toBe(false)
     expect(validateClipSecondsDraft('0', '3', 2000).ok).toBe(false)
     const ok = validateClipSecondsDraft('0.4', '1.6', 2000)
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      expect(ok.startSec).toBe(0.4)
+      expect(ok.endSec).toBe(1.6)
+    }
+  })
+
+  it('validateClipStartMoveForDraft uses Start at / Move for wording', () => {
+    const short = validateClipStartMoveForDraft('1.50', '0.02', 2000)
+    expect(short.ok).toBe(false)
+    if (!short.ok) {
+      expect(short.error).toMatch(/Move for must be at least/i)
+    }
+    const overflow = validateClipStartMoveForDraft('1.50', '1.00', 2000)
+    expect(overflow.ok).toBe(false)
+    if (!overflow.ok) {
+      expect(overflow.error).toMatch(/Ends at would be/i)
+    }
+    const ok = validateClipStartMoveForDraft('0.40', '1.20', 2000)
     expect(ok.ok).toBe(true)
     if (ok.ok) {
       expect(ok.startSec).toBe(0.4)

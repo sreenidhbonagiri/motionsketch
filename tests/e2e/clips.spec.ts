@@ -87,15 +87,42 @@ test.describe('per-actor clip timing', () => {
     expect(Math.abs(earlyLate!.y - earlyMid!.y)).toBeLessThan(2)
   })
 
-  test('clip end edit then undo restores prior end', async ({ page }) => {
+  test('Move for edit then undo restores prior duration', async ({ page }) => {
     await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
     await ensureClipTimelineOpen(page)
     await selectActorByIndex(page, 2)
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.00')
+    await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
+    await expect(page.getByTestId('clip-ends-at')).toContainText('1.00')
+    // Second actor (Late) begins at 1.00s for 1.00s.
+    await selectActorByIndex(page, 1)
+    await expect(page.getByTestId('clip-start-input')).toHaveValue('1.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
+    await selectActorByIndex(page, 2)
     await applyClipSeconds(page, '0.00', '1.50')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.50')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.50')
+    await expect(page.getByTestId('clip-ends-at')).toContainText('1.50')
     await page.getByTestId('btn-undo-transform').click()
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
+  })
+
+  test('three overlapping actors stay readable; first-use hint dismisses', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
+    await ensureClipTimelineOpen(page)
+    await expect(page.getByTestId('sequence-first-use-hint')).toBeVisible()
+    await page.getByTestId('btn-dismiss-sequence-hint').click()
+    await expect(page.getByTestId('sequence-first-use-hint')).toHaveCount(0)
+    await expect(page.getByTestId('sequence-ruler')).toBeVisible()
+    const ids = await actorIdsFromList(page)
+    for (const id of ids) {
+      await expect(page.getByTestId(`clip-row-${id}`)).toBeVisible()
+      await expect(page.getByTestId(`clip-bar-${id}`)).toBeVisible()
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(page.getByTestId('clip-timeline')).toBeVisible()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
   })
 
   test('transform marker uses project scrub time with a late clip', async ({

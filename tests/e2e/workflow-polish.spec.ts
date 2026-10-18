@@ -116,7 +116,7 @@ test.describe('editor workflow polish', () => {
     await expect(page.getByTestId('btn-adjust')).toBeFocused()
   })
 
-  test('clip Start/End draft: blur/switch discard; Apply/Enter/Escape; validation; undo', async ({
+  test('Sequence Start at / Move for draft: blur/switch discard; Apply/Enter/Escape; validation; undo', async ({
     page,
   }) => {
     await page.goto('/')
@@ -127,8 +127,15 @@ test.describe('editor workflow polish', () => {
     await page.getByTestId('btn-close-adjust').click()
 
     await openClipTimeline(page)
+    await expect(page.getByTestId('btn-toggle-clip-timeline')).toContainText(
+      'Sequence',
+    )
+    await expect(page.getByTestId('clip-timeline-help')).toContainText(
+      /Choose when each actor moves/i,
+    )
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('2.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
+    await expect(page.getByTestId('clip-ends-at')).toContainText('2.00')
 
     // Partial input + blur must not commit.
     await page.getByTestId('clip-start-input').fill('0.')
@@ -142,10 +149,11 @@ test.describe('editor workflow polish', () => {
 
     // Escape restores committed values.
     await page.getByTestId('clip-start-input').fill('0.80')
-    await page.getByTestId('clip-end-input').fill('1.80')
+    await page.getByTestId('clip-move-for-input').fill('1.00')
+    await expect(page.getByTestId('clip-ends-at')).toContainText('1.80')
     await page.getByTestId('clip-start-input').press('Escape')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('2.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
     await expect(page.getByTestId('btn-apply-clip-times')).toBeDisabled()
 
     // Actor switch discards uncommitted draft.
@@ -153,19 +161,19 @@ test.describe('editor workflow polish', () => {
     await selectActorByIndex(page, 0)
     await openClipTimeline(page)
     await page.getByTestId('clip-start-input').fill('0.50')
-    await page.getByTestId('clip-end-input').fill('1.50')
+    await page.getByTestId('clip-move-for-input').fill('1.00')
     await selectActorByIndex(page, 1)
     await selectActorByIndex(page, 0)
     await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('2.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
 
     // Invalid Apply explains without changing the clip.
     await page.getByTestId('clip-start-input').fill('1.50')
-    await page.getByTestId('clip-end-input').fill('1.52')
+    await page.getByTestId('clip-move-for-input').fill('0.02')
     await page.getByTestId('btn-apply-clip-times').click()
     await expect(page.getByTestId('clip-times-error')).toContainText(
-      /at least|End must/i,
+      /Move for must|at least/i,
     )
     await expect(page.getByTestId('clip-start-input')).toHaveValue('1.50')
     await page.getByTestId('clip-start-input').press('Escape')
@@ -174,18 +182,20 @@ test.describe('editor workflow polish', () => {
     // Apply commits both; one undo restores both.
     await applyClipSeconds(page, '0.40', '1.60')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.40')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.60')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.20')
+    await expect(page.getByTestId('clip-ends-at')).toContainText('1.60')
     await page.getByTestId('btn-undo-transform').click()
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('2.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
 
     // Enter commits the pair.
     await page.getByTestId('clip-start-input').fill('0.20')
-    await page.getByTestId('clip-end-input').fill('1.20')
-    await page.getByTestId('clip-end-input').press('Enter')
+    await page.getByTestId('clip-move-for-input').fill('1.00')
+    await page.getByTestId('clip-move-for-input').press('Enter')
     await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.20')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
+    await expect(page.getByTestId('clip-ends-at')).toContainText('1.20')
   })
 
   test('download help matches availability after recording', async ({

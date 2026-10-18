@@ -157,6 +157,9 @@ test.describe('polish motion', () => {
     await expect(page.getByTestId('polish-compare-legend')).toContainText(
       /Rounding/i,
     )
+    await expect(
+      page.getByTestId('polish-rounding-timing-note'),
+    ).toContainText(/Timing stays unchanged while rounding this point/i)
     const apply = page.getByTestId('btn-polish-apply')
     if (await apply.isEnabled()) {
       await apply.click()

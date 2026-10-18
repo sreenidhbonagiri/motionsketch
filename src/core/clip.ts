@@ -2,8 +2,8 @@ import { clamp01 } from './coords'
 import type { ActorClip } from './types'
 
 /**
- * Minimum clip length as a fraction of the shared project timeline.
- * Enforced on edit/import so Start/End stay ordered and exportable.
+ * Minimum movement interval as a fraction of the shared project timeline.
+ * Enforced on edit/import so Start at / Move for stay ordered and exportable.
  */
 export const MIN_CLIP_SPAN = 0.05
 
@@ -181,55 +181,93 @@ export type ClipSecondsDraftResult =
   | { ok: true; startSec: number; endSec: number }
   | { ok: false; error: string }
 
+function parseDraftNumber(
+  raw: string | number,
+  emptyError: string,
+): { ok: true; value: number } | { ok: false; error: string } {
+  if (typeof raw === 'string' && raw.trim() === '') {
+    return { ok: false, error: emptyError }
+  }
+  const value = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(value)) {
+    return { ok: false, error: emptyError }
+  }
+  return { ok: true, value }
+}
+
 /**
- * Validate Start/End second drafts for explicit Apply (no silent clamping).
+ * Validate Start at + Move for drafts for explicit Apply (no silent clamping).
+ * Returns normalized start/end seconds on success.
+ */
+export function validateClipStartMoveForDraft(
+  startRaw: string | number,
+  moveForRaw: string | number,
+  durationMs: number,
+): ClipSecondsDraftResult {
+  const empty =
+    'Enter valid Start at and Move for times in seconds.'
+  const startParsed = parseDraftNumber(startRaw, empty)
+  if (!startParsed.ok) return startParsed
+  const moveParsed = parseDraftNumber(moveForRaw, empty)
+  if (!moveParsed.ok) return moveParsed
+
+  const startSec = startParsed.value
+  const moveForSec = moveParsed.value
+  const durationSec = durationMs / 1000
+  if (!(durationSec > 0)) {
+    return { ok: false, error: 'Project duration must be greater than zero.' }
+  }
+  if (startSec < 0) {
+    return { ok: false, error: 'Start at cannot be negative.' }
+  }
+  if (moveForSec <= 0) {
+    return {
+      ok: false,
+      error: 'Move for must be greater than zero.',
+    }
+  }
+  if (startSec > durationSec + 1e-9) {
+    return {
+      ok: false,
+      error: `Start at must be within 0–${durationSec.toFixed(2)} s.`,
+    }
+  }
+  const endSec = startSec + moveForSec
+  if (endSec > durationSec + 1e-9) {
+    return {
+      ok: false,
+      error: `Ends at would be ${endSec.toFixed(2)} s — keep Start at + Move for within 0–${durationSec.toFixed(2)} s.`,
+    }
+  }
+  const minSpanSec = MIN_CLIP_SPAN * durationSec
+  if (moveForSec < minSpanSec - 1e-9) {
+    return {
+      ok: false,
+      error: `Move for must be at least ${minSpanSec.toFixed(2)} s (${Math.round(MIN_CLIP_SPAN * 100)}% of Duration).`,
+    }
+  }
+  return { ok: true, startSec, endSec }
+}
+
+/**
+ * Validate absolute start/end seconds (keyboard nudge / legacy helpers).
+ * Same bounds as Start at / Move for; no silent clamping.
  */
 export function validateClipSecondsDraft(
   startRaw: string | number,
   endRaw: string | number,
   durationMs: number,
 ): ClipSecondsDraftResult {
-  if (typeof startRaw === 'string' && startRaw.trim() === '') {
-    return {
-      ok: false,
-      error: 'Enter valid start and end times in seconds.',
-    }
-  }
-  if (typeof endRaw === 'string' && endRaw.trim() === '') {
-    return {
-      ok: false,
-      error: 'Enter valid start and end times in seconds.',
-    }
-  }
-  const startSec = typeof startRaw === 'number' ? startRaw : Number(startRaw)
-  const endSec = typeof endRaw === 'number' ? endRaw : Number(endRaw)
-  if (!Number.isFinite(startSec) || !Number.isFinite(endSec)) {
-    return {
-      ok: false,
-      error: 'Enter valid start and end times in seconds.',
-    }
-  }
-  const durationSec = durationMs / 1000
-  if (!(durationSec > 0)) {
-    return { ok: false, error: 'Project duration must be greater than zero.' }
-  }
-  if (startSec < 0 || endSec < 0) {
-    return { ok: false, error: 'Times cannot be negative.' }
-  }
-  if (startSec > durationSec + 1e-9 || endSec > durationSec + 1e-9) {
-    return {
-      ok: false,
-      error: `Times must be within 0–${durationSec.toFixed(2)} s.`,
-    }
-  }
-  const minSpanSec = MIN_CLIP_SPAN * durationSec
-  if (endSec - startSec < minSpanSec - 1e-9) {
-    return {
-      ok: false,
-      error: `End must be at least ${minSpanSec.toFixed(2)} s after start (${Math.round(MIN_CLIP_SPAN * 100)}% of the project).`,
-    }
-  }
-  return { ok: true, startSec, endSec }
+  const empty = 'Enter valid Start at and Move for times in seconds.'
+  const startParsed = parseDraftNumber(startRaw, empty)
+  if (!startParsed.ok) return startParsed
+  const endParsed = parseDraftNumber(endRaw, empty)
+  if (!endParsed.ok) return endParsed
+  return validateClipStartMoveForDraft(
+    startParsed.value,
+    endParsed.value - startParsed.value,
+    durationMs,
+  )
 }
 
 export function clipToSeconds(

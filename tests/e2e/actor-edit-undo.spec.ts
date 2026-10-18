@@ -46,18 +46,19 @@ test.describe('unified actor edit undo', () => {
     await expect(page.locator('[data-transform-marker]')).toHaveCount(2)
     await closeChromePanels(page)
 
-    // Clip edit second (most recent).
+    // Sequence edit second (most recent).
     await ensureClipTimelineOpen(page)
     await page.getByTestId('clip-start-input').fill('0.20')
+    await page.getByTestId('clip-move-for-input').fill('1.00')
     await page.getByTestId('clip-start-input').press('Enter')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
 
-    // Dock undoes clip first (chronological), not the older transform.
+    // Dock undoes sequence first (chronological), not the older transform.
     await page.getByTestId('btn-undo-transform').click()
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.locator('[data-transform-marker]')).toHaveCount(2)
 
-    // Redo clip, then keyboard undo still targets clip (top of stack).
+    // Redo sequence, then keyboard undo still targets sequence (top of stack).
     await page.getByTestId('btn-redo-transform').click()
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
@@ -69,8 +70,9 @@ test.describe('unified actor edit undo', () => {
     await page.keyboard.press(`${mod}+z`)
     await expect(page.locator('[data-transform-marker]')).toHaveCount(0)
 
-    // Clip-only keyboard undo when that is the sole pending edit.
+    // Sequence-only keyboard undo when that is the sole pending edit.
     await page.getByTestId('clip-start-input').fill('0.30')
+    await page.getByTestId('clip-move-for-input').fill('0.90')
     await page.getByTestId('clip-start-input').press('Enter')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.30')
     await page.locator('body').click({ position: { x: 8, y: 8 } })
@@ -94,8 +96,8 @@ test.describe('unified actor edit undo', () => {
     await selectActorByIndex(page, 0)
 
     await ensureClipTimelineOpen(page)
-    await page.getByTestId('clip-end-input').fill('0.70')
-    await page.getByTestId('clip-end-input').press('Enter')
+    await page.getByTestId('clip-move-for-input').fill('0.70')
+    await page.getByTestId('clip-move-for-input').press('Enter')
     await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
 
     await selectActorByIndex(page, 1)

@@ -49,8 +49,8 @@ Selector priority for the path used in preview and export (`selectProcessedPathF
 ## Shared clock and clip-local timing
 
 - **Project timeline**: `Project.playback` (`durationMs`, `loop`, `loopMode`) is shared. `usePlaybackClock` drives `playbackHead` (normalized 0…1) and `playbackDirection` via `requestAnimationFrame` while `mode === 'playing'`.
-- **Per-actor clip** (`ActorClip`): `start` / `end` on that timeline; minimum span `MIN_CLIP_SPAN` (0.05). Motion and transform tracks use **actor-local** progress inside the clip (`projectToLocal` in `src/core/clip.ts`). Outside the interval the actor holds first/last pose.
-- **Visibility**: `hideBeforeStart` / `hideAfterEnd` are half-open rules on project time (documented in `clip.ts`). Export uses a separate step-timed visibility animation; motion transform timing stays linear.
+- **Per-actor clip** (`ActorClip`): normalized `start` / `end` on that timeline (UI: Sequence → Start at / Move for); minimum span `MIN_CLIP_SPAN` (0.05). Motion and transform tracks use **actor-local** progress inside the clip (`projectToLocal` in `src/core/clip.ts`). Outside the interval the actor holds first/last pose unless visibility hides it. Changing project Duration scales clips proportionally.
+- **Visibility**: `hideBeforeStart` / `hideAfterEnd` are half-open rules on project time (documented in `clip.ts`). UI labels map to Show starting pose / Hide and Hold final pose / Hide. Export uses a separate step-timed visibility animation; motion transform timing stays linear. Firefox’s exact `step-end` boundary lag is documented in README — not in routine Sequence control copy.
 
 ## Transforms
 

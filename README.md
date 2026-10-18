@@ -35,7 +35,7 @@ npm run preview
 
 - **Record** pointer motion for the selected actor (shape tile or image).
 - **Refine** per-actor smoothing and Steady Speed; edit the path with handles (add/remove controls on the baked path, drag/nudge to reshape); set shared Duration, Loop, and loop mode (repeat or alternate).
-- **Clip** each actor onto a start–end interval of the shared timeline, with optional hide-before / hide-after.
+- **Sequence** when each actor moves (Start at / Move for on the shared Duration), with optional hide before/after movement.
 - **Transform** with rotation/scale keyframes on the same clip-local progress.
 - **Compose** up to **8** actors (paint order = stacking); rename actors and the project.
 - **Appearances** — colored shapes or PNG / JPEG / WebP / SVG images (see limits below).

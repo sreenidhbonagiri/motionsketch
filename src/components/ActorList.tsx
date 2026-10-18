@@ -127,7 +127,7 @@ export function ActorList() {
                 onClick={() => scrubPlayback(selected.clip.start)}
                 className="rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950 transition hover:bg-amber-100 disabled:opacity-40"
               >
-                Go to clip start
+                Go to start
               </button>
             </div>
           )}

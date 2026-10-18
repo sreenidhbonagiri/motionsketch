@@ -217,14 +217,20 @@ export async function clientPointForSample(
   }
 }
 
-/** Set clip Start/End drafts and commit with Apply (blur alone does not commit). */
+/**
+ * Set Sequence Start at / Move for from absolute start/end seconds and Apply.
+ * Blur alone does not commit.
+ */
 export async function applyClipSeconds(
   page: Page,
   startSec: string | number,
   endSec: string | number,
 ) {
+  const start = Number(startSec)
+  const end = Number(endSec)
+  const moveFor = end - start
   await page.getByTestId('clip-start-input').fill(String(startSec))
-  await page.getByTestId('clip-end-input').fill(String(endSec))
+  await page.getByTestId('clip-move-for-input').fill(String(moveFor))
   await page.getByTestId('btn-apply-clip-times').click()
   await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
 }
