@@ -114,7 +114,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'New project ready. Click Record to create an animation.',
+      'Click Record, then drag the actor to capture its movement.',
     )
     await expect(page.getByTestId('action-live-region')).toContainText(
       /Created “Fresh board”/,
@@ -174,22 +174,25 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('1.20 s')
     await expect(page.getByTestId('loop-toggle')).not.toBeChecked()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'New project ready. Click Record to create an animation.',
+      'Click Record, then drag the actor to capture its movement.',
     )
   })
 
-  test('Download current project announces start and stays scoped', async ({
+  test('Download project file announces start and stays scoped', async ({
     page,
   }) => {
     await page.goto('/')
     await ensureEditor(page)
     await openPanel(page, 'project')
+    await expect(page.getByTestId('project-local-save-copy')).toContainText(
+      'One project is saved in this browser',
+    )
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
     await expect(page.getByTestId('btn-download-project')).toHaveText(
-      'Download current project',
+      'Download project file',
     )
     await expect(page.getByTestId('download-project-help')).toHaveText(
-      'Save this animation as a project file you can reopen.',
+      'Reopen and edit in MotionSketch.',
     )
     await page.getByTestId('btn-close-project').click()
 

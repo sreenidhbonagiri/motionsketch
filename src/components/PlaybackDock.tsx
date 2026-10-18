@@ -322,9 +322,9 @@ export function PlaybackDock() {
             {mode === 'armed' && (
               <span
                 data-testid="armed-hint"
-                className="hidden px-2 text-xs text-slate-500 sm:inline"
+                className="px-2 text-xs text-slate-500"
               >
-                Ready — drag the tile
+                Ready — drag the actor
               </span>
             )}
           </>

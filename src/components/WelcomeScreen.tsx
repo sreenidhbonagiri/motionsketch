@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { parseSnapshotJson } from '../core/persist/document'
+import { DEFAULT_PROJECT_NAME } from '../core/projectName'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import {
   statusLabel,
@@ -164,7 +165,7 @@ export function WelcomeScreen() {
         title="Name your project"
         description="You’ll see this name in the editor. You can rename it anytime."
         confirmLabel="Create project"
-        initialName=""
+        initialName={DEFAULT_PROJECT_NAME}
         onCancel={() => setNameOpen(false)}
         onConfirm={finishCreate}
       />

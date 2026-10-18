@@ -4,20 +4,44 @@ import { ensureEditor, openPanel } from './helpers'
 test.describe('named project entry', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('first visit shows welcome; create validates and enters editor', async ({
+  test('first visit prefills Untitled project; create without renaming', async ({
     page,
   }) => {
     await page.goto('/')
     await expect(page.getByTestId('welcome-screen')).toBeVisible()
     await expect(page.getByTestId('app-shell')).toHaveCount(0)
 
-    // Storage must stay empty until create succeeds.
     const before = await page.evaluate(() =>
       localStorage.getItem('motionsketch.project.v1'),
     )
     expect(before).toBeNull()
 
     await page.getByTestId('btn-welcome-create').click()
+    const input = page.getByTestId('project-name-input')
+    await expect(page.getByTestId('project-name-dialog')).toBeVisible()
+    await expect(input).toHaveValue('Untitled project')
+    await expect(input).toBeFocused()
+
+    // Create immediately with the prefilled name.
+    await page.getByTestId('btn-confirm-project-name').click()
+    await expect(page.getByTestId('app-shell')).toBeVisible()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Untitled project',
+    )
+    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
+      'Click Record, then drag the actor to capture its movement.',
+    )
+    await expect(page.getByTestId('header-save-status')).toContainText(
+      'Saved in this browser',
+    )
+  })
+
+  test('create cancel and cleared-name validation leave storage empty', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.getByTestId('btn-welcome-create').click()
+    await page.getByTestId('project-name-input').fill('')
     await page.getByTestId('btn-confirm-project-name').click()
     await expect(page.getByTestId('project-name-error')).toBeVisible()
 
@@ -27,15 +51,6 @@ test.describe('named project entry', () => {
       localStorage.getItem('motionsketch.project.v1'),
     )
     expect(stillEmpty).toBeNull()
-
-    await page.getByTestId('btn-welcome-create').click()
-    await page.getByTestId('project-name-input').fill('  Sky Path  ')
-    await page.getByTestId('btn-confirm-project-name').click()
-    await expect(page.getByTestId('app-shell')).toBeVisible()
-    await expect(page.getByTestId('btn-rename-project')).toHaveText('Sky Path')
-    await expect(page.getByTestId('header-save-status')).toContainText(
-      'Saved in this browser',
-    )
   })
 
   test('rename draft cancels with Escape; empty commit restores', async ({
@@ -88,6 +103,9 @@ test.describe('named project entry', () => {
     await expect(page.getByTestId('new-project-confirm')).toBeVisible()
     await page.getByTestId('btn-new-project-confirm').click()
     await expect(page.getByTestId('project-name-dialog')).toBeVisible()
+    await expect(page.getByTestId('project-name-input')).toHaveValue(
+      'Untitled project',
+    )
     await page.getByTestId('btn-project-name-cancel').click()
     await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
     await expect(page.getByTestId('btn-rename-project')).toHaveText('Keep me')

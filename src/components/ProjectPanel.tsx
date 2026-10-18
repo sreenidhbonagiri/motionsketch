@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { parseSnapshotJson } from '../core/persist/document'
+import { DEFAULT_PROJECT_NAME } from '../core/projectName'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import {
   statusLabel,
@@ -34,6 +35,8 @@ export function ProjectPanel() {
 
   const label = statusLabel(status)
   const hasRecording = project.actors.some((a) => !!a.recording)
+  const canDownloadProject = hasRecording || status === 'save-error'
+  const saveFailed = status === 'save-error'
 
   useEffect(() => {
     if (storeAnnouncement) {
@@ -77,24 +80,29 @@ export function ProjectPanel() {
   }
 
   const handleDownload = () => {
-    if (!hasRecording) return
-    if (downloadCurrentProject()) {
+    if (!canDownloadProject) return
+    const ok = downloadCurrentProject()
+    if (ok) {
       setActionStatus('Project download started.')
       announceAction('Project download started.')
-    } else {
-      const message =
-        useEditorStore.getState().actionAnnouncement ??
-        'Could not download the project file.'
-      setActionStatus(message)
-      setImportError(null)
+      return
     }
+    const message =
+      useEditorStore.getState().actionAnnouncement ??
+      'Could not download the project file.'
+    setActionStatus(message)
+    announceAction(message)
   }
 
   const handleDownloadQuarantine = () => {
     if (downloadQuarantine()) {
       setActionStatus('Project download started.')
       announceAction('Project download started.')
+      return
     }
+    const message = 'Could not download the unreadable save.'
+    setActionStatus(message)
+    announceAction(message)
   }
 
   const handleOpenClick = () => {
@@ -138,12 +146,15 @@ export function ProjectPanel() {
 
   return (
     <div data-testid="project-panel" className="space-y-3 p-3">
-      <p className="text-xs leading-relaxed text-slate-500">
-        Autosaves in this browser on this device. Download a project file for a
-        portable backup you can open later.
+      <p
+        data-testid="project-local-save-copy"
+        className="text-xs leading-relaxed text-slate-500"
+      >
+        One project is saved in this browser. Download a project file to keep
+        another copy.
       </p>
 
-      {label && (
+      {label && !saveFailed && (
         <p
           data-testid="save-status"
           className={
@@ -154,6 +165,26 @@ export function ProjectPanel() {
         >
           {label}
         </p>
+      )}
+
+      {saveFailed && (
+        <div
+          data-testid="save-error-banner"
+          className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3"
+          role="alert"
+        >
+          <p data-testid="save-status" className="text-[11px] leading-relaxed text-amber-950">
+            {label}
+          </p>
+          <button
+            type="button"
+            data-testid="btn-download-project-save-error"
+            onClick={handleDownload}
+            className="rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-950 transition hover:bg-amber-100"
+          >
+            Download project file
+          </button>
+        </div>
       )}
 
       {actionStatus && (
@@ -202,10 +233,10 @@ export function ProjectPanel() {
           type="button"
           data-testid="btn-download-project"
           onClick={handleDownload}
-          disabled={!hasRecording}
+          disabled={!canDownloadProject}
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Download current project
+          Download project file
         </button>
         <button
           type="button"
@@ -229,7 +260,7 @@ export function ProjectPanel() {
         data-testid="download-project-help"
         className="text-[11px] leading-relaxed text-slate-500"
       >
-        Save this animation as a project file you can reopen.
+        Reopen and edit in MotionSketch.
       </p>
 
       <dialog
@@ -278,7 +309,7 @@ export function ProjectPanel() {
         title="Name your new project"
         description="Cancel keeps your current project unchanged."
         confirmLabel="Create project"
-        initialName=""
+        initialName={DEFAULT_PROJECT_NAME}
         onCancel={() => setNameOpen(false)}
         onConfirm={finishNewProject}
       />

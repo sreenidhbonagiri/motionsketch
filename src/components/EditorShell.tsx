@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { usePlaybackClock } from '../hooks/usePlaybackClock'
 import {
   statusLabel,
@@ -34,7 +35,6 @@ export function EditorShell() {
   useTransformShortcuts()
   const { status } = useProjectPersistence()
   const saveLabel = statusLabel(status)
-  const stageHint = useEditorStore((s) => s.stageHint)
   const actionAnnouncement = useEditorStore((s) => s.actionAnnouncement)
   const hasRecording = useEditorStore((s) =>
     projectHasAnyRecording(s.project),
@@ -99,12 +99,14 @@ export function EditorShell() {
     return () => document.removeEventListener('visibilitychange', onHidden)
   }, [])
 
+  const coarsePointer = useCoarsePointer()
+  // Empty-board recording guidance — hide once any take exists; edit mode has its own hint.
   const tip =
-    stageHint === 'new-project' && !hasRecording
-      ? 'New project ready. Click Record to create an animation.'
-      : !hasRecording
-        ? 'Record, drag the tile, then Play.'
-        : null
+    !hasRecording && mode === 'idle'
+      ? coarsePointer
+        ? 'Tap Record, then drag the actor to capture its movement.'
+        : 'Click Record, then drag the actor to capture its movement.'
+      : null
 
   return (
     <div
@@ -144,7 +146,7 @@ export function EditorShell() {
                 className={
                   status === 'saved'
                     ? 'text-xs text-slate-500'
-                    : 'text-xs text-amber-800'
+                    : 'text-xs font-medium text-amber-800'
                 }
               >
                 {saveLabel}

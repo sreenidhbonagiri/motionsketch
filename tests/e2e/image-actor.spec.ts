@@ -210,11 +210,13 @@ test.describe('image actors', () => {
     })
     await page.waitForTimeout(500)
     await openPanel(page, 'project')
-    const status = page.getByTestId('save-status')
-    if (await status.count()) {
-      await expect(status).not.toHaveText('Saved in this browser')
-      await expect(status).toContainText(/Couldn't save|storage/i)
-    }
+    await expect(page.getByTestId('save-error-banner')).toBeVisible()
+    await expect(page.getByTestId('save-status')).toContainText(
+      /Couldn't save|storage/i,
+    )
+    await expect(
+      page.getByTestId('btn-download-project-save-error'),
+    ).toBeVisible()
     await expect(page.getByTestId('header-save-status')).toContainText(
       /Couldn't save|storage/i,
     )

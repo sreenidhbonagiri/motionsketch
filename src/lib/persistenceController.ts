@@ -350,11 +350,17 @@ export function createPersistenceController(
       try {
         const slice = pickPersistable(useEditorStore.getState())
         const snap = buildSnapshot(slice.project, null)
-        return downloadTextFile(
+        const ok = downloadTextFile(
           serializeSnapshot(snap),
           stampProjectFilename(slice.project.name, 'json'),
           'application/json',
         )
+        if (!ok) {
+          useEditorStore
+            .getState()
+            .announceAction('Could not download the project file.')
+        }
+        return ok
       } catch (err) {
         const message =
           err instanceof Error

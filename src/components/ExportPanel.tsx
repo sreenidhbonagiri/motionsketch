@@ -4,11 +4,13 @@ import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
 import { downloadTextFile, stampProjectFilename } from '../lib/download'
 import { copyText } from '../lib/clipboard'
 import { projectHasAnyRecording } from '../core/sceneActor'
+import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
 
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
   const announceAction = useEditorStore((s) => s.announceAction)
+  const { downloadCurrentProject } = useProjectPersistence()
 
   const [copiedInline, setCopiedInline] = useState(false)
   const [copiedDialog, setCopiedDialog] = useState(false)
@@ -60,7 +62,11 @@ export function ExportPanel() {
       stampProjectFilename(project.name, 'css'),
       'text/css;charset=utf-8',
     )
-    if (ok) announce('CSS download started.')
+    if (ok) {
+      announce('CSS download started.')
+      return
+    }
+    announce('Could not download the CSS file.')
   }
 
   const downloadHtmlDemo = () => {
@@ -71,11 +77,26 @@ export function ExportPanel() {
         stampProjectFilename(`${project.name}-demo`, 'html'),
         'text/html;charset=utf-8',
       )
-      if (ok) announce('HTML demo download started.')
+      if (ok) {
+        announce('HTML demo download started.')
+        return
+      }
+      announce('Could not download the HTML demo.')
     } catch {
-      setActionStatus('Couldn’t build the HTML demo.')
-      announceAction('Couldn’t build the HTML demo.')
+      announce('Couldn’t build the HTML demo.')
     }
+  }
+
+  const downloadProjectFile = () => {
+    const ok = downloadCurrentProject()
+    if (ok) {
+      announce('Project download started.')
+      return
+    }
+    const message =
+      useEditorStore.getState().actionAnnouncement ??
+      'Could not download the project file.'
+    announce(message)
   }
 
   const openDialog = () => {
@@ -94,57 +115,85 @@ export function ExportPanel() {
   }
 
   return (
-    <div data-testid="export-panel" className="space-y-2">
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          data-testid="btn-copy-css"
-          onClick={() => void copyCss('inline')}
-          className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
-        >
-          {copiedInline ? 'Copied' : 'Copy CSS'}
-        </button>
-        <button
-          ref={viewBtnRef}
-          type="button"
-          data-testid="btn-view-css"
-          onClick={openDialog}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
-        >
-          View CSS
-        </button>
-        <button
-          type="button"
-          data-testid="btn-download-css"
-          onClick={downloadCss}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
-        >
-          Download CSS
-        </button>
+    <div data-testid="export-panel" className="space-y-3">
+      <div className="space-y-2">
         <button
           type="button"
           data-testid="btn-download-html-demo"
           onClick={downloadHtmlDemo}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50"
         >
           Download HTML demo
         </button>
+        <p
+          data-testid="export-html-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          Play in a browser without MotionSketch.
+        </p>
+
+        <button
+          type="button"
+          data-testid="btn-download-css"
+          onClick={downloadCss}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+        >
+          Download CSS
+        </button>
+        <p
+          data-testid="export-css-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          Use the animation on your website. Image assets are separate.
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            data-testid="btn-copy-css"
+            onClick={() => void copyCss('inline')}
+            className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+          >
+            {copiedInline ? 'Copied' : 'Copy CSS'}
+          </button>
+          <button
+            ref={viewBtnRef}
+            type="button"
+            data-testid="btn-view-css"
+            onClick={openDialog}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          >
+            View CSS
+          </button>
+        </div>
+        <p
+          data-testid="export-css-code-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          Copy CSS and View CSS provide the same animation code
+          {project.actors.length > 1
+            ? ' (unique classes per actor).'
+            : '.'}
+        </p>
       </div>
-      <p className="text-[11px] leading-relaxed text-slate-500">
-        {project.actors.length <= 1 ? (
-          <>
-            One shared stage and timeline. Drop the CSS next to your image (if
-            any) and use class <code className="text-[10px]">.actor</code> on the
-            element. HTML demo embeds assets offline.
-          </>
-        ) : (
-          <>
-            Shared timeline for every actor. CSS uses unique classes (
-            <code className="text-[10px]">.actor-1</code>, …). HTML demo embeds
-            all images offline.
-          </>
-        )}
-      </p>
+
+      <div className="border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          data-testid="btn-export-download-project"
+          onClick={downloadProjectFile}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+        >
+          Download project file
+        </button>
+        <p
+          data-testid="export-project-help"
+          className="mt-1 text-[11px] leading-relaxed text-slate-500"
+        >
+          Reopen and edit in MotionSketch. Also available under Project.
+        </p>
+      </div>
+
       {actionStatus && (
         <p data-testid="export-action-status" className="text-[11px] text-slate-600">
           {actionStatus}

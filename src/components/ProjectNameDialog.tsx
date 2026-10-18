@@ -37,10 +37,14 @@ export function ProjectNameDialog({
     if (!open) return
     setDraft(initialName)
     setError(null)
-    queueMicrotask(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    })
+  }, [open, initialName])
+
+  useEffect(() => {
+    if (!open) return
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    el.select()
   }, [open, initialName])
 
   if (!open) return null
