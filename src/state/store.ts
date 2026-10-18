@@ -63,6 +63,7 @@ import {
   type GeometryEdit,
   type LoopMode,
   type MotionSample,
+  type PlaybackTrigger,
   type Project,
   type Recording,
   type SceneActor,
@@ -151,6 +152,7 @@ interface EditorStore {
   setSteadySpeed: (value: number) => void
   setLoop: (loop: boolean) => void
   setLoopMode: (loopMode: LoopMode) => void
+  setPlaybackTrigger: (trigger: PlaybackTrigger) => void
   setShowPathComparison: (show: boolean) => void
   setActorColor: (color: string) => void
   setActorSize: (size: number) => void
@@ -610,6 +612,17 @@ export const useEditorStore = create<EditorStore>((set, get) => {
             ? state.playbackEpoch + 1
             : state.playbackEpoch,
         playbackDirection: loopMode === 'repeat' ? 1 : state.playbackDirection,
+      })),
+
+    setPlaybackTrigger: (trigger) =>
+      set((state) => ({
+        project: {
+          ...state.project,
+          playback: {
+            ...state.project.playback,
+            trigger,
+          },
+        },
       })),
 
     setShowPathComparison: (show) => set({ showPathComparison: show }),

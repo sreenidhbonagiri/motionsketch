@@ -65,6 +65,7 @@ function makePersistProject(overrides?: Partial<Project>): Project {
       durationMs: 1200,
       loop: true,
       loopMode: 'repeat',
+      trigger: 'page-load',
       ...(overrides?.playback ?? {}),
     },
     stageAspect: overrides?.stageAspect ?? 1.6,

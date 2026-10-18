@@ -50,6 +50,7 @@ export function makeProject(overrides?: Partial<Project>): Project {
       durationMs: 1200,
       loop: false,
       loopMode: 'repeat',
+      trigger: 'page-load',
     },
     stageAspect: overrides?.stageAspect ?? 1.6,
   }

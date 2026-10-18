@@ -57,6 +57,16 @@ export type LoopMode = 'repeat' | 'alternate'
  * Shared timeline settings. Duration, loop, and loopMode apply to every actor.
  * Per-actor path cleanup lives on SceneActor (smoothing / steadySpeed).
  */
+/**
+ * When an exported CSS scene starts. Loop / alternate still apply after start.
+ * @see src/core/export/triggers.ts
+ */
+export type PlaybackTrigger =
+  | 'page-load'
+  | 'click'
+  | 'hover'
+  | 'viewport'
+
 export interface PlaybackSettings {
   durationMs: number
   loop: boolean
@@ -66,6 +76,11 @@ export interface PlaybackSettings {
    * - alternate: reverse at endpoints (ping-pong)
    */
   loopMode: LoopMode
+  /**
+   * Export-time activation. Editor playback is unchanged.
+   * Missing / legacy → `page-load` (via coercePlaybackTrigger).
+   */
+  trigger?: PlaybackTrigger
 }
 
 /**
@@ -191,6 +206,7 @@ export const DEFAULT_PLAYBACK: PlaybackSettings = {
   durationMs: 1200,
   loop: false,
   loopMode: 'repeat',
+  trigger: 'page-load',
 }
 
 /** Default path-processing values for new actors (not shared timeline). */

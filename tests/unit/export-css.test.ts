@@ -54,7 +54,7 @@ describe('css export', () => {
     expect(keyframeBlock).not.toMatch(/\btop\s*:/)
     expect(css).not.toMatch(/\bease\b/)
     expect(css).toMatch(
-      /Example HTML:[\s\S]*<div class="ms-scene-[a-f0-9]{8}">[\s\S]*<div class="ms-stage">[\s\S]*<div class="ms-actor"><\/div>/,
+      /Example HTML:[\s\S]*<div class="ms-scene-[a-f0-9]{8}" data-ms-scene="[a-f0-9]{8}">[\s\S]*<div class="ms-stage">[\s\S]*<div class="ms-actor"><\/div>/,
     )
   })
 

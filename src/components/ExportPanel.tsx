@@ -3,6 +3,13 @@ import { exportCssFromProject } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
 import { buildWebPackage } from '../core/export/webPackage'
 import {
+  PLAYBACK_TRIGGERS,
+  coercePlaybackTrigger,
+  triggerHelpText,
+  triggerNeedsJavaScript,
+  type PlaybackTrigger,
+} from '../core/export/triggers'
+import {
   downloadBlob,
   downloadTextFile,
   stampProjectFilename,
@@ -15,19 +22,25 @@ import { useEditorStore } from '../state/store'
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
   const announceAction = useEditorStore((s) => s.announceAction)
+  const setPlaybackTrigger = useEditorStore((s) => s.setPlaybackTrigger)
   const { downloadCurrentProject } = useProjectPersistence()
 
   const [copiedInline, setCopiedInline] = useState(false)
   const [copiedDialog, setCopiedDialog] = useState(false)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
   const [packaging, setPackaging] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const previewRef = useRef<HTMLDialogElement>(null)
   const viewBtnRef = useRef<HTMLButtonElement>(null)
   const codeRef = useRef<HTMLTextAreaElement>(null)
   const titleId = useId()
   const packageStatusId = useId()
+  const triggerHelpId = useId()
+  const previewTitleId = useId()
 
   const hasExport = projectHasAnyRecording(project)
+  const trigger = coercePlaybackTrigger(project.playback.trigger)
 
   const css = useMemo(() => {
     if (!hasExport) return ''
@@ -153,9 +166,78 @@ export function ExportPanel() {
     dialogRef.current?.close()
   }
 
+  const openTriggerPreview = () => {
+    try {
+      const html = buildHtmlDemoFromProject(project)
+      setPreviewHtml(html)
+      previewRef.current?.showModal()
+    } catch {
+      announce('Couldn’t build the trigger preview.')
+    }
+  }
+
+  const closeTriggerPreview = () => {
+    previewRef.current?.close()
+    setPreviewHtml(null)
+  }
+
+  const onTriggerChange = (value: string) => {
+    const next = coercePlaybackTrigger(value)
+    setPlaybackTrigger(next as PlaybackTrigger)
+  }
+
   return (
     <div data-testid="export-panel" className="space-y-3">
       <div className="space-y-2">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium text-slate-800">
+            Playback trigger
+          </span>
+          <select
+            data-testid="export-trigger-select"
+            value={trigger}
+            aria-describedby={triggerHelpId}
+            onChange={(e) => onTriggerChange(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+          >
+            {PLAYBACK_TRIGGERS.map((mode) => (
+              <option key={mode} value={mode}>
+                {mode === 'page-load'
+                  ? 'Page load'
+                  : mode === 'click'
+                    ? 'Click / tap'
+                    : mode === 'hover'
+                      ? 'Hover / focus'
+                      : 'Enter viewport'}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p
+          id={triggerHelpId}
+          data-testid="export-trigger-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          {triggerHelpText(trigger)}
+          {triggerNeedsJavaScript(trigger)
+            ? ' Download CSS is CSS-only — this trigger needs the HTML demo or web package (includes ms-trigger.js).'
+            : ' Download CSS works alone for page-load.'}{' '}
+          Loop / alternate still apply after the scene starts.
+        </p>
+        <button
+          type="button"
+          data-testid="btn-preview-trigger"
+          onClick={openTriggerPreview}
+          disabled={packaging}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Preview trigger
+        </button>
+        <p className="text-[11px] leading-relaxed text-slate-500">
+          Isolated export preview — does not change the editor playhead,
+          recording, or undo history.
+        </p>
+
         <button
           type="button"
           data-testid="btn-download-html-demo"
@@ -205,8 +287,11 @@ export function ExportPanel() {
           className="text-[11px] leading-relaxed text-slate-500"
         >
           Scoped CSS for your site (scene root + keyframes). Image assets are
-          separate. See the header comments for reduced motion and instance
-          prefixes.
+          separate. See the header comments for reduced motion, triggers, and
+          instance prefixes.
+          {triggerNeedsJavaScript(trigger)
+            ? ' This project’s trigger requires JavaScript (not included in Download CSS).'
+            : ''}
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -305,6 +390,45 @@ export function ExportPanel() {
             wrap="off"
             className="css-export-code min-h-0 w-full flex-1 resize-none overflow-auto whitespace-pre bg-slate-50 p-4 text-slate-800 outline-none"
           />
+        </div>
+      </dialog>
+
+      <dialog
+        ref={previewRef}
+        data-testid="trigger-preview-dialog"
+        aria-labelledby={previewTitleId}
+        className="fixed inset-0 z-50 m-auto h-[min(85dvh,calc(100dvh-1.5rem))] w-[min(90vw,960px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40"
+        onClose={() => setPreviewHtml(null)}
+        onClick={(e) => {
+          if (e.target === previewRef.current) closeTriggerPreview()
+        }}
+      >
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <h2
+              id={previewTitleId}
+              className="text-sm font-semibold text-slate-900"
+            >
+              Trigger preview
+            </h2>
+            <button
+              type="button"
+              data-testid="btn-close-trigger-preview"
+              onClick={closeTriggerPreview}
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Close
+            </button>
+          </div>
+          {previewHtml && (
+            <iframe
+              title="Export trigger preview"
+              data-testid="trigger-preview-frame"
+              srcDoc={previewHtml}
+              sandbox="allow-scripts allow-same-origin"
+              className="min-h-0 w-full flex-1 border-0 bg-[#f4f6fb]"
+            />
+          )}
         </div>
       </dialog>
     </div>

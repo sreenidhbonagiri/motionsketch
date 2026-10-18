@@ -138,6 +138,7 @@ export function fingerprintProjectScene(project: Project): string {
     String(project.playback.durationMs),
     project.playback.loop ? '1' : '0',
     project.playback.loopMode,
+    project.playback.trigger ?? 'page-load',
     project.stageAspect.toFixed(6),
     String(project.actors.length),
     ...project.actors.map(actorDigest),

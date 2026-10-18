@@ -12,6 +12,7 @@ import {
   WEB_PACKAGE_HTML_NAME,
   WEB_PACKAGE_PROJECT_NAME,
   WEB_PACKAGE_README_NAME,
+  WEB_PACKAGE_TRIGGER_JS_NAME,
 } from '../../src/core/export/webPackage'
 import { parseSnapshotJson } from '../../src/core/persist/document'
 import { createSceneActor } from '../../src/core/sceneActor'
@@ -141,6 +142,7 @@ describe('web package export', () => {
         WEB_PACKAGE_HTML_NAME,
         WEB_PACKAGE_PROJECT_NAME,
         WEB_PACKAGE_README_NAME,
+        WEB_PACKAGE_TRIGGER_JS_NAME,
       ].sort(),
     )
 
@@ -164,7 +166,8 @@ describe('web package export', () => {
     expect(readme).toContain(result.scope.rootClass)
     expect(readme).toContain('assets/asset-01.png')
     expect(readme).toContain('assets/asset-02.svg')
-    expect(readme).toContain('instancePrefix')
+    expect(readme).toContain('MotionSketchTrigger.init')
+    expect(readme).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
     expect(readme).toContain(WEB_PACKAGE_PROJECT_NAME)
 
     const parsed = parseSnapshotJson(projectJson)

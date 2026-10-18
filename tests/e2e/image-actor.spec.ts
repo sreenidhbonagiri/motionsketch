@@ -127,7 +127,7 @@ test.describe('image actors', () => {
     const projPath = await proj.path()
     const projJson = fs.readFileSync(projPath!, 'utf8')
     const snap = JSON.parse(projJson)
-    expect(snap.formatVersion).toBe(9)
+    expect(snap.formatVersion).toBe(10)
     const appearance = snap.project.actors[0].appearance
     expect(appearance.kind).toBe('image')
     const assetId = appearance.image.assetId as string | undefined

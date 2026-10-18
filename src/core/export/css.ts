@@ -38,6 +38,12 @@ import {
   type ExportCssOptions,
   type ExportScope,
 } from './sceneScope'
+import {
+  coercePlaybackTrigger,
+  MS_WAITING_CLASS,
+  triggerNeedsJavaScript,
+  VIEWPORT_TRIGGER_THRESHOLD,
+} from './triggers'
 
 export type { ExportCssOptions, ExportScope } from './sceneScope'
 export {
@@ -455,6 +461,7 @@ export function generateProjectCss(
   const durationMs = project.playback.durationMs
   const loop = project.playback.loop
   const loopMode = project.playback.loopMode
+  const trigger = coercePlaybackTrigger(project.playback.trigger)
   const stageAspect = project.stageAspect
   const aspectCss = formatCssAspectRatio(stageAspect)
   const scope = resolveExportScope(project, options)
@@ -469,6 +476,25 @@ export function generateProjectCss(
     : loopMode === 'alternate'
       ? ' * Loop: back and forth (animation-direction: alternate). Duration is one way; a full cycle is 2×. Shared timeline.'
       : ' * Loop: repeat (infinite). Shared timeline for every actor. End and start may jump if they differ — no bridging segment is added.'
+
+  const triggerNote = (() => {
+    switch (trigger) {
+      case 'page-load':
+        return ' * Playback trigger: page-load (CSS starts immediately; no controller required).'
+      case 'click':
+        return ` * Playback trigger: click/tap — requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS} (paused at 0%).`
+      case 'hover':
+        return ` * Playback trigger: hover/focus — requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+      case 'viewport':
+        return ` * Playback trigger: enter-viewport (~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% visible, once) — requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+      default:
+        return ''
+    }
+  })()
+
+  const jsNote = triggerNeedsJavaScript(trigger)
+    ? ` * JavaScript required: include ms-trigger.js (web package) or the HTML demo controller. Download CSS alone is not enough for this trigger.\n *`
+    : ' *'
 
   const actorCount = project.actors.length
   const htmlParts = project.actors.map((actor, index) => {
@@ -511,6 +537,14 @@ export function generateProjectCss(
     .join('\n')
 
   const stageSelector = scopedStageSelector(scope)
+  const waitingBlock = triggerNeedsJavaScript(trigger)
+    ? `
+/* Hold at project progress 0 until MotionSketchTrigger removes .${MS_WAITING_CLASS}. */
+.${scope.rootClass}.${MS_WAITING_CLASS} [class^="ms-actor"] {
+  animation-play-state: paused !important;
+}
+`
+    : ''
   const reducedMotionBlock = `
 @media (prefers-reduced-motion: reduce) {
   .${scope.rootClass}:not(.${MS_MOTION_OK_CLASS}) [class^="ms-actor"] {
@@ -533,8 +567,16 @@ export function generateProjectCss(
  * Reduced motion:
  * - Under prefers-reduced-motion: reduce, animations stay off until the scene root
  *   also has class "${MS_MOTION_OK_CLASS}" (set by an explicit Play control).
+ * - Automatic triggers never override reduced-motion; Play opts in.
  * - The static pose uses each actor’s base transform (clip-start / rest) and forces
  *   visibility so hide-before/hide-after cannot blank the scene.
+ *
+ * Playback trigger:
+${triggerNote}
+${jsNote}
+ * Looping scenes keep running after a trigger until paused or restarted.
+ * Embedding API (when JS is included): MotionSketchTrigger.init(root, options),
+ *   .play() / .pause() / .resume() / .restart() / .destroy().
  *
  * Positioning:
  * - Place actors inside .${scope.stageClass} (position: relative; container-type: size).
@@ -554,7 +596,7 @@ ${loopNote}
  *   Ncqmin → (N / 100) * min(stageWidth, stageHeight)
  *
  * Example HTML:
- * <div class="${scope.rootClass}">
+ * <div class="${scope.rootClass}${triggerNeedsJavaScript(trigger) ? ` ${MS_WAITING_CLASS}` : ''}" data-ms-scene="${scope.sceneId}">
  *   <div class="${scope.stageClass}">
  *     ${htmlParts.join('\n *     ')}
  *   </div>
@@ -569,7 +611,7 @@ ${stageSelector} {
 }
 
 ${actorBlocks}
-${reducedMotionBlock}`
+${waitingBlock}${reducedMotionBlock}`
 }
 
 /** @deprecated single-actor helper — prefer generateProjectCss */
@@ -615,6 +657,7 @@ export function generateCssSnippet(options: {
       durationMs: options.durationMs,
       loop: options.loop ?? false,
       loopMode: options.loopMode ?? 'repeat',
+      trigger: 'page-load',
     },
     stageAspect: options.stageAspect ?? LEGACY_STAGE_ASPECT,
   }
@@ -680,6 +723,7 @@ export function exportCssFromRecording(options: {
       durationMs: options.durationMs,
       loop: options.loop ?? false,
       loopMode: options.loopMode ?? 'repeat',
+      trigger: 'page-load',
     },
     stageAspect: options.stageAspect ?? LEGACY_STAGE_ASPECT,
   }

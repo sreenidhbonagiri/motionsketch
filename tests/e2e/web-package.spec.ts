@@ -164,7 +164,8 @@ test.describe('web package export', () => {
     expect(html).not.toMatch(/https?:\/\//i)
     expect(css).toContain('@keyframes')
     expect(readme).toContain('assets/asset-01.png')
-    expect(readme).toContain('instancePrefix')
+    expect(readme).toContain('MotionSketchTrigger.init')
+    expect(readme).toContain('ms-trigger.js')
 
     const unzipped = unzipSync(new Uint8Array(readFileSync(zipPath!)))
     const assetNames = Object.keys(unzipped).filter((k) =>
@@ -202,15 +203,9 @@ test.describe('web package export', () => {
     expect(animAfter).not.toBe('none')
 
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await expect(page.getByTestId('demo-replay')).toHaveAttribute(
-      'data-demo-mode',
-      'play',
-    )
+    await expect(page.getByTestId('demo-replay')).toHaveText('Play animation')
     await page.getByTestId('demo-replay').click()
-    await expect(page.getByTestId('demo-replay')).toHaveAttribute(
-      'data-demo-mode',
-      'replay',
-    )
+    await expect(page.getByTestId('demo-replay')).toHaveText('Replay')
     const root = page.getByTestId('demo-scene')
     await expect(root).toHaveClass(/ms-motion-ok/)
 

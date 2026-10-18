@@ -16,11 +16,21 @@ import { makeGeometryEdit } from '../edit'
 import { exportCssFromProject, resolveExportScope } from './css'
 import { fullClip } from '../clip'
 import {
-  MS_MOTION_OK_CLASS,
   scopedActorClass,
   type ExportCssOptions,
   type ExportScope,
 } from './sceneScope'
+import {
+  buildTriggerBootScript,
+  buildTriggerControllerOptions,
+  buildTriggerControllerSource,
+} from './triggerController'
+import {
+  coercePlaybackTrigger,
+  MS_WAITING_CLASS,
+  triggerNeedsJavaScript,
+  type PlaybackTrigger,
+} from './triggers'
 
 export interface HtmlDemoOptions {
   samples: MotionSample[]
@@ -43,6 +53,11 @@ export type HtmlDemoBuildOptions = ExportCssOptions & {
   stylesheetHref?: string
   /** Override image `src` (default: embedded data URL). */
   resolveImageSrc?: (image: ActorImage) => string
+  /**
+   * When set, link the trigger controller instead of inlining
+   * (web package uses `ms-trigger.js`).
+   */
+  triggerScriptHref?: string
 }
 
 /**
@@ -107,7 +122,17 @@ body {
   box-shadow: 0 16px 48px rgba(15, 23, 42, 0.1);
 }
 
-.demo-replay {
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.demo-replay,
+.demo-pause,
+.demo-hover-tap {
   appearance: none;
   border: 1px solid #e2e8f0;
   background: #fff;
@@ -120,13 +145,26 @@ body {
   cursor: pointer;
 }
 
-.demo-replay:hover {
+.demo-replay:hover,
+.demo-pause:hover,
+.demo-hover-tap:hover {
   background: #f8fafc;
 }
 
-.demo-replay:focus-visible {
+.demo-replay:focus-visible,
+.demo-pause:focus-visible,
+.demo-hover-tap:focus-visible,
+.${scope.rootClass}:focus-visible {
   outline: 2px solid #4f46e5;
   outline-offset: 2px;
+}
+
+.demo-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+  max-width: 28rem;
 }`
 }
 
@@ -153,74 +191,21 @@ function buildActorMarkup(
     .join('\n          ')
 }
 
-function demoReplayScript(
-  scope: ExportScope,
-  actorClassList: string[],
-): string {
-  return `(function () {
-  var root = document.querySelector('[data-ms-scene="${scope.sceneId}"]');
-  var button = document.getElementById('replay');
-  var actorClasses = ${JSON.stringify(actorClassList)};
-  var motionOk = ${JSON.stringify(MS_MOTION_OK_CLASS)};
-  if (!root || !button) return;
-
-  var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-  function actors() {
-    return actorClasses.map(function (cls) {
-      return root.querySelector('.' + cls);
-    }).filter(Boolean);
+function triggerHint(trigger: PlaybackTrigger): string {
+  switch (trigger) {
+    case 'click':
+      return 'Click or tap the scene (or press Enter / Space when focused) to play. Looping continues until you pause.'
+    case 'hover':
+      return 'Hover or focus the scene to play once. On touch, use Tap to play. Leaving does not stop a running loop.'
+    case 'viewport':
+      return 'Plays once when enough of the scene is on screen. Use Play if it never appears.'
+    default:
+      return 'Plays on page load. Prefer reduced motion? Use Play animation.'
   }
-
-  function restartAnimations() {
-    actors().forEach(function (el) {
-      el.style.animation = 'none';
-      void el.offsetWidth;
-      el.style.removeProperty('animation');
-    });
-  }
-
-  function syncLabel() {
-    if (mq.matches && !root.classList.contains(motionOk)) {
-      button.textContent = 'Play animation';
-      button.setAttribute('data-demo-mode', 'play');
-    } else {
-      button.textContent = 'Replay';
-      button.setAttribute('data-demo-mode', 'replay');
-    }
-  }
-
-  function onPreferenceChange() {
-    if (!mq.matches) {
-      // Preference cleared: resume default autoplay semantics (no opt-in class).
-      root.classList.remove(motionOk);
-      restartAnimations();
-    } else if (!root.classList.contains(motionOk)) {
-      // Reduced motion engaged while idle: ensure static presentation.
-      restartAnimations();
-    }
-    syncLabel();
-  }
-
-  button.addEventListener('click', function () {
-    if (mq.matches) {
-      root.classList.add(motionOk);
-    }
-    restartAnimations();
-    syncLabel();
-  });
-
-  if (typeof mq.addEventListener === 'function') {
-    mq.addEventListener('change', onPreferenceChange);
-  } else if (typeof mq.addListener === 'function') {
-    mq.addListener(onPreferenceChange);
-  }
-  syncLabel();
-})();`
 }
 
 /**
- * Offline preview HTML with scene-scoped Play/Replay controls.
+ * Offline preview HTML with scene-scoped trigger controls.
  * Shared by the single-file HTML demo and the web package `index.html`.
  */
 export function buildHtmlDemoFromProject(
@@ -234,6 +219,16 @@ export function buildHtmlDemoFromProject(
     throw new Error('Refusing to embed CSS that failed safety checks.')
   }
 
+  const trigger = coercePlaybackTrigger(project.playback.trigger)
+  const ctlOptions = buildTriggerControllerOptions({
+    trigger,
+    loop: project.playback.loop,
+    durationMs: project.playback.durationMs,
+  })
+  const waitingClass = triggerNeedsJavaScript(trigger)
+    ? ` ${MS_WAITING_CLASS}`
+    : ''
+
   const stylesheetHref = options.stylesheetHref?.replace(/"/g, '').trim()
   const cssBlock = stylesheetHref
     ? `<link rel="stylesheet" href="${stylesheetHref}">`
@@ -241,11 +236,17 @@ export function buildHtmlDemoFromProject(
 ${css}
 </style>`
 
+  const triggerHref = options.triggerScriptHref?.replace(/"/g, '').trim()
+  const controllerBlock = triggerHref
+    ? `<script src="${triggerHref}"></script>`
+    : `<script>
+${buildTriggerControllerSource()}
+</script>`
+
   const chromeCss = demoChromeCss(stageAspect, scope)
   const actorMarkup = buildActorMarkup(project, options.resolveImageSrc)
-  const actorClassList = project.actors.map((_, i) =>
-    scopedActorClass(i, project.actors.length),
-  )
+  const offerPause = ctlOptions.offerPause
+  const showHoverTap = trigger === 'hover'
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -259,18 +260,32 @@ ${chromeCss}
 ${cssBlock}
 </head>
 <body>
-  <div class="demo-shell">
+  <div class="demo-shell" data-ms-demo-shell data-testid="demo-shell">
     <div class="demo-frame">
-      <div class="${scope.rootClass}" data-ms-scene="${scope.sceneId}" data-testid="demo-scene">
+      <div class="${scope.rootClass}${waitingClass}" data-ms-scene="${scope.sceneId}" data-testid="demo-scene" data-ms-trigger="${trigger}">
         <div class="${scope.stageClass}" data-testid="demo-stage">
           ${actorMarkup}
         </div>
       </div>
     </div>
-    <button type="button" class="demo-replay" data-testid="demo-replay" id="replay">Replay</button>
+    <div class="demo-controls" data-ms-chrome data-testid="demo-controls">
+      <button type="button" class="demo-replay" data-testid="demo-replay" data-ms-play data-ms-chrome>Play animation</button>
+      ${
+        offerPause
+          ? `<button type="button" class="demo-pause" data-testid="demo-pause" data-ms-pause data-ms-chrome hidden>Pause</button>`
+          : ''
+      }
+      ${
+        showHoverTap
+          ? `<button type="button" class="demo-hover-tap" data-testid="demo-hover-tap" data-ms-hover-tap data-ms-chrome>Tap to play</button>`
+          : ''
+      }
+    </div>
+    <p class="demo-hint" data-testid="demo-trigger-hint">${escapeHtmlText(triggerHint(trigger))}</p>
   </div>
+${controllerBlock}
   <script>
-${demoReplayScript(scope, actorClassList)}
+${buildTriggerBootScript(scope.sceneId, ctlOptions)}
   </script>
 </body>
 </html>
@@ -323,6 +338,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
       durationMs,
       loop: options.loop ?? false,
       loopMode: options.loopMode ?? 'repeat',
+      trigger: 'page-load',
     },
     stageAspect,
   }

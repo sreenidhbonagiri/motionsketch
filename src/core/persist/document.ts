@@ -16,6 +16,7 @@ import {
   DEFAULT_PROJECT_NAME,
   sanitizeProjectName,
 } from '../projectName'
+import { coercePlaybackTrigger, isPlaybackTrigger } from '../export/triggers'
 import {
   DEFAULT_PLAYBACK,
   DEFAULT_STAGE_ASPECT,
@@ -37,8 +38,9 @@ import {
  * v7: project.name (older files migrate to “Untitled project”).
  * v8: clip.hideBeforeStart / clip.hideAfterEnd (older → both off).
  * v9: geometryEdit.handleIndices (older → evenly spaced defaults).
+ * v10: playback.trigger (older → page-load; export activation only).
  */
-export const PERSIST_FORMAT_VERSION = 9 as const
+export const PERSIST_FORMAT_VERSION = 10 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
@@ -47,6 +49,7 @@ export const PERSIST_FORMAT_VERSION_V5 = 5 as const
 export const PERSIST_FORMAT_VERSION_V6 = 6 as const
 export const PERSIST_FORMAT_VERSION_V7 = 7 as const
 export const PERSIST_FORMAT_VERSION_V8 = 8 as const
+export const PERSIST_FORMAT_VERSION_V9 = 9 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -120,6 +123,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   const supported = [
     PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V9,
     PERSIST_FORMAT_VERSION_V8,
     PERSIST_FORMAT_VERSION_V7,
     PERSIST_FORMAT_VERSION_V6,
@@ -207,6 +211,9 @@ export function validateSnapshot(data: unknown): PersistParseResult {
           durationMs: legacy.value.playback.durationMs,
           loop: legacy.value.playback.loop,
           loopMode: legacy.value.playback.loopMode,
+          trigger: coercePlaybackTrigger(
+            (legacy.value.playback as { trigger?: unknown }).trigger,
+          ),
         },
         stageAspect: legacy.value.stageAspect,
       },
@@ -537,12 +544,24 @@ function validatePlayback(
     return { ok: false, error: 'playback.loop must be a boolean.' }
   }
   const loopMode = coerceLoopMode(value.loopMode)
+  // Missing trigger (v1–v9) → page-load. Present but invalid → reject import.
+  if (value.trigger !== undefined && value.trigger !== null) {
+    if (!isPlaybackTrigger(value.trigger)) {
+      return {
+        ok: false,
+        error:
+          'playback.trigger must be one of: page-load, click, hover, viewport.',
+      }
+    }
+  }
+  const trigger = coercePlaybackTrigger(value.trigger)
   return {
     ok: true,
     value: {
       durationMs: Math.round(durationMs),
       loop: value.loop,
       loopMode,
+      trigger,
     },
   }
 }

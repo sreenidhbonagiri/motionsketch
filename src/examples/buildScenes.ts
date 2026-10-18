@@ -49,7 +49,7 @@ export function buildLogoEntranceProject(): Project {
     version: 1,
     name: 'Logo entrance',
     stageAspect: EXAMPLE_STAGE_ASPECT,
-    playback: { durationMs, loop: false, loopMode: 'repeat' },
+    playback: { durationMs, loop: false, loopMode: 'repeat', trigger: 'page-load' },
     actors: [
       createSceneActor({
         id: 'ex-logo',
@@ -98,7 +98,7 @@ export function buildFollowTheLeaderProject(): Project {
     version: 1,
     name: 'Follow the leader',
     stageAspect: EXAMPLE_STAGE_ASPECT,
-    playback: { durationMs, loop: false, loopMode: 'repeat' },
+    playback: { durationMs, loop: false, loopMode: 'repeat', trigger: 'page-load' },
     actors: [
       createSceneActor({
         id: 'ex-lead',
@@ -177,7 +177,7 @@ export function buildOrbitProject(): Project {
     version: 1,
     name: 'Orbit',
     stageAspect: EXAMPLE_STAGE_ASPECT,
-    playback: { durationMs, loop: true, loopMode: 'repeat' },
+    playback: { durationMs, loop: true, loopMode: 'repeat', trigger: 'page-load' },
     actors: [
       createSceneActor({
         id: 'ex-hub',
