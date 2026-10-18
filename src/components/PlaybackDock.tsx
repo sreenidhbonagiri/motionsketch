@@ -176,7 +176,7 @@ export function PlaybackDock() {
   return (
     <div
       data-testid="playback-dock"
-      className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md"
+      className="pointer-events-auto flex w-full max-w-2xl shrink-0 flex-col gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md"
       onPointerDown={(e) => e.stopPropagation()}
     >
       {hasAnyRecording && !editing && (

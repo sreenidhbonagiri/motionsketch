@@ -338,12 +338,12 @@ export function EditorShell() {
         </div>
       )}
 
-      {/* Bottom dock */}
+      {/* Bottom dock — min-h-0 so Sequence can shrink and scroll inside the slot */}
       <div
         data-testid="toolbar-slot"
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex max-h-[100dvh] flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
       >
-        <div className="flex w-full max-w-2xl flex-col items-center gap-2">
+        <div className="flex min-h-0 w-full max-w-2xl flex-col items-center gap-2">
           {!editing && !polishSession && <ClipTimeline />}
           {polishSession && <PolishPanel />}
           <PlaybackDock />

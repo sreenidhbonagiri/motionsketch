@@ -4,11 +4,11 @@ import {
   useId,
   useRef,
   useState,
+  type FormEvent,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
-  MIN_CLIP_SPAN,
   clampClip,
   cloneClip,
   clipFromSeconds,
@@ -27,8 +27,24 @@ type DragKind = 'move' | 'start' | 'end'
 
 const SEQUENCE_HINT_KEY = 'motionsketch.sequenceHintDismissed'
 
+/** Display / spinner precision for Start at and Move for (seconds). */
+const SEQUENCE_TIME_STEP = 0.01
+
+/**
+ * Max height for the expanded Sequence sheet: leave room for the playback
+ * dock, slot padding, and safe-area insets so the header/Collapse stay on
+ * screen and the dock remains reachable.
+ */
+const SEQUENCE_PANEL_MAX_HEIGHT =
+  'min(36rem, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8.5rem))'
+
 function formatSec(sec: number): string {
   return sec.toFixed(2)
+}
+
+/** Suppress native step/min tooltips; Apply uses our inline validation. */
+function suppressNativeInvalid(event: FormEvent<HTMLInputElement>) {
+  event.preventDefault()
 }
 
 /**
@@ -312,24 +328,45 @@ export function ClipTimeline() {
   return (
     <div
       data-testid="clip-timeline"
-      className="pointer-events-auto w-full rounded-2xl border border-white/80 bg-white/92 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md"
+      data-sequence-open={open ? 'true' : 'false'}
+      className={`pointer-events-auto flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/92 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md ${
+        open ? 'max-sm:rounded-b-none' : ''
+      }`}
+      style={open ? { maxHeight: SEQUENCE_PANEL_MAX_HEIGHT } : undefined}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <button
-        type="button"
-        data-testid="btn-toggle-clip-timeline"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-800"
+      <div
+        data-testid="sequence-header"
+        className="flex shrink-0 items-stretch border-b border-transparent"
       >
-        <span>Sequence</span>
-        <span aria-hidden className="text-slate-400">
-          {open ? '▾' : '▸'}
-        </span>
-      </button>
+        <button
+          type="button"
+          data-testid="btn-toggle-clip-timeline"
+          aria-expanded={open}
+          aria-controls="sequence-panel-body"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-800"
+        >
+          <span>Sequence</span>
+          <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-600">
+            {open ? (
+              <span data-testid="sequence-collapse-label">Collapse</span>
+            ) : (
+              <span className="sr-only">Expand</span>
+            )}
+            <span aria-hidden className="text-slate-400">
+              {open ? '▾' : '▸'}
+            </span>
+          </span>
+        </button>
+      </div>
 
       {open && (
-        <div className="space-y-2 border-t border-slate-100 px-2.5 pb-2.5 pt-2">
+        <div
+          id="sequence-panel-body"
+          data-testid="sequence-panel-body"
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain border-t border-slate-100 px-2.5 pb-2.5 pt-2"
+        >
           <p
             data-testid="clip-timeline-help"
             className="text-xs text-slate-600"
@@ -376,7 +413,7 @@ export function ClipTimeline() {
 
           <div
             data-testid="clip-timeline-rows"
-            className="max-h-44 space-y-1.5 overflow-auto"
+            className="space-y-1.5"
             role="list"
             aria-label="Actor sequence"
           >
@@ -512,7 +549,7 @@ export function ClipTimeline() {
                     data-testid="clip-start-input"
                     type="number"
                     inputMode="decimal"
-                    step={0.05}
+                    step={SEQUENCE_TIME_STEP}
                     min={0}
                     max={durationSec}
                     disabled={busy}
@@ -521,6 +558,7 @@ export function ClipTimeline() {
                     aria-describedby={draftDescribedBy}
                     onChange={(e) => markDraft(e.target.value, moveForDraft)}
                     onKeyDown={onDraftKeyDown}
+                    onInvalid={suppressNativeInvalid}
                     className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>
@@ -531,8 +569,8 @@ export function ClipTimeline() {
                     data-testid="clip-move-for-input"
                     type="number"
                     inputMode="decimal"
-                    step={0.05}
-                    min={MIN_CLIP_SPAN * durationSec}
+                    step={SEQUENCE_TIME_STEP}
+                    min={0}
                     max={durationSec}
                     disabled={busy}
                     value={moveForDraft}
@@ -540,6 +578,7 @@ export function ClipTimeline() {
                     aria-describedby={draftDescribedBy}
                     onChange={(e) => markDraft(startDraft, e.target.value)}
                     onKeyDown={onDraftKeyDown}
+                    onInvalid={suppressNativeInvalid}
                     className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>

@@ -76,3 +76,41 @@ export function buildClipsTimingFixtureJson(
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }
+
+/** Eight actors for Sequence overflow / scroll regression coverage. */
+export function buildSequenceCrowdFixtureJson(
+  savedAt = '2026-01-01T00:00:00.000Z',
+): string {
+  const actors = Array.from({ length: 8 }, (_, i) => {
+    const start = Math.min(0.7, i * 0.08)
+    const end = Math.min(1, start + 0.25)
+    return createSceneActor({
+      id: `seq-crowd-${i + 1}`,
+      name: `Actor ${i + 1}`,
+      recording: pathRecording(
+        12,
+        { x: 0.2 + (i % 4) * 0.12, y: 0.3 + Math.floor(i / 4) * 0.2 },
+        { x: 0.55 + (i % 3) * 0.1, y: 0.55 },
+      ),
+      clip: {
+        start,
+        end,
+        hideBeforeStart: false,
+        hideAfterEnd: false,
+      },
+    })
+  })
+  const project: Project = {
+    version: 1,
+    name: 'Sequence crowd fixture',
+    actors,
+    playback: {
+      durationMs: 4000,
+      loop: false,
+      loopMode: 'repeat',
+      trigger: 'page-load',
+    },
+    stageAspect: 1.6,
+  }
+  return serializeSnapshot(buildSnapshot(project, null, savedAt))
+}

@@ -82,6 +82,15 @@ describe('clip mapping', () => {
       expect(ok.endSec).toBe(1.6)
     }
   })
+
+  it('accepts hundredth-second Start at values such as 0.97', () => {
+    const ok = validateClipStartMoveForDraft('0.97', '0.80', 2000)
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      expect(ok.startSec).toBeCloseTo(0.97, 5)
+      expect(ok.endSec).toBeCloseTo(1.77, 5)
+    }
+  })
 })
 
 describe('clip evaluation parity', () => {
