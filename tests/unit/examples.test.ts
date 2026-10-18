@@ -79,6 +79,10 @@ describe('starter examples', () => {
     const blank = createEmptyPersistableProject()
     expect(projectHasMeaningfulWork(blank)).toBe(false)
 
+    const renamedOnly = createEmptyPersistableProject()
+    renamedOnly.name = 'Sky Path'
+    expect(projectHasMeaningfulWork(renamedOnly)).toBe(true)
+
     const recolored = makeProject({
       actors: [
         makeActor({

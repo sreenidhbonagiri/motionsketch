@@ -12,7 +12,6 @@ import { getAppPersistenceController } from '../lib/persistenceController'
 import { useEditorStore } from '../state/store'
 import { ExamplePreviewStage } from './ExamplePreviewStage'
 import { ExampleThumbnail } from './ExampleThumbnail'
-import { ProjectNameDialog } from './ProjectNameDialog'
 
 interface ExampleGalleryProps {
   onClose: () => void
@@ -49,13 +48,9 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
   const titleId = useId()
   const [activeId, setActiveId] = useState<ExampleId | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pendingExampleId, setPendingExampleId] = useState<ExampleId | null>(
-    null,
-  )
   const reducedMotion = usePrefersReducedMotion()
 
   const project = useEditorStore((s) => s.project)
-  const workspace = useEditorStore((s) => s.workspace)
   const applyPersistedSnapshot = useEditorStore((s) => s.applyPersistedSnapshot)
   const announceAction = useEditorStore((s) => s.announceAction)
 
@@ -112,44 +107,31 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
 
   const handleUse = (id: ExampleId) => {
     setError(null)
-    if (workspace === 'editing' && projectHasMeaningfulWork(project)) {
+    if (projectHasMeaningfulWork(project)) {
       const ok = window.confirm(
         'Load this example? It replaces your current project, including actors, appearance, and motion.',
       )
       if (!ok) return
     }
-    // Name the project before replacing — cancel leaves the current project.
-    setPendingExampleId(id)
-  }
-
-  const pendingExample = pendingExampleId
-    ? EXAMPLE_CATALOG.find((e) => e.id === pendingExampleId)
-    : null
-
-  const finishUseExample = (name: string) => {
-    if (!pendingExampleId) return
-    const loaded = loadExampleSnapshot(pendingExampleId, name)
+    const loaded = loadExampleSnapshot(id)
     if (!loaded.ok) {
       setError(loaded.error)
-      setPendingExampleId(null)
       return
     }
     applyPersistedSnapshot(loaded.snapshot)
     getAppPersistenceController().afterSuccessfulReplace()
     announceAction(
-      `Loaded example “${loaded.title}” as “${loaded.snapshot.project.name}”. You can edit it like any project.`,
+      `Loaded example “${loaded.title}”. You can edit it like any project.`,
     )
-    setPendingExampleId(null)
     onClose()
   }
 
   return (
-    <>
     <div
       data-testid="examples-gallery-root"
       className="pointer-events-auto fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/35 p-3 sm:items-center"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !pendingExampleId) onClose()
+        if (event.target === event.currentTarget) onClose()
       }}
     >
       <div
@@ -261,16 +243,5 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
         </div>
       </div>
     </div>
-
-    <ProjectNameDialog
-      open={pendingExampleId !== null}
-      title="Name this project"
-      description="The example loads as a normal editable project under this name."
-      confirmLabel="Use this example"
-      initialName={pendingExample?.title ?? ''}
-      onCancel={() => setPendingExampleId(null)}
-      onConfirm={finishUseExample}
-    />
-    </>
   )
 }

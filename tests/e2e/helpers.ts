@@ -1,24 +1,23 @@
 import { expect, type Page } from '@playwright/test'
 
 /**
- * From a first visit (welcome screen), create a named project and enter the editor.
- * No-ops if the editor is already showing (e.g. restored save).
+ * Wait for the editor canvas. Optionally rename the project header.
+ * No-ops the rename when the name already matches.
  */
-export async function ensureEditor(
-  page: Page,
-  name = 'Test project',
-) {
-  const welcome = page.getByTestId('welcome-screen')
-  if (await welcome.isVisible().catch(() => false)) {
-    await page.getByTestId('btn-welcome-create').click()
-    await expect(page.getByTestId('project-name-dialog')).toBeVisible()
-    await page.getByTestId('project-name-input').fill(name)
-    await page.getByTestId('btn-confirm-project-name').click()
-    await expect(page.getByTestId('app-shell')).toBeVisible()
-    await expect(page.getByTestId('btn-rename-project')).toContainText(name)
-    return
-  }
+export async function ensureEditor(page: Page, name?: string) {
   await expect(page.getByTestId('app-shell')).toBeVisible()
+  await expect(page.getByTestId('welcome-screen')).toHaveCount(0)
+  await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
+  if (!name) return
+  const renameBtn = page.getByTestId('btn-rename-project')
+  const current = (await renameBtn.textContent())?.trim()
+  if (current === name) return
+  await renameBtn.click()
+  const input = page.getByTestId('header-project-name-input')
+  await expect(input).toBeFocused()
+  await input.fill(name)
+  await input.press('Enter')
+  await expect(renameBtn).toHaveText(name)
 }
 
 export async function dragActor(

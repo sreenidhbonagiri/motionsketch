@@ -27,7 +27,7 @@ test.describe('downloadable exports', () => {
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-css').click()
     const download = await downloadPromise
-    expect(download.suggestedFilename()).toMatch(/test-project-.*\.css/)
+    expect(download.suggestedFilename()).toMatch(/untitled-project-.*\.css/)
     const saved = await readDownloadText(download)
     expect(saved).toBe(viewed)
     await expect(page.getByTestId('export-action-status')).toHaveText(
@@ -55,7 +55,7 @@ test.describe('downloadable exports', () => {
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
-    expect(download.suggestedFilename()).toMatch(/test-project-demo-.*\.html/)
+    expect(download.suggestedFilename()).toMatch(/untitled-project-demo-.*\.html/)
     await expect(page.getByTestId('export-action-status')).toHaveText(
       'HTML demo download started.',
     )

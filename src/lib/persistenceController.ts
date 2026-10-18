@@ -13,6 +13,7 @@ import {
 import { captureViewportStageAspect } from '../core/stageAspect'
 import { createEmptyPersistableProject } from '../core/persist/document'
 import type { Project } from '../core/types'
+import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import { downloadTextFile, stampFilename, stampProjectFilename } from './download'
 import { useEditorStore } from '../state/store'
 
@@ -62,6 +63,7 @@ export function isSliderOnlyChange(
     loopMode: prev.project.playback.loopMode,
     version: prev.project.version,
     actorCount: prev.project.actors.length,
+    projectName: prev.project.name,
   })
   const nextAnchor = JSON.stringify({
     actors: next.project.actors.map((a) => ({
@@ -75,6 +77,7 @@ export function isSliderOnlyChange(
     loopMode: next.project.playback.loopMode,
     version: next.project.version,
     actorCount: next.project.actors.length,
+    projectName: next.project.name,
   })
   if (prevAnchor !== nextAnchor) return false
 
@@ -130,6 +133,22 @@ export function getAppPersistenceController(): PersistenceController {
   return appController
 }
 
+function enterFreshUntitledCanvas() {
+  const fresh = createEmptyPersistableProject(captureViewportStageAspect())
+  useEditorStore.setState({
+    project: fresh,
+    selectedActorId: fresh.actors[0].id,
+    livePosition: { ...fresh.actors[0].restPosition },
+    mode: 'idle',
+    playbackHead: 0,
+    playbackDirection: 1,
+    liveTrail: [],
+    showPathComparison: false,
+    stageHint: 'default',
+    actionAnnouncement: null,
+  })
+}
+
 export function createPersistenceController(
   storage: StorageAdapter | null = getLocalStorageAdapter(),
 ): PersistenceController {
@@ -152,6 +171,9 @@ export function createPersistenceController(
 
   const writeSlice = (slice: PersistableSlice) => {
     if (disposed || saveBlocked) return
+    // Never persist an untouched blank untitled canvas.
+    if (!projectHasMeaningfulWork(slice.project)) return
+
     if (!storage) {
       setStatus('save-error')
       return
@@ -177,6 +199,7 @@ export function createPersistenceController(
     mode: 'immediate' | 'debounce',
   ) => {
     if (disposed || saveBlocked) return
+    if (!projectHasMeaningfulWork(slice.project)) return
     if (timer) {
       clearTimeout(timer)
       timer = null
@@ -199,13 +222,24 @@ export function createPersistenceController(
     }
   }
 
-  const onStoreChange = (
-    state: { project: Project; workspace?: string },
-    prev: { project: Project; workspace?: string },
-  ) => {
-    // Never autosave the welcome placeholder — no intentional project yet.
-    if (state.workspace === 'welcome') return
+  const clearActiveSaveKeepingCanvas = () => {
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
+    if (storage) {
+      clearStoredSnapshot(storage)
+    }
+    lastWrittenFingerprint = ''
+    quarantineRaw = null
+    saveBlocked = false
+    setStatus('idle')
+  }
 
+  const onStoreChange = (
+    state: { project: Project },
+    prev: { project: Project },
+  ) => {
     // Playhead/direction/mode UI updates keep the same project reference —
     // bail before any JSON serialization or image-bearing snapshots.
     if (state.project === prev.project) return
@@ -213,6 +247,10 @@ export function createPersistenceController(
     const next = pickPersistable(state)
     const previous = pickPersistable(prev)
     if (persistableEqual(next, previous)) return
+
+    // Untouched blank canvas: do not create a stored project.
+    if (!projectHasMeaningfulWork(next.project)) return
+
     if (fingerprint(next) === lastWrittenFingerprint) return
 
     const mode = isSliderOnlyChange(previous, next) ? 'debounce' : 'immediate'
@@ -243,29 +281,15 @@ export function createPersistenceController(
 
       if (!storage) {
         setStatus('save-error')
-        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
-        useEditorStore.setState({
-          workspace: 'welcome',
-          project: fresh,
-          selectedActorId: fresh.actors[0].id,
-          livePosition: { ...fresh.actors[0].restPosition },
-        })
+        enterFreshUntitledCanvas()
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
 
       const loaded = loadStoredSnapshot(storage)
       if (loaded.status === 'empty') {
-        // No saved project: stay on the welcome screen and do not persist a blank.
-        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
-        useEditorStore.setState({
-          workspace: 'welcome',
-          project: fresh,
-          selectedActorId: fresh.actors[0].id,
-          livePosition: { ...fresh.actors[0].restPosition },
-          mode: 'idle',
-          playbackHead: 0,
-        })
+        // Fresh untitled canvas — do not persist until meaningful work.
+        enterFreshUntitledCanvas()
         lastWrittenFingerprint = ''
         setStatus('idle')
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
@@ -274,13 +298,7 @@ export function createPersistenceController(
 
       if (loaded.status === 'error') {
         setStatus('restore-error')
-        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
-        useEditorStore.setState({
-          workspace: 'welcome',
-          project: fresh,
-          selectedActorId: fresh.actors[0].id,
-          livePosition: { ...fresh.actors[0].restPosition },
-        })
+        enterFreshUntitledCanvas()
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
@@ -289,13 +307,7 @@ export function createPersistenceController(
         quarantineRaw = loaded.raw
         saveBlocked = true
         setStatus('restore-error')
-        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
-        useEditorStore.setState({
-          workspace: 'welcome',
-          project: fresh,
-          selectedActorId: fresh.actors[0].id,
-          livePosition: { ...fresh.actors[0].restPosition },
-        })
+        enterFreshUntitledCanvas()
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
@@ -307,7 +319,6 @@ export function createPersistenceController(
       setStatus('saved')
       unsubscribeStore = useEditorStore.subscribe(onStoreChange)
 
-      // Keep flush listeners — attach once.
       void onFlushPending
     },
 
@@ -316,23 +327,16 @@ export function createPersistenceController(
       writeSlice(pickPersistable(useEditorStore.getState()))
     },
 
+    /** Clear the active save (e.g. after New project). Blank canvas stays unsaved. */
     discardStoredAndUnblock: () => {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-      if (storage) {
-        clearStoredSnapshot(storage)
-      }
-      quarantineRaw = null
-      saveBlocked = false
-      lastWrittenFingerprint = ''
+      clearActiveSaveKeepingCanvas()
       const state = useEditorStore.getState()
-      if (state.workspace === 'editing') {
+      if (projectHasMeaningfulWork(state.project)) {
         writeSlice(pickPersistable(state))
       }
     },
 
+    /** After open/example replace: persist when the loaded project has work. */
     afterSuccessfulReplace: () => {
       if (timer) {
         clearTimeout(timer)
@@ -341,8 +345,10 @@ export function createPersistenceController(
       quarantineRaw = null
       saveBlocked = false
       const state = useEditorStore.getState()
-      if (state.workspace === 'editing') {
+      if (projectHasMeaningfulWork(state.project)) {
         writeSlice(pickPersistable(state))
+      } else {
+        clearActiveSaveKeepingCanvas()
       }
     },
 

@@ -84,7 +84,6 @@ function resetStore(
   const projectWithGeo = { ...project, actors }
   const first = projectWithGeo.actors[0]
   useEditorStore.setState({
-    workspace: 'editing',
     project: projectWithGeo,
     selectedActorId: first.id,
     mode: 'idle',
@@ -322,7 +321,6 @@ describe('persistence controller', () => {
       5,
     )
     expect(controller.getStatus()).toBe('saved')
-    expect(state.workspace).toBe('editing')
     expect(state.project.name).toBe('Test project')
     controller.dispose()
   })
@@ -399,9 +397,9 @@ describe('persistence controller', () => {
     controller.restoreOnStartup()
     expect(controller.getStatus()).toBe('restore-error')
     expect(controller.isSaveBlocked()).toBe(true)
-    expect(useEditorStore.getState().workspace).toBe('welcome')
+    expect(useEditorStore.getState().project.name).toBe('Untitled project')
 
-    // Enter an intentional project; quarantine still blocks writes.
+    // Meaningful edits while quarantined must not overwrite the bad save.
     expect(useEditorStore.getState().createNamedProject('Recovered')).toBe(true)
     useEditorStore.getState().finishRecording(makeRecording())
     expect(storage.getItem(STORAGE_KEY)).toBe(bad)
@@ -504,13 +502,22 @@ describe('persistence controller', () => {
     controller.dispose()
   })
 
-  it('empty storage stays on welcome and does not persist a blank project', () => {
+  it('empty storage opens untitled canvas and does not persist a blank project', () => {
     const storage = createMemoryStorage()
     const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
-    expect(useEditorStore.getState().workspace).toBe('welcome')
+    expect(useEditorStore.getState().project.name).toBe('Untitled project')
     expect(storage.getItem(STORAGE_KEY)).toBeNull()
     expect(controller.getStatus()).toBe('idle')
+
+    // Playhead / UI-only updates still do not write.
+    useEditorStore.getState().setPlaybackHead(0.5)
+    expect(storage.getItem(STORAGE_KEY)).toBeNull()
+
+    // Meaningful work starts autosave.
+    useEditorStore.getState().finishRecording(makeRecording())
+    expect(storage.getItem(STORAGE_KEY)).toBeTruthy()
+    expect(controller.getStatus()).toBe('saved')
     controller.dispose()
   })
 })
@@ -579,7 +586,7 @@ describe('store applyPersistedSnapshot / newProject', () => {
     expect(state.mode).toBe('idle')
     expect(state.stageHint).toBe('new-project')
     expect(state.actionAnnouncement).toBe(
-      'Created “Untitled project”. You can start drawing.',
+      'New project ready. Click Record to create an animation.',
     )
   })
 

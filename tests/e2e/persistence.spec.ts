@@ -14,7 +14,7 @@ async function waitForSaved(page: Page) {
   )
 }
 
-async function confirmNewProject(page: Page, name = 'Fresh board') {
+async function confirmNewProject(page: Page) {
   await openPanel(page, 'project')
   await page.getByTestId('btn-new-project').click()
   await expect(page.getByTestId('new-project-confirm')).toBeVisible()
@@ -23,13 +23,13 @@ async function confirmNewProject(page: Page, name = 'Fresh board') {
   )
   await expect(page.getByTestId('btn-new-project-cancel')).toHaveText('Cancel')
   await expect(page.getByTestId('btn-new-project-confirm')).toHaveText(
-    'Continue',
+    'Start new project',
   )
   await page.getByTestId('btn-new-project-confirm').click()
-  await expect(page.getByTestId('project-name-dialog')).toBeVisible()
-  await page.getByTestId('project-name-input').fill(name)
-  await page.getByTestId('btn-confirm-project-name').click()
-  await expect(page.getByTestId('btn-rename-project')).toContainText(name)
+  await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
+  await expect(page.getByTestId('btn-rename-project')).toHaveText(
+    'Untitled project',
+  )
 }
 
 test.describe('project persistence', () => {
@@ -109,31 +109,35 @@ test.describe('project persistence', () => {
     await recordSimplePath(page)
     await waitForSaved(page)
 
-    await confirmNewProject(page, 'Fresh board')
+    await confirmNewProject(page)
 
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
       'Click Record, then drag the actor to capture its movement.',
     )
-    await expect(page.getByTestId('action-live-region')).toContainText(
-      /Created “Fresh board”/,
-    )
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
-    await expect(page.getByTestId('btn-rename-project')).toContainText(
-      'Fresh board',
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Untitled project',
     )
+    // Untouched blank is not claimed as saved.
+    await expect(page.getByTestId('header-save-status')).toHaveCount(0)
+    const storageAfterNew = await page.evaluate(() =>
+      localStorage.getItem('motionsketch.project.v1'),
+    )
+    expect(storageAfterNew).toBeNull()
 
     await page.reload()
     await expect(page.getByTestId('app-shell')).toBeVisible()
-    await expect(page.getByTestId('btn-rename-project')).toContainText(
-      'Fresh board',
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Untitled project',
     )
+    await expect(page.getByTestId('btn-play')).toBeDisabled()
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
-    await expect(page.getByTestId('btn-play')).toBeDisabled()
     await openPanel(page, 'project')
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
+    await expect(page.getByTestId('header-save-status')).toHaveCount(0)
   })
 
   test('New project confirm can be cancelled', async ({ page }) => {
@@ -169,7 +173,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
 
     // Playback settings still count as work — New project confirms, then names.
-    await confirmNewProject(page, 'After reset')
+    await confirmNewProject(page)
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('1.20 s')
     await expect(page.getByTestId('loop-toggle')).not.toBeChecked()
@@ -203,7 +207,7 @@ test.describe('project persistence', () => {
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-project').click()
     const download = await downloadPromise
-    expect(download.suggestedFilename()).toMatch(/test-project-.*\.json/)
+    expect(download.suggestedFilename()).toMatch(/untitled-project-.*\.json/)
 
     await expect(page.getByTestId('project-action-status')).toHaveText(
       'Project download started.',

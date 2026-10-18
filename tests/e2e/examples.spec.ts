@@ -12,17 +12,6 @@ async function openExamples(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('examples-gallery')).toBeVisible()
 }
 
-async function confirmExampleName(
-  page: import('@playwright/test').Page,
-  name?: string,
-) {
-  await expect(page.getByTestId('project-name-dialog')).toBeVisible()
-  if (name !== undefined) {
-    await page.getByTestId('project-name-input').fill(name)
-  }
-  await page.getByTestId('btn-confirm-project-name').click()
-}
-
 test.describe('starter examples', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -38,6 +27,7 @@ test.describe('starter examples', () => {
     const storageBefore = await page.evaluate(() =>
       localStorage.getItem('motionsketch.project.v1'),
     )
+    expect(storageBefore).toBeNull()
     const actorBefore = await page.getByTestId('actor').boundingBox()
 
     await openExamples(page)
@@ -50,15 +40,17 @@ test.describe('starter examples', () => {
     const storageDuring = await page.evaluate(() =>
       localStorage.getItem('motionsketch.project.v1'),
     )
-    expect(storageDuring).toBe(storageBefore)
+    expect(storageDuring).toBeNull()
     const actorDuring = await page.getByTestId('actor').boundingBox()
     expect(actorDuring).toBeTruthy()
     expect(Math.abs(actorDuring!.x - actorBefore!.x)).toBeLessThan(2)
 
     await page.getByTestId('btn-use-logo-entrance').click()
-    await confirmExampleName(page, 'My logo')
     await expect(page.getByTestId('examples-gallery')).toHaveCount(0)
-    await expect(page.getByTestId('btn-rename-project')).toContainText('My logo')
+    await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Logo entrance',
+    )
     await expect(page.getByTestId('action-live-region')).toContainText(
       /Logo entrance/i,
     )
@@ -77,19 +69,21 @@ test.describe('starter examples', () => {
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
     const html = readFileSync((await download.path())!, 'utf8')
-    expect(html).toContain('<title>My logo</title>')
+    expect(html).toContain('<title>Logo entrance</title>')
     expect(html).toContain('@keyframes')
 
     await page.reload()
     await expect(page.getByTestId('btn-play')).toBeEnabled()
-    await expect(page.getByTestId('btn-rename-project')).toContainText('My logo')
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Logo entrance',
+    )
     await expect(page.getByTestId('actor')).toHaveAttribute(
       'data-actor-kind',
       'image',
     )
   })
 
-  test('confirm replace; cancel name leaves project untouched', async ({
+  test('confirm replace can be cancelled; accept loads immediately', async ({
     page,
   }) => {
     await page.goto('/')
@@ -113,23 +107,10 @@ test.describe('starter examples', () => {
     })
     await openExamples(page)
     await page.getByTestId('btn-use-orbit').click()
-    // Cancel naming after confirm — must not replace.
-    await expect(page.getByTestId('project-name-dialog')).toBeVisible()
-    await page.getByTestId('btn-project-name-cancel').click()
     await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
-    await page.getByTestId('btn-close-examples').click()
-    await expect(page.getByTestId('examples-gallery')).toHaveCount(0)
-    const cssAfterNameCancel = await readExportedCss(page)
-    expect(cssAfterNameCancel).toBe(cssBefore)
-
-    page.once('dialog', (dialog) => {
-      void dialog.accept()
-    })
-    await openExamples(page)
-    await page.getByTestId('btn-use-orbit').click()
-    await confirmExampleName(page)
     await expect(page.getByTestId('examples-gallery')).toHaveCount(0)
     await expect(page.getByTestId('action-live-region')).toContainText(/Orbit/i)
+    await expect(page.getByTestId('btn-rename-project')).toContainText('Orbit')
     await expect(page.locator('[data-testid^="actor-list-item-"]')).toHaveCount(
       2,
     )
@@ -142,9 +123,11 @@ test.describe('starter examples', () => {
     await ensureEditor(page)
     await openExamples(page)
     await page.getByTestId('btn-use-follow-the-leader').click()
-    await confirmExampleName(page, 'Leaders')
     await expect(page.locator('[data-testid^="actor-list-item-"]')).toHaveCount(
       3,
+    )
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Follow the leader',
     )
 
     await page.getByTestId('actor-name-input').fill('Changed')
@@ -156,12 +139,11 @@ test.describe('starter examples', () => {
     })
     await openExamples(page)
     await page.getByTestId('btn-use-follow-the-leader').click()
-    await confirmExampleName(page, 'Leaders again')
     await expect(page.getByTestId('actor-name-input')).not.toHaveValue(
       'Changed',
     )
     await expect(page.getByTestId('btn-rename-project')).toContainText(
-      'Leaders again',
+      'Follow the leader',
     )
   })
 

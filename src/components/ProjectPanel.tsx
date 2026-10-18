@@ -1,13 +1,11 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { parseSnapshotJson } from '../core/persist/document'
-import { DEFAULT_PROJECT_NAME } from '../core/projectName'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import {
   statusLabel,
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
-import { ProjectNameDialog } from './ProjectNameDialog'
 
 export function ProjectPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -16,10 +14,9 @@ export function ProjectPanel() {
   const titleId = useId()
   const [importError, setImportError] = useState<string | null>(null)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
-  const [nameOpen, setNameOpen] = useState(false)
 
   const project = useEditorStore((s) => s.project)
-  const createNamedProject = useEditorStore((s) => s.createNamedProject)
+  const newProject = useEditorStore((s) => s.newProject)
   const applyPersistedSnapshot = useEditorStore((s) => s.applyPersistedSnapshot)
   const announceAction = useEditorStore((s) => s.announceAction)
   const storeAnnouncement = useEditorStore((s) => s.actionAnnouncement)
@@ -54,29 +51,28 @@ export function ProjectPanel() {
     return () => dialog.removeEventListener('close', onClose)
   }, [])
 
+  const startFreshUntitled = () => {
+    newProject()
+    discardStoredAndUnblock()
+    setImportError(null)
+    setActionStatus('New project ready.')
+  }
+
   const handleNewProject = () => {
     if (projectHasMeaningfulWork(project)) {
       confirmDialogRef.current?.showModal()
       return
     }
-    setNameOpen(true)
+    startFreshUntitled()
   }
 
   const closeConfirm = () => {
     confirmDialogRef.current?.close()
   }
 
-  const confirmThenName = () => {
+  const confirmNewProject = () => {
     closeConfirm()
-    setNameOpen(true)
-  }
-
-  const finishNewProject = (name: string) => {
-    if (!createNamedProject(name)) return
-    setNameOpen(false)
-    discardStoredAndUnblock()
-    setImportError(null)
-    setActionStatus(`Created “${name}”.`)
+    startFreshUntitled()
   }
 
   const handleDownload = () => {
@@ -281,7 +277,7 @@ export function ProjectPanel() {
             className="text-[11px] leading-relaxed text-slate-600"
           >
             This replaces the current project. Download it first if you want to
-            keep a copy. You’ll name the new project next.
+            keep a copy.
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button
@@ -295,24 +291,14 @@ export function ProjectPanel() {
             <button
               type="button"
               data-testid="btn-new-project-confirm"
-              onClick={confirmThenName}
+              onClick={confirmNewProject}
               className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
             >
-              Continue
+              Start new project
             </button>
           </div>
         </div>
       </dialog>
-
-      <ProjectNameDialog
-        open={nameOpen}
-        title="Name your new project"
-        description="Cancel keeps your current project unchanged."
-        confirmLabel="Create project"
-        initialName={DEFAULT_PROJECT_NAME}
-        onCancel={() => setNameOpen(false)}
-        onConfirm={finishNewProject}
-      />
     </div>
   )
 }

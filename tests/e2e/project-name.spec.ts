@@ -4,49 +4,30 @@ import { ensureEditor, openPanel } from './helpers'
 test.describe('named project entry', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('first visit prefills Untitled project; create without renaming', async ({
-    page,
-  }) => {
+  test('first visit opens untitled canvas with no modal', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByTestId('welcome-screen')).toBeVisible()
-    await expect(page.getByTestId('app-shell')).toHaveCount(0)
-
-    const before = await page.evaluate(() =>
-      localStorage.getItem('motionsketch.project.v1'),
-    )
-    expect(before).toBeNull()
-
-    await page.getByTestId('btn-welcome-create').click()
-    const input = page.getByTestId('project-name-input')
-    await expect(page.getByTestId('project-name-dialog')).toBeVisible()
-    await expect(input).toHaveValue('Untitled project')
-    await expect(input).toBeFocused()
-
-    // Create immediately with the prefilled name.
-    await page.getByTestId('btn-confirm-project-name').click()
+    await expect(page.getByTestId('welcome-screen')).toHaveCount(0)
+    await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
     await expect(page.getByTestId('app-shell')).toBeVisible()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
       'Untitled project',
     )
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Click Record, then drag the actor to capture its movement.',
+    await expect(page.getByTestId('stage-empty-hint')).toContainText(
+      /drag the actor/i,
     )
-    await expect(page.getByTestId('header-save-status')).toContainText(
-      'Saved in this browser',
+    await expect(page.getByTestId('examples-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('header-save-status')).toHaveCount(0)
+
+    const storage = await page.evaluate(() =>
+      localStorage.getItem('motionsketch.project.v1'),
     )
-  })
+    expect(storage).toBeNull()
 
-  test('create cancel and cleared-name validation leave storage empty', async ({
-    page,
-  }) => {
-    await page.goto('/')
-    await page.getByTestId('btn-welcome-create').click()
-    await page.getByTestId('project-name-input').fill('')
-    await page.getByTestId('btn-confirm-project-name').click()
-    await expect(page.getByTestId('project-name-error')).toBeVisible()
-
-    await page.getByTestId('btn-project-name-cancel').click()
-    await expect(page.getByTestId('welcome-screen')).toBeVisible()
+    // UI-only actions must not create a stored project.
+    await openPanel(page, 'project')
+    await page.getByTestId('btn-close-project').click()
+    await openPanel(page, 'adjust')
+    await page.keyboard.press('Escape')
     const stillEmpty = await page.evaluate(() =>
       localStorage.getItem('motionsketch.project.v1'),
     )
@@ -81,6 +62,11 @@ test.describe('named project entry', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page, 'Return trip')
+    // Rename alone is meaningful — wait for autosave.
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+    )
     await page.reload()
     await expect(page.getByTestId('welcome-screen')).toHaveCount(0)
     await expect(page.getByTestId('app-shell')).toBeVisible()
@@ -89,7 +75,7 @@ test.describe('named project entry', () => {
     )
   })
 
-  test('New project name cancel preserves current project', async ({
+  test('New project confirm cancel preserves current project', async ({
     page,
   }) => {
     await page.goto('/')
@@ -101,13 +87,8 @@ test.describe('named project entry', () => {
     await openPanel(page, 'project')
     await page.getByTestId('btn-new-project').click()
     await expect(page.getByTestId('new-project-confirm')).toBeVisible()
-    await page.getByTestId('btn-new-project-confirm').click()
-    await expect(page.getByTestId('project-name-dialog')).toBeVisible()
-    await expect(page.getByTestId('project-name-input')).toHaveValue(
-      'Untitled project',
-    )
-    await page.getByTestId('btn-project-name-cancel').click()
-    await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
+    await page.getByTestId('btn-new-project-cancel').click()
+    await expect(page.getByTestId('new-project-confirm')).toBeHidden()
     await expect(page.getByTestId('btn-rename-project')).toHaveText('Keep me')
     await openPanel(page, 'appearance')
     await expect(page.getByTestId('actor-color-value')).toHaveValue('#112233')

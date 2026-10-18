@@ -1,4 +1,8 @@
 import { isFullClip } from '../core/clip'
+import {
+  DEFAULT_PROJECT_NAME,
+  sanitizeProjectName,
+} from '../core/projectName'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { DEFAULT_REST_POSITION } from '../core/sceneActor'
 import {
@@ -9,11 +13,12 @@ import {
 
 /**
  * True when replacing the project would discard user work beyond a blank
- * starter — recordings, custom actors, appearance, rest pose, clips,
- * transforms, or non-default playback settings.
+ * starter — renamed title, recordings, custom actors, appearance, rest pose,
+ * clips, transforms, or non-default playback settings.
  * Stage aspect alone (viewport capture) does not count.
  */
 export function projectHasMeaningfulWork(project: Project): boolean {
+  if (sanitizeProjectName(project.name) !== DEFAULT_PROJECT_NAME) return true
   if (projectHasAnyRecording(project)) return true
   if (project.actors.length !== 1) return true
 

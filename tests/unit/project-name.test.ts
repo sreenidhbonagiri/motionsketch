@@ -73,7 +73,6 @@ describe('project name helpers', () => {
   it('renameProject changes only the name', () => {
     const project = createEmptyPersistableProject(1.6, 'Alpha')
     useEditorStore.setState({
-      workspace: 'editing',
       project,
       selectedActorId: project.actors[0].id,
       actorEditOrder: ['clip'],
