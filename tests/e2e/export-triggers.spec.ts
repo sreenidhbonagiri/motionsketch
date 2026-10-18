@@ -25,24 +25,81 @@ async function previewFrame(page: Page): Promise<Frame> {
   return frame!
 }
 
-async function installStartCounter(frame: Frame) {
-  await frame.evaluate(() => {
-    const w = window as unknown as { __msAnimStarts?: number }
-    w.__msAnimStarts = 0
-    const root = document.querySelector('[data-testid="demo-scene"]')
-    if (!root) return
-    root.querySelectorAll('[class^="ms-actor"]').forEach((el) => {
-      el.addEventListener('animationstart', () => {
-        w.__msAnimStarts = (w.__msAnimStarts ?? 0) + 1
-      })
-    })
+/** Move the host pointer off the preview, then hover the scene (guarantees mouseenter). */
+async function enterSceneWithPointer(
+  page: Page,
+  scene: ReturnType<Frame['getByTestId']>,
+) {
+  await page.mouse.move(4, 4)
+  await scene.hover()
+}
+
+/** Motion animation currentTime (ms); ignores visibility (-vis) tracks. */
+async function motionTime(frame: Frame): Promise<number> {
+  return frame.evaluate(() => {
+    const el = document.querySelector('[data-testid="demo-actor"]') as
+      | HTMLElement
+      | null
+    if (!el || typeof el.getAnimations !== 'function') return -1
+    const anim = el
+      .getAnimations()
+      .find(
+        (a) =>
+          'animationName' in a &&
+          typeof (a as CSSAnimation).animationName === 'string' &&
+          !(a as CSSAnimation).animationName.includes('-vis'),
+      ) as CSSAnimation | undefined
+    return anim && typeof anim.currentTime === 'number' ? anim.currentTime : -1
   })
 }
 
-async function animStarts(frame: Frame): Promise<number> {
+/** Click the scene root and return motion currentTime in the same turn. */
+async function clickSceneReadTime(frame: Frame): Promise<number> {
   return frame.evaluate(() => {
-    const w = window as unknown as { __msAnimStarts?: number }
-    return w.__msAnimStarts ?? 0
+    const root = document.querySelector('[data-testid="demo-scene"]')
+    if (!root) throw new Error('demo-scene missing')
+    root.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, view: window }),
+    )
+    const el = document.querySelector('[data-testid="demo-actor"]') as HTMLElement
+    const anim = el
+      ?.getAnimations()
+      .find(
+        (a) =>
+          'animationName' in a &&
+          typeof (a as CSSAnimation).animationName === 'string' &&
+          !(a as CSSAnimation).animationName.includes('-vis'),
+      ) as CSSAnimation | undefined
+    return anim && typeof anim.currentTime === 'number' ? anim.currentTime : -1
+  })
+}
+
+/** Focus scene root and press Enter; return motion currentTime in the same turn. */
+async function enterSceneReadTime(frame: Frame): Promise<number> {
+  return frame.evaluate(() => {
+    const root = document.querySelector(
+      '[data-testid="demo-scene"]',
+    ) as HTMLElement | null
+    if (!root) throw new Error('demo-scene missing')
+    root.focus()
+    root.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        code: 'Enter',
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    const el = document.querySelector('[data-testid="demo-actor"]') as HTMLElement
+    const anim = el
+      ?.getAnimations()
+      .find(
+        (a) =>
+          'animationName' in a &&
+          typeof (a as CSSAnimation).animationName === 'string' &&
+          !(a as CSSAnimation).animationName.includes('-vis'),
+      ) as CSSAnimation | undefined
+    return anim && typeof anim.currentTime === 'number' ? anim.currentTime : -1
   })
 }
 
@@ -173,36 +230,35 @@ test.describe('export playback triggers', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await openExport(page)
+    // Keep the timeline in progress for currentTime-based restart checks.
+    await setDurationMs(page, 8000)
 
-    // Rapid deliberate clicks each restart.
+    // Rapid deliberate clicks each restart the shared timeline.
     await page.getByTestId('export-trigger-select').selectOption('click')
     const clickFrame = await previewFrame(page)
-    await installStartCounter(clickFrame)
     const scene = clickFrame.getByTestId('demo-scene')
-    await scene.click()
-    await scene.click()
-    await scene.click()
-    await expect.poll(() => animStarts(clickFrame)).toBeGreaterThanOrEqual(3)
+    await expect(scene).toHaveClass(/ms-waiting/)
+    expect(await clickSceneReadTime(clickFrame)).toBeLessThan(40)
+    await expect(scene).not.toHaveClass(/ms-waiting/)
+    await expect.poll(() => motionTime(clickFrame)).toBeGreaterThan(30)
+    expect(await clickSceneReadTime(clickFrame)).toBeLessThan(40)
+    await expect.poll(() => motionTime(clickFrame)).toBeGreaterThan(30)
+    expect(await clickSceneReadTime(clickFrame)).toBeLessThan(40)
 
     // Keyboard-only activation (Enter) also restarts.
-    await scene.focus()
-    const beforeKey = await animStarts(clickFrame)
-    await scene.press('Enter')
-    await expect
-      .poll(() => animStarts(clickFrame))
-      .toBeGreaterThan(beforeKey)
+    await expect.poll(() => motionTime(clickFrame)).toBeGreaterThan(30)
+    expect(await enterSceneReadTime(clickFrame)).toBeLessThan(40)
     await page.getByTestId('btn-close-trigger-preview').click()
 
-    // Hover: pointer then focus must not double-start; leave/re-enter rearms;
+    // Hover: pointer then focus must not restart; leave/re-enter rearms;
     // child focus moves stay in one session; tap control activates.
     await page.getByTestId('export-trigger-select').selectOption('hover')
     const hoverFrame = await previewFrame(page)
-    await installStartCounter(hoverFrame)
+    const hoverScene = hoverFrame.getByTestId('demo-scene')
+    await expect(hoverScene).toBeVisible()
     await hoverFrame.evaluate(() => {
       const root = document.querySelector('[data-testid="demo-scene"]')
-      const actor = document.querySelector('[data-testid="demo-actor"]')
-      if (!root || !actor) return
+      if (!root) throw new Error('demo-scene missing before focus fixtures')
       const a = document.createElement('button')
       a.type = 'button'
       a.textContent = 'A'
@@ -214,32 +270,73 @@ test.describe('export playback triggers', () => {
       root.appendChild(a)
       root.appendChild(b)
     })
+    await expect(hoverFrame.getByTestId('demo-focus-a')).toBeVisible()
+    await expect(hoverFrame.getByTestId('demo-focus-b')).toBeVisible()
 
-    const hoverScene = hoverFrame.getByTestId('demo-scene')
-    await hoverScene.hover()
-    await expect.poll(() => animStarts(hoverFrame)).toBe(1)
-    // Focus while pointer still inside — same session.
+    await enterSceneWithPointer(page, hoverScene)
+    await expect(hoverScene).not.toHaveClass(/ms-waiting/)
+    await expect.poll(() => motionTime(hoverFrame)).toBeGreaterThan(40)
+    const afterHover = await motionTime(hoverFrame)
+
+    // Product fix: focusout relatedTarget inside root must not re-arm / restart.
     await hoverFrame.getByTestId('demo-focus-a').focus()
     await hoverFrame.getByTestId('demo-focus-b').focus()
-    await expect.poll(() => animStarts(hoverFrame)).toBe(1)
+    const afterFocus = await motionTime(hoverFrame)
+    expect(afterFocus).toBeGreaterThanOrEqual(afterHover - 5)
+    expect(afterFocus).toBeGreaterThan(40)
 
-    // Leave pointer and focus, then re-enter with pointer.
+    // Leave pointer and focus, then re-enter with pointer → restart.
     await page.mouse.move(8, 8)
     await hoverFrame.evaluate(() => {
       const ae = document.activeElement as HTMLElement | null
       ae?.blur()
     })
-    await hoverScene.hover()
-    await expect.poll(() => animStarts(hoverFrame)).toBe(2)
+    await enterSceneWithPointer(page, hoverScene)
+    await expect.poll(() => motionTime(hoverFrame)).toBeLessThan(40)
 
     // Touch-style activation via explicit tap control after leave.
+    await expect.poll(() => motionTime(hoverFrame)).toBeGreaterThan(20)
     await page.mouse.move(8, 8)
     await hoverFrame.evaluate(() => {
       const ae = document.activeElement as HTMLElement | null
       ae?.blur()
     })
     await hoverFrame.getByTestId('demo-hover-tap').click()
-    await expect.poll(() => animStarts(hoverFrame)).toBe(3)
+    await expect.poll(() => motionTime(hoverFrame)).toBeLessThan(40)
+
+    await page.getByTestId('btn-close-trigger-preview').click()
+  })
+
+  test('reduced-motion blocks hover/focus until explicit Play', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openExport(page)
+    await page.getByTestId('export-trigger-select').selectOption('hover')
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.getByTestId('btn-preview-trigger').click()
+
+    const frame = page.frameLocator('[data-testid="trigger-preview-frame"]')
+    const scene = frame.getByTestId('demo-scene')
+    await expect(scene).toHaveClass(/ms-waiting/)
+    await scene.hover()
+    await expect(scene).toHaveClass(/ms-waiting/)
+    await expect(scene).not.toHaveClass(/ms-motion-ok/)
+
+    await scene.focus()
+    await expect(scene).toHaveClass(/ms-waiting/)
+    await expect(scene).not.toHaveClass(/ms-motion-ok/)
+
+    await frame.getByTestId('demo-replay').click()
+    await expect(scene).toHaveClass(/ms-motion-ok/)
+    await expect(scene).not.toHaveClass(/ms-waiting/)
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await expect
+      .poll(async () => scene.getAttribute('class'))
+      .not.toContain('ms-motion-ok')
 
     await page.getByTestId('btn-close-trigger-preview').click()
   })

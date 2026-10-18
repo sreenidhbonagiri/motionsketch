@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { makeGeometryEdit } from '../../src/core/edit'
 import {
   exportCssFromProject,
   fingerprintProjectScene,
   resolveExportScope,
 } from '../../src/core/export/css'
 import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
-import { makeActor, makeProject, makeRecording } from './helpers/project'
+import {
+  makeActor,
+  makeProject,
+  makeRecording,
+  makeSamples,
+} from './helpers/project'
 
 describe('scoped CSS export isolation', () => {
   it('scopes stage/actors and uses content fingerprint keyframes', () => {
@@ -85,6 +91,56 @@ describe('scoped CSS export isolation', () => {
     expect(resolveExportScope(a).rootClass).not.toBe(
       resolveExportScope(b).rootClass,
     )
+  })
+
+  it('fingerprints every geometryEdit sample (mid-path edit changes scene id)', () => {
+    const samplesA = makeSamples(120)
+    const samplesB = samplesA.map((s) => ({ ...s }))
+    samplesB[2] = { ...samplesB[2]!, x: samplesB[2]!.x + 0.017 }
+
+    const projectA = makeProject({
+      name: 'Twin path',
+      actors: [
+        makeActor({
+          id: 'path',
+          recording: makeRecording(120),
+          geometryEdit: makeGeometryEdit(samplesA, 0.2, [0, 30, 60, 119]),
+        }),
+      ],
+      playback: {
+        durationMs: 2000,
+        loop: false,
+        loopMode: 'repeat',
+        trigger: 'page-load',
+      },
+    })
+    const projectB = makeProject({
+      name: 'Twin path',
+      actors: [
+        makeActor({
+          id: 'path',
+          recording: makeRecording(120),
+          geometryEdit: makeGeometryEdit(samplesB, 0.2, [0, 30, 60, 119]),
+        }),
+      ],
+      playback: {
+        durationMs: 2000,
+        loop: false,
+        loopMode: 'repeat',
+        trigger: 'page-load',
+      },
+    })
+
+    const idA = fingerprintProjectScene(projectA)
+    const idB = fingerprintProjectScene(projectB)
+    expect(idA).not.toBe(idB)
+
+    const cssA = exportCssFromProject(projectA)
+    const cssB = exportCssFromProject(projectB)
+    expect(cssA).toContain(`@keyframes ms-${idA}`)
+    expect(cssB).toContain(`@keyframes ms-${idB}`)
+    expect(cssA).not.toContain(`@keyframes ms-${idB}`)
+    expect(cssB).not.toContain(`@keyframes ms-${idA}`)
   })
 
   it('instancePrefix yields independently named copies', () => {

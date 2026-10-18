@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { makeGeometryEdit } from '../../src/core/edit'
 import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
-import { MS_MOTION_OK_CLASS } from '../../src/core/export/sceneScope'
+import {
+  fingerprintProjectScene,
+  MS_MOTION_OK_CLASS,
+} from '../../src/core/export/sceneScope'
 import {
   buildEmbedCompanionProject,
   buildEmbedMarkProject,
@@ -8,7 +12,12 @@ import {
   EMBED_SCENE_B_OPTIONS,
 } from '../fixtures/embedScenes'
 import { buildExportIsolationPage } from '../fixtures/exportIsolationPage'
-import { makeActor, makeProject, makeRecording } from '../unit/helpers/project'
+import {
+  makeActor,
+  makeProject,
+  makeRecording,
+  makeSamples,
+} from '../unit/helpers/project'
 
 test.describe('export scene isolation + reduced motion', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -218,6 +227,101 @@ test.describe('export scene isolation + reduced motion', () => {
         actor.evaluate((el) => getComputedStyle(el).visibility),
       )
       .toBe('visible')
+  })
+
+  test('near-identical geometryEdit paths keep distinct keyframes when embedded together', async ({
+    page,
+  }) => {
+    const samplesA = makeSamples(120)
+    const samplesB = samplesA.map((s) => ({ ...s }))
+    samplesB[2] = { ...samplesB[2]!, x: samplesB[2]!.x + 0.017 }
+
+    const projectA = makeProject({
+      name: 'Path twin A',
+      actors: [
+        makeActor({
+          id: 'path',
+          recording: makeRecording(120),
+          geometryEdit: makeGeometryEdit(samplesA, 0.2, [0, 30, 60, 119]),
+          appearance: { color: '#0f766e', width: 0.18, height: 0.18 },
+        }),
+      ],
+      playback: {
+        durationMs: 1600,
+        loop: false,
+        loopMode: 'repeat',
+        trigger: 'page-load',
+      },
+    })
+    const projectB = makeProject({
+      name: 'Path twin B',
+      actors: [
+        makeActor({
+          id: 'path',
+          recording: makeRecording(120),
+          geometryEdit: makeGeometryEdit(samplesB, 0.2, [0, 30, 60, 119]),
+          appearance: { color: '#c2410c', width: 0.18, height: 0.18 },
+        }),
+      ],
+      playback: {
+        durationMs: 1600,
+        loop: false,
+        loopMode: 'repeat',
+        trigger: 'page-load',
+      },
+    })
+
+    const idA = fingerprintProjectScene(projectA)
+    const idB = fingerprintProjectScene(projectB)
+    expect(idA).not.toBe(idB)
+
+    const html = buildExportIsolationPage({
+      projectA,
+      projectB,
+      withReplayControls: true,
+    })
+    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+
+    const meta = await page.evaluate(() => {
+      const w = window as unknown as {
+        __msIsolation: {
+          rootA: string
+          rootB: string
+          sceneIdA: string
+          sceneIdB: string
+        }
+      }
+      return w.__msIsolation
+    })
+    expect(meta.sceneIdA).toBe(idA)
+    expect(meta.sceneIdB).toBe(idB)
+    expect(meta.rootA).not.toBe(meta.rootB)
+
+    const styleA = await page
+      .locator('style[data-ms="scene-a"]')
+      .evaluate((el) => el.textContent ?? '')
+    const styleB = await page
+      .locator('style[data-ms="scene-b"]')
+      .evaluate((el) => el.textContent ?? '')
+    expect(styleA).toContain(`@keyframes ms-${idA}`)
+    expect(styleB).toContain(`@keyframes ms-${idB}`)
+    expect(styleA).not.toContain(`@keyframes ms-${idB}`)
+    expect(styleB).not.toContain(`@keyframes ms-${idA}`)
+
+    const actorA = page.locator(`.${meta.rootA} [class^="ms-actor"]`).first()
+    const actorB = page.locator(`.${meta.rootB} [class^="ms-actor"]`).first()
+    const nameA = await actorA.evaluate((el) => getComputedStyle(el).animationName)
+    const nameB = await actorB.evaluate((el) => getComputedStyle(el).animationName)
+    expect(nameA).toContain(idA)
+    expect(nameB).toContain(idB)
+    expect(nameA).not.toBe(nameB)
+
+    // Replay A must not rewrite B's animation name.
+    await page.getByTestId('replay-a').click()
+    const nameBAfter = await actorB.evaluate(
+      (el) => getComputedStyle(el).animationName,
+    )
+    expect(nameBAfter).toBe(nameB)
   })
 
   test('authored embed scenes: containment, scoped replay, responsive aspect', async ({

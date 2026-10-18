@@ -48,6 +48,12 @@ export function buildTriggerControllerOptions(args: {
  *   destroy(root)
  *
  * Controller methods: play(), pause(), resume(), restart(), destroy()
+ *
+ * Lifecycle:
+ * - destroy() cancels CSS animations on owned actor elements, clears listeners /
+ *   observers / pending arm timers, and restores controller-owned root attrs/classes.
+ * - init() after destroy establishes the correct armed/running state for `mode`.
+ * - Host animations on non-actor elements are left alone.
  */
 export function buildTriggerControllerSource(): string {
   return `/* MotionSketch scene trigger controller
@@ -75,10 +81,34 @@ export function buildTriggerControllerSource(): string {
     );
   }
 
+  function isCssAnimation(anim) {
+    if (!anim) return false;
+    if (typeof CSSAnimation !== 'undefined' && anim instanceof CSSAnimation) {
+      return true;
+    }
+    // jsdom / older engines: treat named CSS animations as owned.
+    return typeof anim.animationName === 'string' && anim.animationName !== '' && anim.animationName !== 'none';
+  }
+
   function restartAnimations(root, selector) {
     actors(root, selector).forEach(function (el) {
       el.style.animation = 'none';
       void el.offsetWidth;
+      el.style.removeProperty('animation');
+    });
+  }
+
+  function stopOwnedActorAnimations(root, selector) {
+    actors(root, selector).forEach(function (el) {
+      if (typeof el.getAnimations === 'function') {
+        el.getAnimations().forEach(function (anim) {
+          if (!isCssAnimation(anim)) return;
+          try {
+            anim.cancel();
+          } catch (e) {}
+        });
+      }
+      el.style.removeProperty('animation-play-state');
       el.style.removeProperty('animation');
     });
   }
@@ -92,7 +122,6 @@ export function buildTriggerControllerSource(): string {
       typeof options.viewportThreshold === 'number'
         ? options.viewportThreshold
         : 0.35;
-    var loop = !!options.loop;
     var destroyed = false;
     var started = false;
     var paused = false;
@@ -101,24 +130,52 @@ export function buildTriggerControllerSource(): string {
     var pointerInside = false;
     var io = null;
     var mq = null;
+    var armTimer = null;
     var tapBtn = null;
     var pauseBtn = null;
     var playBtn = null;
     var onPlayClick = null;
     var onPauseClick = null;
     var onTapClick = null;
-
-    function isWaiting() {
-      return root.classList.contains(waiting);
-    }
+    // Track mutations the controller owns so destroy() can restore the host.
+    var owned = {
+      waitingAdded: false,
+      waitingRemoved: false,
+      motionOkAdded: false,
+      tabindexAdded: false,
+      roleAdded: false,
+      ariaLabelAdded: false,
+    };
 
     function setWaiting(on) {
-      if (on) root.classList.add(waiting);
-      else root.classList.remove(waiting);
+      if (on) {
+        if (!root.classList.contains(waiting)) {
+          root.classList.add(waiting);
+          owned.waitingAdded = true;
+        }
+      } else if (root.classList.contains(waiting)) {
+        root.classList.remove(waiting);
+        owned.waitingRemoved = true;
+      }
     }
 
     function canAutoAnimate() {
       return !reducedMotion() || root.classList.contains(motionOk);
+    }
+
+    function clearArmTimer() {
+      if (armTimer != null) {
+        clearTimeout(armTimer);
+        armTimer = null;
+      }
+    }
+
+    function scheduleArmRefresh() {
+      clearArmTimer();
+      armTimer = setTimeout(function () {
+        armTimer = null;
+        refreshHoverArm();
+      }, 0);
     }
 
     function syncChrome() {
@@ -138,24 +195,29 @@ export function buildTriggerControllerSource(): string {
         pauseBtn.setAttribute('aria-pressed', paused ? 'true' : 'false');
       }
       if (tapBtn) {
-        // Touch-friendly activation for hover mode (also useful after a run ends).
         tapBtn.hidden = mode !== 'hover';
       }
     }
 
+    /**
+     * @param opts.optInReducedMotion  Explicit Play / click / Enter / Space / tap.
+     *   Hover and focus never set this — they must not override reduced-motion.
+     */
     function beginPlayback(opts) {
-      if (destroyed) return;
+      if (destroyed) return false;
       var force = opts && opts.force;
+      var optIn = opts && opts.optInReducedMotion;
       if (reducedMotion() && !root.classList.contains(motionOk)) {
-        if (!(opts && opts.userGesture)) {
+        if (!optIn) {
           syncChrome();
-          return;
+          return false;
         }
         root.classList.add(motionOk);
+        owned.motionOkAdded = true;
       }
       if (!canAutoAnimate() && !force) {
         syncChrome();
-        return;
+        return false;
       }
       setWaiting(false);
       restartAnimations(root, actorSel);
@@ -165,6 +227,7 @@ export function buildTriggerControllerSource(): string {
         el.style.removeProperty('animation-play-state');
       });
       syncChrome();
+      return true;
     }
 
     function pausePlayback() {
@@ -190,7 +253,7 @@ export function buildTriggerControllerSource(): string {
     }
 
     function restartPlayback() {
-      beginPlayback({ force: true, userGesture: true });
+      beginPlayback({ force: true, optInReducedMotion: true });
     }
 
     function rootHasPointer() {
@@ -218,8 +281,7 @@ export function buildTriggerControllerSource(): string {
       if (event.target && event.target.closest && event.target.closest('[data-ms-chrome]')) {
         return;
       }
-      // Every valid click/tap restarts — no time-based suppression.
-      beginPlayback({ userGesture: true });
+      beginPlayback({ optInReducedMotion: true });
     }
 
     function onKeyActivate(event) {
@@ -227,15 +289,29 @@ export function buildTriggerControllerSource(): string {
       if (event.target !== root) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
-      beginPlayback({ userGesture: true });
+      beginPlayback({ optInReducedMotion: true });
+    }
+
+    function tryHoverFocusStart() {
+      if (reducedMotion() && !root.classList.contains(motionOk)) {
+        // Do not consume the arm — wait for explicit Play / tap.
+        syncChrome();
+        return;
+      }
+      if (!hoverArmed) return;
+      hoverArmed = false;
+      beginPlayback({ optInReducedMotion: false });
     }
 
     function onPointerEnter() {
       if (destroyed || mode !== 'hover') return;
+      // If focus already left before this enter (blur + re-hover in one turn),
+      // re-arm synchronously — do not wait for a deferred focusout timer.
+      if (!pointerInside && !rootHasFocus()) {
+        hoverArmed = true;
+      }
       pointerInside = true;
-      if (!hoverArmed) return;
-      hoverArmed = false;
-      beginPlayback({ userGesture: true });
+      tryHoverFocusStart();
     }
 
     function onFocusIn() {
@@ -243,21 +319,28 @@ export function buildTriggerControllerSource(): string {
       // Focus that arrives while the pointer is already inside is the same
       // pointer session (e.g. click-to-focus), not a fresh hover/focus arm.
       if (pointerInside) return;
-      if (!hoverArmed) return;
-      hoverArmed = false;
-      beginPlayback({ userGesture: true });
+      tryHoverFocusStart();
     }
 
     function onPointerLeave() {
       if (mode !== 'hover') return;
       pointerInside = false;
-      // Next task: let focusout/relatedTarget settle before re-arming.
-      setTimeout(refreshHoverArm, 0);
+      scheduleArmRefresh();
     }
 
-    function onFocusOut() {
+    function onFocusOut(event) {
       if (mode !== 'hover') return;
-      setTimeout(refreshHoverArm, 0);
+      // Child→child focus stays inside the scene — never re-arm mid-transfer.
+      var next = event && event.relatedTarget;
+      if (next && root.contains(next)) return;
+      scheduleArmRefresh();
+    }
+
+    function ensureAttr(name, value, flag) {
+      if (!root.hasAttribute(name)) {
+        root.setAttribute(name, value);
+        owned[flag] = true;
+      }
     }
 
     function bindChrome() {
@@ -278,7 +361,7 @@ export function buildTriggerControllerSource(): string {
 
       if (playBtn) {
         onPlayClick = function () {
-          beginPlayback({ userGesture: true });
+          beginPlayback({ optInReducedMotion: true });
         };
         playBtn.addEventListener('click', onPlayClick);
       }
@@ -292,31 +375,43 @@ export function buildTriggerControllerSource(): string {
       if (tapBtn) {
         onTapClick = function () {
           hoverArmed = false;
-          beginPlayback({ userGesture: true });
+          beginPlayback({ optInReducedMotion: true });
         };
         tapBtn.addEventListener('click', onTapClick);
       }
     }
 
     function bindMode() {
+      // Clear leftover inline play-state from a prior instance before arming.
+      actors(root, actorSel).forEach(function (el) {
+        el.style.removeProperty('animation-play-state');
+        el.style.removeProperty('animation');
+      });
+
       if (mode === 'page-load') {
         if (canAutoAnimate()) {
           setWaiting(false);
+          restartAnimations(root, actorSel);
           started = true;
+          paused = false;
         } else {
           setWaiting(false);
+          started = false;
+          paused = false;
         }
         return;
       }
 
       setWaiting(true);
+      started = false;
+      paused = false;
+      hoverArmed = true;
+      pointerInside = false;
 
       if (mode === 'click') {
-        if (!root.hasAttribute('tabindex')) root.setAttribute('tabindex', '0');
-        if (!root.getAttribute('role')) root.setAttribute('role', 'button');
-        if (!root.getAttribute('aria-label')) {
-          root.setAttribute('aria-label', 'Play animation');
-        }
+        ensureAttr('tabindex', '0', 'tabindexAdded');
+        ensureAttr('role', 'button', 'roleAdded');
+        ensureAttr('aria-label', 'Play animation', 'ariaLabelAdded');
         root.addEventListener('click', onClickActivate);
         root.addEventListener('keydown', onKeyActivate);
       }
@@ -327,7 +422,7 @@ export function buildTriggerControllerSource(): string {
         root.addEventListener('mouseleave', onPointerLeave);
         root.addEventListener('focusin', onFocusIn);
         root.addEventListener('focusout', onFocusOut);
-        if (!root.hasAttribute('tabindex')) root.setAttribute('tabindex', '0');
+        ensureAttr('tabindex', '0', 'tabindexAdded');
       }
 
       if (mode === 'viewport') {
@@ -337,7 +432,7 @@ export function buildTriggerControllerSource(): string {
               for (var i = 0; i < entries.length; i++) {
                 if (entries[i].isIntersecting && !started) {
                   if (canAutoAnimate()) {
-                    beginPlayback({ userGesture: false });
+                    beginPlayback({ optInReducedMotion: false });
                   }
                   if (io) {
                     io.disconnect();
@@ -358,7 +453,12 @@ export function buildTriggerControllerSource(): string {
     function onMqChange() {
       if (destroyed) return;
       if (!reducedMotion()) {
-        root.classList.remove(motionOk);
+        if (owned.motionOkAdded) {
+          root.classList.remove(motionOk);
+          owned.motionOkAdded = false;
+        } else {
+          root.classList.remove(motionOk);
+        }
         if (mode === 'page-load') {
           restartAnimations(root, actorSel);
           started = true;
@@ -366,12 +466,26 @@ export function buildTriggerControllerSource(): string {
         }
       } else if (!root.classList.contains(motionOk)) {
         // Preference engaged: freeze to static presentation.
-        restartAnimations(root, actorSel);
-        if (mode !== 'page-load') setWaiting(true);
-        started = mode === 'page-load' ? false : started;
+        stopOwnedActorAnimations(root, actorSel);
+        if (mode !== 'page-load') {
+          setWaiting(true);
+          started = false;
+          hoverArmed = true;
+        } else {
+          started = false;
+        }
         paused = false;
       }
       syncChrome();
+    }
+
+    function restoreOwnedRootState() {
+      if (owned.motionOkAdded) root.classList.remove(motionOk);
+      if (owned.waitingAdded) root.classList.remove(waiting);
+      if (owned.waitingRemoved) root.classList.add(waiting);
+      if (owned.tabindexAdded) root.removeAttribute('tabindex');
+      if (owned.roleAdded) root.removeAttribute('role');
+      if (owned.ariaLabelAdded) root.removeAttribute('aria-label');
     }
 
     bindChrome();
@@ -389,7 +503,7 @@ export function buildTriggerControllerSource(): string {
 
     return {
       play: function () {
-        beginPlayback({ userGesture: true });
+        beginPlayback({ optInReducedMotion: true });
       },
       pause: pausePlayback,
       resume: resumePlayback,
@@ -397,6 +511,7 @@ export function buildTriggerControllerSource(): string {
       destroy: function () {
         if (destroyed) return;
         destroyed = true;
+        clearArmTimer();
         root.removeEventListener('click', onClickActivate);
         root.removeEventListener('keydown', onKeyActivate);
         root.removeEventListener('mouseenter', onPointerEnter);
@@ -423,6 +538,8 @@ export function buildTriggerControllerSource(): string {
         if (tapBtn && onTapClick) {
           tapBtn.removeEventListener('click', onTapClick);
         }
+        stopOwnedActorAnimations(root, actorSel);
+        restoreOwnedRootState();
         map().delete(root);
       },
       get started() {

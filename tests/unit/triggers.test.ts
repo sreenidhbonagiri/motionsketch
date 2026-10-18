@@ -134,8 +134,15 @@ describe('playback triggers', () => {
     expect(src).toContain('prefers-reduced-motion')
     // Pointer/focus state — not a timed ignore window — coordinates hover.
     expect(src).toContain('pointerInside')
+    expect(src).toContain('relatedTarget')
+    expect(src).toContain('optInReducedMotion')
+    expect(src).toContain('stopOwnedActorAnimations')
     expect(src).not.toContain('ignoreClickUntil')
     expect(src).not.toMatch(/Date\.now\(\)\s*\+\s*\d+/)
+    // Hover/focus must not pass reduced-motion opt-in.
+    expect(src).toMatch(
+      /tryHoverFocusStart[\s\S]*beginPlayback\(\{\s*optInReducedMotion:\s*false/,
+    )
     // Re-init destroys the prior instance; chrome listeners are removed.
     expect(src).toContain('existing.destroy()')
     expect(src).toContain('removeEventListener')

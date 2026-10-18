@@ -8,7 +8,7 @@ There is no hosted product URL in this repository. Run the app locally with the 
 
 | Tool | Notes |
 | --- | --- |
-| **Node.js** | See `engines.node` in `package.json` (`^22.12.0` / `^24.0.0` / `>=26.0.0` — intersection of Vite 8 and Vitest 5). CI uses **Node 22** LTS. |
+| **Node.js** | See `engines.node` in `package.json` (`^22.22.2` / `^24.15.0` / `>=26.0.0` — intersection of Vite 8, Vitest 5, and locked jsdom). CI uses **Node 22.22.2**. |
 | **npm** | Comes with Node; used for install and scripts. Prefer `npm ci` with the lockfile for CI-parity installs. |
 | **Browser** | A current Chromium-based browser for the editor. Playwright e2e uses Chromium only. |
 
@@ -34,7 +34,7 @@ npm run preview
 ## What you can do
 
 - **Record** pointer motion for the selected actor (shape tile or image).
-- **Refine** per-actor smoothing and Steady Speed; edit the path with handles; set shared Duration, Loop, and loop mode (repeat or alternate).
+- **Refine** per-actor smoothing and Steady Speed; edit the path with handles (add/remove controls on the baked path, drag/nudge to reshape); set shared Duration, Loop, and loop mode (repeat or alternate).
 - **Clip** each actor onto a start–end interval of the shared timeline, with optional hide-before / hide-after.
 - **Transform** with rotation/scale keyframes on the same clip-local progress.
 - **Compose** up to **8** actors (paint order = stacking); rename actors and the project.
@@ -73,6 +73,7 @@ Clearing site data for this origin removes the autosaved project. Keep downloads
 | Export | Use when |
 | --- | --- |
 | **HTML demo** | Offline preview in any browser; embeds scene CSS + Play control for reduced motion. |
+| **Web package** | ZIP with `index.html`, `animation.css`, deduplicated `assets/`, `README.txt`, and `project.json` for offline preview and embedding. |
 | **CSS** (copy / download / view) | Integrate into your own markup. Image actors are **not** inlined into the CSS — host the assets yourself and match the documented structure. |
 
 CSS uses a scene root class (content fingerprint, optional `instancePrefix`), stage class `ms-stage`, and per-actor classes under that root. Keyframe names include the same fingerprint so multiple scenes can share a page. Details and markup example live in the CSS header comments and in [`docs/architecture.md`](docs/architecture.md).

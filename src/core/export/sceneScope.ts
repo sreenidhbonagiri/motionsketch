@@ -57,49 +57,35 @@ function hashString(input: string): string {
   return (h >>> 0).toString(16).padStart(8, '0')
 }
 
+/**
+ * Exact digest of every sample. Uses String(number) — no rounding / stride
+ * sampling — so a mid-path edit always changes the scene fingerprint.
+ * Export-time only (never on the playback hot path).
+ */
 function samplesDigest(samples: MotionSample[] | null | undefined): string {
   if (!samples || samples.length === 0) return '0'
-  const n = samples.length
-  const a = samples[0]
-  const b = samples[n - 1]
-  const m = samples[n >> 1]
-  let acc = n
-  const step = Math.max(1, Math.floor(n / 16))
-  for (let i = 0; i < n; i += step) {
-    const s = samples[i]
-    acc =
-      (Math.imul(acc, 33) +
-        Math.round(s.t * 1000) +
-        Math.round(s.x * 1e6) +
-        Math.round(s.y * 1e6)) >>>
-      0
+  const parts: string[] = [String(samples.length)]
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i]!
+    parts.push(String(s.t), String(s.x), String(s.y))
   }
-  return [
-    n,
-    a.t.toFixed(3),
-    a.x.toFixed(5),
-    a.y.toFixed(5),
-    m.t.toFixed(3),
-    m.x.toFixed(5),
-    m.y.toFixed(5),
-    b.t.toFixed(3),
-    b.x.toFixed(5),
-    b.y.toFixed(5),
-    acc.toString(36),
-  ].join(',')
+  return hashString(parts.join('\0'))
 }
 
 function actorDigest(actor: SceneActor): string {
   const app = coerceActor(actor.appearance)
   const img =
     app.kind === 'image' && app.image
-      ? `${app.image.label}:${app.image.naturalWidth}x${app.image.naturalHeight}:${app.image.dataUrl.length}`
+      ? [
+          app.image.label,
+          String(app.image.naturalWidth),
+          String(app.image.naturalHeight),
+          app.image.mimeType,
+          hashString(app.image.dataUrl),
+        ].join(':')
       : ''
   const xf = (actor.transform?.keyframes ?? [])
-    .map(
-      (k) =>
-        `${k.t.toFixed(4)}:${k.rotationDeg.toFixed(2)}:${k.scale.toFixed(4)}`,
-    )
+    .map((k) => [String(k.t), String(k.rotationDeg), String(k.scale)].join(':'))
     .join('|')
   const clip = actor.clip ?? {
     start: 0,
@@ -111,18 +97,18 @@ function actorDigest(actor: SceneActor): string {
     actor.id,
     app.kind,
     app.color,
-    app.width.toFixed(4),
-    app.height.toFixed(4),
-    app.borderRadius.toFixed(4),
+    String(app.width),
+    String(app.height),
+    String(app.borderRadius),
     img,
-    Number(actor.smoothing ?? 0).toFixed(4),
-    Number(actor.steadySpeed ?? 0).toFixed(4),
-    clip.start.toFixed(4),
-    clip.end.toFixed(4),
+    String(actor.smoothing ?? 0),
+    String(actor.steadySpeed ?? 0),
+    String(clip.start),
+    String(clip.end),
     clip.hideBeforeStart ? '1' : '0',
     clip.hideAfterEnd ? '1' : '0',
-    Number(actor.restPosition?.x ?? 0.5).toFixed(5),
-    Number(actor.restPosition?.y ?? 0.5).toFixed(5),
+    String(actor.restPosition?.x ?? 0.5),
+    String(actor.restPosition?.y ?? 0.5),
     samplesDigest(actor.recording?.samples),
     samplesDigest(actor.geometryEdit?.samples),
     xf,
@@ -139,7 +125,7 @@ export function fingerprintProjectScene(project: Project): string {
     project.playback.loop ? '1' : '0',
     project.playback.loopMode,
     project.playback.trigger ?? 'page-load',
-    project.stageAspect.toFixed(6),
+    String(project.stageAspect),
     String(project.actors.length),
     ...project.actors.map(actorDigest),
   ]
