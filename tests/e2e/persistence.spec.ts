@@ -45,7 +45,6 @@ test.describe('project persistence', () => {
     await page.getByTestId('loop-toggle').check()
     await page.getByTestId('duration-slider').fill('2400')
     await expect(page.getByTestId('duration-value')).toHaveText('2.40 s')
-    await page.waitForTimeout(400)
     await waitForSaved(page)
 
     const cssBefore = await readExportedCss(page)
@@ -73,7 +72,6 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('loop-toggle').check()
     await page.getByTestId('btn-close-adjust').click()
-    await page.waitForTimeout(400)
     await waitForSaved(page)
 
     await page.reload()
@@ -82,14 +80,20 @@ test.describe('project persistence', () => {
 
     const actor = page.getByTestId('actor')
     const before = await actor.boundingBox()
+    expect(before).toBeTruthy()
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await expect
+      .poll(async () => {
+        const mid = await actor.boundingBox()
+        if (!mid || !before) return false
+        return (
+          Math.abs(mid.x - before.x) > 2 || Math.abs(mid.y - before.y) > 2
+        )
+      })
+      .toBe(true)
     await page.getByTestId('btn-pause').click()
-    const mid = await actor.boundingBox()
-    expect(before && mid).toBeTruthy()
-    const moved =
-      Math.abs(mid!.x - before!.x) > 2 || Math.abs(mid!.y - before!.y) > 2
-    expect(moved).toBeTruthy()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
   })
 
   test('restores committed path edits after reload', async ({ page }) => {

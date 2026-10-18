@@ -76,9 +76,7 @@ function extractDemoSceneMarkup(html: string): string {
 test.describe('web package export', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('ZIP has assets once, previews offline, reopens project.json', async ({
-    page,
-  }) => {
+  test('ZIP deduplicates shared image assets', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page, 'Web pack')
     await recordSimplePath(page)
@@ -173,6 +171,32 @@ test.describe('web package export', () => {
       'assets/asset-01.png',
       'assets/asset-02.svg',
     ])
+  })
+
+  test('packaged preview plays offline without network', async ({ page }) => {
+    await page.goto('/')
+    await ensureEditor(page, 'Offline pack')
+    await recordSimplePath(page)
+    await page.getByTestId('btn-add-actor').click()
+    const png = await makePngBytes(page, 32, 24, '#0f766e')
+    await selectActorByIndex(page, 1)
+    await openPanel(page, 'appearance')
+    await page.getByTestId('actor-image-input').setInputFiles({
+      name: 'one.png',
+      mimeType: 'image/png',
+      buffer: png,
+    })
+    await expect(page.getByTestId('actor-image-status')).toContainText('Loaded')
+    await page.getByTestId('btn-close-appearance').click()
+    await clickRecord(page)
+    await dragActor(page, { x: 20, y: -10 }, { x: 90, y: 25 })
+
+    await openPanel(page, 'export')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-web-package').click()
+    const zipPath = await (await downloadPromise).path()
+    expect(zipPath).toBeTruthy()
+    const dir = extractZipToDir(zipPath!)
 
     const requests: string[] = []
     page.on('request', (req) => requests.push(req.url()))
@@ -185,7 +209,9 @@ test.describe('web package export', () => {
     const pngImg = page.locator('img[src="assets/asset-01.png"]').first()
     await expect(pngImg).toBeVisible()
     await expect
-      .poll(async () => pngImg.evaluate((el: HTMLImageElement) => el.naturalWidth))
+      .poll(async () =>
+        pngImg.evaluate((el: HTMLImageElement) => el.naturalWidth),
+      )
       .toBeGreaterThan(0)
 
     const actor = page.getByTestId('demo-actor')
@@ -211,12 +237,39 @@ test.describe('web package export', () => {
       (u) => /^https?:/i.test(u) && !u.startsWith('file:'),
     )
     expect(external).toEqual([])
+  })
 
-    // Reopen project.json in MotionSketch and confirm actors restored.
+  test('opening packaged project.json restores image actors', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page, 'Web pack')
+    await recordSimplePath(page)
+    await page.getByTestId('btn-add-actor').click()
+    const png = await makePngBytes(page, 32, 24, '#0f766e')
+    await selectActorByIndex(page, 1)
+    await openPanel(page, 'appearance')
+    await page.getByTestId('actor-image-input').setInputFiles({
+      name: 'one.png',
+      mimeType: 'image/png',
+      buffer: png,
+    })
+    await expect(page.getByTestId('actor-image-status')).toContainText('Loaded')
+    await page.getByTestId('btn-close-appearance').click()
+    await clickRecord(page)
+    await dragActor(page, { x: 20, y: -10 }, { x: 90, y: 25 })
+
+    await openPanel(page, 'export')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-web-package').click()
+    const zipPath = await (await downloadPromise).path()
+    expect(zipPath).toBeTruthy()
+    const dir = extractZipToDir(zipPath!)
+    const projectJson = readFileSync(join(dir, 'project.json'), 'utf8')
+
     await page.goto('/')
     await ensureEditor(page)
     await openPanel(page, 'project')
-    const projectJson = readFileSync(join(dir, 'project.json'), 'utf8')
     await page.getByTestId('project-file-input').setInputFiles({
       name: 'project.json',
       mimeType: 'application/json',
@@ -229,7 +282,7 @@ test.describe('web package export', () => {
     })
     await expect(page.getByTestId('btn-rename-project')).toHaveText('Web pack')
     const items = page.locator('[data-testid^="actor-list-item-"]')
-    await expect(items).toHaveCount(4)
+    await expect(items).toHaveCount(2)
     await selectActorByIndex(page, 1)
     await expect(page.getByTestId('actor')).toHaveAttribute(
       'data-actor-kind',
@@ -256,17 +309,12 @@ test.describe('web package export', () => {
     // Build package B (different motion / color → different scene id)
     await page.goto('/')
     await ensureEditor(page, 'Scene B')
-    await page.getByTestId('btn-record').click()
-    const actor = page.getByTestId('actor')
-    const box = await actor.boundingBox()
-    expect(box).toBeTruthy()
-    await page.mouse.move(box!.x + 10, box!.y + 10)
-    await page.mouse.down()
-    await page.mouse.move(box!.x + 200, box!.y + 120, { steps: 10 })
-    await page.mouse.up()
+    await clickRecord(page)
+    await dragActor(page, { x: 10, y: 10 }, { x: 200, y: 120 })
     await expect(page.getByTestId('btn-play')).toBeEnabled()
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-color').fill('#c2410c')
+    await page.getByTestId('btn-close-appearance').click()
     await openPanel(page, 'export')
     const dlB = page.waitForEvent('download')
     await page.getByTestId('btn-download-web-package').click()
