@@ -8,8 +8,8 @@ There is no hosted product URL in this repository. Run the app locally with the 
 
 | Tool | Notes |
 | --- | --- |
-| **Node.js** | Vite 8 expects Node 20.19+ or 22.12+. Vitest 5 (unit tests) expects Node 22.12+, 24+, or 26+. Use **Node 22.12+** (or newer) if you run the full test suite. |
-| **npm** | Comes with Node; used for install and scripts. |
+| **Node.js** | See `engines.node` in `package.json` (`^22.12.0` / `^24.0.0` / `>=26.0.0` — intersection of Vite 8 and Vitest 5). CI uses **Node 22** LTS. |
+| **npm** | Comes with Node; used for install and scripts. Prefer `npm ci` with the lockfile for CI-parity installs. |
 | **Browser** | A current Chromium-based browser for the editor. Playwright e2e uses Chromium only. |
 
 Check your versions with `node -v` and `npm -v`.
@@ -105,7 +105,30 @@ CSS uses a scene root class (content fingerprint, optional `instancePrefix`), st
 | `npm run preview` | Serve the production build |
 | `npm test` | Vitest unit tests (`tests/unit`) |
 | `npm run test:e2e` | Playwright e2e (`tests/e2e`, Chromium) |
-| `npm run lint` | Oxlint |
+| `npm run lint` | Oxlint (warnings are reported; they do not fail the script today) |
+
+## Continuous integration
+
+GitHub Actions runs on pushes to `main` and on pull requests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `npm ci`, lint, unit tests, production build, then the full Chromium e2e suite with `--retries=0`. Playwright installs Chromium and OS dependencies in CI and starts its own Vite server (`CI` is set, so `reuseExistingServer` is false).
+
+### Same checks locally
+
+```bash
+npm ci
+npm run lint
+npm test
+npm run build
+npx playwright install chromium          # once per machine
+# Optional OS deps (closer to CI on Linux):
+# npx playwright install chromium --with-deps
+CI=1 npm run test:e2e -- --retries=0
+```
+
+`CI=1` makes Playwright launch a fresh web server instead of reusing whatever is already on port 5173, and enables `forbidOnly`.
+
+### Finding CI failures
+
+On GitHub: open the repository **Actions** tab → select the failed workflow run → inspect the failing step log. For e2e failures, download the **playwright-report** artifact (HTML report under `playwright-report/`, plus `test-results/` including traces retained on failure). Artifacts are kept for 7 days.
 
 ## Documentation
 

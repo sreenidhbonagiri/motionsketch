@@ -29,9 +29,14 @@ test.describe('path editing', () => {
     const before = await handle.boundingBox()
     expect(before).toBeTruthy()
 
-    await handle.hover()
+    // Dense handles can overlap; drive the pointer by coordinates instead of hover hit-testing.
+    const center = {
+      x: before!.x + before!.width / 2,
+      y: before!.y + before!.height / 2,
+    }
+    await page.mouse.move(center.x, center.y)
     await page.mouse.down()
-    await page.mouse.move(before!.x + 40, before!.y - 30, { steps: 8 })
+    await page.mouse.move(center.x + 40, center.y - 30, { steps: 8 })
     await page.mouse.up()
 
     await expect(page.getByTestId('btn-undo-edit')).toBeEnabled()
@@ -49,9 +54,18 @@ test.describe('path editing', () => {
     expect(Math.abs(afterUndo!.y - before!.y)).toBeLessThan(8)
 
     // Re-edit then restore recorded path.
-    await handle.hover()
+    const again = await handle.boundingBox()
+    expect(again).toBeTruthy()
+    await page.mouse.move(
+      again!.x + again!.width / 2,
+      again!.y + again!.height / 2,
+    )
     await page.mouse.down()
-    await page.mouse.move(before!.x + 50, before!.y + 20, { steps: 6 })
+    await page.mouse.move(
+      again!.x + again!.width / 2 + 50,
+      again!.y + again!.height / 2 + 20,
+      { steps: 6 },
+    )
     await page.mouse.up()
     await page.getByTestId('btn-restore-path').click()
     await expect(page.getByTestId('path-handles')).toBeVisible()
