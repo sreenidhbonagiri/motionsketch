@@ -739,6 +739,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         version: 1,
         actors: snapshot.project.actors.map((a) => cloneSceneActor(a)),
         playback: { ...snapshot.project.playback },
+        // Preserve the snapshot’s authored aspect (examples and imports).
         stageAspect: clampStageAspect(snapshot.project.stageAspect),
       }
       const first = project.actors[0] ?? createSceneActor({ name: 'Actor 1' })
@@ -751,23 +752,19 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pointerId: null,
         playbackHead: 0,
         playbackDirection: 1,
+        playbackEpoch: get().playbackEpoch + 1,
         liveTrail: [],
         livePosition: { ...first.restPosition },
         showPathComparison: false,
         stageHint: 'default',
         selectedActorId,
+        ...clearHistoryForActorSwitch(),
         geometryEdit: first?.geometryEdit
           ? {
               bakedSmoothing: first.geometryEdit.bakedSmoothing,
               samples: copyPath(first.geometryEdit.samples),
             }
           : null,
-        editSession: null,
-        undoStack: [],
-        redoStack: [],
-        selectedHandleIndex: null,
-        editPreview: null,
-        ...clearTransformEditState(),
         project,
       })
     },

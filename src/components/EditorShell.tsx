@@ -10,6 +10,7 @@ import { useEditorStore } from '../state/store'
 import { AdjustPanel } from './AdjustPanel'
 import { AppearancePanel } from './AppearancePanel'
 import { CanvasStage } from './CanvasStage'
+import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
 import {
   FloatingPanel,
@@ -20,6 +21,9 @@ import { ClipTimeline } from './ClipTimeline'
 import { PlaybackDock } from './PlaybackDock'
 import { ProjectPanel } from './ProjectPanel'
 import { projectHasAnyRecording } from '../core/sceneActor'
+import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
+
+const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
 
 const chromeBtn =
   'inline-flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md transition hover:bg-white'
@@ -48,12 +52,39 @@ export function EditorShell() {
   const actorIsImage = actor?.kind === 'image' && !!actor.image
 
   const [openPanel, setOpenPanel] = useState<ChromePanel | null>(null)
+  const [examplesOpen, setExamplesOpen] = useState(false)
+  const [hintDismissed, setHintDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(EXAMPLES_HINT_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
+  const closeExamples = useCallback(() => setExamplesOpen(false), [])
 
   const togglePanel = (id: ChromePanel) => {
+    setExamplesOpen(false)
     setOpenPanel((prev) => (prev === id ? null : id))
   }
+
+  const openExamples = () => {
+    setOpenPanel(null)
+    setExamplesOpen(true)
+  }
+
+  const dismissExamplesHint = () => {
+    setHintDismissed(true)
+    try {
+      sessionStorage.setItem(EXAMPLES_HINT_KEY, '1')
+    } catch {
+      // ignore quota / private mode
+    }
+  }
+
+  const isEmptyProject = useEditorStore((s) => !projectHasMeaningfulWork(s.project))
+  const showExamplesHint = isEmptyProject && !hintDismissed && !examplesOpen
 
   useEffect(() => {
     const onHidden = () => {
@@ -138,6 +169,17 @@ export function EditorShell() {
               </div>
             </FloatingPanel>
           </div>
+
+          <button
+            type="button"
+            data-testid="btn-examples"
+            aria-haspopup="dialog"
+            aria-expanded={examplesOpen}
+            onClick={openExamples}
+            className={chromeBtn}
+          >
+            Examples
+          </button>
         </div>
 
         <div className="pointer-events-auto relative flex flex-wrap items-center justify-end gap-2">
@@ -308,8 +350,35 @@ export function EditorShell() {
               {tip}
             </p>
           )}
+          {showExamplesHint && (
+            <div
+              data-testid="examples-empty-hint"
+              className="pointer-events-auto flex max-w-md items-center gap-2 rounded-full border border-white/70 bg-white/90 px-3 py-1.5 text-xs text-slate-700 shadow-sm backdrop-blur-md"
+            >
+              <button
+                type="button"
+                data-testid="btn-try-example"
+                onClick={openExamples}
+                className="font-medium text-slate-900 underline-offset-2 hover:underline"
+              >
+                Try an example
+              </button>
+              <span className="text-slate-500">to explore a starter scene.</span>
+              <button
+                type="button"
+                data-testid="btn-dismiss-examples-hint"
+                onClick={dismissExamplesHint}
+                className="ml-1 rounded-md px-1.5 py-0.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                aria-label="Dismiss example hint"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {examplesOpen && <ExampleGallery onClose={closeExamples} />}
     </div>
   )
 }
