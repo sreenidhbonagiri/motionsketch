@@ -1,45 +1,125 @@
 # MotionSketch
 
-Browser-based animation editor: demonstrate how an element should move, then replay and export CSS keyframes.
+MotionSketch is a local browser editor for demonstrating motion. Drag an asset on the stage to record a path, refine timing and appearance, compose a multi-actor scene, then export scoped CSS or a self-contained HTML demo you can open offline.
 
-## Quick start
+There is no hosted product URL in this repository. Run the app locally with the commands below.
+
+## Requirements
+
+| Tool | Notes |
+| --- | --- |
+| **Node.js** | Vite 8 expects Node 20.19+ or 22.12+. Vitest 5 (unit tests) expects Node 22.12+, 24+, or 26+. Use **Node 22.12+** (or newer) if you run the full test suite. |
+| **npm** | Comes with Node; used for install and scripts. |
+| **Browser** | A current Chromium-based browser for the editor. Playwright e2e uses Chromium only. |
+
+Check your versions with `node -v` and `npm -v`.
+
+## Setup
 
 ```bash
 npm install
+npx playwright install chromium   # needed for npm run test:e2e
 npm run dev
 ```
 
-Open the local URL. The editor opens directly on the canvas. Click **Record**, drag a tile, then **Play** or copy the CSS export.
+Open the URL Vite prints (default `http://127.0.0.1:5173/`). The editor loads at `/` with an untitled canvas — no account or welcome modal.
+
+Production build locally:
+
+```bash
+npm run build
+npm run preview
+```
 
 ## What you can do
 
-- Record pointer motion for one or more actors on a stage
-- Adjust smoothing, duration, clip timing, and per-actor visibility
-- Add rotation/scale keyframes and image or shape appearances
-- Load bundled starter examples (Logo entrance, Follow the leader, Orbit)
-- Save and open projects locally; download project JSON
-- Export scoped CSS and a self-contained HTML demo that respects `prefers-reduced-motion`
+- **Record** pointer motion for the selected actor (shape tile or image).
+- **Refine** per-actor smoothing and Steady Speed; edit the path with handles; set shared Duration, Loop, and loop mode (repeat or alternate).
+- **Clip** each actor onto a start–end interval of the shared timeline, with optional hide-before / hide-after.
+- **Transform** with rotation/scale keyframes on the same clip-local progress.
+- **Compose** up to **8** actors (paint order = stacking); rename actors and the project.
+- **Appearances** — colored shapes or PNG / JPEG / WebP / SVG images (see limits below).
+- **Examples** — load bundled starters: Logo entrance, Follow the leader, Orbit.
+- **Projects** — New / Open / Download JSON; one active project autosaves in this browser.
+- **Export** — scoped CSS (copy or download) and an offline HTML demo. Exports respect `prefers-reduced-motion` until an explicit Play opt-in.
 
-Exports use scene-scoped selectors and unique keyframe names so multiple scenes can sit on one host page without colliding with ordinary `.stage` / `.actor` styles.
+Confirmations (reset actor, replace recording, delete actor, new/open project, load example) use in-app dialogs, not the browser’s native `confirm`.
+
+## Recording and playback
+
+1. Select an actor, click **Record**, then drag on the stage (or on the actor).
+2. Short takes are rejected (need at least two samples and ~50 ms). Replacing an existing take asks for confirmation.
+3. **Play** advances a **shared** playhead for every actor. Duration, loop, and loop mode are project-wide; smoothing and Steady Speed are per actor.
+4. Original sample timestamps stay on the recording. Smoothing / Steady Speed / path edit / clip remap only affect the derived path used for preview and export.
+
+## Examples
+
+Open **Examples** in the editor to preview and load a starter scene. Loading replaces the current project after confirmation. Assets for examples are original and embedded as data URLs — see [`src/examples/ASSETS.md`](src/examples/ASSETS.md).
+
+## Project files and local autosave
+
+| Concern | Behavior |
+| --- | --- |
+| **Where** | `localStorage` key `motionsketch.project.v1` (see `src/core/persist/document.ts`). |
+| **What** | One active project in this browser origin. No accounts, sync, or cloud backup. |
+| **When** | Discrete edits save immediately; continuous slider / appearance tweaks debounce (~350 ms). Untouched blank untitled canvases are not written. |
+| **Download / Open** | JSON envelope `formatVersion` **8** (older files migrate on open). Soft size cap ~4.5M characters. Image payloads may be deduped into an `assets` map. |
+| **Recovery** | If stored JSON is invalid, the app can quarantine it and offer a download rather than silently overwriting. |
+
+Clearing site data for this origin removes the autosaved project. Keep downloads if you need a backup.
+
+## Export choices
+
+| Export | Use when |
+| --- | --- |
+| **HTML demo** | Offline preview in any browser; embeds scene CSS + Play control for reduced motion. |
+| **CSS** (copy / download / view) | Integrate into your own markup. Image actors are **not** inlined into the CSS — host the assets yourself and match the documented structure. |
+
+CSS uses a scene root class (content fingerprint, optional `instancePrefix`), stage class `ms-stage`, and per-actor classes under that root. Keyframe names include the same fingerprint so multiple scenes can share a page. Details and markup example live in the CSS header comments and in [`docs/architecture.md`](docs/architecture.md).
+
+**Integration requirements (CSS):**
+
+- Wrap the stage in the exported root class; put actors inside `.ms-stage` (`position: relative; container-type: size`).
+- Prefer container query units (`cqw` / `cqh` / `cqmin`); a px fallback formula is in the export header.
+- Under `prefers-reduced-motion: reduce`, animations stay off until the root also has `ms-motion-ok` (the HTML demo’s Play button sets this).
+- For a second independently controlled copy of the same scene, re-export with an `instancePrefix` (e.g. `hero-`) or rename the root class and keyframe prefix together.
+
+## Limits and platform behavior
+
+| Topic | Value / behavior |
+| --- | --- |
+| **Actors** | Max **8**; names up to 40 characters. |
+| **Images** | Max **1.5 MB**; max decoded edge **2048 px**; MIME: PNG, JPEG, WebP, SVG. SVGs render only via `<img src="data:…">` (no markup injection); scripts / external refs / SMIL-style animation tags are rejected. |
+| **Actor size** | Longer box edge is **6%–40%** of the stage’s shorter side (`cqmin`). |
+| **Duration** | Shared playback **200–8000 ms**. |
+| **Project title** | Up to 60 characters. |
+| **Stage aspect** | Stored per project; resize does not rewrite samples. Editor may stretch vs. logical aspect; exports use stored aspect. See [`docs/stage-aspect.md`](docs/stage-aspect.md). |
+| **Reduced motion** | Gallery previews do not autoplay when `prefers-reduced-motion: reduce`. Exports pause CSS animation until `ms-motion-ok`. |
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start Vite dev server (editor at `/`) |
-| `npm run build` | Typecheck and production build |
-| `npm run preview` | Serve the production build locally |
-| `npm test` | Vitest unit tests |
-| `npm run test:e2e` | Playwright end-to-end flows |
+| `npm run dev` | Vite dev server (editor at `/`) |
+| `npm run build` | Typecheck (`tsc -b`) and production build |
+| `npm run preview` | Serve the production build |
+| `npm test` | Vitest unit tests (`tests/unit`) |
+| `npm run test:e2e` | Playwright e2e (`tests/e2e`, Chromium) |
 | `npm run lint` | Oxlint |
 
-## Architecture
+## Documentation
 
-- `src/core` — pure algorithms (coords, recording, smoothing, playback, CSS export)
-- `src/state` — Zustand editor store + derived selectors
-- `src/components` — canvas stage, actor, toolbar, inspector
-- `src/hooks` — pointer recording + playback clock
-- `src/examples` — bundled starter scenes and assets
-- `tests/fixtures` — HTML host pages and authored scenes for export isolation tests
+| Doc | Contents |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | Data flow, clock, undo, persistence migrations, path cache, export scope, tradeoffs |
+| [`docs/stage-aspect.md`](docs/stage-aspect.md) | Logical stage aspect vs. window resize |
+| [`src/examples/ASSETS.md`](src/examples/ASSETS.md) | Bundled example asset provenance |
 
-Motion is stored as normalized canvas coordinates with original sample timestamps preserved. Smoothing and duration only affect a derived path used for playback and export.
+## Layout (source)
+
+- `src/core` — coords, recording, process/smoothing, clip, transform, persist, export
+- `src/state` — Zustand editor store and path/playback selectors
+- `src/components` — stage, dock, inspector, export, examples, confirms
+- `src/hooks` — pointer recording, playback clock, path editor, persistence wiring
+- `src/examples` — starter scene builders and assets
+- `tests/unit`, `tests/e2e`, `tests/fixtures` — unit, Playwright, and export-isolation fixtures
