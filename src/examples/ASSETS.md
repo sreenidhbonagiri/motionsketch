@@ -5,6 +5,6 @@ All starter-scene assets are original to MotionSketch and ship as inline data UR
 
 | Asset | Used by | License / source |
 | --- | --- | --- |
-| `MOTIONSKETCH_MARK_SVG` | Logo entrance | Original MotionSketch mark (geometric “M” tile). Created for this project; free to use with MotionSketch. |
+| `MOTIONSKETCH_MARK_SVG` | Logo entrance; export-embed test fixture (`Mark entrance`) | Original MotionSketch mark (geometric “M” tile). Created for this project; free to use with MotionSketch. |
 
 Shape actors in “Follow the leader” and “Orbit” use solid fills only — no external images.

@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
 import { MS_MOTION_OK_CLASS } from '../../src/core/export/sceneScope'
+import {
+  buildEmbedCompanionProject,
+  buildEmbedMarkProject,
+  EMBED_SCENE_A_OPTIONS,
+  EMBED_SCENE_B_OPTIONS,
+} from '../fixtures/embedScenes'
 import { buildExportIsolationPage } from '../fixtures/exportIsolationPage'
 import { makeActor, makeProject, makeRecording } from '../unit/helpers/project'
 
@@ -212,5 +218,102 @@ test.describe('export scene isolation + reduced motion', () => {
         actor.evaluate((el) => getComputedStyle(el).visibility),
       )
       .toBe('visible')
+  })
+
+  test('authored embed scenes: containment, scoped replay, responsive aspect', async ({
+    page,
+  }) => {
+    const projectA = buildEmbedMarkProject()
+    const projectB = buildEmbedCompanionProject()
+    const html = buildExportIsolationPage({
+      projectA,
+      projectB,
+      optionsA: { ...EMBED_SCENE_A_OPTIONS },
+      optionsB: { ...EMBED_SCENE_B_OPTIONS },
+      withReplayControls: true,
+    })
+    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+
+    const meta = await page.evaluate(() => {
+      const w = window as unknown as {
+        __msIsolation: { rootA: string; rootB: string; sceneIdA: string; sceneIdB: string }
+      }
+      return w.__msIsolation
+    })
+    expect(meta.rootA).toBe('embed-a-ms-scene-mark-in')
+    expect(meta.rootB).toBe('embed-b-ms-scene-pulse')
+    expect(meta.sceneIdA).not.toBe(meta.sceneIdB)
+
+    const sceneStyleA = await page
+      .locator('style[data-ms="scene-a"]')
+      .evaluate((el) => el.textContent ?? '')
+    const sceneStyleB = await page
+      .locator('style[data-ms="scene-b"]')
+      .evaluate((el) => el.textContent ?? '')
+    expect(sceneStyleA).toContain(meta.rootA)
+    expect(sceneStyleB).toContain(meta.rootB)
+    expect(sceneStyleA).not.toContain(meta.rootB)
+    expect(sceneStyleB).not.toContain(meta.rootA)
+
+    const headline = page.getByTestId('host-headline')
+    const mountA = page.getByTestId('mount-a')
+    const stageA = page.locator(`.${meta.rootA} .ms-stage`)
+    const headlineBox = await headline.boundingBox()
+    const mountBox = await mountA.boundingBox()
+    const stageBox = await stageA.boundingBox()
+    expect(headlineBox).toBeTruthy()
+    expect(mountBox).toBeTruthy()
+    expect(stageBox).toBeTruthy()
+    // Stage stays inside its mount; mount does not cover the host headline.
+    expect(stageBox!.x).toBeGreaterThanOrEqual(mountBox!.x - 1)
+    expect(stageBox!.y).toBeGreaterThanOrEqual(mountBox!.y - 1)
+    expect(stageBox!.x + stageBox!.width).toBeLessThanOrEqual(
+      mountBox!.x + mountBox!.width + 1,
+    )
+    expect(stageBox!.y + stageBox!.height).toBeLessThanOrEqual(
+      mountBox!.y + mountBox!.height + 1,
+    )
+    expect(mountBox!.y).toBeGreaterThan(headlineBox!.y)
+
+    expect(stageBox!.width / stageBox!.height).toBeCloseTo(
+      projectA.stageAspect,
+      1,
+    )
+
+    // Advance B, then replay only A — B's timeline must keep progressing.
+    const actorB = page.locator(`.${meta.rootB} [class^="ms-actor"]`).first()
+    await actorB.evaluate((el) => {
+      for (const anim of el.getAnimations()) {
+        if (anim instanceof CSSAnimation) {
+          anim.pause()
+          anim.currentTime = 600
+        }
+      }
+    })
+    const timeBefore = await actorB.evaluate((el) => {
+      const anim = el.getAnimations().find((a) => a instanceof CSSAnimation)
+      return anim instanceof CSSAnimation ? Number(anim.currentTime) : -1
+    })
+    expect(timeBefore).toBeCloseTo(600, 0)
+
+    await page.getByTestId('replay-a').click()
+    const timeAfter = await actorB.evaluate((el) => {
+      const anim = el.getAnimations().find((a) => a instanceof CSSAnimation)
+      return anim instanceof CSSAnimation ? Number(anim.currentTime) : -1
+    })
+    expect(timeAfter).toBeCloseTo(600, 0)
+
+    const actorA = page.locator(`.${meta.rootA} [class^="ms-actor"]`).first()
+    const animA = await actorA.evaluate((el) => getComputedStyle(el).animationName)
+    expect(animA).not.toBe('none')
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    const narrowStage = await stageA.boundingBox()
+    expect(narrowStage).toBeTruthy()
+    expect(narrowStage!.width).toBeLessThanOrEqual(390)
+    expect(narrowStage!.width / narrowStage!.height).toBeCloseTo(
+      projectA.stageAspect,
+      1,
+    )
   })
 })
