@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { isActorVisibleAt, projectToLocal } from '../core/clip'
+import { gridLineCoords } from '../core/grid'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
 import { findActor } from '../core/sceneActor'
@@ -16,23 +17,58 @@ import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
 import { PathMoveOverlay } from './PathMoveOverlay'
 
+/** Draw the shared project-space lattice (same points used for snap targets). */
 function drawGrid(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
 ) {
-  const step = 28
   ctx.fillStyle = '#eef1f6'
   ctx.fillRect(0, 0, width, height)
 
-  ctx.fillStyle = 'rgba(100, 116, 139, 0.28)'
-  for (let x = step; x < width; x += step) {
-    for (let y = step; y < height; y += step) {
+  const lines = gridLineCoords()
+  // Moderately darker than the old CSS-pixel field so dots read clearly
+  // without competing with paths/actors.
+  ctx.fillStyle = 'rgba(71, 85, 105, 0.48)'
+  for (const nx of lines) {
+    for (const ny of lines) {
+      const x = nx * width
+      const y = ny * height
       ctx.beginPath()
-      ctx.arc(x, y, 1.05, 0, Math.PI * 2)
+      ctx.arc(x, y, 1.2, 0, Math.PI * 2)
       ctx.fill()
     }
   }
+}
+
+function drawSnapIndicator(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  point: Vec2,
+) {
+  const x = point.x * width
+  const y = point.y * height
+  ctx.save()
+  ctx.strokeStyle = 'rgba(15, 118, 110, 0.9)'
+  ctx.fillStyle = 'rgba(45, 212, 191, 0.35)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.arc(x, y, 6, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  // Crosshair ticks for non-color cue.
+  ctx.beginPath()
+  ctx.moveTo(x - 9, y)
+  ctx.lineTo(x - 4, y)
+  ctx.moveTo(x + 4, y)
+  ctx.lineTo(x + 9, y)
+  ctx.moveTo(x, y - 9)
+  ctx.lineTo(x, y - 4)
+  ctx.moveTo(x, y + 4)
+  ctx.lineTo(x, y + 9)
+  ctx.stroke()
+  ctx.restore()
 }
 
 function drawPath(
@@ -140,6 +176,7 @@ export function CanvasStage() {
   const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const polishSession = useEditorStore((s) => s.polishSession)
+  const snapIndicator = useEditorStore((s) => s.snapIndicator)
 
   const {
     onActorPointerDown,
@@ -188,6 +225,10 @@ export function CanvasStage() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     drawGrid(ctx, size.width, size.height)
+
+    if (snapIndicator) {
+      drawSnapIndicator(ctx, size.width, size.height, snapIndicator)
+    }
 
     if (mode === 'recording' || mode === 'armed') {
       if (liveTrail.length >= 2) {
@@ -285,6 +326,7 @@ export function CanvasStage() {
     playbackHead,
     editing,
     polishSession,
+    snapIndicator,
   ])
 
   return (
@@ -367,6 +409,9 @@ export function CanvasStage() {
           samples={workingSamples}
           hovered={moveHovered}
           dragging={moveDragging}
+          snapAnchor={
+            moveDragging && snapIndicator ? snapIndicator : null
+          }
           onPointerDown={onMovePathPointerDown}
           onPointerMove={onMovePathPointerMove}
           onPointerLeave={onMovePathPointerLeave}

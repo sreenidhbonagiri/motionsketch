@@ -10,13 +10,22 @@ import {
   findNearestPathHit,
   HANDLE_DRAG_THRESHOLD_PX,
   isEndpointHandle,
+  limitPathTranslationDelta,
   PATH_ADD_HIT_TOLERANCE_PX,
   PATH_MOVE_HIT_TOLERANCE_PX,
   PATH_MOVE_NUDGE_STEP,
   PATH_MOVE_NUDGE_STEP_SHIFT,
   samplesMatch,
+  translatePathSamples,
 } from '../core/edit'
-import type { MotionSample } from '../core/types'
+import {
+  GRID_KEYBOARD_STEP,
+  GRID_KEYBOARD_STEP_SHIFT,
+  nearestGridPoint,
+  resolveSnapTarget,
+  snapTranslationForAnchor,
+} from '../core/grid'
+import type { MotionSample, Vec2 } from '../core/types'
 import { isEditableKeyboardTarget } from './useTransformShortcuts'
 import { useEditorStore } from '../state/store'
 
@@ -34,6 +43,7 @@ type PendingHandlePointer = {
   originNorm: { x: number; y: number }
   baseSamples: MotionSample[]
   dragging: boolean
+  previousSnap: Vec2 | null
   target: HTMLElement
   cleanup: () => void
 }
@@ -43,6 +53,7 @@ type PendingMovePointer = {
   originNorm: { x: number; y: number }
   baseSamples: MotionSample[]
   dragging: boolean
+  previousSnap: Vec2 | null
   target: Element
   cleanup: () => void
 }
@@ -103,6 +114,10 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   const handleIndices = editSession ? editSession.handleIndices : []
   const moveTool = mode === 'editing' && pathTool === 'move-path'
 
+  const clearSnapChrome = useCallback(() => {
+    useEditorStore.getState().setSnapIndicator(null)
+  }, [])
+
   const finishDrag = useCallback(
     (pointerId: number, commit: boolean) => {
       const pending = pendingRef.current
@@ -122,8 +137,9 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         setPathGestureActive(false)
       }
       pendingRef.current = null
+      clearSnapChrome()
     },
-    [commitHandleEdit, cancelHandleDrag, setPathGestureActive],
+    [commitHandleEdit, cancelHandleDrag, setPathGestureActive, clearSnapChrome],
   )
 
   const finishMoveDrag = useCallback(
@@ -148,8 +164,9 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       }
       pendingMoveRef.current = null
       setMoveDragging(false)
+      clearSnapChrome()
     },
-    [commitHandleEdit, cancelHandleDrag, setPathGestureActive],
+    [commitHandleEdit, cancelHandleDrag, setPathGestureActive, clearSnapChrome],
   )
 
   const endMoveNudge = useCallback(
@@ -166,6 +183,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         }
       }
       cancelHandleDrag()
+      useEditorStore.getState().setSnapIndicator(null)
     },
     [commitHandleEdit, cancelHandleDrag],
   )
@@ -187,6 +205,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     }
     cancelHandleDrag()
     setPathGestureActive(false)
+    useEditorStore.getState().setSnapIndicator(null)
   }, [cancelHandleDrag, setPathGestureActive])
 
   const onHandlePointerDown = useCallback(
@@ -261,9 +280,33 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         const stageRect = stageRef.current?.getBoundingClientRect()
         if (!stageRect) return
         const p = clientToNormalized(e.clientX, e.clientY, stageRect)
+        const baseHandle = pending.baseSamples[pending.handleIndex]!
+        let target = {
+          x: baseHandle.x + (p.x - pending.originNorm.x),
+          y: baseHandle.y + (p.y - pending.originNorm.y),
+        }
+        const snapOn = useEditorStore.getState().snapToGrid
+        if (snapOn) {
+          const resolved = resolveSnapTarget(
+            target,
+            stageRect.width,
+            stageRect.height,
+            pending.previousSnap,
+          )
+          pending.previousSnap = resolved.snapped
+          if (resolved.snapped) {
+            target = resolved.snapped
+            useEditorStore.getState().setSnapIndicator(resolved.snapped)
+          } else {
+            useEditorStore.getState().setSnapIndicator(null)
+          }
+        } else {
+          pending.previousSnap = null
+          useEditorStore.getState().setSnapIndicator(null)
+        }
         const delta = {
-          x: p.x - pending.originNorm.x,
-          y: p.y - pending.originNorm.y,
+          x: target.x - baseHandle.x,
+          y: target.y - baseHandle.y,
         }
         updateEditPreview(
           applyHandleDelta(
@@ -321,11 +364,13 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         originNorm: { x: pointer.x, y: pointer.y },
         baseSamples: base,
         dragging: false,
+        previousSnap: null,
         target,
         cleanup,
       }
       setPathGestureActive(true)
       setSelectedHandleIndex(pick)
+      useEditorStore.getState().setSnapIndicator(null)
 
       target.addEventListener('pointermove', onMove)
       target.addEventListener('pointerup', onUp)
@@ -382,13 +427,13 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         const stageRect = stageRef.current?.getBoundingClientRect()
         if (!stageRect) return
         const p = clientToStageNormalized(e.clientX, e.clientY, stageRect)
-        const delta = {
+        const rawDelta = {
           x: p.x - pending.originNorm.x,
           y: p.y - pending.originNorm.y,
         }
         const movedPx = Math.hypot(
-          (p.x - pending.originNorm.x) * stageRect.width,
-          (p.y - pending.originNorm.y) * stageRect.height,
+          rawDelta.x * stageRect.width,
+          rawDelta.y * stageRect.height,
         )
         if (!pending.dragging) {
           if (movedPx < HANDLE_DRAG_THRESHOLD_PX) return
@@ -396,7 +441,25 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
           setMoveDragging(true)
           beginHandleDrag()
         }
-        updateEditPreview(applyPathTranslation(pending.baseSamples, delta))
+        const anchor = pending.baseSamples[0]!
+        const snapOn = useEditorStore.getState().snapToGrid
+        const { delta, idealSnap, actualAnchor } = snapTranslationForAnchor(
+          { x: anchor.x, y: anchor.y },
+          rawDelta,
+          (d) => limitPathTranslationDelta(pending.baseSamples, d),
+          snapOn,
+          stageRect.width,
+          stageRect.height,
+          pending.previousSnap,
+        )
+        pending.previousSnap = idealSnap
+        // Marker shows the reachable anchor (honest when bounds clip snap).
+        if (snapOn && pending.dragging) {
+          useEditorStore.getState().setSnapIndicator(actualAnchor)
+        } else {
+          useEditorStore.getState().setSnapIndicator(null)
+        }
+        updateEditPreview(translatePathSamples(pending.baseSamples, delta))
       }
 
       const onUp = (e: PointerEvent) => {
@@ -427,11 +490,13 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         originNorm: origin,
         baseSamples: base,
         dragging: false,
+        previousSnap: null,
         target,
         cleanup,
       }
       setPathGestureActive(true)
       setMoveDragging(false)
+      useEditorStore.getState().setSnapIndicator(null)
 
       target.addEventListener('pointermove', onMove)
       target.addEventListener('pointerup', onUp)
@@ -605,9 +670,14 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         if (!ARROW_KEYS.has(key)) return
         event.preventDefault()
 
-        const step = event.shiftKey
-          ? PATH_MOVE_NUDGE_STEP_SHIFT
-          : PATH_MOVE_NUDGE_STEP
+        const snapOn = useEditorStore.getState().snapToGrid
+        const step = snapOn
+          ? event.shiftKey
+            ? GRID_KEYBOARD_STEP_SHIFT
+            : GRID_KEYBOARD_STEP
+          : event.shiftKey
+            ? PATH_MOVE_NUDGE_STEP_SHIFT
+            : PATH_MOVE_NUDGE_STEP
         let dx = 0
         let dy = 0
         if (key === 'ArrowLeft') dx = -step
@@ -631,12 +701,32 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         // Held-key repeats accumulate on the gesture baseline (one undo later).
         gesture.dx += dx
         gesture.dy += dy
-        updateEditPreview(
-          applyPathTranslation(gesture.baseline, {
-            x: gesture.dx,
-            y: gesture.dy,
-          }),
-        )
+        const anchor = gesture.baseline[0]!
+        if (snapOn) {
+          const rawAnchor = {
+            x: anchor.x + gesture.dx,
+            y: anchor.y + gesture.dy,
+          }
+          const snapped = nearestGridPoint(rawAnchor)
+          const delta = limitPathTranslationDelta(gesture.baseline, {
+            x: snapped.x - anchor.x,
+            y: snapped.y - anchor.y,
+          })
+          const actual = {
+            x: anchor.x + delta.x,
+            y: anchor.y + delta.y,
+          }
+          useEditorStore.getState().setSnapIndicator(actual)
+          updateEditPreview(translatePathSamples(gesture.baseline, delta))
+        } else {
+          useEditorStore.getState().setSnapIndicator(null)
+          updateEditPreview(
+            applyPathTranslation(gesture.baseline, {
+              x: gesture.dx,
+              y: gesture.dy,
+            }),
+          )
+        }
         return
       }
 
@@ -703,7 +793,14 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       const selected = useEditorStore.getState().selectedHandleIndex
       if (selected === null) return
 
-      const step = event.shiftKey ? 0.02 : 0.005
+      const snapOn = useEditorStore.getState().snapToGrid
+      const step = snapOn
+        ? event.shiftKey
+          ? GRID_KEYBOARD_STEP_SHIFT
+          : GRID_KEYBOARD_STEP
+        : event.shiftKey
+          ? 0.02
+          : 0.005
       let dx = 0
       let dy = 0
       if (key === 'ArrowLeft') dx = -step
@@ -716,6 +813,15 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       const preview = useEditorStore.getState().editPreview
       const base = preview ?? session.samples
       const aspect = useEditorStore.getState().project.stageAspect
+      const handle = base[selected]!
+      if (snapOn) {
+        const target = nearestGridPoint({
+          x: handle.x + dx,
+          y: handle.y + dy,
+        })
+        dx = target.x - handle.x
+        dy = target.y - handle.y
+      }
       commitHandleEdit(
         applyHandleDelta(base, selected, { x: dx, y: dy }, {
           stageAspect: aspect,

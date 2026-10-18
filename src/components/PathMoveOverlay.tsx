@@ -1,10 +1,12 @@
 import type { FocusEventHandler, PointerEventHandler } from 'react'
-import type { MotionSample } from '../core/types'
+import type { MotionSample, Vec2 } from '../core/types'
 
 interface PathMoveOverlayProps {
   samples: MotionSample[]
   hovered: boolean
   dragging: boolean
+  /** Actual reachable start-point anchor while snapping Move path. */
+  snapAnchor?: Vec2 | null
   onPointerDown: PointerEventHandler<SVGElement>
   onPointerMove: PointerEventHandler<SVGElement>
   onPointerLeave: () => void
@@ -17,6 +19,7 @@ export function PathMoveOverlay({
   samples,
   hovered,
   dragging,
+  snapAnchor = null,
   onPointerDown,
   onPointerMove,
   onPointerLeave,
@@ -30,6 +33,7 @@ export function PathMoveOverlay({
     .join(' ')
 
   const active = hovered || dragging
+  const start = samples[0]!
 
   return (
     <svg
@@ -75,6 +79,19 @@ export function PathMoveOverlay({
             : undefined
         }
       />
+      {dragging && (
+        <g data-testid="path-move-anchor" aria-hidden>
+          <circle
+            cx={(snapAnchor?.x ?? start.x) * 100}
+            cy={(snapAnchor?.y ?? start.y) * 100}
+            r={1.4}
+            fill="#ccfbf1"
+            stroke="#0f766e"
+            strokeWidth={0.35}
+            vectorEffect="non-scaling-stroke"
+          />
+        </g>
+      )}
     </svg>
   )
 }

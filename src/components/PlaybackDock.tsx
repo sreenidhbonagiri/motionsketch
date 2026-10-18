@@ -57,6 +57,8 @@ export function PlaybackDock() {
   const exitEditMode = useEditorStore((s) => s.exitEditMode)
   const beginPolishSession = useEditorStore((s) => s.beginPolishSession)
   const polishSession = useEditorStore((s) => s.polishSession)
+  const snapToGrid = useEditorStore((s) => s.snapToGrid)
+  const setSnapToGrid = useEditorStore((s) => s.setSnapToGrid)
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
@@ -610,7 +612,35 @@ export function PlaybackDock() {
             )}
           </>
         )}
+
+        {!isRecordingLike && (
+          <button
+            type="button"
+            data-testid="snap-to-grid-toggle"
+            aria-pressed={snapToGrid}
+            aria-describedby="snap-to-grid-help"
+            title="Align placement and path edits to the dots. Recording stays freehand."
+            onClick={() => setSnapToGrid(!snapToGrid)}
+            className={
+              snapToGrid
+                ? 'shrink-0 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800'
+                : `${btnSecondary} shrink-0`
+            }
+          >
+            {snapToGrid ? 'Snap on' : 'Snap to grid'}
+          </button>
+        )}
       </div>
+
+      {!isRecordingLike && (
+        <p
+          id="snap-to-grid-help"
+          data-testid="snap-to-grid-help"
+          className="max-w-xl text-center text-[11px] leading-snug text-slate-500"
+        >
+          Align placement and path edits to the dots. Recording stays freehand.
+        </p>
+      )}
 
       {modeStatus && (
         <div

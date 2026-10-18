@@ -119,6 +119,13 @@ interface EditorStore {
   livePosition: Vec2
   liveTrail: Vec2[]
   showPathComparison: boolean
+  /**
+   * Snap placement / path edits to the editor grid. Local preference only —
+   * not project data, not exported, not autosaved. Off by default.
+   */
+  snapToGrid: boolean
+  /** Ephemeral snap/anchor marker in normalized coords (editor chrome only). */
+  snapIndicator: Vec2 | null
 
   /**
    * Working geometry for the selected actor (mirrors actor.geometryEdit when idle).
@@ -196,6 +203,8 @@ interface EditorStore {
   setLoopMode: (loopMode: LoopMode) => void
   setPlaybackTrigger: (trigger: PlaybackTrigger) => void
   setShowPathComparison: (show: boolean) => void
+  setSnapToGrid: (on: boolean) => void
+  setSnapIndicator: (point: Vec2 | null) => void
   setActorColor: (color: string) => void
   setActorSize: (size: number) => void
   setActorBorderRadius: (radius: number) => void
@@ -500,6 +509,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     livePosition: { ...DEFAULT_REST_POSITION },
     liveTrail: [],
     showPathComparison: false,
+    snapToGrid: false,
+    snapIndicator: null,
     stageHint: 'default',
     actionAnnouncement: null,
     polishStrengthByActorId: {},
@@ -770,6 +781,15 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       })),
 
     setShowPathComparison: (show) => set({ showPathComparison: show }),
+
+    setSnapToGrid: (on) =>
+      set({
+        snapToGrid: !!on,
+        // Clearing the marker when disabling avoids a stale chrome hint.
+        snapIndicator: on ? get().snapIndicator : null,
+      }),
+
+    setSnapIndicator: (point) => set({ snapIndicator: point }),
 
     setActorColor: (color) =>
       set((state) => ({
@@ -1413,6 +1433,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddCandidateIndex: null,
         pathTool: 'edit-points',
         polishSession: null,
+        snapIndicator: null,
       })
     },
 
@@ -1775,7 +1796,11 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       // Never commit path geometry outside an active edit session — Done /
       // restore / project load must not absorb a late keyup or pointerup.
       if (state.mode !== 'editing') {
-        set({ editPreview: null, pathGestureActive: false })
+        set({
+          editPreview: null,
+          pathGestureActive: false,
+          snapIndicator: null,
+        })
         return
       }
       const base = state.editSession
@@ -1783,7 +1808,11 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
       // Zero-distance / cancelled-equivalent gestures must not create undo noise.
       if (samplesMatch(base.samples, samples)) {
-        set({ editPreview: null, pathGestureActive: false })
+        set({
+          editPreview: null,
+          pathGestureActive: false,
+          snapIndicator: null,
+        })
         return
       }
 
@@ -1806,11 +1835,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         redoStack: [],
         editPreview: null,
         pathGestureActive: false,
+        snapIndicator: null,
       })
     },
 
     cancelHandleDrag: () =>
-      set({ editPreview: null, pathGestureActive: false }),
+      set({
+        editPreview: null,
+        pathGestureActive: false,
+        snapIndicator: null,
+      }),
 
     undoEdit: () => {
       const state = get()

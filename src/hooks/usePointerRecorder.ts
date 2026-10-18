@@ -1,10 +1,16 @@
-import { useCallback, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import {
   centerFromPointer,
   clientToNormalized,
   grabOffsetFromPointer,
 } from '../core/coords'
+import { resolveSnapTarget } from '../core/grid'
 import { findActor } from '../core/sceneActor'
+import type { Vec2 } from '../core/types'
 import {
   commitIdleDragBaseline,
   endDrag,
@@ -28,10 +34,16 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
   const mode = useEditorStore((s) => s.mode)
   const pointerId = useEditorStore((s) => s.pointerId)
   const selectActor = useEditorStore((s) => s.selectActor)
+  const previousSnapRef = useRef<Vec2 | null>(null)
 
   const getRect = useCallback(() => {
     return stageRef.current?.getBoundingClientRect() ?? null
   }, [stageRef])
+
+  const clearSnapChrome = useCallback(() => {
+    previousSnapRef.current = null
+    useEditorStore.getState().setSnapIndicator(null)
+  }, [])
 
   const onActorPointerDown = useCallback(
     (actorId: string, event: ReactPointerEvent<HTMLElement>) => {
@@ -57,7 +69,10 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
           ? state.livePosition
           : actor.restPosition
       setGrabOffset(grabOffsetFromPointer(pointer, position))
+      // Unsnapped on pointer down — preserves grab offset, no jump.
       const center = centerFromPointer(pointer, getGrabOffset())
+      previousSnapRef.current = null
+      useEditorStore.getState().setSnapIndicator(null)
 
       if (state.mode === 'armed') {
         startRecordingDrag(event.pointerId, event.timeStamp, center)
@@ -80,17 +95,38 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
           ? event.nativeEvent.getCoalescedEvents()
           : [event.nativeEvent]
 
+      const snapEnabled = useEditorStore.getState().snapToGrid
+      const recording = isRecordingActive()
+
       for (const e of events) {
         const pointer = clientToNormalized(e.clientX, e.clientY, rect)
-        const center = centerFromPointer(pointer, getGrabOffset())
-        if (isRecordingActive()) {
+        let center = centerFromPointer(pointer, getGrabOffset())
+        if (recording) {
+          // Recording stays freehand — never snap pointer samples.
           pushRecordingSample(e.timeStamp, center)
-        } else {
-          useEditorStore.getState().setLivePosition(center)
+          continue
         }
+        if (snapEnabled) {
+          const resolved = resolveSnapTarget(
+            center,
+            rect.width,
+            rect.height,
+            previousSnapRef.current,
+          )
+          previousSnapRef.current = resolved.snapped
+          if (resolved.snapped) {
+            center = resolved.snapped
+            useEditorStore.getState().setSnapIndicator(resolved.snapped)
+          } else {
+            useEditorStore.getState().setSnapIndicator(null)
+          }
+        } else if (previousSnapRef.current || useEditorStore.getState().snapIndicator) {
+          clearSnapChrome()
+        }
+        useEditorStore.getState().setLivePosition(center)
       }
     },
-    [getRect],
+    [getRect, clearSnapChrome],
   )
 
   const onPointerUp = useCallback(
@@ -121,8 +157,9 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
         commitIdleDragBaseline()
         endDrag(false)
       }
+      clearSnapChrome()
     },
-    [],
+    [clearSnapChrome],
   )
 
   const onPointerCancel = useCallback(
@@ -139,8 +176,9 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
         endDrag(false)
         if (mode === 'recording') useEditorStore.getState().setIdle()
       }
+      clearSnapChrome()
     },
-    [mode],
+    [mode, clearSnapChrome],
   )
 
   return {
