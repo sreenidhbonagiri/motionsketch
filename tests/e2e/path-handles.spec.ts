@@ -201,7 +201,9 @@ test.describe('user path handles', () => {
     await expect(page.getByTestId('path-handles')).toBeVisible()
 
     const total = await page.locator('[data-testid^="path-handle-"]').count()
-    await expect(page.getByTestId('action-live-region')).toContainText(
+    // Mode stays on action-live-region; Point N of M uses handle-selection-status.
+    await expect(page.getByTestId('action-live-region')).toHaveText('Edit points')
+    await expect(page.getByTestId('handle-selection-status')).toContainText(
       `Point 1 of ${total}`,
     )
     await expect(
@@ -209,9 +211,10 @@ test.describe('user path handles', () => {
     ).toHaveAttribute('data-handle-ordinal', '1')
 
     await page.keyboard.press(']')
-    await expect(page.getByTestId('action-live-region')).toContainText(
+    await expect(page.getByTestId('handle-selection-status')).toContainText(
       `Point 2 of ${total}`,
     )
+    await expect(page.getByTestId('action-live-region')).toHaveText('Edit points')
     await expect(
       page.locator('[data-testid^="path-handle-"][aria-pressed="true"]'),
     ).toHaveAttribute('data-handle-ordinal', '2')
