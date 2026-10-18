@@ -3,7 +3,10 @@ import { maxPlaybackExportError } from '../../src/core/export/consistency'
 import {
   exportCssFromProject,
   exportCssFromRecording,
+  formatProjectOffsets,
+  projectTimelineSamples,
 } from '../../src/core/export/css'
+import { evaluateTransform } from '../../src/core/transform'
 import { buildKeyframes } from '../../src/core/export/format'
 import { processMotion } from '../../src/core/process'
 import { selectProcessedPathForActor } from '../../src/state/selectors'
@@ -206,5 +209,52 @@ describe('css export', () => {
     // Example HTML lists actors in list/stacking order.
     const example = css.slice(css.indexOf('Example HTML:'))
     expect(example.indexOf('actor-1')).toBeLessThan(example.indexOf('actor-2'))
+  })
+
+  it('keeps near-final and final clip poses distinct under short clips', () => {
+    // Regression: 2-decimal rounding used to collapse local 0.9995 and 1 onto
+    // the same CSS %, dropping the final 180° pose into the hold.
+    const clip = { start: 0.2, end: 0.25 }
+    const samples = projectTimelineSamples([0, 0.9995, 1], clip)
+    const offsets = formatProjectOffsets(samples.map((s) => s.projectT))
+    expect(new Set(offsets).size).toBe(offsets.length)
+
+    const finalSample = samples.find((s) => s.localT >= 1 - 1e-9)
+    expect(finalSample).toBeTruthy()
+    const nearFinal = samples.find(
+      (s) => s.localT > 0.99 && s.localT < 1 - 1e-9,
+    )
+    expect(nearFinal).toBeTruthy()
+    expect(offsets[samples.indexOf(nearFinal!)]).not.toBe(
+      offsets[samples.indexOf(finalSample!)],
+    )
+
+    const project = makeProject({
+      actors: [
+        makeActor({
+          id: 'short',
+          clip,
+          recording: makeRecording(8),
+          transform: {
+            keyframes: [
+              { id: 'k0', t: 0, rotationDeg: 0, scale: 1 },
+              { id: 'k1', t: 0.9995, rotationDeg: 0, scale: 1 },
+              { id: 'k2', t: 1, rotationDeg: 180, scale: 1 },
+            ],
+          },
+        }),
+      ],
+      playback: { durationMs: 1000, loop: false, loopMode: 'repeat' },
+    })
+    const css = exportCssFromProject(project)
+    const block = css.slice(css.indexOf('@keyframes'))
+    // Clip-end pose must include 180deg before the final hold, not animate
+    // toward it across the rest of the project timeline.
+    expect(block).toMatch(/25(?:\.\d+)?%\s*\{[^}]*rotate\(180deg\)/)
+    expect(block).toMatch(/100%\s*\{[^}]*rotate\(180deg\)/)
+    // Preview evaluation agrees at and after the clip boundary.
+    const track = project.actors[0].transform
+    expect(evaluateTransform(track, 1).rotationDeg).toBe(180)
+    expect(evaluateTransform(track, 0.9995).rotationDeg).toBe(0)
   })
 })

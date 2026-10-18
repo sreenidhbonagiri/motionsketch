@@ -48,6 +48,10 @@ function seedTransformStore() {
     selectedTransformId: null,
     transformUndoStack: [],
     transformRedoStack: [],
+    clipUndoStack: [],
+    clipRedoStack: [],
+    actorEditOrder: [],
+    actorEditRedoOrder: [],
   })
 }
 

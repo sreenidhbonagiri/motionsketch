@@ -4,6 +4,7 @@ import {
   pushSample,
   type RecordingSession,
 } from '../core/recording'
+import { findActor } from '../core/sceneActor'
 import type { Recording, Vec2 } from '../core/types'
 import { useEditorStore } from '../state/store'
 
@@ -11,6 +12,8 @@ let session: RecordingSession | null = null
 let grabOffset: Vec2 = { x: 0, y: 0 }
 let activePointerId: number | null = null
 let isRecordingDrag = false
+/** Rest pose captured at idle-drag start; restored on cancel. */
+let idleRestBaseline: Vec2 | null = null
 
 export function getGrabOffset(): Vec2 {
   return grabOffset
@@ -31,6 +34,7 @@ export function startRecordingDrag(
 ): void {
   activePointerId = pointerId
   isRecordingDrag = true
+  idleRestBaseline = null
   session = pushSample(createSession(), absoluteTimestamp, center.x, center.y)
   useEditorStore.getState().beginRecording(pointerId, center)
 }
@@ -39,7 +43,25 @@ export function startIdleDrag(pointerId: number, center: Vec2): void {
   activePointerId = pointerId
   isRecordingDrag = false
   session = null
+  const state = useEditorStore.getState()
+  const actor = findActor(state.project.actors, state.selectedActorId)
+  idleRestBaseline = actor
+    ? { x: actor.restPosition.x, y: actor.restPosition.y }
+    : { x: center.x, y: center.y }
   useEditorStore.getState().setLivePosition(center)
+}
+
+/** Commit path for a finished idle drag (clears cancel baseline). */
+export function commitIdleDragBaseline(): void {
+  idleRestBaseline = null
+}
+
+/** Restore rest/live position after a canceled idle drag. */
+export function restoreIdleDragBaseline(): void {
+  if (idleRestBaseline) {
+    useEditorStore.getState().setLivePosition({ ...idleRestBaseline })
+  }
+  idleRestBaseline = null
 }
 
 export function pushRecordingSample(
@@ -65,6 +87,7 @@ export function endDrag(keep: boolean): Recording | null {
     return null
   }
 
+  idleRestBaseline = null
   const recording = keep && current ? finish(current) : null
   useEditorStore.getState().finishRecording(recording)
   return recording
@@ -93,5 +116,6 @@ export function resetController(): void {
   session = null
   activePointerId = null
   isRecordingDrag = false
+  idleRestBaseline = null
   grabOffset = { x: 0, y: 0 }
 }

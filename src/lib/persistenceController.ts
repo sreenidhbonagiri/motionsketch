@@ -203,6 +203,10 @@ export function createPersistenceController(
     state: { project: Project },
     prev: { project: Project },
   ) => {
+    // Playhead/direction/mode UI updates keep the same project reference —
+    // bail before any JSON serialization or image-bearing snapshots.
+    if (state.project === prev.project) return
+
     const next = pickPersistable(state)
     const previous = pickPersistable(prev)
     if (persistableEqual(next, previous)) return

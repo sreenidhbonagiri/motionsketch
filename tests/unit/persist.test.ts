@@ -113,6 +113,10 @@ function resetStore(
     selectedTransformId: null,
     transformUndoStack: [],
     transformRedoStack: [],
+    clipUndoStack: [],
+    clipRedoStack: [],
+    actorEditOrder: [],
+    actorEditRedoOrder: [],
     stageHint: 'default',
     actionAnnouncement: null,
   })
@@ -447,6 +451,46 @@ describe('persistence controller', () => {
     const afterSlider = storage.getItem(STORAGE_KEY)!
     expect(afterSlider).not.toBe(afterRecord)
     expect(afterSlider).toContain('"durationMs": 2000')
+    controller.dispose()
+  })
+
+  it('skips serialization and storage writes on playhead-only updates', () => {
+    const storage = createMemoryStorage()
+    const setItemSpy = vi.spyOn(storage, 'setItem')
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: makeRecording() })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    setItemSpy.mockClear()
+
+    const stringifySpy = vi.spyOn(JSON, 'stringify')
+    const beforeCalls = stringifySpy.mock.calls.length
+
+    useEditorStore.getState().setPlaybackHead(0.33)
+    useEditorStore.getState().setPlaybackDirection(-1)
+    useEditorStore.getState().setPlaybackSample(0.8, 1)
+
+    // No new project fingerprints / writes from playhead traffic.
+    expect(setItemSpy).not.toHaveBeenCalled()
+    const projectStringifies = stringifySpy.mock.calls.filter((args) => {
+      const first = args[0]
+      return (
+        first &&
+        typeof first === 'object' &&
+        'project' in (first as object)
+      )
+    })
+    expect(projectStringifies.length).toBe(0)
+    expect(stringifySpy.mock.calls.length).toBe(beforeCalls)
+
+    stringifySpy.mockRestore()
+
+    // Real edits still save.
+    useEditorStore.getState().setLoop(true)
+    expect(setItemSpy).toHaveBeenCalled()
     controller.dispose()
   })
 })

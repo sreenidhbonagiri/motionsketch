@@ -6,11 +6,13 @@ import {
 } from '../core/coords'
 import { findActor } from '../core/sceneActor'
 import {
+  commitIdleDragBaseline,
   endDrag,
   getActivePointerId,
   getGrabOffset,
   isRecordingActive,
   pushRecordingSample,
+  restoreIdleDragBaseline,
   setGrabOffset,
   startIdleDrag,
   startRecordingDrag,
@@ -112,6 +114,7 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
         if (actor && !actor.recording) {
           useEditorStore.getState().setRestPosition(pos)
         }
+        commitIdleDragBaseline()
         endDrag(false)
       }
     },
@@ -125,6 +128,8 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       if (isRecordingActive()) {
         endDrag(true)
       } else {
+        // Cancel restores the pre-drag rest pose; do not commit.
+        restoreIdleDragBaseline()
         endDrag(false)
         if (mode === 'recording') useEditorStore.getState().setIdle()
       }

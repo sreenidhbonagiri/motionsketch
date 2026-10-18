@@ -27,15 +27,11 @@ export function PlaybackDock() {
   )
   const transformKeys = selectedActor?.transform.keyframes ?? []
   const selectedTransformId = useEditorStore((s) => s.selectedTransformId)
-  const undoClip = useEditorStore((s) => s.undoClip)
-  const redoClip = useEditorStore((s) => s.redoClip)
-  const clipUndoStack = useEditorStore((s) => s.clipUndoStack)
-  const clipRedoStack = useEditorStore((s) => s.clipRedoStack)
+  const actorEditOrder = useEditorStore((s) => s.actorEditOrder)
+  const actorEditRedoOrder = useEditorStore((s) => s.actorEditRedoOrder)
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const undoStack = useEditorStore((s) => s.undoStack)
   const redoStack = useEditorStore((s) => s.redoStack)
-  const transformUndoStack = useEditorStore((s) => s.transformUndoStack)
-  const transformRedoStack = useEditorStore((s) => s.transformRedoStack)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const loop = useEditorStore((s) => s.project.playback.loop)
   const loopMode = useEditorStore((s) => s.project.playback.loopMode)
@@ -53,8 +49,8 @@ export function PlaybackDock() {
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
-  const undoTransform = useEditorStore((s) => s.undoTransform)
-  const redoTransform = useEditorStore((s) => s.redoTransform)
+  const undoActorEdit = useEditorStore((s) => s.undoActorEdit)
+  const redoActorEdit = useEditorStore((s) => s.redoActorEdit)
   const selectTransformKeyframe = useEditorStore((s) => s.selectTransformKeyframe)
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
@@ -273,14 +269,8 @@ export function PlaybackDock() {
             <button
               type="button"
               data-testid="btn-undo-transform"
-              onClick={() => {
-                if (transformUndoStack.length > 0) undoTransform()
-                else undoClip()
-              }}
-              disabled={
-                isRecordingLike ||
-                (transformUndoStack.length === 0 && clipUndoStack.length === 0)
-              }
+              onClick={() => undoActorEdit()}
+              disabled={isRecordingLike || actorEditOrder.length === 0}
               className={btnQuiet}
               title="Undo transform or clip timing for the selected actor"
             >
@@ -289,14 +279,8 @@ export function PlaybackDock() {
             <button
               type="button"
               data-testid="btn-redo-transform"
-              onClick={() => {
-                if (transformRedoStack.length > 0) redoTransform()
-                else redoClip()
-              }}
-              disabled={
-                isRecordingLike ||
-                (transformRedoStack.length === 0 && clipRedoStack.length === 0)
-              }
+              onClick={() => redoActorEdit()}
+              disabled={isRecordingLike || actorEditRedoOrder.length === 0}
               className={btnQuiet}
               title="Redo transform or clip timing for the selected actor"
             >

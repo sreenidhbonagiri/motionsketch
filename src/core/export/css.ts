@@ -28,17 +28,107 @@ import { selectProcessedPathForActor } from '../../state/selectors'
 import { evaluateKeyframes } from './consistency'
 import { buildKeyframesFromProcessed } from './format'
 
-function formatOffset(offset: number): string {
+/**
+ * CSS keyframe percentage precision. Export starts at {@link CSS_OFFSET_MIN_DECIMALS}
+ * and raises digits until every distinct project time gets a unique percentage
+ * (up to {@link CSS_OFFSET_MAX_DECIMALS}). Preview evaluates continuously in float
+ * space, so it already distinguishes the same times; export matches that intent
+ * instead of collapsing poses that only collide after rounding.
+ *
+ * At max decimals the quantum is 10^-6 percent of the timeline (1e-8 normalized).
+ * If two times still collide, the later percentage is nudged by one quantum so
+ * both poses remain (never drop a later keyframe to keep an earlier one).
+ */
+export const CSS_OFFSET_MIN_DECIMALS = 2
+export const CSS_OFFSET_MAX_DECIMALS = 6
+
+const PROJECT_T_MERGE_EPS = 1e-12
+
+function formatOffsetWithDigits(offset: number, digits: number): string {
   const pct = clamp01(offset) * 100
-  // Two decimals keep nearby clip boundaries distinct without CSS collisions.
-  const rounded = Math.round(pct * 100) / 100
+  const factor = 10 ** digits
+  const rounded = Math.round(pct * factor) / factor
   if (Number.isInteger(rounded)) return `${rounded}%`
-  return `${rounded.toFixed(2)}%`
+  return `${rounded.toFixed(digits)}%`
+}
+
+/** @deprecated Prefer {@link formatProjectOffsets} for keyframe lists. */
+export function formatOffset(offset: number): string {
+  return formatOffsetWithDigits(offset, CSS_OFFSET_MIN_DECIMALS)
+}
+
+/**
+ * Format project-timeline offsets as unique CSS percentages.
+ * Preserves every distinct evaluation time (adaptive precision / nudge).
+ */
+export function formatProjectOffsets(projectTs: number[]): string[] {
+  const n = projectTs.length
+  if (n === 0) return []
+
+  for (
+    let digits = CSS_OFFSET_MIN_DECIMALS;
+    digits <= CSS_OFFSET_MAX_DECIMALS;
+    digits++
+  ) {
+    const formatted = projectTs.map((t) => formatOffsetWithDigits(t, digits))
+    if (new Set(formatted).size === formatted.length) return formatted
+  }
+
+  const digits = CSS_OFFSET_MAX_DECIMALS
+  const quantum = 10 ** -digits
+  const used = new Set<string>()
+  const out: string[] = []
+  for (const t of projectTs) {
+    let pct =
+      Math.round(clamp01(t) * 100 * 10 ** digits) / 10 ** digits
+    let key = formatOffsetWithDigits(pct / 100, digits)
+    let guard = 0
+    while (used.has(key) && guard < 10_000) {
+      if (pct < 100) {
+        pct = Math.min(100, pct + quantum)
+      } else {
+        // Corner case: stuck at 100% — step backward from 100.
+        pct = Math.max(0, 100 - quantum * (guard + 1))
+      }
+      key = formatOffsetWithDigits(pct / 100, digits)
+      guard++
+    }
+    used.add(key)
+    out.push(key)
+  }
+  return out
+}
+
+/**
+ * When two samples share the same project time, keep a single pose.
+ * Prefer local 1 (final), then local 0 (initial), else the later sample.
+ */
+function mergeSameProjectTime(
+  samples: Array<{ projectT: number; localT: number }>,
+): Array<{ projectT: number; localT: number }> {
+  const out: Array<{ projectT: number; localT: number }> = []
+  for (const sample of samples) {
+    const prev = out[out.length - 1]
+    if (prev && Math.abs(prev.projectT - sample.projectT) <= PROJECT_T_MERGE_EPS) {
+      const prevFinal = prev.localT >= 1 - 1e-12
+      const sampleFinal = sample.localT >= 1 - 1e-12
+      const prevInitial = prev.localT <= 1e-12
+      const sampleInitial = sample.localT <= 1e-12
+      if (sampleFinal || (prevInitial && !sampleInitial && !prevFinal)) {
+        out[out.length - 1] = sample
+      }
+      continue
+    }
+    out.push(sample)
+  }
+  return out
 }
 
 /**
  * Build project-timeline sample times for an actor clip, including explicit
  * initial/final holds. Local offsets are remapped into [start, end].
+ * Distinct project times are preserved; CSS percentage uniquifying happens in
+ * {@link formatProjectOffsets} at emit time.
  */
 export function projectTimelineSamples(
   localOffsets: number[],
@@ -66,16 +156,7 @@ export function projectTimelineSamples(
     samples.push({ projectT: 1, localT: 1 })
   }
 
-  // Collapse samples that round to the same CSS percentage; keep first.
-  const seen = new Set<string>()
-  const unique: Array<{ projectT: number; localT: number }> = []
-  for (const sample of samples) {
-    const key = formatOffset(sample.projectT)
-    if (seen.has(key)) continue
-    seen.add(key)
-    unique.push(sample)
-  }
-  return unique
+  return mergeSameProjectTime(samples)
 }
 
 function formatCq(value: number, unit: 'cqw' | 'cqh', digits = 3): string {
@@ -215,15 +296,16 @@ ${box.shapeDecls}
   const localOffsets = unionExportOffsets(keyframes, track)
   const clip = clampClip(options.actor.clip)
   const timeline = projectTimelineSamples(localOffsets, clip)
+  const cssOffsets = formatProjectOffsets(timeline.map((s) => s.projectT))
   const startLocal = timeline[0]?.localT ?? 0
   const startPos = evaluateKeyframes(keyframes, startLocal)
   const startXf = evaluateTransform(track, startLocal)
 
   const frames = timeline
-    .map(({ projectT, localT }) => {
+    .map(({ localT }, index) => {
       const pos = evaluateKeyframes(keyframes, localT)
       const xf = evaluateTransform(track, localT)
-      return `  ${formatOffset(projectT)} { transform: ${cssTransformAt(pos.x, pos.y, xf.rotationDeg, xf.scale, includeXf)}; }`
+      return `  ${cssOffsets[index]} { transform: ${cssTransformAt(pos.x, pos.y, xf.rotationDeg, xf.scale, includeXf)}; }`
     })
     .join('\n')
 

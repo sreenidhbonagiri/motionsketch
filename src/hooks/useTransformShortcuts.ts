@@ -20,14 +20,14 @@ export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Keyboard undo/redo/delete for transform keyframes when not path-editing.
+ * Keyboard undo/redo for clip/transform edits, plus transform keyframe delete.
  * Never intercepts typing or native editing in form fields / contenteditable.
  * Delete/Backspace only runs when a transform keyframe is selected.
  */
 export function useTransformShortcuts() {
   const mode = useEditorStore((s) => s.mode)
-  const undoTransform = useEditorStore((s) => s.undoTransform)
-  const redoTransform = useEditorStore((s) => s.redoTransform)
+  const undoActorEdit = useEditorStore((s) => s.undoActorEdit)
+  const redoActorEdit = useEditorStore((s) => s.redoActorEdit)
   const deleteSelected = useEditorStore((s) => s.deleteSelectedTransform)
   const selectTransform = useEditorStore((s) => s.selectTransformKeyframe)
 
@@ -44,10 +44,10 @@ export function useTransformShortcuts() {
         key.toLowerCase() === 'z' &&
         !event.shiftKey
       ) {
-        const stack = useEditorStore.getState().transformUndoStack
-        if (stack.length === 0) return
+        const order = useEditorStore.getState().actorEditOrder
+        if (order.length === 0) return
         event.preventDefault()
-        undoTransform()
+        undoActorEdit()
         return
       }
       if (
@@ -55,10 +55,10 @@ export function useTransformShortcuts() {
         (key.toLowerCase() === 'y' ||
           (key.toLowerCase() === 'z' && event.shiftKey))
       ) {
-        const stack = useEditorStore.getState().transformRedoStack
-        if (stack.length === 0) return
+        const order = useEditorStore.getState().actorEditRedoOrder
+        if (order.length === 0) return
         event.preventDefault()
-        redoTransform()
+        redoActorEdit()
         return
       }
       if (key === 'Escape') {
@@ -77,5 +77,5 @@ export function useTransformShortcuts() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [mode, undoTransform, redoTransform, deleteSelected, selectTransform])
+  }, [mode, undoActorEdit, redoActorEdit, deleteSelected, selectTransform])
 }

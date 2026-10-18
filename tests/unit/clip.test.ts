@@ -175,6 +175,8 @@ describe('clip store history', () => {
       mode: 'idle',
       clipUndoStack: [],
       clipRedoStack: [],
+      actorEditOrder: [],
+      actorEditRedoOrder: [],
     })
     useEditorStore.getState().beginClipGesture('a')
     useEditorStore.getState().previewActorClip('a', { start: 0.2, end: 1 })
@@ -184,6 +186,7 @@ describe('clip store history', () => {
       5,
     )
     expect(useEditorStore.getState().clipUndoStack).toHaveLength(1)
+    expect(useEditorStore.getState().actorEditOrder).toEqual(['clip'])
     useEditorStore.getState().undoClip()
     expect(useEditorStore.getState().project.actors[0].clip).toEqual({
       start: 0,

@@ -112,6 +112,11 @@ export function selectActorPositionForActor(
 
   const path = selectProcessedPathForActor(project, actor, view)
   if (path.length === 0) {
+    // Unrecorded selected actor: follow livePosition during idle drag;
+    // livePosition tracks rest when not dragging.
+    if (isSelected && mode === 'idle') {
+      return livePosition
+    }
     return actor.restPosition
   }
 

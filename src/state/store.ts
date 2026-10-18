@@ -57,6 +57,9 @@ import {
 
 const MAX_UNDO = 40
 
+/** Chronological actor-edit kinds for unified clip/transform undo. */
+export type ActorEditKind = 'transform' | 'clip'
+
 interface EditorStore {
   project: Project
   selectedActorId: string
@@ -87,6 +90,13 @@ interface EditorStore {
   /** Selection-scoped clip timing history (one gesture → one entry). */
   clipUndoStack: ActorClip[]
   clipRedoStack: ActorClip[]
+
+  /**
+   * Chronological order of completed clip/transform edits for the selected actor.
+   * Dock + keyboard undo/redo pop the most recent kind first.
+   */
+  actorEditOrder: ActorEditKind[]
+  actorEditRedoOrder: ActorEditKind[]
 
   stageHint: 'default' | 'new-project'
   actionAnnouncement: string | null
@@ -151,6 +161,9 @@ interface EditorStore {
   finishClipGesture: (id: string, clip: ActorClip) => void
   undoClip: () => void
   redoClip: () => void
+  /** Undo the most recent clip or transform edit for the selected actor. */
+  undoActorEdit: () => void
+  redoActorEdit: () => void
 
   enterEditMode: () => void
   exitEditMode: () => void
@@ -202,13 +215,38 @@ function clearClipEditState() {
   }
 }
 
+function clearActorEditOrder() {
+  return {
+    actorEditOrder: [] as ActorEditKind[],
+    actorEditRedoOrder: [] as ActorEditKind[],
+  }
+}
+
 /** History is selection-scoped: changing actors drops undo/redo stacks. */
 function clearHistoryForActorSwitch() {
   return {
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
+    ...clearActorEditOrder(),
   }
+}
+
+function popKindFromOrder(
+  order: ActorEditKind[],
+  kind: ActorEditKind,
+): ActorEditKind[] {
+  const next: ActorEditKind[] = [...order]
+  const idx = next.lastIndexOf(kind)
+  if (idx >= 0) next.splice(idx, 1)
+  return next
+}
+
+function pushEditOrder(
+  order: ActorEditKind[],
+  kind: ActorEditKind,
+): ActorEditKind[] {
+  return [...order, kind].slice(-MAX_UNDO)
 }
 
 let clipGestureBaseline: { id: string; clip: ActorClip } | null = null
@@ -249,6 +287,10 @@ function pushTransformHistory(
     selectedTransformId: selectedId,
     transformUndoStack: [...state.transformUndoStack, prev].slice(-MAX_UNDO),
     transformRedoStack: [],
+    // New transform action clears all actor-edit redo (clip + transform).
+    clipRedoStack: [],
+    actorEditOrder: pushEditOrder(state.actorEditOrder, 'transform'),
+    actorEditRedoOrder: [],
   }
 }
 
@@ -277,6 +319,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
+    ...clearActorEditOrder(),
 
     armRecording: () => {
       const { mode } = get()
@@ -934,6 +977,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedActorId: id,
         clipUndoStack: [...state.clipUndoStack, prev].slice(-MAX_UNDO),
         clipRedoStack: [],
+        transformRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
+        actorEditRedoOrder: [],
       })
     },
 
@@ -999,6 +1045,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedActorId: id,
         clipUndoStack: [...state.clipUndoStack, baseline].slice(-MAX_UNDO),
         clipRedoStack: [],
+        transformRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
+        actorEditRedoOrder: [],
       })
     },
 
@@ -1023,6 +1072,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         ),
         clipUndoStack: state.clipUndoStack.slice(0, -1),
         clipRedoStack: [...state.clipRedoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'clip'),
+        actorEditRedoOrder: pushEditOrder(state.actorEditRedoOrder, 'clip'),
       })
     },
 
@@ -1047,7 +1098,47 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         ),
         clipRedoStack: state.clipRedoStack.slice(0, -1),
         clipUndoStack: [...state.clipUndoStack, current].slice(-MAX_UNDO),
+        actorEditRedoOrder: popKindFromOrder(state.actorEditRedoOrder, 'clip'),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
       })
+    },
+
+    undoActorEdit: () => {
+      const state = get()
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const kind = state.actorEditOrder[state.actorEditOrder.length - 1]
+      if (kind === 'transform') {
+        get().undoTransform()
+        return
+      }
+      if (kind === 'clip') {
+        get().undoClip()
+      }
+    },
+
+    redoActorEdit: () => {
+      const state = get()
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const kind = state.actorEditRedoOrder[state.actorEditRedoOrder.length - 1]
+      if (kind === 'transform') {
+        get().redoTransform()
+        return
+      }
+      if (kind === 'clip') {
+        get().redoClip()
+      }
     },
 
     moveSelectedActor: (direction) =>
@@ -1340,6 +1431,11 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           -MAX_UNDO,
         ),
         selectedTransformId: selectedStill,
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'transform'),
+        actorEditRedoOrder: pushEditOrder(
+          state.actorEditRedoOrder,
+          'transform',
+        ),
       })
     },
 
@@ -1367,6 +1463,11 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           -MAX_UNDO,
         ),
         selectedTransformId: selectedStill,
+        actorEditRedoOrder: popKindFromOrder(
+          state.actorEditRedoOrder,
+          'transform',
+        ),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'transform'),
       })
     },
   }
