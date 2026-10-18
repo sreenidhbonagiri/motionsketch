@@ -8,6 +8,7 @@ import {
 import { EXAMPLE_CATALOG, type ExampleId } from '../examples/catalog'
 import { cloneExampleProject, loadExampleSnapshot } from '../examples/load'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
+import { useConfirm } from '../hooks/useConfirm'
 import { getAppPersistenceController } from '../lib/persistenceController'
 import { useEditorStore } from '../state/store'
 import { ExamplePreviewStage } from './ExamplePreviewStage'
@@ -53,6 +54,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
   const project = useEditorStore((s) => s.project)
   const applyPersistedSnapshot = useEditorStore((s) => s.applyPersistedSnapshot)
   const announceAction = useEditorStore((s) => s.announceAction)
+  const confirm = useConfirm()
 
   useEffect(() => {
     previouslyFocused.current =
@@ -63,6 +65,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (document.querySelector('dialog[open]')) return
       event.preventDefault()
       event.stopPropagation()
       onClose()
@@ -106,24 +109,32 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
   )
 
   const handleUse = (id: ExampleId) => {
-    setError(null)
-    if (projectHasMeaningfulWork(project)) {
-      const ok = window.confirm(
-        'Load this example? It replaces your current project, including actors, appearance, and motion.',
+    void (async () => {
+      setError(null)
+      if (projectHasMeaningfulWork(project)) {
+        const ok = await confirm({
+          title: 'Load this example?',
+          body: 'It replaces your current project, including actors, appearance, and motion.',
+          confirmLabel: 'Load example',
+          testId: 'load-example-confirm',
+          confirmTestId: 'btn-load-example-confirm',
+          cancelTestId: 'btn-load-example-cancel',
+          bodyTestId: 'load-example-confirm-copy',
+        })
+        if (!ok) return
+      }
+      const loaded = loadExampleSnapshot(id)
+      if (!loaded.ok) {
+        setError(loaded.error)
+        return
+      }
+      applyPersistedSnapshot(loaded.snapshot)
+      getAppPersistenceController().afterSuccessfulReplace()
+      announceAction(
+        `Loaded example “${loaded.title}”. You can edit it like any project.`,
       )
-      if (!ok) return
-    }
-    const loaded = loadExampleSnapshot(id)
-    if (!loaded.ok) {
-      setError(loaded.error)
-      return
-    }
-    applyPersistedSnapshot(loaded.snapshot)
-    getAppPersistenceController().afterSuccessfulReplace()
-    announceAction(
-      `Loaded example “${loaded.title}”. You can edit it like any project.`,
-    )
-    onClose()
+      onClose()
+    })()
   }
 
   return (

@@ -5,6 +5,7 @@ import {
   openPanel,
   readExportedCss,
   recordSimplePath,
+  respondToConfirm,
 } from './helpers'
 
 async function openExamples(page: import('@playwright/test').Page) {
@@ -91,22 +92,27 @@ test.describe('starter examples', () => {
     await recordSimplePath(page)
     const cssBefore = await readExportedCss(page)
 
-    page.once('dialog', (dialog) => {
-      void dialog.dismiss()
-    })
     await openExamples(page)
     await page.getByTestId('btn-use-orbit').click()
+    await respondToConfirm(page, {
+      accept: false,
+      dialogTestId: 'load-example-confirm',
+      confirmTestId: 'btn-load-example-confirm',
+      cancelTestId: 'btn-load-example-cancel',
+    })
     await expect(page.getByTestId('examples-gallery')).toBeVisible()
     await page.getByTestId('btn-close-examples').click()
 
     const cssAfterCancel = await readExportedCss(page)
     expect(cssAfterCancel).toBe(cssBefore)
 
-    page.once('dialog', (dialog) => {
-      void dialog.accept()
-    })
     await openExamples(page)
     await page.getByTestId('btn-use-orbit').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'load-example-confirm',
+      confirmTestId: 'btn-load-example-confirm',
+      cancelTestId: 'btn-load-example-cancel',
+    })
     await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
     await expect(page.getByTestId('examples-gallery')).toHaveCount(0)
     await expect(page.getByTestId('action-live-region')).toContainText(/Orbit/i)
@@ -134,11 +140,13 @@ test.describe('starter examples', () => {
     await page.getByTestId('actor-name-input').press('Enter')
     await expect(page.getByTestId('actor-name-input')).toHaveValue('Changed')
 
-    page.once('dialog', (dialog) => {
-      void dialog.accept()
-    })
     await openExamples(page)
     await page.getByTestId('btn-use-follow-the-leader').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'load-example-confirm',
+      confirmTestId: 'btn-load-example-confirm',
+      cancelTestId: 'btn-load-example-cancel',
+    })
     await expect(page.getByTestId('actor-name-input')).not.toHaveValue(
       'Changed',
     )

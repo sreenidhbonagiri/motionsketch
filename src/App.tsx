@@ -1,5 +1,10 @@
 import { EditorShell } from './components/EditorShell'
+import { ConfirmProvider } from './hooks/ConfirmProvider'
 
 export default function App() {
-  return <EditorShell />
+  return (
+    <ConfirmProvider>
+      <EditorShell />
+    </ConfirmProvider>
+  )
 }

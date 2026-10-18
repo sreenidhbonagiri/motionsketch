@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   ensureEditor,
-  acceptNextDialog,
   openPanel,
   readExportedCss,
   recordSimplePath,
+  respondToConfirm,
 } from './helpers'
 
 async function waitForSaved(page: Page) {
@@ -164,8 +164,12 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await page.getByTestId('loop-toggle').check()
 
-    acceptNextDialog(page, true)
     await page.getByTestId('btn-reset').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'reset-actor-confirm',
+      confirmTestId: 'btn-reset-actor-confirm',
+      cancelTestId: 'btn-reset-actor-cancel',
+    })
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await openPanel(page, 'adjust')
@@ -235,12 +239,16 @@ test.describe('project persistence', () => {
     mutated.project.playback.durationMs = 4000
     mutated.savedAt = new Date().toISOString()
 
-    page.once('dialog', (dialog) => dialog.accept())
     await openPanel(page, 'project')
     await page.getByTestId('project-file-input').setInputFiles({
       name: 'import.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(mutated), 'utf-8'),
+    })
+    await respondToConfirm(page, {
+      dialogTestId: 'open-project-confirm',
+      confirmTestId: 'btn-open-project-confirm',
+      cancelTestId: 'btn-open-project-cancel',
     })
 
     await openPanel(page, 'adjust')

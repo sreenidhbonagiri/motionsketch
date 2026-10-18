@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { parseSnapshotJson } from '../core/persist/document'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
+import { useConfirm } from '../hooks/useConfirm'
 import {
   statusLabel,
   useProjectPersistence,
@@ -9,9 +10,8 @@ import { useEditorStore } from '../state/store'
 
 export function ProjectPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const confirmDialogRef = useRef<HTMLDialogElement>(null)
   const newProjectBtnRef = useRef<HTMLButtonElement>(null)
-  const titleId = useId()
+  const confirm = useConfirm()
   const [importError, setImportError] = useState<string | null>(null)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
 
@@ -41,16 +41,6 @@ export function ProjectPanel() {
     }
   }, [storeAnnouncement])
 
-  useEffect(() => {
-    const dialog = confirmDialogRef.current
-    if (!dialog) return
-    const onClose = () => {
-      newProjectBtnRef.current?.focus()
-    }
-    dialog.addEventListener('close', onClose)
-    return () => dialog.removeEventListener('close', onClose)
-  }, [])
-
   const startFreshUntitled = () => {
     newProject()
     discardStoredAndUnblock()
@@ -58,20 +48,20 @@ export function ProjectPanel() {
     setActionStatus('New project ready.')
   }
 
-  const handleNewProject = () => {
+  const handleNewProject = async () => {
     if (projectHasMeaningfulWork(project)) {
-      confirmDialogRef.current?.showModal()
-      return
+      const ok = await confirm({
+        title: 'Start a new project?',
+        body: 'This replaces the current project. Download it first if you want to keep a copy.',
+        confirmLabel: 'Start new project',
+        testId: 'new-project-confirm',
+        confirmTestId: 'btn-new-project-confirm',
+        cancelTestId: 'btn-new-project-cancel',
+        bodyTestId: 'new-project-confirm-copy',
+      })
+      newProjectBtnRef.current?.focus()
+      if (!ok) return
     }
-    startFreshUntitled()
-  }
-
-  const closeConfirm = () => {
-    confirmDialogRef.current?.close()
-  }
-
-  const confirmNewProject = () => {
-    closeConfirm()
     startFreshUntitled()
   }
 
@@ -125,9 +115,15 @@ export function ProjectPanel() {
     }
 
     if (projectHasMeaningfulWork(project)) {
-      const ok = window.confirm(
-        'Open this project file? This replaces the current project, including actors, appearance, and motion.',
-      )
+      const ok = await confirm({
+        title: 'Open this project file?',
+        body: 'This replaces the current project, including actors, appearance, and motion.',
+        confirmLabel: 'Open project',
+        testId: 'open-project-confirm',
+        confirmTestId: 'btn-open-project-confirm',
+        cancelTestId: 'btn-open-project-cancel',
+        bodyTestId: 'open-project-confirm-copy',
+      })
       if (!ok) return
     }
 
@@ -220,7 +216,7 @@ export function ProjectPanel() {
           ref={newProjectBtnRef}
           type="button"
           data-testid="btn-new-project"
-          onClick={handleNewProject}
+          onClick={() => void handleNewProject()}
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
         >
           New project
@@ -261,47 +257,6 @@ export function ProjectPanel() {
           ? 'Download a JSON file you can reopen and edit in MotionSketch.'
           : 'Record a path (or recover from a save error) before downloading a project file.'}
       </p>
-
-      <dialog
-        ref={confirmDialogRef}
-        data-testid="new-project-confirm"
-        aria-labelledby={titleId}
-        className="confirm-dialog fixed inset-0 z-50 m-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)]"
-        onClick={(e) => {
-          if (e.target === confirmDialogRef.current) closeConfirm()
-        }}
-      >
-        <div className="space-y-3 p-4">
-          <h2 id={titleId} className="text-sm font-semibold text-slate-900">
-            Start a new project?
-          </h2>
-          <p
-            data-testid="new-project-confirm-copy"
-            className="text-[11px] leading-relaxed text-slate-600"
-          >
-            This replaces the current project. Download it first if you want to
-            keep a copy.
-          </p>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              data-testid="btn-new-project-cancel"
-              onClick={closeConfirm}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              data-testid="btn-new-project-confirm"
-              onClick={confirmNewProject}
-              className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
-            >
-              Start new project
-            </button>
-          </div>
-        </div>
-      </dialog>
     </div>
   )
 }

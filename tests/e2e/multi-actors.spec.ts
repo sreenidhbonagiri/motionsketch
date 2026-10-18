@@ -2,13 +2,13 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
   ensureEditor,
-  acceptNextDialog,
   actorIdsFromList,
   clickRecord,
   dragActor,
   openPanel,
   readExportedCss,
   recordSimplePath,
+  respondToConfirm,
   selectActorByIndex,
 } from './helpers'
 
@@ -83,22 +83,31 @@ test.describe('multiple actors', () => {
         .getAttribute('data-testid')
     )?.replace('actor-list-item-', '')
     expect(selectedId).toBeTruthy()
-    page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toMatch(/Delete “.+”\?/)
-      await dialog.dismiss()
-    })
     await page.getByTestId('btn-delete-actor').click()
+    await expect(page.getByTestId('delete-actor-confirm')).toBeVisible()
+    await expect(page.getByTestId('delete-actor-confirm')).toContainText(
+      /Delete “.+”\?/,
+    )
+    await respondToConfirm(page, {
+      accept: false,
+      dialogTestId: 'delete-actor-confirm',
+      confirmTestId: 'btn-delete-actor-confirm',
+      cancelTestId: 'btn-delete-actor-cancel',
+    })
     expect(await actorIdsFromList(page)).toEqual(beforeCancel)
     await expect(
       page.getByTestId(`actor-list-item-${selectedId}`),
     ).toHaveAttribute('data-selected', 'true')
 
-    page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toMatch(/Delete “.+”\?/)
-      expect(dialog.message()).toContain('cannot be undone')
-      await dialog.accept()
-    })
     await page.getByTestId('btn-delete-actor').click()
+    await expect(page.getByTestId('delete-actor-confirm-copy')).toContainText(
+      'cannot be undone',
+    )
+    await respondToConfirm(page, {
+      dialogTestId: 'delete-actor-confirm',
+      confirmTestId: 'btn-delete-actor-confirm',
+      cancelTestId: 'btn-delete-actor-cancel',
+    })
     ids = await actorIdsFromList(page)
     expect(ids).toHaveLength(2)
   })
@@ -211,8 +220,12 @@ test.describe('multiple actors', () => {
 
     const ids = await actorIdsFromList(page)
     await selectActorByIndex(page, 0)
-    acceptNextDialog(page, true)
     await page.getByTestId('btn-reset').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'reset-actor-confirm',
+      confirmTestId: 'btn-reset-actor-confirm',
+      cancelTestId: 'btn-reset-actor-cancel',
+    })
     await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
 
     // Other actor’s take remains; shared play stays available.
@@ -292,12 +305,16 @@ test.describe('multiple actors', () => {
       },
     }
 
-    acceptNextDialog(page, true)
     await openPanel(page, 'project')
     await page.getByTestId('project-file-input').setInputFiles({
       name: 'legacy-v4.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(legacy), 'utf-8'),
+    })
+    await respondToConfirm(page, {
+      dialogTestId: 'open-project-confirm',
+      confirmTestId: 'btn-open-project-confirm',
+      cancelTestId: 'btn-open-project-cancel',
     })
 
     const ids = await actorIdsFromList(page)

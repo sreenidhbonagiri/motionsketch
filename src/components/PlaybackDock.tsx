@@ -1,5 +1,6 @@
 import { localToProject } from '../core/clip'
 import { traversalElapsedMs } from '../core/playback'
+import { useConfirm } from '../hooks/useConfirm'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 
@@ -52,6 +53,7 @@ export function PlaybackDock() {
   const undoActorEdit = useEditorStore((s) => s.undoActorEdit)
   const redoActorEdit = useEditorStore((s) => s.redoActorEdit)
   const selectTransformKeyframe = useEditorStore((s) => s.selectTransformKeyframe)
+  const confirm = useConfirm()
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
@@ -254,14 +256,23 @@ export function PlaybackDock() {
                 type="button"
                 data-testid="btn-record"
                 onClick={() => {
-                  if (recording) {
-                    const ok = window.confirm(
-                      `Re-record “${selectedActor?.name ?? 'this actor'}”? This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.`,
-                    )
-                    if (!ok) return
-                  }
-                  setPlaybackHead(0)
-                  armRecording()
+                  void (async () => {
+                    if (recording) {
+                      const label = selectedActor?.name ?? 'this actor'
+                      const ok = await confirm({
+                        title: `Re-record “${label}”?`,
+                        body: 'This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.',
+                        confirmLabel: 'Replace recording',
+                        testId: 'rerecord-confirm',
+                        confirmTestId: 'btn-rerecord-confirm',
+                        cancelTestId: 'btn-rerecord-cancel',
+                        bodyTestId: 'rerecord-confirm-copy',
+                      })
+                      if (!ok) return
+                    }
+                    setPlaybackHead(0)
+                    armRecording()
+                  })()
                 }}
                 className={btnPrimary}
               >
@@ -338,15 +349,23 @@ export function PlaybackDock() {
               type="button"
               data-testid="btn-reset"
               onClick={() => {
-                if (
-                  recording &&
-                  !window.confirm(
-                    `Reset “${selectedActor?.name ?? 'this actor'}”? Clears that actor’s path, path edits, and transform — not other actors.`,
-                  )
-                ) {
-                  return
-                }
-                resetRecording()
+                void (async () => {
+                  if (recording) {
+                    const label = selectedActor?.name ?? 'this actor'
+                    const ok = await confirm({
+                      title: `Reset “${label}”?`,
+                      body: 'Clears that actor’s path, path edits, and transform — not other actors.',
+                      confirmLabel: 'Reset actor',
+                      danger: true,
+                      testId: 'reset-actor-confirm',
+                      confirmTestId: 'btn-reset-actor-confirm',
+                      cancelTestId: 'btn-reset-actor-cancel',
+                      bodyTestId: 'reset-actor-confirm-copy',
+                    })
+                    if (!ok) return
+                  }
+                  resetRecording()
+                })()
               }}
               disabled={resetDisabled}
               aria-describedby={resetDescribedBy}

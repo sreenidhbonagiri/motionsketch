@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ActorNameInput } from '../../src/components/ActorNameInput'
 import { ActorList } from '../../src/components/ActorList'
+import { ConfirmProvider } from '../../src/hooks/useConfirm'
 import { findActor } from '../../src/core/sceneActor'
 import { useEditorStore } from '../../src/state/store'
 import { makeActor, makeProject, makeRecording } from './helpers/project'
@@ -200,7 +201,11 @@ describe('ActorList rename integration', () => {
 
   it('persists a committed rename in the list while playback head updates', async () => {
     const user = userEvent.setup()
-    render(<ActorList />)
+    render(
+      <ConfirmProvider>
+        <ActorList />
+      </ConfirmProvider>,
+    )
     const input = screen.getByTestId('actor-name-input')
     await user.clear(input)
     expect(input).toHaveValue('')
@@ -221,7 +226,11 @@ describe('ActorList rename integration', () => {
 
   it('does not apply a draft to another actor when selection changes', async () => {
     const user = userEvent.setup()
-    render(<ActorList />)
+    render(
+      <ConfirmProvider>
+        <ActorList />
+      </ConfirmProvider>,
+    )
     const input = screen.getByTestId('actor-name-input')
     await user.clear(input)
     await user.keyboard('Scratch')

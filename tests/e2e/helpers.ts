@@ -40,23 +40,47 @@ export async function dragActor(
   await page.mouse.up()
 }
 
-/** Accept or dismiss the next native confirm/alert. */
-export function acceptNextDialog(page: Page, accept = true) {
-  page.once('dialog', (dialog) => {
-    void (accept ? dialog.accept() : dialog.dismiss())
-  })
+/**
+ * Accept or dismiss a MotionSketch confirmation dialog by its root test id.
+ * Call after the action that opens the dialog (not before).
+ */
+export async function respondToConfirm(
+  page: Page,
+  options: {
+    accept?: boolean
+    dialogTestId: string
+    confirmTestId: string
+    cancelTestId: string
+  },
+) {
+  const accept = options.accept !== false
+  const dialog = page.getByTestId(options.dialogTestId)
+  await expect(dialog).toBeVisible()
+  await page
+    .getByTestId(accept ? options.confirmTestId : options.cancelTestId)
+    .click()
+  await expect(dialog).toBeHidden()
 }
 
 /**
  * Arm recording. When the selected actor already has a take, a confirm
- * dialog appears — pass `replaceExisting: true` to accept it.
+ * dialog appears — pass `replaceExisting: true` to accept it when shown.
+ * (A discarded short take may leave no recording; then no dialog appears.)
  */
 export async function clickRecord(
   page: Page,
   options: { replaceExisting?: boolean } = {},
 ) {
-  if (options.replaceExisting) acceptNextDialog(page, true)
   await page.getByTestId('btn-record').click()
+  if (!options.replaceExisting) return
+  const dialog = page.getByTestId('rerecord-confirm')
+  try {
+    await expect(dialog).toBeVisible({ timeout: 1500 })
+  } catch {
+    return
+  }
+  await page.getByTestId('btn-rerecord-confirm').click()
+  await expect(dialog).toBeHidden()
 }
 
 export async function actorIdsFromList(page: Page): Promise<string[]> {

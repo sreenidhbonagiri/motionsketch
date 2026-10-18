@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { isActorVisibleAt } from '../core/clip'
 import { MAX_ACTORS } from '../core/sceneActor'
+import { useConfirm } from '../hooks/useConfirm'
 import { useEditorStore } from '../state/store'
 import { ActorNameInput } from './ActorNameInput'
 
@@ -16,6 +17,7 @@ export function ActorList() {
   const deleteSelectedActor = useEditorStore((s) => s.deleteSelectedActor)
   const renameActor = useEditorStore((s) => s.renameActor)
   const moveSelectedActor = useEditorStore((s) => s.moveSelectedActor)
+  const confirm = useConfirm()
 
   // Collapsed on narrow viewports so the dock and chrome stay reachable.
   const [open, setOpen] = useState(() =>
@@ -155,14 +157,20 @@ export function ActorList() {
               disabled={busy || actors.length <= 1}
               aria-describedby="actor-list-help"
               onClick={() => {
-                const label = selected?.name?.trim() || 'this actor'
-                if (
-                  window.confirm(
-                    `Delete “${label}”? Its path, transform keyframes, path edits, and appearance are removed. This cannot be undone.`,
-                  )
-                ) {
-                  deleteSelectedActor()
-                }
+                void (async () => {
+                  const label = selected?.name?.trim() || 'this actor'
+                  const ok = await confirm({
+                    title: `Delete “${label}”?`,
+                    body: 'Its path, transform keyframes, path edits, and appearance are removed. This cannot be undone.',
+                    confirmLabel: 'Delete actor',
+                    danger: true,
+                    testId: 'delete-actor-confirm',
+                    confirmTestId: 'btn-delete-actor-confirm',
+                    cancelTestId: 'btn-delete-actor-cancel',
+                    bodyTestId: 'delete-actor-confirm-copy',
+                  })
+                  if (ok) deleteSelectedActor()
+                })()
               }}
               className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-red-700 disabled:opacity-40"
             >
