@@ -93,6 +93,7 @@ export function CanvasStage() {
   const editSession = useEditorStore((s) => s.editSession)
   const editPreview = useEditorStore((s) => s.editPreview)
   const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
+  const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
 
   const {
     onActorPointerDown,
@@ -204,6 +205,7 @@ export function CanvasStage() {
       data-testid="stage"
       data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
       data-path-tool={editing ? pathTool : undefined}
+      data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
       className={`absolute inset-0 touch-none overflow-hidden bg-[#eef1f6] ${
         editing && pathAddMode ? 'cursor-crosshair' : ''
       }`}

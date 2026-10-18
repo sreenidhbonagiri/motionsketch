@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEditorStore } from '../state/store'
 
 export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
 
@@ -50,6 +51,16 @@ export function FloatingPanel({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (document.querySelector('dialog[open]')) return
+      // Path edit gestures / Add point own Escape first.
+      const editor = useEditorStore.getState()
+      if (
+        editor.mode === 'editing' &&
+        (editor.pathGestureActive ||
+          editor.editPreview !== null ||
+          editor.pathAddMode)
+      ) {
+        return
+      }
       e.preventDefault()
       e.stopPropagation()
       onClose()

@@ -61,6 +61,7 @@ describe('edit store', () => {
       pathAddMode: false,
       pathAddCandidateIndex: null,
       pathTool: 'edit-points',
+      pathGestureActive: false,
       stageHint: 'default',
       actionAnnouncement: null,
     })
@@ -380,5 +381,57 @@ describe('edit store', () => {
       expect(s.y).toBeGreaterThanOrEqual(0)
       expect(s.y).toBeLessThanOrEqual(1)
     }
+  })
+
+  it('rejects path commits after leaving edit mode (late keyup / Done)', () => {
+    useEditorStore.getState().enterEditMode()
+    const session = useEditorStore.getState().editSession!
+    const baseline = session.samples.map((s) => ({ ...s }))
+    const moved = applyPathTranslation(session.samples, { x: 0.05, y: 0 })
+    useEditorStore.getState().beginHandleDrag()
+    useEditorStore.getState().updateEditPreview(moved)
+    expect(useEditorStore.getState().editPreview).not.toBeNull()
+
+    useEditorStore.getState().exitEditMode()
+    expect(useEditorStore.getState().mode).toBe('idle')
+    expect(useEditorStore.getState().editSession).toBeNull()
+
+    // Late commit must not mutate geometryEdit via a leftover preview.
+    useEditorStore.getState().commitHandleEdit(moved)
+    expect(useEditorStore.getState().editPreview).toBeNull()
+    expect(useEditorStore.getState().geometryEdit).toBeNull()
+    expect(useEditorStore.getState().undoStack).toHaveLength(0)
+
+    useEditorStore.getState().beginHandleDrag()
+    useEditorStore.getState().updateEditPreview(moved)
+    expect(useEditorStore.getState().editPreview).toBeNull()
+
+    // Re-enter: geometry still matches the pre-Done recording bake.
+    useEditorStore.getState().enterEditMode()
+    const again = useEditorStore.getState().editSession!.samples
+    expect(again[0]!.x).toBeCloseTo(baseline[0]!.x, 8)
+  })
+
+  it('enterEditMode from playing stops playback mode', () => {
+    useEditorStore.getState().play()
+    expect(useEditorStore.getState().mode).toBe('playing')
+    useEditorStore.getState().enterEditMode()
+    expect(useEditorStore.getState().mode).toBe('editing')
+    useEditorStore.getState().play()
+    expect(useEditorStore.getState().mode).toBe('editing')
+  })
+
+  it('setPathTool clears preview and add-point mode', () => {
+    useEditorStore.getState().enterEditMode()
+    useEditorStore.getState().setPathAddMode(true)
+    expect(useEditorStore.getState().pathAddMode).toBe(true)
+    const session = useEditorStore.getState().editSession!
+    useEditorStore.getState().updateEditPreview(
+      applyPathTranslation(session.samples, { x: 0.02, y: 0 }),
+    )
+    useEditorStore.getState().setPathTool('move-path')
+    expect(useEditorStore.getState().pathTool).toBe('move-path')
+    expect(useEditorStore.getState().pathAddMode).toBe(false)
+    expect(useEditorStore.getState().editPreview).toBeNull()
   })
 })

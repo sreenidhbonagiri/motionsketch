@@ -35,6 +35,7 @@ type PendingHandlePointer = {
   baseSamples: MotionSample[]
   dragging: boolean
   target: HTMLElement
+  cleanup: () => void
 }
 
 type PendingMovePointer = {
@@ -43,6 +44,7 @@ type PendingMovePointer = {
   baseSamples: MotionSample[]
   dragging: boolean
   target: Element
+  cleanup: () => void
 }
 
 type MoveNudgeGesture = {
@@ -84,6 +86,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   const makeSelectedCorner = useEditorStore((s) => s.makeSelectedCorner)
   const setPathAddMode = useEditorStore((s) => s.setPathAddMode)
   const setPathTool = useEditorStore((s) => s.setPathTool)
+  const setPathGestureActive = useEditorStore((s) => s.setPathGestureActive)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
   const announceAction = useEditorStore((s) => s.announceAction)
@@ -105,6 +108,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       const pending = pendingRef.current
       if (!pending || pending.pointerId !== pointerId) return
 
+      pending.cleanup()
       if (pending.dragging) {
         if (commit) {
           const preview = useEditorStore.getState().editPreview
@@ -124,6 +128,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       const pending = pendingMoveRef.current
       if (!pending || pending.pointerId !== pointerId) return
 
+      pending.cleanup()
       if (pending.dragging) {
         if (commit) {
           const preview = useEditorStore.getState().editPreview
@@ -147,8 +152,9 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       const gesture = moveNudgeRef.current
       if (!gesture) return
       moveNudgeRef.current = null
-      if (commit) {
-        const preview = useEditorStore.getState().editPreview
+      const state = useEditorStore.getState()
+      if (commit && state.mode === 'editing' && state.editSession) {
+        const preview = state.editPreview
         if (preview && !samplesMatch(gesture.baseline, preview)) {
           commitHandleEdit(preview)
           return
@@ -158,6 +164,25 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     },
     [commitHandleEdit, cancelHandleDrag],
   )
+
+  /** Drop pointer/keyboard path gestures without leaving preview or capture stuck. */
+  const discardAllPathGestures = useCallback(() => {
+    if (pendingMoveRef.current) {
+      const pending = pendingMoveRef.current
+      pending.cleanup()
+      pendingMoveRef.current = null
+      setMoveDragging(false)
+    }
+    if (pendingRef.current) {
+      pendingRef.current.cleanup()
+      pendingRef.current = null
+    }
+    if (moveNudgeRef.current) {
+      moveNudgeRef.current = null
+    }
+    cancelHandleDrag()
+    setPathGestureActive(false)
+  }, [cancelHandleDrag, setPathGestureActive])
 
   const onHandlePointerDown = useCallback(
     (handleIndex: number, event: React.PointerEvent<HTMLElement>) => {
@@ -211,19 +236,6 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
 
       const pointer = clientToNormalized(event.clientX, event.clientY, rect)
       const base = copyPath(editSession.samples)
-      pendingRef.current = {
-        pointerId: event.pointerId,
-        handleIndex: pick,
-        cluster: effectiveCluster,
-        prevSelected,
-        originClient: { x: event.clientX, y: event.clientY },
-        originNorm: { x: pointer.x, y: pointer.y },
-        baseSamples: base,
-        dragging: false,
-        target: event.currentTarget,
-      }
-      setSelectedHandleIndex(pick)
-
       const target = event.currentTarget
       const pointerId = event.pointerId
       const aspect = useEditorStore.getState().project.stageAspect
@@ -295,6 +307,21 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         }
       }
 
+      pendingRef.current = {
+        pointerId,
+        handleIndex: pick,
+        cluster: effectiveCluster,
+        prevSelected,
+        originClient: { x: event.clientX, y: event.clientY },
+        originNorm: { x: pointer.x, y: pointer.y },
+        baseSamples: base,
+        dragging: false,
+        target,
+        cleanup,
+      }
+      setPathGestureActive(true)
+      setSelectedHandleIndex(pick)
+
       target.addEventListener('pointermove', onMove)
       target.addEventListener('pointerup', onUp)
       target.addEventListener('pointercancel', onCancel)
@@ -306,6 +333,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       pathTool,
       stageRef,
       setSelectedHandleIndex,
+      setPathGestureActive,
       beginHandleDrag,
       updateEditPreview,
       finishDrag,
@@ -342,15 +370,6 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       } catch {
         // ignore
       }
-
-      pendingMoveRef.current = {
-        pointerId,
-        originNorm: origin,
-        baseSamples: base,
-        dragging: false,
-        target,
-      }
-      setMoveDragging(false)
 
       const onMove = (e: PointerEvent) => {
         const pending = pendingMoveRef.current
@@ -398,6 +417,17 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         }
       }
 
+      pendingMoveRef.current = {
+        pointerId,
+        originNorm: origin,
+        baseSamples: base,
+        dragging: false,
+        target,
+        cleanup,
+      }
+      setPathGestureActive(true)
+      setMoveDragging(false)
+
       target.addEventListener('pointermove', onMove)
       target.addEventListener('pointerup', onUp)
       target.addEventListener('pointercancel', onCancel)
@@ -413,6 +443,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       updateEditPreview,
       finishMoveDrag,
       endMoveNudge,
+      setPathGestureActive,
     ],
   )
 
@@ -529,7 +560,10 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   )
 
   useEffect(() => {
-    if (mode !== 'editing' || !editSession) return
+    if (mode !== 'editing' || !editSession) {
+      discardAllPathGestures()
+      return
+    }
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableKeyboardTarget(event.target)) return
@@ -561,32 +595,6 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       const session = useEditorStore.getState().editSession
       if (!session) return
 
-      if (key === 'Escape') {
-        if (pendingMoveRef.current) {
-          event.preventDefault()
-          const pointerId = pendingMoveRef.current.pointerId
-          finishMoveDrag(pointerId, false)
-          return
-        }
-        if (moveNudgeRef.current) {
-          event.preventDefault()
-          endMoveNudge(false)
-          announceAction('Move cancelled.')
-          return
-        }
-        if (pendingRef.current?.dragging) {
-          event.preventDefault()
-          finishDrag(pendingRef.current.pointerId, false)
-          return
-        }
-        if (addMode) {
-          event.preventDefault()
-          setPathAddMode(false)
-          return
-        }
-        return
-      }
-
       if (tool === 'move-path') {
         if (!movePathFocusedRef.current) return
         if (!ARROW_KEYS.has(key)) return
@@ -611,6 +619,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
             keys: new Set(),
           }
           moveNudgeRef.current = gesture
+          setPathGestureActive(true)
           beginHandleDrag()
         }
         gesture.keys.add(key)
@@ -719,11 +728,62 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       }
     }
 
+    // Capture phase: cancel gestures before FloatingPanel closes on Escape.
+    // stopImmediatePropagation — other window capture listeners (panels) must
+    // not also handle this key after the gesture claims it.
+    const onKeyDownCapture = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (isEditableKeyboardTarget(event.target)) return
+      const addMode = useEditorStore.getState().pathAddMode
+      if (pendingMoveRef.current) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        finishMoveDrag(pendingMoveRef.current.pointerId, false)
+        return
+      }
+      if (moveNudgeRef.current) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        endMoveNudge(false)
+        announceAction('Move cancelled.')
+        return
+      }
+      if (pendingRef.current?.dragging) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        finishDrag(pendingRef.current.pointerId, false)
+        return
+      }
+      if (addMode) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        setPathAddMode(false)
+      }
+    }
+
+    const resolveOpenNudge = () => {
+      // Tab switch / window blur can drop keyup — commit the preview so an
+      // undo gesture is never left open.
+      if (moveNudgeRef.current) endMoveNudge(true)
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') resolveOpenNudge()
+    }
+
+    window.addEventListener('keydown', onKeyDownCapture, true)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', resolveOpenNudge)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      window.removeEventListener('keydown', onKeyDownCapture, true)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', resolveOpenNudge)
+      document.removeEventListener('visibilitychange', onVisibility)
+      // Leaving edit mode or remounting must not keep capture/nudge alive.
+      discardAllPathGestures()
     }
   }, [
     mode,
@@ -744,19 +804,37 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     endMoveNudge,
     finishMoveDrag,
     finishDrag,
+    discardAllPathGestures,
+    setPathGestureActive,
   ])
 
-  // Cancel in-flight move gestures when leaving the tool (refs only).
+  // Switching Edit points ↔ Move path drops the other tool's in-flight gesture.
   useEffect(() => {
-    if (moveTool) return
-    movePathFocusedRef.current = false
+    if (mode !== 'editing') return
+    if (pathTool === 'move-path') {
+      if (pendingRef.current) {
+        finishDrag(pendingRef.current.pointerId, false)
+      }
+    } else {
+      movePathFocusedRef.current = false
+      if (pendingMoveRef.current) {
+        finishMoveDrag(pendingMoveRef.current.pointerId, false)
+      }
+      if (moveNudgeRef.current) {
+        endMoveNudge(false)
+      }
+    }
+  }, [mode, pathTool, finishDrag, finishMoveDrag, endMoveNudge])
+
+  // Entering Add point discards an unfinished reshape/move preview.
+  useEffect(() => {
+    if (mode !== 'editing' || !pathAddMode) return
+    if (pendingRef.current) finishDrag(pendingRef.current.pointerId, false)
     if (pendingMoveRef.current) {
       finishMoveDrag(pendingMoveRef.current.pointerId, false)
     }
-    if (moveNudgeRef.current) {
-      endMoveNudge(false)
-    }
-  }, [moveTool, finishMoveDrag, endMoveNudge])
+    if (moveNudgeRef.current) endMoveNudge(false)
+  }, [mode, pathAddMode, finishDrag, finishMoveDrag, endMoveNudge])
 
   return {
     workingSamples,

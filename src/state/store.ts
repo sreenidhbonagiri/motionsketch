@@ -111,6 +111,11 @@ interface EditorStore {
   pathAddCandidateIndex: number | null
   /** Edit points (handles) vs whole-path translation while in Edit path mode. */
   pathTool: PathEditTool
+  /**
+   * True while a pointer/keyboard path gesture is in flight (including before
+   * the drag threshold). Floating panels must not steal Escape meanwhile.
+   */
+  pathGestureActive: boolean
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -210,6 +215,7 @@ interface EditorStore {
   setPathAddMode: (on: boolean) => void
   setPathAddCandidateIndex: (index: number | null) => void
   setPathTool: (tool: PathEditTool) => void
+  setPathGestureActive: (active: boolean) => void
   /** Add handle at sample index; geometry unchanged. Returns false on failure. */
   addPathHandleAt: (sampleIndex: number) => boolean
   /** Remove selected interior handle; geometry unchanged. */
@@ -249,6 +255,7 @@ function clearEditState() {
     pathAddMode: false,
     pathAddCandidateIndex: null as number | null,
     pathTool: 'edit-points' as PathEditTool,
+    pathGestureActive: false,
   }
 }
 
@@ -1362,6 +1369,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddMode: false,
         pathAddCandidateIndex: null,
         editPreview: null,
+        pathGestureActive: false,
         actionAnnouncement:
           tool === 'move-path'
             ? 'Move path: drag the path to reposition it. Arrow keys nudge when the path is focused; Shift for larger steps. Escape cancels an in-progress move. Bounds keep sample centers on stage when the path starts in bounds.'
@@ -1371,6 +1379,11 @@ export const useEditorStore = create<EditorStore>((set, get) => {
                 state.editSession?.samples.length ?? 0,
               ),
       })
+    },
+
+    setPathGestureActive: (active) => {
+      if (get().pathGestureActive === active) return
+      set({ pathGestureActive: active })
     },
 
     addPathHandleAt: (sampleIndex) => {
@@ -1619,21 +1632,35 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     beginHandleDrag: () => {
       const state = get()
-      const base = state.editSession ?? state.geometryEdit
+      if (state.mode !== 'editing') return
+      const base = state.editSession
       if (!base) return
-      set({ editPreview: copyPath(base.samples), pathAddMode: false })
+      set({
+        editPreview: copyPath(base.samples),
+        pathAddMode: false,
+        pathGestureActive: true,
+      })
     },
 
-    updateEditPreview: (samples) => set({ editPreview: samples }),
+    updateEditPreview: (samples) => {
+      if (get().mode !== 'editing' || !get().editSession) return
+      set({ editPreview: samples, pathGestureActive: true })
+    },
 
     commitHandleEdit: (samples) => {
       const state = get()
-      const base = state.editSession ?? state.geometryEdit
+      // Never commit path geometry outside an active edit session — Done /
+      // restore / project load must not absorb a late keyup or pointerup.
+      if (state.mode !== 'editing') {
+        set({ editPreview: null, pathGestureActive: false })
+        return
+      }
+      const base = state.editSession
       if (!base) return
 
       // Zero-distance / cancelled-equivalent gestures must not create undo noise.
       if (samplesMatch(base.samples, samples)) {
-        set({ editPreview: null })
+        set({ editPreview: null, pathGestureActive: false })
         return
       }
 
@@ -1651,14 +1678,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           (a) => ({ ...a, geometryEdit: next }),
         ),
         geometryEdit: next,
-        editSession: state.mode === 'editing' ? next : null,
+        editSession: next,
         undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
         redoStack: [],
         editPreview: null,
+        pathGestureActive: false,
       })
     },
 
-    cancelHandleDrag: () => set({ editPreview: null }),
+    cancelHandleDrag: () =>
+      set({ editPreview: null, pathGestureActive: false }),
 
     undoEdit: () => {
       const state = get()
