@@ -63,6 +63,7 @@ describe('edit store', () => {
       pathTool: 'edit-points',
       pathGestureActive: false,
       polishSession: null,
+      polishStrengthByActorId: {},
       stageHint: 'default',
       actionAnnouncement: null,
     })

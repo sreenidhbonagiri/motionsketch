@@ -20,7 +20,10 @@ import {
   smoothBendAtHandle,
   smoothBendAvailability,
 } from '../core/edit'
-import { polishMotion } from '../core/polish'
+import {
+  polishMotion,
+  polishRoundingAvailability,
+} from '../core/polish'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
@@ -87,7 +90,18 @@ export type PolishSession = {
   reason: string | null
   timingAdjusted: boolean
   maxDeviation: number
+  /**
+   * Sample index captured when Polish opened (selected interior handle).
+   * Temporary UI only — not written into geometry or exports.
+   */
+  roundingTargetIndex: number | null
+  allowRoundingAtPoint: boolean
+  roundingUnavailableReason: string | null
+  roundingNeighborhood: { lo: number; hi: number } | null
 }
+
+/** Default Polish strength when an actor has no remembered preference. */
+export const DEFAULT_POLISH_STRENGTH = 0.55
 
 const MAX_UNDO = 40
 
@@ -130,6 +144,11 @@ interface EditorStore {
   pathGestureActive: boolean
   /** Non-destructive Polish motion preview (null when inactive). */
   polishSession: PolishSession | null
+  /**
+   * Last-used Polish strength per actor id. Local UI preference only — not
+   * project data, not exported, not autosaved. Survives Cancel/reopen in-session.
+   */
+  polishStrengthByActorId: Record<string, number>
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -247,6 +266,7 @@ interface EditorStore {
 
   beginPolishSession: () => boolean
   setPolishStrength: (strength: number) => void
+  setPolishAllowRounding: (allow: boolean) => void
   applyPolish: () => boolean
   cancelPolish: () => void
 
@@ -279,17 +299,44 @@ function clearEditState() {
   }
 }
 
+function rememberedPolishStrength(
+  byActor: Record<string, number>,
+  actorId: string,
+): number {
+  const remembered = byActor[actorId]
+  return typeof remembered === 'number'
+    ? clamp(remembered, 0, 1)
+    : DEFAULT_POLISH_STRENGTH
+}
+
+function withPolishStrengthPreference(
+  byActor: Record<string, number>,
+  actorId: string,
+  strength: number,
+): Record<string, number> {
+  return { ...byActor, [actorId]: clamp(strength, 0, 1) }
+}
+
 function runPolishPreview(
   baseline: GeometryEdit,
   strength: number,
   stageAspect: number,
-): Omit<PolishSession, 'baseline' | 'strength'> & {
-  previewSamples: MotionSample[]
-} {
+  rounding: {
+    targetIndex: number | null
+    allowRoundingAtPoint: boolean
+    unavailableReason: string | null
+    neighborhood: { lo: number; hi: number } | null
+  },
+): Omit<PolishSession, 'baseline' | 'strength'> {
+  const relax =
+    rounding.allowRoundingAtPoint && rounding.targetIndex !== null
+      ? rounding.targetIndex
+      : null
   const result = polishMotion(baseline.samples, {
     strength,
     stageAspect,
     anchorIndices: baseline.handleIndices,
+    relaxCornerAtIndex: relax,
   })
   return {
     previewSamples: result.samples,
@@ -297,6 +344,41 @@ function runPolishPreview(
     reason: result.reason ?? null,
     timingAdjusted: result.timingAdjusted,
     maxDeviation: result.maxDeviation,
+    roundingTargetIndex: rounding.targetIndex,
+    allowRoundingAtPoint: rounding.allowRoundingAtPoint,
+    roundingUnavailableReason: rounding.unavailableReason,
+    roundingNeighborhood: rounding.neighborhood,
+  }
+}
+
+function resolvePolishRounding(
+  baseline: GeometryEdit,
+  selectedHandleIndex: number | null,
+  stageAspect: number,
+): {
+  targetIndex: number | null
+  allowRoundingAtPoint: boolean
+  unavailableReason: string | null
+  neighborhood: { lo: number; hi: number } | null
+} {
+  const availability = polishRoundingAvailability(
+    baseline.samples,
+    baseline.handleIndices,
+    selectedHandleIndex,
+    stageAspect,
+  )
+  const targetIndex =
+    selectedHandleIndex !== null &&
+    baseline.handleIndices.includes(selectedHandleIndex)
+      ? selectedHandleIndex
+      : null
+  return {
+    targetIndex,
+    allowRoundingAtPoint: false,
+    unavailableReason: availability.enabled
+      ? null
+      : (availability.message ?? 'Rounding unavailable at this point.'),
+    neighborhood: availability.neighborhood,
   }
 }
 
@@ -420,6 +502,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     showPathComparison: false,
     stageHint: 'default',
     actionAnnouncement: null,
+    polishStrengthByActorId: {},
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
@@ -860,6 +943,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
             : `Created “${project.name}”. You can start drawing.`,
         selectedActorId: project.actors[0].id,
         ...clearHistoryForActorSwitch(),
+        polishStrengthByActorId: {},
         project,
       })
       return true
@@ -908,6 +992,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         stageHint: 'default',
         selectedActorId,
         ...clearHistoryForActorSwitch(),
+        polishStrengthByActorId: {},
         geometryEdit: geometryMirror(first?.geometryEdit),
         project,
       })
@@ -942,10 +1027,19 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         },
         false,
       )
+      // Keep per-actor strength prefs; drop only the active preview.
+      const polishStrengthByActorId = state.polishSession
+        ? withPolishStrengthPreference(
+            state.polishStrengthByActorId,
+            state.selectedActorId,
+            state.polishSession.strength,
+          )
+        : state.polishStrengthByActorId
       set({
         selectedActorId: id,
         livePosition,
         mode: state.mode === 'playing' ? 'playing' : 'idle',
+        polishStrengthByActorId,
         ...clearHistoryForActorSwitch(),
         geometryEdit: geometryMirror(actor.geometryEdit),
       })
@@ -1805,20 +1899,36 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         baseline = makeGeometryEdit(baked, actor.smoothing)
       }
 
-      const strength = 0.55
+      const strength = rememberedPolishStrength(
+        state.polishStrengthByActorId,
+        actor.id,
+      )
+      const rounding = resolvePolishRounding(
+        baseline,
+        state.selectedHandleIndex,
+        state.project.stageAspect,
+      )
       const preview = runPolishPreview(
         baseline,
         strength,
         state.project.stageAspect,
+        rounding,
       )
+      // Leave Edit path chrome so Polish owns the dock; keep handle selection
+      // for the optional “Allow rounding at this point” control.
       set({
+        mode: state.mode === 'editing' ? 'idle' : state.mode,
+        editSession: null,
         polishSession: {
           baseline,
           strength,
           ...preview,
         },
         pathAddMode: false,
+        pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
         editPreview: null,
+        pointerId: null,
         actionAnnouncement: 'Polish motion preview',
       })
       return true
@@ -1833,11 +1943,48 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         session.baseline,
         nextStrength,
         state.project.stageAspect,
+        {
+          targetIndex: session.roundingTargetIndex,
+          allowRoundingAtPoint: session.allowRoundingAtPoint,
+          unavailableReason: session.roundingUnavailableReason,
+          neighborhood: session.roundingNeighborhood,
+        },
       )
       set({
         polishSession: {
           baseline: session.baseline,
           strength: nextStrength,
+          ...preview,
+        },
+        polishStrengthByActorId: withPolishStrengthPreference(
+          state.polishStrengthByActorId,
+          state.selectedActorId,
+          nextStrength,
+        ),
+      })
+    },
+
+    setPolishAllowRounding: (allow) => {
+      const state = get()
+      const session = state.polishSession
+      if (!session) return
+      if (session.roundingUnavailableReason && allow) return
+      if (session.roundingTargetIndex === null && allow) return
+      const preview = runPolishPreview(
+        session.baseline,
+        session.strength,
+        state.project.stageAspect,
+        {
+          targetIndex: session.roundingTargetIndex,
+          allowRoundingAtPoint: allow,
+          unavailableReason: session.roundingUnavailableReason,
+          neighborhood: session.roundingNeighborhood,
+        },
+      )
+      set({
+        polishSession: {
+          baseline: session.baseline,
+          strength: session.strength,
           ...preview,
         },
       })
@@ -1847,9 +1994,15 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const state = get()
       const session = state.polishSession
       if (!session) return false
+      const strengthPref = withPolishStrengthPreference(
+        state.polishStrengthByActorId,
+        state.selectedActorId,
+        session.strength,
+      )
       if (!session.changed) {
         set({
           polishSession: null,
+          polishStrengthByActorId: strengthPref,
           actionAnnouncement:
             session.reason ?? 'Nothing to polish — left unchanged.',
         })
@@ -1875,6 +2028,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
         redoStack: [],
         polishSession: null,
+        polishStrengthByActorId: strengthPref,
         editPreview: null,
         selectedHandleIndex: editing
           ? next.handleIndices.includes(state.selectedHandleIndex ?? -1)
@@ -1889,9 +2043,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     },
 
     cancelPolish: () => {
-      if (!get().polishSession) return
+      const state = get()
+      const session = state.polishSession
+      if (!session) return
       set({
         polishSession: null,
+        polishStrengthByActorId: withPolishStrengthPreference(
+          state.polishStrengthByActorId,
+          state.selectedActorId,
+          session.strength,
+        ),
         actionAnnouncement: 'Polish cancelled.',
       })
     },

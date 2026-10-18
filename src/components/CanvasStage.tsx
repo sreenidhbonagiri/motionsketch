@@ -76,6 +76,51 @@ function drawPlayhead(
   ctx.restore()
 }
 
+function drawPolishRoundingHighlight(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  samples: Array<Vec2 | MotionSample>,
+  targetIndex: number,
+  neighborhood: { lo: number; hi: number } | null,
+) {
+  if (samples.length < 2) return
+  const target = samples[targetIndex]
+  if (!target) return
+
+  ctx.save()
+  if (
+    neighborhood &&
+    neighborhood.hi > neighborhood.lo &&
+    neighborhood.lo >= 0 &&
+    neighborhood.hi < samples.length
+  ) {
+    ctx.strokeStyle = '#b45309'
+    ctx.lineWidth = 4
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.globalAlpha = 0.55
+    ctx.beginPath()
+    const start = samples[neighborhood.lo]!
+    ctx.moveTo(start.x * width, start.y * height)
+    for (let i = neighborhood.lo + 1; i <= neighborhood.hi; i++) {
+      const s = samples[i]!
+      ctx.lineTo(s.x * width, s.y * height)
+    }
+    ctx.stroke()
+  }
+
+  ctx.globalAlpha = 1
+  ctx.fillStyle = '#f59e0b'
+  ctx.strokeStyle = '#92400e'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(target.x * width, target.y * height, 7, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  ctx.restore()
+}
+
 /** Full-viewport interactive stage — no inset card or aspect box. */
 export function CanvasStage() {
   const stageRef = useRef<HTMLDivElement>(null)
@@ -173,6 +218,19 @@ export function CanvasStage() {
             '#0f766e',
             2.75,
             0.95,
+          )
+        }
+        if (
+          polishSession.allowRoundingAtPoint &&
+          polishSession.roundingTargetIndex !== null
+        ) {
+          drawPolishRoundingHighlight(
+            ctx,
+            size.width,
+            size.height,
+            polished.length >= 2 ? polished : original,
+            polishSession.roundingTargetIndex,
+            polishSession.roundingNeighborhood,
           )
         }
       } else {

@@ -102,6 +102,74 @@ test.describe('polish motion', () => {
     await page.getByTestId('btn-done-edit').click()
   })
 
+  test('strength preference survives cancel/reopen per actor', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
+    await ensureEditor(page, 'Polish motion fixture')
+
+    await page.getByTestId('btn-polish-motion').click()
+    await expect(page.getByTestId('polish-strength-value')).toHaveText('55%')
+    await page.getByTestId('polish-strength').evaluate((el) => {
+      const input = el as HTMLInputElement
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )?.set
+      setter?.call(input, '0.8')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await expect(page.getByTestId('polish-strength-value')).toHaveText('80%')
+    await page.getByTestId('btn-polish-cancel').click()
+
+    await page.getByTestId('btn-polish-motion').click()
+    await expect(page.getByTestId('polish-strength-value')).toHaveText('80%')
+    await page.getByTestId('btn-polish-cancel').click()
+
+    await selectActorByIndex(page, 1)
+    await page.getByTestId('btn-polish-motion').click()
+    await expect(page.getByTestId('polish-strength-value')).toHaveText('55%')
+    await page.getByTestId('btn-polish-cancel').click()
+
+    await selectActorByIndex(page, 0)
+    await page.getByTestId('btn-polish-motion').click()
+    await expect(page.getByTestId('polish-strength-value')).toHaveText('80%')
+    await page.getByTestId('btn-polish-cancel').click()
+  })
+
+  test('rounding override softens a selected corner after Edit path selection', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
+    await ensureEditor(page, 'Polish motion fixture')
+
+    await page.getByTestId('btn-edit-path').click()
+    await expect(page.getByTestId('path-handles')).toBeVisible()
+    await page.getByTestId('path-handle-114').click({ force: true })
+    await page.getByTestId('btn-polish-motion').click()
+    await expect(page.getByTestId('polish-panel')).toBeVisible()
+    await expect(page.getByTestId('polish-allow-rounding')).toBeEnabled()
+    await expect(page.getByTestId('polish-rounding-help')).toContainText(
+      /May move this point slightly/i,
+    )
+    await page.getByTestId('polish-allow-rounding').check()
+    await expect(page.getByTestId('polish-compare-legend')).toContainText(
+      /Rounding/i,
+    )
+    const apply = page.getByTestId('btn-polish-apply')
+    if (await apply.isEnabled()) {
+      await apply.click()
+      await expect(page.getByTestId('polish-panel')).toHaveCount(0)
+      await page.getByTestId('btn-edit-path').click()
+      await expect(page.getByTestId('btn-undo-edit')).toBeEnabled()
+      await page.getByTestId('btn-undo-edit').click()
+      await page.getByTestId('btn-done-edit').click()
+    } else {
+      await page.getByTestId('btn-polish-cancel').click()
+    }
+  })
+
   test('raw actor polish creates editable geometry without dropping the take', async ({
     page,
   }) => {

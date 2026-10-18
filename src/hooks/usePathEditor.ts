@@ -117,10 +117,13 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         } else {
           cancelHandleDrag()
         }
+      } else {
+        // Selection-only click: pointerdown arms the gesture flag — clear it.
+        setPathGestureActive(false)
       }
       pendingRef.current = null
     },
-    [commitHandleEdit, cancelHandleDrag],
+    [commitHandleEdit, cancelHandleDrag, setPathGestureActive],
   )
 
   const finishMoveDrag = useCallback(
@@ -140,11 +143,13 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         } else {
           cancelHandleDrag()
         }
+      } else {
+        setPathGestureActive(false)
       }
       pendingMoveRef.current = null
       setMoveDragging(false)
     },
-    [commitHandleEdit, cancelHandleDrag],
+    [commitHandleEdit, cancelHandleDrag, setPathGestureActive],
   )
 
   const endMoveNudge = useCallback(

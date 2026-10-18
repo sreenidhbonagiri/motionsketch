@@ -3,7 +3,9 @@ import {
   buildPolishProtection,
   maxDensePolylineDeviation,
   polishMotion,
+  polishRoundingAvailability,
 } from '../../src/core/polish'
+import { aspectDistance } from '../../src/core/stageAspect'
 import { buildKeyframesFromProcessed } from '../../src/core/export/format'
 import { maxPlaybackExportError } from '../../src/core/export/consistency'
 import type { MotionSample } from '../../src/core/types'
@@ -179,5 +181,86 @@ describe('polishMotion', () => {
       const err = maxPlaybackExportError(result.samples, kfs, 48)
       expect(err).toBeLessThan(0.02)
     }
+  })
+
+  it('default polish preserves the fixture sharp turn; rounding may soften it', () => {
+    const project = buildPolishMotionFixtureProject()
+    const actor = project.actors.find((a) => a.id === POLISH_EDITED_ACTOR_ID)!
+    const ge = actor.geometryEdit!
+    const corner = 114
+    const aspect = project.stageAspect
+
+    const preserved = polishMotion(ge.samples, {
+      strength: 0.75,
+      stageAspect: aspect,
+      anchorIndices: ge.handleIndices,
+    })
+    expect(preserved.samples[corner]!.x).toBeCloseTo(ge.samples[corner]!.x, 6)
+    expect(preserved.samples[corner]!.y).toBeCloseTo(ge.samples[corner]!.y, 6)
+
+    const avail = polishRoundingAvailability(
+      ge.samples,
+      ge.handleIndices,
+      corner,
+      aspect,
+    )
+    expect(avail.enabled).toBe(true)
+
+    const rounded = polishMotion(ge.samples, {
+      strength: 0.75,
+      stageAspect: aspect,
+      anchorIndices: ge.handleIndices,
+      relaxCornerAtIndex: corner,
+    })
+    const moved = aspectDistance(
+      ge.samples[corner]!.x,
+      ge.samples[corner]!.y,
+      rounded.samples[corner]!.x,
+      rounded.samples[corner]!.y,
+      aspect,
+    )
+    expect(moved).toBeGreaterThan(1e-5)
+    expect(moved).toBeLessThanOrEqual(0.018 + 1e-6)
+    expect(rounded.samples[corner]!.t).toBe(ge.samples[corner]!.t)
+
+    // Other handles stay put.
+    for (const h of ge.handleIndices) {
+      if (h === corner) continue
+      expect(rounded.samples[h]!.x).toBeCloseTo(ge.samples[h]!.x, 6)
+      expect(rounded.samples[h]!.y).toBeCloseTo(ge.samples[h]!.y, 6)
+    }
+    // Endpoints unchanged.
+    expect(rounded.samples[0]).toMatchObject({
+      x: ge.samples[0]!.x,
+      y: ge.samples[0]!.y,
+    })
+    expect(rounded.samples.at(-1)).toMatchObject({
+      x: ge.samples.at(-1)!.x,
+      y: ge.samples.at(-1)!.y,
+      t: ge.samples.at(-1)!.t,
+    })
+
+    const dense = maxDensePolylineDeviation(
+      ge.samples,
+      rounded.samples,
+      aspect,
+    )
+    expect(dense).toBeLessThanOrEqual(0.018 * 1.15 + 1e-5)
+  })
+
+  it('disallows rounding at endpoints and pauses', () => {
+    const samples = sampleLine(24, (i, s) => {
+      if (i >= 8 && i <= 12) return { ...s, x: 0.4, y: 0.5 }
+      return s
+    })
+    const handles = [0, 10, 23]
+    expect(
+      polishRoundingAvailability(samples, handles, 0, 1.5).enabled,
+    ).toBe(false)
+    expect(
+      polishRoundingAvailability(samples, handles, 10, 1.5).message,
+    ).toMatch(/pause/i)
+    const mask = buildPolishProtection(samples, 1.5, handles, 10)
+    expect(mask[10]).toBe(true)
   })
 })

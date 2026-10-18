@@ -427,6 +427,22 @@ export function PlaybackDock() {
             </button>
             <button
               type="button"
+              data-testid="btn-polish-motion"
+              onClick={() => beginPolishSession()}
+              disabled={polishDisabled || pathTool === 'move-path'}
+              title={
+                pathTool === 'move-path'
+                  ? 'Switch to Edit points to polish motion'
+                  : selectedHandleIndex !== null
+                    ? 'Preview a gentler path; optional rounding uses the selected point'
+                    : 'Preview a gentler path while keeping pauses and corners'
+              }
+              className={btnSecondary}
+            >
+              Polish motion
+            </button>
+            <button
+              type="button"
               data-testid="btn-restore-path"
               onClick={restoreRecordedPath}
               className={btnQuiet}

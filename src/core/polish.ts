@@ -1,5 +1,9 @@
 import { clamp, clamp01 } from './coords'
-import { copyPath } from './edit'
+import {
+  copyPath,
+  isEndpointHandle,
+  localBendNeighborhood,
+} from './edit'
 import { isInStationaryRun } from './process'
 import { aspectDistance, clampStageAspect } from './stageAspect'
 import type { MotionSample } from './types'
@@ -29,6 +33,12 @@ export type PolishMotionOptions = {
   stageAspect: number
   /** Sample indices that must stay put (handles + inferred corners/pauses). */
   anchorIndices?: readonly number[]
+  /**
+   * When set, relax corner/handle protection at this interior sample so polish
+   * may move it (and non-handle neighbors in its bend neighborhood) within
+   * the deviation bound. Other handles, pauses, and endpoints stay anchored.
+   */
+  relaxCornerAtIndex?: number | null
 }
 
 export type PolishMotionResult = {
@@ -40,6 +50,73 @@ export type PolishMotionResult = {
   maxDeviation: number
   /** Whether timing within moving segments was redistributed. */
   timingAdjusted: boolean
+}
+
+export type PolishRoundingAvailability = {
+  enabled: boolean
+  /** Concise reason when the rounding override cannot be offered. */
+  message: string | null
+  /** Bend neighborhood used for preview highlight when enabled. */
+  neighborhood: { lo: number; hi: number } | null
+}
+
+/**
+ * Whether “Allow rounding at this point” can target `handleIndex`.
+ * Endpoints and pause samples stay locked; requires an interior handle.
+ */
+export function polishRoundingAvailability(
+  samples: MotionSample[],
+  handleIndices: readonly number[],
+  handleIndex: number | null,
+  stageAspect: number,
+): PolishRoundingAvailability {
+  const aspect = clampStageAspect(stageAspect)
+  if (handleIndex === null || samples.length < 3) {
+    return {
+      enabled: false,
+      message: 'Select an interior path point in Edit path first.',
+      neighborhood: null,
+    }
+  }
+  if (isEndpointHandle(samples.length, handleIndex)) {
+    return {
+      enabled: false,
+      message: 'Endpoints stay anchored and cannot be rounded.',
+      neighborhood: null,
+    }
+  }
+  if (!handleIndices.includes(handleIndex)) {
+    return {
+      enabled: false,
+      message: 'Select an interior path point in Edit path first.',
+      neighborhood: null,
+    }
+  }
+  if (isInStationaryRun(samples, handleIndex, 40, aspect)) {
+    return {
+      enabled: false,
+      message: 'This point is part of a pause and cannot be rounded.',
+      neighborhood: null,
+    }
+  }
+  const nb = localBendNeighborhood(
+    samples,
+    [...handleIndices],
+    handleIndex,
+    aspect,
+  )
+  if (!nb) {
+    return {
+      enabled: false,
+      message: 'Neighborhood is too narrow to round this point safely.',
+      neighborhood: null,
+    }
+  }
+  return {
+    enabled: true,
+    message: null,
+    neighborhood: { lo: nb.lo, hi: nb.hi },
+  }
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -102,12 +179,13 @@ function boundToOriginal(
 
 /**
  * Build a protection mask. Prefer retain when corner evidence is weak.
- * Anchors (handles) are always protected.
+ * Anchors (handles) are protected unless explicitly relaxed for rounding.
  */
 export function buildPolishProtection(
   samples: MotionSample[],
   stageAspect: number,
   anchorIndices: readonly number[] = [],
+  relaxCornerAtIndex: number | null = null,
 ): boolean[] {
   const n = samples.length
   const aspect = clampStageAspect(stageAspect)
@@ -137,6 +215,28 @@ export function buildPolishProtection(
         protectedMask[i + 1] = true
       }
     }
+  }
+
+  const relax = polishRoundingAvailability(
+    samples,
+    anchorIndices,
+    relaxCornerAtIndex,
+    aspect,
+  )
+  if (
+    relax.enabled &&
+    relaxCornerAtIndex !== null &&
+    relax.neighborhood
+  ) {
+    const handleSet = new Set(anchorIndices)
+    const { lo, hi } = relax.neighborhood
+    for (let i = lo + 1; i < hi; i++) {
+      if (i <= 0 || i >= n - 1) continue
+      if (isInStationaryRun(samples, i, 40, aspect)) continue
+      if (handleSet.has(i) && i !== relaxCornerAtIndex) continue
+      protectedMask[i] = false
+    }
+    protectedMask[relaxCornerAtIndex] = false
   }
 
   return protectedMask
@@ -351,10 +451,16 @@ export function polishMotion(
     }
   }
 
+  const anchors = options.anchorIndices ?? []
+  const relaxAt =
+    typeof options.relaxCornerAtIndex === 'number'
+      ? options.relaxCornerAtIndex
+      : null
   const protectedMask = buildPolishProtection(
     baseline,
     aspect,
-    options.anchorIndices ?? [],
+    anchors,
+    relaxAt,
   )
   const movable = protectedMask.some((p) => !p)
   const maxDev = lerp(MAX_DEV_MIN, MAX_DEV_MAX, strength)
@@ -364,13 +470,20 @@ export function polishMotion(
     faired = fairUnprotected(baseline, protectedMask, strength, maxDev, aspect)
   }
 
-  // Pin endpoints and anchors explicitly.
+  // Pin endpoints and still-protected samples explicitly (timestamps untouched).
   for (let i = 0; i < faired.length; i++) {
     if (protectedMask[i]) {
       faired[i] = {
-        t: faired[i]!.t,
+        t: baseline[i]!.t,
         x: baseline[i]!.x,
         y: baseline[i]!.y,
+      }
+    } else {
+      // Geometry pass never rewrites timestamps.
+      faired[i] = {
+        t: baseline[i]!.t,
+        x: faired[i]!.x,
+        y: faired[i]!.y,
       }
     }
   }
@@ -410,7 +523,10 @@ export function polishMotion(
     }
   }
 
-  const timingAmount = strength * TIMING_BLEND_SCALE
+  // Rounding override is a geometry-only pass: keep sample timestamps.
+  // Normal polish may still blend timing in moving segments separately.
+  const timingAmount =
+    relaxAt !== null ? 0 : strength * TIMING_BLEND_SCALE
   const timed = blendMovingSegmentTiming(faired, timingAmount, aspect)
 
   const vertexDev = maxVertexDeviation(baseline, timed.samples, aspect)

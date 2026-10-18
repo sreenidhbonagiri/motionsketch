@@ -8,6 +8,9 @@ import { useEditorStore } from '../state/store'
 export function PolishPanel() {
   const session = useEditorStore((s) => s.polishSession)
   const setPolishStrength = useEditorStore((s) => s.setPolishStrength)
+  const setPolishAllowRounding = useEditorStore(
+    (s) => s.setPolishAllowRounding,
+  )
   const applyPolish = useEditorStore((s) => s.applyPolish)
   const cancelPolish = useEditorStore((s) => s.cancelPolish)
 
@@ -27,6 +30,8 @@ export function PolishPanel() {
   if (!session) return null
 
   const strengthPct = Math.round(session.strength * 100)
+  const roundingEnabled = session.roundingUnavailableReason === null
+  const showRoundingControl = session.roundingTargetIndex !== null
 
   return (
     <div
@@ -43,6 +48,12 @@ export function PolishPanel() {
           <span className="font-medium text-slate-600">Dashed</span> Original
           {' · '}
           <span className="font-medium text-teal-800">Solid</span> Polished
+          {session.allowRoundingAtPoint && (
+            <>
+              {' · '}
+              <span className="font-medium text-amber-800">Amber</span> Rounding
+            </>
+          )}
         </p>
       </div>
 
@@ -74,11 +85,43 @@ export function PolishPanel() {
           className="text-xs leading-relaxed text-slate-500"
         >
           Higher strength eases wobble on open curves and may even out speed in
-          moving sections. Pauses, sharp corners, and path handles stay put.
-          Total duration is unchanged. Transform keyframes keep the same times
-          even if speed along the path shifts.
+          moving sections. Pauses, sharp corners, and path handles stay put by
+          default. Total duration is unchanged. Transform keyframes keep the
+          same times even if speed along the path shifts.
         </p>
       </div>
+
+      {showRoundingControl && (
+        <div
+          data-testid="polish-rounding-control"
+          className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2"
+        >
+          <label className="flex items-start gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              data-testid="polish-allow-rounding"
+              className="mt-0.5 accent-teal-700"
+              checked={session.allowRoundingAtPoint}
+              disabled={!roundingEnabled}
+              onChange={(e) => setPolishAllowRounding(e.target.checked)}
+              aria-describedby="polish-rounding-help"
+            />
+            <span>
+              Allow rounding at this point
+              <span
+                id="polish-rounding-help"
+                data-testid="polish-rounding-help"
+                className="mt-0.5 block text-xs font-normal leading-relaxed text-slate-500"
+              >
+                {roundingEnabled
+                  ? 'May move this point slightly to soften the turn.'
+                  : (session.roundingUnavailableReason ??
+                    'Rounding unavailable at this point.')}
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
 
       <p
         data-testid="polish-status"
@@ -86,9 +129,11 @@ export function PolishPanel() {
         role="status"
       >
         {session.changed
-          ? session.timingAdjusted
-            ? 'Preview ready. Applying may redistribute speed within moving sections.'
-            : 'Preview ready. Geometry cleanup within the safe bound.'
+          ? session.allowRoundingAtPoint
+            ? 'Preview ready. Selected turn may soften within the safe bound.'
+            : session.timingAdjusted
+              ? 'Preview ready. Applying may redistribute speed within moving sections.'
+              : 'Preview ready. Geometry cleanup within the safe bound.'
           : (session.reason ?? 'Nothing to polish at this strength.')}
       </p>
 
