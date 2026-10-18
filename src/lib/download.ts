@@ -1,13 +1,8 @@
 import { filenameStemFromProjectName } from '../core/projectName'
 
-/** Trigger a browser download for a text file. Returns false if the API fails. */
-export function downloadTextFile(
-  text: string,
-  filename: string,
-  mimeType: string,
-): boolean {
+/** Trigger a browser download for a Blob. Returns false if the API fails. */
+export function downloadBlob(blob: Blob, filename: string): boolean {
   try {
-    const blob = new Blob([text], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -18,6 +13,19 @@ export function downloadTextFile(
     anchor.remove()
     URL.revokeObjectURL(url)
     return true
+  } catch {
+    return false
+  }
+}
+
+/** Trigger a browser download for a text file. Returns false if the API fails. */
+export function downloadTextFile(
+  text: string,
+  filename: string,
+  mimeType: string,
+): boolean {
+  try {
+    return downloadBlob(new Blob([text], { type: mimeType }), filename)
   } catch {
     return false
   }

@@ -4,13 +4,21 @@ import {
   clampStageAspect,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
-import type { Actor, LoopMode, MotionSample, Project, TransformTrack } from '../types'
+import type {
+  Actor,
+  ActorImage,
+  LoopMode,
+  MotionSample,
+  Project,
+  TransformTrack,
+} from '../types'
 import { exportCssFromProject, resolveExportScope } from './css'
 import { fullClip } from '../clip'
 import {
   MS_MOTION_OK_CLASS,
   scopedActorClass,
   type ExportCssOptions,
+  type ExportScope,
 } from './sceneScope'
 
 export interface HtmlDemoOptions {
@@ -26,6 +34,16 @@ export interface HtmlDemoOptions {
   transform?: TransformTrack | null
 }
 
+export type HtmlDemoBuildOptions = ExportCssOptions & {
+  /**
+   * When set, link this stylesheet instead of inlining CSS
+   * (web package uses `animation.css`).
+   */
+  stylesheetHref?: string
+  /** Override image `src` (default: embedded data URL). */
+  resolveImageSrc?: (image: ActorImage) => string
+}
+
 /**
  * Reject CSS that could break out of a <style> block or pull remote assets.
  */
@@ -38,18 +56,8 @@ export function isSafeCssForEmbed(css: string): boolean {
   return true
 }
 
-export function buildHtmlDemoFromProject(
-  project: Project,
-  options: ExportCssOptions = {},
-): string {
-  const stageAspect = clampStageAspect(project.stageAspect)
-  const scope = resolveExportScope(project, options)
-  const css = exportCssFromProject(project, options)
-  if (!isSafeCssForEmbed(css)) {
-    throw new Error('Refusing to embed CSS that failed safety checks.')
-  }
-
-  const chromeCss = `*,
+function demoChromeCss(stageAspect: number, scope: ExportScope): string {
+  return `*,
 *::before,
 *::after {
   box-sizing: border-box;
@@ -119,50 +127,36 @@ body {
   outline: 2px solid #4f46e5;
   outline-offset: 2px;
 }`
+}
 
+function buildActorMarkup(
+  project: Project,
+  resolveImageSrc?: (image: ActorImage) => string,
+): string {
   const actorCount = project.actors.length
-  const actorMarkup = project.actors
+  return project.actors
     .map((actor, i) => {
       const cls = scopedActorClass(i, actorCount)
       const appearance = coerceActor(actor.appearance)
       const testId = i === 0 ? ' data-testid="demo-actor"' : ''
       if (appearance.kind === 'image' && appearance.image) {
-        return `<img class="${cls}"${testId} src="${appearance.image.dataUrl.replace(/"/g, '')}" alt="${appearance.image.label.replace(/"/g, '&quot;')}" />`
+        const src = resolveImageSrc
+          ? resolveImageSrc(appearance.image)
+          : appearance.image.dataUrl
+        const safeSrc = src.replace(/"/g, '')
+        const alt = escapeHtmlText(appearance.image.label || 'Actor image')
+        return `<img class="${cls}"${testId} src="${safeSrc}" alt="${alt}" />`
       }
       return `<div class="${cls}"${testId}></div>`
     })
     .join('\n          ')
+}
 
-  const actorClassList = project.actors.map((_, i) =>
-    scopedActorClass(i, actorCount),
-  )
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtmlText(project.name || 'MotionSketch demo')}</title>
-<style>
-${chromeCss}
-</style>
-<style>
-${css}
-</style>
-</head>
-<body>
-  <div class="demo-shell">
-    <div class="demo-frame">
-      <div class="${scope.rootClass}" data-ms-scene="${scope.sceneId}" data-testid="demo-scene">
-        <div class="${scope.stageClass}" data-testid="demo-stage">
-          ${actorMarkup}
-        </div>
-      </div>
-    </div>
-    <button type="button" class="demo-replay" data-testid="demo-replay" id="replay">Replay</button>
-  </div>
-  <script>
-(function () {
+function demoReplayScript(
+  scope: ExportScope,
+  actorClassList: string[],
+): string {
+  return `(function () {
   var root = document.querySelector('[data-ms-scene="${scope.sceneId}"]');
   var button = document.getElementById('replay');
   var actorClasses = ${JSON.stringify(actorClassList)};
@@ -221,7 +215,61 @@ ${css}
     mq.addListener(onPreferenceChange);
   }
   syncLabel();
-})();
+})();`
+}
+
+/**
+ * Offline preview HTML with scene-scoped Play/Replay controls.
+ * Shared by the single-file HTML demo and the web package `index.html`.
+ */
+export function buildHtmlDemoFromProject(
+  project: Project,
+  options: HtmlDemoBuildOptions = {},
+): string {
+  const stageAspect = clampStageAspect(project.stageAspect)
+  const scope = resolveExportScope(project, options)
+  const css = exportCssFromProject(project, options)
+  if (!isSafeCssForEmbed(css)) {
+    throw new Error('Refusing to embed CSS that failed safety checks.')
+  }
+
+  const stylesheetHref = options.stylesheetHref?.replace(/"/g, '').trim()
+  const cssBlock = stylesheetHref
+    ? `<link rel="stylesheet" href="${stylesheetHref}">`
+    : `<style>
+${css}
+</style>`
+
+  const chromeCss = demoChromeCss(stageAspect, scope)
+  const actorMarkup = buildActorMarkup(project, options.resolveImageSrc)
+  const actorClassList = project.actors.map((_, i) =>
+    scopedActorClass(i, project.actors.length),
+  )
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtmlText(project.name || 'MotionSketch demo')}</title>
+<style>
+${chromeCss}
+</style>
+${cssBlock}
+</head>
+<body>
+  <div class="demo-shell">
+    <div class="demo-frame">
+      <div class="${scope.rootClass}" data-ms-scene="${scope.sceneId}" data-testid="demo-scene">
+        <div class="${scope.stageClass}" data-testid="demo-stage">
+          ${actorMarkup}
+        </div>
+      </div>
+    </div>
+    <button type="button" class="demo-replay" data-testid="demo-replay" id="replay">Replay</button>
+  </div>
+  <script>
+${demoReplayScript(scope, actorClassList)}
   </script>
 </body>
 </html>

@@ -116,5 +116,6 @@ test.describe('downloadable exports', () => {
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-css')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-html-demo')).toHaveCount(0)
+    await expect(page.getByTestId('btn-download-web-package')).toHaveCount(0)
   })
 })

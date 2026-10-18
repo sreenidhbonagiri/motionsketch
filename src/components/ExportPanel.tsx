@@ -1,7 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { exportCssFromProject } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
-import { downloadTextFile, stampProjectFilename } from '../lib/download'
+import { buildWebPackage } from '../core/export/webPackage'
+import {
+  downloadBlob,
+  downloadTextFile,
+  stampProjectFilename,
+} from '../lib/download'
 import { copyText } from '../lib/clipboard'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { useProjectPersistence } from '../hooks/useProjectPersistence'
@@ -15,10 +20,12 @@ export function ExportPanel() {
   const [copiedInline, setCopiedInline] = useState(false)
   const [copiedDialog, setCopiedDialog] = useState(false)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
+  const [packaging, setPackaging] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const viewBtnRef = useRef<HTMLButtonElement>(null)
   const codeRef = useRef<HTMLTextAreaElement>(null)
   const titleId = useId()
+  const packageStatusId = useId()
 
   const hasExport = projectHasAnyRecording(project)
 
@@ -87,6 +94,38 @@ export function ExportPanel() {
     }
   }
 
+  const downloadWebPackage = () => {
+    if (packaging) return
+    setPackaging(true)
+    setActionStatus('Building web package…')
+    // Yield so the busy state paints before ZIP work.
+    window.setTimeout(() => {
+      try {
+        const result = buildWebPackage(project)
+        if (!result.ok) {
+          announce(result.error)
+          return
+        }
+        const blob = new Blob([result.zip as BlobPart], {
+          type: 'application/zip',
+        })
+        const ok = downloadBlob(
+          blob,
+          stampProjectFilename(`${project.name}-web`, 'zip'),
+        )
+        if (ok) {
+          announce('Web package download started.')
+          return
+        }
+        announce('Could not download the web package.')
+      } catch {
+        announce('Couldn’t build the web package.')
+      } finally {
+        setPackaging(false)
+      }
+    }, 0)
+  }
+
   const downloadProjectFile = () => {
     const ok = downloadCurrentProject()
     if (ok) {
@@ -121,7 +160,8 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-download-html-demo"
           onClick={downloadHtmlDemo}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          disabled={packaging}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Download HTML demo
         </button>
@@ -134,9 +174,29 @@ export function ExportPanel() {
 
         <button
           type="button"
+          data-testid="btn-download-web-package"
+          onClick={downloadWebPackage}
+          disabled={packaging}
+          aria-busy={packaging}
+          aria-describedby={packageStatusId}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {packaging ? 'Building web package…' : 'Download web package'}
+        </button>
+        <p
+          id={packageStatusId}
+          data-testid="export-web-package-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          ZIP with preview HTML, scoped CSS, images, README, and project file.
+        </p>
+
+        <button
+          type="button"
           data-testid="btn-download-css"
           onClick={downloadCss}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          disabled={packaging}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Download CSS
         </button>
@@ -184,7 +244,8 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-export-download-project"
           onClick={downloadProjectFile}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          disabled={packaging}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Download project file
         </button>
