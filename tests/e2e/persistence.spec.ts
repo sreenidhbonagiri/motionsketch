@@ -64,11 +64,27 @@ test.describe('project persistence', () => {
 
     const cssAfter = await readExportedCss(page)
     expect(cssAfter).toBe(cssBefore)
+  })
+
+  test('restored project plays from a paused pose', async ({ page }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'adjust')
+    await page.getByTestId('loop-toggle').check()
+    await page.getByTestId('btn-close-adjust').click()
+    await page.waitForTimeout(400)
+    await waitForSaved(page)
+
+    await page.reload()
+    await ensureEditor(page)
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
 
     const actor = page.getByTestId('actor')
     const before = await actor.boundingBox()
     await page.getByTestId('btn-play').click()
-    await page.waitForTimeout(350)
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await page.getByTestId('btn-pause').click()
     const mid = await actor.boundingBox()
     expect(before && mid).toBeTruthy()
     const moved =

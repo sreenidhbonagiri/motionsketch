@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { unzipSync } from 'fflate'
 import {
+  clickRecord,
+  dragActor,
   ensureEditor,
   openPanel,
   recordSimplePath,
@@ -122,16 +124,12 @@ test.describe('web package export', () => {
     // Record short takes on the image actors so export includes them.
     for (const index of [1, 2, 3]) {
       await selectActorByIndex(page, index)
-      await page.getByTestId('btn-record').click()
-      const actor = page.getByTestId('actor')
-      const box = await actor.boundingBox()
-      expect(box).toBeTruthy()
-      const x = box!.x + box!.width / 2
-      const y = box!.y + box!.height / 2
-      await page.mouse.move(x, y)
-      await page.mouse.down()
-      await page.mouse.move(x + 40 + index * 8, y - 20, { steps: 6 })
-      await page.mouse.up()
+      await clickRecord(page)
+      await dragActor(
+        page,
+        { x: 20 + index * 4, y: -10 },
+        { x: 80 + index * 10, y: 30 },
+      )
       await expect(page.getByTestId('btn-play')).toBeEnabled()
     }
 

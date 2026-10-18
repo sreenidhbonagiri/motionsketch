@@ -164,13 +164,14 @@ test.describe('export playback triggers', () => {
     await expect(page.getByTestId('playback-scrubber')).toHaveValue('0')
   })
 
-  test('pause for long automatic and looping scenes', async ({ page }) => {
+  test('pause control for long page-load and viewport scenes', async ({
+    page,
+  }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
     await setDurationMs(page, 6000)
 
-    // Long page-load → Pause after auto start.
     await page.getByTestId('export-trigger-select').selectOption('page-load')
     await page.getByTestId('btn-preview-trigger').click()
     const pageLoad = page.frameLocator(
@@ -187,7 +188,6 @@ test.describe('export playback triggers', () => {
     await expect(pageLoad.getByTestId('demo-pause')).toHaveText('Pause')
     await page.getByTestId('btn-close-trigger-preview').click()
 
-    // Long viewport → Pause after IO start.
     await page.getByTestId('export-trigger-select').selectOption('viewport')
     await page.getByTestId('btn-preview-trigger').click()
     const viewport = page.frameLocator(
@@ -199,9 +199,14 @@ test.describe('export playback triggers', () => {
     )
     await expect(viewport.getByTestId('demo-pause')).toBeVisible()
     await page.getByTestId('btn-close-trigger-preview').click()
+  })
 
-    // Short click without loop → no pause control in markup.
+  test('pause control only when click scenes loop', async ({ page }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
     await setDurationMs(page, 2000)
+
     await page.getByTestId('export-trigger-select').selectOption('click')
     await page.getByTestId('btn-preview-trigger').click()
     const shortClick = page.frameLocator(
@@ -210,7 +215,6 @@ test.describe('export playback triggers', () => {
     await expect(shortClick.getByTestId('demo-pause')).toHaveCount(0)
     await page.getByTestId('btn-close-trigger-preview').click()
 
-    // Looping click → Pause after activation.
     await openPanel(page, 'adjust')
     await page.getByTestId('loop-toggle').check()
     await openExport(page)
@@ -224,16 +228,12 @@ test.describe('export playback triggers', () => {
     await page.getByTestId('btn-close-trigger-preview').click()
   })
 
-  test('click and hover interactions use pointer/focus state, not a timed mute', async ({
-    page,
-  }) => {
+  test('click interactions restart without a timed mute', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    // Keep the timeline in progress for currentTime-based restart checks.
     await setDurationMs(page, 8000)
 
-    // Rapid deliberate clicks each restart the shared timeline.
     await page.getByTestId('export-trigger-select').selectOption('click')
     const clickFrame = await previewFrame(page)
     const scene = clickFrame.getByTestId('demo-scene')
@@ -245,13 +245,19 @@ test.describe('export playback triggers', () => {
     await expect.poll(() => motionTime(clickFrame)).toBeGreaterThan(30)
     expect(await clickSceneReadTime(clickFrame)).toBeLessThan(40)
 
-    // Keyboard-only activation (Enter) also restarts.
     await expect.poll(() => motionTime(clickFrame)).toBeGreaterThan(30)
     expect(await enterSceneReadTime(clickFrame)).toBeLessThan(40)
     await page.getByTestId('btn-close-trigger-preview').click()
+  })
 
-    // Hover: pointer then focus must not restart; leave/re-enter rearms;
-    // child focus moves stay in one session; tap control activates.
+  test('hover interactions use pointer/focus state, not a timed mute', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await setDurationMs(page, 8000)
+
     await page.getByTestId('export-trigger-select').selectOption('hover')
     const hoverFrame = await previewFrame(page)
     const hoverScene = hoverFrame.getByTestId('demo-scene')
@@ -278,14 +284,12 @@ test.describe('export playback triggers', () => {
     await expect.poll(() => motionTime(hoverFrame)).toBeGreaterThan(40)
     const afterHover = await motionTime(hoverFrame)
 
-    // Product fix: focusout relatedTarget inside root must not re-arm / restart.
     await hoverFrame.getByTestId('demo-focus-a').focus()
     await hoverFrame.getByTestId('demo-focus-b').focus()
     const afterFocus = await motionTime(hoverFrame)
     expect(afterFocus).toBeGreaterThanOrEqual(afterHover - 5)
     expect(afterFocus).toBeGreaterThan(40)
 
-    // Leave pointer and focus, then re-enter with pointer → restart.
     await page.mouse.move(8, 8)
     await hoverFrame.evaluate(() => {
       const ae = document.activeElement as HTMLElement | null
@@ -294,7 +298,6 @@ test.describe('export playback triggers', () => {
     await enterSceneWithPointer(page, hoverScene)
     await expect.poll(() => motionTime(hoverFrame)).toBeLessThan(40)
 
-    // Touch-style activation via explicit tap control after leave.
     await expect.poll(() => motionTime(hoverFrame)).toBeGreaterThan(20)
     await page.mouse.move(8, 8)
     await hoverFrame.evaluate(() => {

@@ -112,7 +112,7 @@ CSS uses a scene root class (content fingerprint, optional `instancePrefix`), st
 
 ## Continuous integration
 
-GitHub Actions runs on pushes to `main` and on pull requests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `npm ci`, lint, unit tests, and production build, then a matrix of e2e jobs (Chromium, Firefox, Playwright WebKit) each with `--retries=0`. Each matrix job installs only its browser (+ OS deps) and uploads a separate failure artifact. Playwright starts its own Vite server (`CI` is set, so `reuseExistingServer` is false). Playwright WebKit is engine coverage — not a claim that every Safari or iOS version was tested.
+GitHub Actions runs on pushes to `main` and on pull requests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `npm ci`, lint, unit tests, and production build, then a matrix of e2e jobs (Chromium, Firefox, Playwright WebKit) each with `--retries=0`. Each matrix job installs only its browser (+ OS deps), runs Playwright with one worker, and uploads a separate failure artifact. Playwright starts its own Vite server (`CI` is set, so `reuseExistingServer` is false). Playwright WebKit is engine coverage — not a claim that every Safari or iOS version was tested.
 
 ### Same checks locally
 

@@ -115,7 +115,7 @@ test.describe('playback inspection', () => {
     expect(head).toBeLessThan(1)
   })
 
-  test('back-and-forth reverses, supports pause/resume, and exports alternate', async ({
+  test('back-and-forth reverses and supports pause/resume', async ({
     page,
   }) => {
     await page.goto('/')
@@ -137,6 +137,7 @@ test.describe('playback inspection', () => {
     await page.getByTestId('transform-rotation-input').fill('360')
     await page.getByTestId('transform-scale-slider').fill('2')
     await page.getByTestId('btn-set-transform-keyframe').click()
+    await page.getByTestId('btn-close-appearance').click()
     // Return to start so the clock run measures from t=0 forward→reverse.
     await page.getByTestId('playback-scrubber').fill('0')
 
@@ -217,6 +218,16 @@ test.describe('playback inspection', () => {
     expect(resumed.transform).not.toBe(paused.transform)
 
     await page.getByTestId('btn-pause').click()
+  })
+
+  test('alternate loop exports CSS comment and timing', async ({ page }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'adjust')
+    await page.getByTestId('loop-toggle').check()
+    await page.getByTestId('loop-mode-alternate').check()
+    await page.getByTestId('btn-close-adjust').click()
     const css = await readExportedCss(page)
     expect(css).toContain('linear infinite alternate')
     expect(css).toContain('full cycle is 2×')

@@ -10,8 +10,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   // Keep failures visible — do not retry to paper over flakes (CI also passes --retries=0).
   retries: 0,
-  // Cap workers in CI so three browser projects stay within runner memory.
-  workers: process.env.CI ? 2 : undefined,
+  // One worker in CI: Linux WebKit under two parallel browsers routinely
+  // stretches long scenarios past the default 30s test budget.
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: 'http://127.0.0.1:5173',
     // With retries disabled, on-first-retry never captures; keep traces for failed tests.
