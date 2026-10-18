@@ -6,7 +6,9 @@ import {
   smoothBendAvailability,
 } from '../core/edit'
 import { traversalElapsedMs } from '../core/playback'
+import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { useConfirm } from '../hooks/useConfirm'
+import { resolveModeStatus } from '../lib/modeStatus'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 
@@ -73,7 +75,9 @@ export function PlaybackDock() {
   const smoothSelectedBend = useEditorStore((s) => s.smoothSelectedBend)
   const makeSelectedCorner = useEditorStore((s) => s.makeSelectedCorner)
   const stageAspect = useEditorStore((s) => s.project.stageAspect)
+  const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const confirm = useConfirm()
+  const coarsePointer = useCoarsePointer()
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
@@ -122,47 +126,37 @@ export function PlaybackDock() {
 
   const actorLabel = selectedActor?.name?.trim() || 'the selected actor'
 
-  // One contextual status for recording / selected-actor gaps. Empty-board Record
-  // guidance stays on the existing stage tip (id=stage-empty-hint).
-  let dockStatus: string | null = null
-  if (editing) {
-    if (pathTool === 'move-path') {
-      dockStatus =
-        'Move path: drag the path to slide every sample by the same amount. Focus the path, then arrow keys nudge (Shift for larger steps). Escape cancels an in-progress move. Bounds keep every path sample on stage when the path starts in bounds — the actor’s rotated or scaled box may still extend past the edges.'
-    } else if (pathAddMode) {
-      dockStatus =
-        'Add point: the ghost sits on the sample that will become the handle. Click near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
-    } else {
-      dockStatus = `Edit points: drag or nudge handles · [ ] cycle · Smooth bend / Make corner · Delete removes an interior handle · Add point for local control. ${handleCount} of ${MAX_PATH_HANDLES} handles.`
-    }
-  } else if (mode === 'armed') {
-    dockStatus =
-      'Ready — drag the actor to capture motion. Cancel exits without saving a take.'
-  } else if (mode === 'recording') {
-    dockStatus = 'Recording… release the pointer to finish, or press Stop.'
-  } else if (hasAnyRecording && !hasRecording) {
-    dockStatus = `“${actorLabel}” has no path yet. Record for this actor to edit or reset its take. Play still uses other actors’ takes.`
-  } else if (mode === 'playing') {
-    dockStatus = 'Pause before editing the path.'
-  }
+  // Compact label + instruction in the dock. Empty-board Record guidance stays on
+  // the stage tip (id=stage-empty-hint). Selected-point copy stays in
+  // handle-selection-status.
+  const modeStatus = resolveModeStatus({
+    mode,
+    pathTool,
+    pathAddMode,
+    pathGestureActive,
+    coarsePointer,
+    hasAnyRecording,
+    hasSelectedRecording: hasRecording,
+    actorLabel,
+  })
 
   const emptyBoardHintId = 'stage-empty-hint'
   const playbackDescribedBy = playbackDisabled
-    ? dockStatus
+    ? modeStatus
       ? dockStatusId
       : !hasAnyRecording
         ? emptyBoardHintId
         : undefined
     : undefined
   const editDescribedBy = editPathDisabled
-    ? dockStatus
+    ? modeStatus
       ? dockStatusId
       : !hasAnyRecording
         ? emptyBoardHintId
         : undefined
     : undefined
   const resetDescribedBy = resetDisabled
-    ? dockStatus
+    ? modeStatus
       ? dockStatusId
       : !hasAnyRecording
         ? emptyBoardHintId
@@ -439,6 +433,9 @@ export function PlaybackDock() {
                 type="button"
                 data-testid="btn-stop"
                 onClick={stopFromUi}
+                aria-label={
+                  mode === 'armed' ? 'Cancel ready to record' : 'Stop recording'
+                }
                 className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-600"
               >
                 {mode === 'armed' ? 'Cancel' : 'Stop'}
@@ -580,14 +577,61 @@ export function PlaybackDock() {
         )}
       </div>
 
-      {dockStatus && (
-        <p
+      {modeStatus && (
+        <div
           id={dockStatusId}
           data-testid="dock-status"
-          className="text-center text-xs leading-relaxed text-slate-500"
+          data-mode-status={modeStatus.kind}
+          role="status"
+          className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-xs leading-snug"
         >
-          {dockStatus}
-        </p>
+          {modeStatus.kind === 'recording' ? (
+            <span
+              data-testid="mode-status-label"
+              className="inline-flex items-center gap-1.5 font-semibold text-red-700"
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block size-2 shrink-0 rounded-full bg-red-600"
+              />
+              {modeStatus.label}
+            </span>
+          ) : modeStatus.kind === 'armed' ? (
+            <span
+              data-testid="mode-status-label"
+              className="font-semibold text-slate-700"
+            >
+              Ready
+            </span>
+          ) : modeStatus.label ? (
+            <span
+              data-testid="mode-status-label"
+              className="font-semibold text-slate-700"
+            >
+              {modeStatus.label}
+            </span>
+          ) : null}
+          {modeStatus.kind === 'armed' && modeStatus.instruction ? (
+            <>
+              <span aria-hidden="true" className="text-slate-500">
+                {' — '}
+              </span>
+              <span
+                data-testid="mode-status-instruction"
+                className="text-slate-500"
+              >
+                {modeStatus.instruction}
+              </span>
+            </>
+          ) : modeStatus.instruction ? (
+            <span
+              data-testid="mode-status-instruction"
+              className="text-slate-500"
+            >
+              {modeStatus.instruction}
+            </span>
+          ) : null}
+        </div>
       )}
       {editing && (
         <>

@@ -19,7 +19,10 @@ test.describe('path editing', () => {
     await page.getByTestId('btn-edit-path').click()
     await expect(page.getByTestId('path-handles')).toBeVisible()
     await expect(page.getByTestId('btn-done-edit')).toBeVisible()
-    await expect(page.getByTestId('edit-mode-hint')).toBeVisible()
+    await expect(page.getByTestId('mode-status-label')).toHaveText('Edit points')
+    await expect(page.getByTestId('mode-status-instruction')).toContainText(
+      /Drag a point to reshape the path/i,
+    )
 
     // Play should not start while editing.
     await expect(page.getByTestId('btn-play')).toHaveCount(0)

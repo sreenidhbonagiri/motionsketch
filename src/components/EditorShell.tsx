@@ -100,7 +100,7 @@ export function EditorShell() {
   }, [])
 
   const coarsePointer = useCoarsePointer()
-  // Empty-board recording guidance — hide once any take exists; edit mode has its own hint.
+  // Empty-board recording guidance — hide once any take exists; edit/record status lives in the dock.
   const tip =
     !hasRecording && mode === 'idle'
       ? coarsePointer
@@ -344,16 +344,6 @@ export function EditorShell() {
         <div className="flex w-full max-w-2xl flex-col items-center gap-2">
           {!editing && <ClipTimeline />}
           <PlaybackDock />
-          {editing && (
-            <p
-              data-testid="edit-mode-hint"
-              className="pointer-events-auto rounded-full border border-white/70 bg-white/90 px-3 py-1 text-center text-xs text-slate-600 shadow-sm backdrop-blur-md"
-            >
-              Edit points: drag or nudge handles. Move path: drag the whole path
-              (or focus it and use arrow keys; Shift for larger steps). Add point
-              places a control without changing shape until you drag it.
-            </p>
-          )}
           {tip && (
             <p
               id="stage-empty-hint"

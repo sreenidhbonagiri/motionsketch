@@ -73,7 +73,8 @@ test.describe('workspace layout', () => {
       await assertFullyInViewport(page, 'playback-timeline')
 
       await page.getByTestId('btn-edit-path').click()
-      await expect(page.getByTestId('edit-mode-hint')).toBeVisible()
+      await expect(page.getByTestId('dock-status')).toBeVisible()
+      await expect(page.getByTestId('mode-status-label')).toHaveText('Edit points')
 
       const handle = page.locator('[data-testid^="path-handle-"]').first()
       await handle.click({ force: true })

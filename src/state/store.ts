@@ -387,12 +387,17 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     armRecording: () => {
       const { mode } = get()
       if (mode === 'playing' || mode === 'editing') return
-      set({ mode: 'armed', liveTrail: [], stageHint: 'default' })
+      set({
+        mode: 'armed',
+        liveTrail: [],
+        stageHint: 'default',
+        actionAnnouncement: 'Ready — drag the actor.',
+      })
     },
 
     cancelArm: () => {
       if (get().mode === 'armed') {
-        set({ mode: 'idle', pointerId: null })
+        set({ mode: 'idle', pointerId: null, actionAnnouncement: null })
       }
     },
 
@@ -406,6 +411,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         playbackHead: 0,
         playbackDirection: 1,
         stageHint: 'default',
+        actionAnnouncement: 'Recording',
         ...clearEditState(),
         ...clearTransformEditState(),
         // New take on the selected actor clears its transform + path edits.
@@ -1254,11 +1260,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddMode: false,
         pathAddCandidateIndex: null,
         pathTool: 'edit-points',
-        actionAnnouncement: formatHandleSelectionAnnouncement(
-          editSession.handleIndices,
-          selected,
-          editSession.samples.length,
-        ),
+        // Mode transition once; selected-point copy lives in handle-selection-status.
+        actionAnnouncement: 'Edit points',
       })
     },
 
@@ -1313,19 +1316,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     setSelectedHandleIndex: (index) => {
       const state = get()
-      const session = state.editSession
-      const announcement =
-        index !== null && session
-          ? formatHandleSelectionAnnouncement(
-              session.handleIndices,
-              index,
-              session.samples.length,
-            )
-          : state.actionAnnouncement
       set({
         selectedHandleIndex: index,
         selectedTransformId: index !== null ? null : state.selectedTransformId,
-        actionAnnouncement: announcement,
+        // Keep point selection out of actionAnnouncement (see handle-selection-status).
       })
     },
 
@@ -1352,9 +1346,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddMode: on,
         pathAddCandidateIndex: on ? (state.pathAddCandidateIndex ?? mid) : null,
         editPreview: on ? null : state.editPreview,
-        actionAnnouncement: on
-          ? 'Add point mode. The ghost marks the sample that will become the handle.'
-          : state.actionAnnouncement,
+        actionAnnouncement: on ? 'Add point' : 'Edit points',
       })
     },
 
@@ -1370,14 +1362,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddCandidateIndex: null,
         editPreview: null,
         pathGestureActive: false,
-        actionAnnouncement:
-          tool === 'move-path'
-            ? 'Move path: drag the path to reposition it. Arrow keys nudge when the path is focused; Shift for larger steps. Escape cancels an in-progress move. Bounds keep sample centers on stage when the path starts in bounds.'
-            : formatHandleSelectionAnnouncement(
-                state.editSession?.handleIndices ?? [],
-                state.selectedHandleIndex ?? 0,
-                state.editSession?.samples.length ?? 0,
-              ),
+        actionAnnouncement: tool === 'move-path' ? 'Move path' : 'Edit points',
       })
     },
 

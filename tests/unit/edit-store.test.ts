@@ -188,8 +188,9 @@ describe('edit store', () => {
     )
 
     useEditorStore.getState().setSelectedHandleIndex(addAt)
+    // Selection stays in handle-selection-status; actionAnnouncement keeps action copy.
     expect(useEditorStore.getState().actionAnnouncement).toMatch(
-      /Point \d+ of \d+/,
+      /Handle added — point \d+ of \d+/,
     )
     expect(useEditorStore.getState().removeSelectedPathHandle()).toBe(true)
     expect(useEditorStore.getState().editSession!.handleIndices).not.toContain(
@@ -205,23 +206,42 @@ describe('edit store', () => {
     ).toBe(false)
   })
 
-  it('announces selection and endpoint protection via setSelectedHandleIndex', () => {
+  it('announces mode once; selection does not overwrite actionAnnouncement', () => {
     useEditorStore.getState().enterEditMode()
     const session = useEditorStore.getState().editSession!
-    expect(useEditorStore.getState().actionAnnouncement).toMatch(
-      /Point 1 of \d+/,
-    )
-    const interior = session.handleIndices.find((i) => i !== 0 && i !== session.samples.length - 1)!
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Edit points')
+    const interior = session.handleIndices.find(
+      (i) => i !== 0 && i !== session.samples.length - 1,
+    )!
     useEditorStore.getState().setSelectedHandleIndex(interior)
-    expect(useEditorStore.getState().actionAnnouncement).toMatch(
-      /^Point \d+ of \d+\.$/,
-    )
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Edit points')
     useEditorStore.getState().setSelectedHandleIndex(0)
-    expect(useEditorStore.getState().actionAnnouncement).toContain('endpoint')
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Edit points')
     expect(useEditorStore.getState().removeSelectedPathHandle()).toBe(false)
     expect(useEditorStore.getState().actionAnnouncement).toMatch(
       /can’t be removed/i,
     )
+  })
+
+  it('announces path tool and add-point transitions politely', () => {
+    useEditorStore.getState().enterEditMode()
+    useEditorStore.getState().setPathTool('move-path')
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Move path')
+    useEditorStore.getState().setPathTool('edit-points')
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Edit points')
+    useEditorStore.getState().setPathAddMode(true)
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Add point')
+    useEditorStore.getState().setPathAddMode(false)
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Edit points')
+  })
+
+  it('announces armed and recording readiness once', () => {
+    useEditorStore.getState().armRecording()
+    expect(useEditorStore.getState().actionAnnouncement).toBe(
+      'Ready — drag the actor.',
+    )
+    useEditorStore.getState().beginRecording(1, { x: 0.4, y: 0.5 })
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Recording')
   })
 
   it('smooth bend commits one undo entry; no-op does not grow history', () => {
