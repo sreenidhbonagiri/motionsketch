@@ -14,6 +14,8 @@ let activePointerId: number | null = null
 let isRecordingDrag = false
 /** Rest pose captured at idle-drag start; restored on cancel. */
 let idleRestBaseline: Vec2 | null = null
+/** Element that called setPointerCapture for the active gesture. */
+let pointerCaptureTarget: Element | null = null
 
 export function getGrabOffset(): Vec2 {
   return grabOffset
@@ -25,6 +27,35 @@ export function setGrabOffset(offset: Vec2): void {
 
 export function getActivePointerId(): number | null {
   return activePointerId
+}
+
+/** Remember the capture owner so Escape / blur / teardown can release it. */
+export function bindPointerCaptureTarget(target: Element | null): void {
+  pointerCaptureTarget = target
+}
+
+/**
+ * Release pointer capture from the bound owner. Safe when the element is
+ * gone, capture was already lost, or no gesture is active.
+ */
+export function releaseBoundPointerCapture(
+  pointerId: number | null = activePointerId,
+): void {
+  const target = pointerCaptureTarget
+  pointerCaptureTarget = null
+  if (!target || pointerId === null) return
+  try {
+    if (!target.isConnected) return
+    if (
+      typeof target.hasPointerCapture === 'function' &&
+      !target.hasPointerCapture(pointerId)
+    ) {
+      return
+    }
+    target.releasePointerCapture(pointerId)
+  } catch {
+    // already released / invalid state
+  }
 }
 
 export function startRecordingDrag(
@@ -64,6 +95,27 @@ export function restoreIdleDragBaseline(): void {
   idleRestBaseline = null
 }
 
+/**
+ * Abort an in-progress idle placement without a history entry.
+ * Releases capture, clears transient gesture state, and is the shared path
+ * for Escape, pointercancel, blur, actor deletion, and project replacement.
+ */
+export function cancelIdleDrag(): void {
+  if (isRecordingActive()) return
+  if (
+    activePointerId === null &&
+    !idleRestBaseline &&
+    !pointerCaptureTarget
+  ) {
+    return
+  }
+  restoreIdleDragBaseline()
+  // endDrag releases bound capture then clears activePointerId.
+  endDrag(false)
+  grabOffset = { x: 0, y: 0 }
+  useEditorStore.getState().setSnapIndicator(null)
+}
+
 export function pushRecordingSample(
   absoluteTimestamp: number,
   center: Vec2,
@@ -78,6 +130,9 @@ export function pushRecordingSample(
 
 export function endDrag(keep: boolean): Recording | null {
   const current = session
+  const pointerId = activePointerId
+  // Drop capture before clearing the active id so release can match it.
+  releaseBoundPointerCapture(pointerId)
   session = null
   activePointerId = null
   const wasRecording = isRecordingDrag
@@ -113,6 +168,7 @@ export function isRecordingActive(): boolean {
 }
 
 export function resetController(): void {
+  pointerCaptureTarget = null
   session = null
   activePointerId = null
   isRecordingDrag = false

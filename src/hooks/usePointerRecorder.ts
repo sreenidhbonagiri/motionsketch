@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
@@ -12,13 +13,14 @@ import { resolveSnapTarget } from '../core/grid'
 import { findActor } from '../core/sceneActor'
 import type { Vec2 } from '../core/types'
 import {
+  bindPointerCaptureTarget,
+  cancelIdleDrag,
   commitIdleDragBaseline,
   endDrag,
   getActivePointerId,
   getGrabOffset,
   isRecordingActive,
   pushRecordingSample,
-  restoreIdleDragBaseline,
   setGrabOffset,
   startIdleDrag,
   startRecordingDrag,
@@ -45,6 +47,12 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
     useEditorStore.getState().setSnapIndicator(null)
   }, [])
 
+  /** Shared idle-placement cancel: capture release + baseline + transient chrome. */
+  const cancelIdlePlacement = useCallback(() => {
+    cancelIdleDrag()
+    previousSnapRef.current = null
+  }, [])
+
   const onActorPointerDown = useCallback(
     (actorId: string, event: ReactPointerEvent<HTMLElement>) => {
       if (mode === 'playing' || mode === 'editing') return
@@ -61,7 +69,16 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       if (!rect) return
 
       event.preventDefault()
-      event.currentTarget.setPointerCapture(event.pointerId)
+      const captureEl = event.currentTarget
+      try {
+        captureEl.setPointerCapture(event.pointerId)
+        bindPointerCaptureTarget(captureEl)
+      } catch {
+        // Synthetic / inactive pointer ids (tests, some touch engines) cannot
+        // take capture — still bind the element so cancel cleanup is a no-op
+        // release, and continue the gesture via bubbling move/up.
+        bindPointerCaptureTarget(captureEl)
+      }
 
       const pointer = clientToNormalized(event.clientX, event.clientY, rect)
       const position =
@@ -133,12 +150,6 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
     (event: ReactPointerEvent<HTMLElement>) => {
       if (getActivePointerId() !== event.pointerId) return
 
-      try {
-        event.currentTarget.releasePointerCapture(event.pointerId)
-      } catch {
-        // already released
-      }
-
       if (isRecordingActive()) {
         // Stamp the release time so a post-move hold still counts toward
         // minimum duration (WebKit often compresses move timeStamps).
@@ -152,9 +163,10 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
           useEditorStore.getState().selectedActorId,
         )
         if (actor && !actor.recording) {
-          useEditorStore.getState().setRestPosition(pos)
+          useEditorStore.getState().commitActorPlacement(pos)
         }
         commitIdleDragBaseline()
+        // Releases bound capture; later orphaned ups cannot match active id.
         endDrag(false)
       }
       clearSnapChrome()
@@ -170,16 +182,38 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
         const pos = useEditorStore.getState().livePosition
         pushRecordingSample(event.timeStamp, pos)
         endDrag(true)
+        clearSnapChrome()
       } else {
-        // Cancel restores the pre-drag rest pose; do not commit.
-        restoreIdleDragBaseline()
-        endDrag(false)
+        // Same cleanup as Escape / blur / project teardown.
+        cancelIdlePlacement()
         if (mode === 'recording') useEditorStore.getState().setIdle()
       }
-      clearSnapChrome()
     },
-    [mode, clearSnapChrome],
+    [mode, clearSnapChrome, cancelIdlePlacement],
   )
+
+  // Escape / blur: same cancel path as pointercancel (capture + baseline).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (isRecordingActive()) return
+      if (getActivePointerId() === null) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      cancelIdlePlacement()
+    }
+    const onBlur = () => {
+      cancelIdlePlacement()
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('blur', onBlur)
+      // Unmount mid-gesture: drop capture without committing.
+      cancelIdlePlacement()
+    }
+  }, [cancelIdlePlacement])
 
   return {
     pointerId,

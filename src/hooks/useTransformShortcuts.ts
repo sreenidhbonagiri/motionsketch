@@ -20,9 +20,10 @@ export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Keyboard undo/redo for clip/transform edits, plus transform keyframe delete.
- * Never intercepts typing or native editing in form fields / contenteditable.
- * Delete/Backspace only runs when a transform keyframe is selected.
+ * Keyboard undo/redo for placement/clip/transform edits, plus transform
+ * keyframe delete. Never intercepts typing or native editing in form fields /
+ * contenteditable. Delete/Backspace only runs when a transform keyframe is
+ * selected.
  */
 export function useTransformShortcuts() {
   const mode = useEditorStore((s) => s.mode)

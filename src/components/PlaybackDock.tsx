@@ -556,7 +556,7 @@ export function PlaybackDock() {
               onClick={() => undoActorEdit()}
               disabled={isRecordingLike || actorEditOrder.length === 0}
               className={btnQuiet}
-              title="Undo transform or sequence timing for the selected actor"
+              title="Undo placement, transform, or sequence timing for the selected actor"
             >
               Undo
             </button>
@@ -566,7 +566,7 @@ export function PlaybackDock() {
               onClick={() => redoActorEdit()}
               disabled={isRecordingLike || actorEditRedoOrder.length === 0}
               className={btnQuiet}
-              title="Redo transform or sequence timing for the selected actor"
+              title="Redo placement, transform, or sequence timing for the selected actor"
             >
               Redo
             </button>

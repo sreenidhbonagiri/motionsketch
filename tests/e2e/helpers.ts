@@ -78,6 +78,96 @@ export async function dispatchActivePointerCancel(
   }, selector)
 }
 
+/** True when the actor (or stage) still holds pointer capture for common ids. */
+export async function actorHasPointerCapture(
+  page: Page,
+  selector = '[data-testid="actor"]',
+): Promise<boolean> {
+  return page.evaluate((sel) => {
+    const els = [
+      document.querySelector(sel),
+      document.querySelector('[data-testid="stage"]'),
+    ].filter(Boolean) as Element[]
+    for (const el of els) {
+      if (typeof el.hasPointerCapture !== 'function') continue
+      for (const id of [0, 1, 2]) {
+        try {
+          if (el.hasPointerCapture(id)) return true
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return false
+  }, selector)
+}
+
+/**
+ * Touch-capable placement gesture.
+ * Chromium: real CDP touch (pointerType "touch"). WebKit/Firefox: trusted
+ * pointer drag inside a hasTouch context (Playwright cannot CDP-touch-drag
+ * there); cancel uses the same pointercancel path as production.
+ */
+export async function touchPointerGesture(
+  page: Page,
+  options: {
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+    /** 'up' commits; 'cancel' aborts without history. */
+    end?: 'up' | 'cancel'
+    browserName?: string
+  },
+) {
+  const end = options.end ?? 'up'
+  const browserName =
+    options.browserName ??
+    page.context().browser()?.browserType().name() ??
+    'chromium'
+
+  if (browserName === 'chromium') {
+    const client = await page.context().newCDPSession(page)
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: options.from.x, y: options.from.y }],
+    })
+    // Intermediate points help snap hysteresis engage like a finger drag.
+    const mid = {
+      x: (options.from.x + options.to.x) / 2,
+      y: (options.from.y + options.to.y) / 2,
+    }
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: mid.x, y: mid.y }],
+    })
+    await client.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: options.to.x, y: options.to.y }],
+    })
+    if (end === 'cancel') {
+      await client.send('Input.dispatchTouchEvent', {
+        type: 'touchCancel',
+        touchPoints: [],
+      })
+    } else {
+      await client.send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: [],
+      })
+    }
+    return
+  }
+
+  await page.mouse.move(options.from.x, options.from.y)
+  await page.mouse.down()
+  await page.mouse.move(options.to.x, options.to.y, { steps: 12 })
+  if (end === 'cancel') {
+    await dispatchActivePointerCancel(page)
+    await page.mouse.up().catch(() => undefined)
+  } else {
+    await page.mouse.up()
+  }
+}
+
 /**
  * Accept or dismiss a MotionSketch confirmation dialog by its root test id.
  * Call after the action that opens the dialog (not before).

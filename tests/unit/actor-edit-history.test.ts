@@ -29,12 +29,14 @@ function seed() {
     transformRedoStack: [],
     clipUndoStack: [],
     clipRedoStack: [],
+    placementUndoStack: [],
+    placementRedoStack: [],
     actorEditOrder: [],
     actorEditRedoOrder: [],
   })
 }
 
-describe('unified clip/transform undo', () => {
+describe('unified placement/clip/transform undo', () => {
   beforeEach(seed)
 
   it('undoes interleaved transform → clip → transform in chronological order', () => {
@@ -107,6 +109,7 @@ describe('unified clip/transform undo', () => {
     expect(useEditorStore.getState().actorEditRedoOrder).toEqual([])
     expect(useEditorStore.getState().transformRedoStack).toEqual([])
     expect(useEditorStore.getState().clipRedoStack).toEqual([])
+    expect(useEditorStore.getState().placementRedoStack).toEqual([])
   })
 
   it('clears actor-edit history when switching actors', () => {
@@ -117,5 +120,67 @@ describe('unified clip/transform undo', () => {
     expect(useEditorStore.getState().actorEditOrder).toEqual([])
     expect(useEditorStore.getState().transformUndoStack).toEqual([])
     expect(useEditorStore.getState().clipUndoStack).toEqual([])
+    expect(useEditorStore.getState().placementUndoStack).toEqual([])
+  })
+
+  it('interleaves unrecorded placement with clip edits chronologically', () => {
+    const project = makeProject({
+      actors: [
+        makeActor({
+          id: 'loose',
+          recording: null,
+          restPosition: { x: 0.25, y: 0.25 },
+          clip: { start: 0, end: 1 },
+        }),
+      ],
+    })
+    useEditorStore.setState({
+      project,
+      selectedActorId: 'loose',
+      mode: 'idle',
+      livePosition: { x: 0.25, y: 0.25 },
+      placementUndoStack: [],
+      placementRedoStack: [],
+      clipUndoStack: [],
+      clipRedoStack: [],
+      actorEditOrder: [],
+      actorEditRedoOrder: [],
+    })
+
+    useEditorStore.getState().commitActorPlacement({ x: 0.4, y: 0.5 })
+    useEditorStore.getState().commitActorClip('loose', { start: 0.1, end: 0.9 })
+    useEditorStore.getState().commitActorPlacement({ x: 0.6, y: 0.3 })
+
+    expect(useEditorStore.getState().actorEditOrder).toEqual([
+      'placement',
+      'clip',
+      'placement',
+    ])
+
+    useEditorStore.getState().undoActorEdit()
+    expect(useEditorStore.getState().project.actors[0].restPosition).toEqual({
+      x: 0.4,
+      y: 0.5,
+    })
+    expect(useEditorStore.getState().livePosition).toEqual({ x: 0.4, y: 0.5 })
+    expect(useEditorStore.getState().project.actors[0].clip.start).toBeCloseTo(
+      0.1,
+      5,
+    )
+
+    useEditorStore.getState().undoActorEdit()
+    expect(useEditorStore.getState().project.actors[0].clip).toEqual({
+      start: 0,
+      end: 1,
+      hideBeforeStart: false,
+      hideAfterEnd: false,
+    })
+
+    useEditorStore.getState().undoActorEdit()
+    expect(useEditorStore.getState().project.actors[0].restPosition).toEqual({
+      x: 0.25,
+      y: 0.25,
+    })
+    expect(useEditorStore.getState().livePosition).toEqual({ x: 0.25, y: 0.25 })
   })
 })

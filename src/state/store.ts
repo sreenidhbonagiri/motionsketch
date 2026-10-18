@@ -76,6 +76,7 @@ import {
   type TransformTrack,
   type Vec2,
 } from '../core/types'
+import { cancelIdleDrag } from '../lib/recordingController'
 import {
   bakeEditablePathForActor,
   selectActorPositionForActor,
@@ -105,8 +106,21 @@ export const DEFAULT_POLISH_STRENGTH = 0.55
 
 const MAX_UNDO = 40
 
-/** Chronological actor-edit kinds for unified clip/transform undo. */
-export type ActorEditKind = 'transform' | 'clip'
+/** Chronological actor-edit kinds for unified placement/clip/transform undo. */
+export type ActorEditKind = 'transform' | 'clip' | 'placement'
+
+const PLACEMENT_NOOP_EPS = 1e-9
+
+function cloneRestPosition(position: Vec2): Vec2 {
+  return { x: position.x, y: position.y }
+}
+
+function restPositionsEqual(a: Vec2, b: Vec2): boolean {
+  return (
+    Math.abs(a.x - b.x) < PLACEMENT_NOOP_EPS &&
+    Math.abs(a.y - b.y) < PLACEMENT_NOOP_EPS
+  )
+}
 
 interface EditorStore {
   project: Project
@@ -165,9 +179,13 @@ interface EditorStore {
   clipUndoStack: ActorClip[]
   clipRedoStack: ActorClip[]
 
+  /** Selection-scoped unrecorded placement history (one drag → one entry). */
+  placementUndoStack: Vec2[]
+  placementRedoStack: Vec2[]
+
   /**
-   * Chronological order of completed clip/transform edits for the selected actor.
-   * Dock + keyboard undo/redo pop the most recent kind first.
+   * Chronological order of completed placement/clip/transform edits for the
+   * selected actor. Dock + keyboard undo/redo pop the most recent kind first.
    */
   actorEditOrder: ActorEditKind[]
   actorEditRedoOrder: ActorEditKind[]
@@ -183,8 +201,18 @@ interface EditorStore {
   setIdle: () => void
 
   setLivePosition: (position: Vec2) => void
-  /** Persist rest position for the selected actor (idle drag, no recording). */
+  /**
+   * Silently set rest + live (no history). Prefer
+   * {@link commitActorPlacement} for user placement drags.
+   */
   setRestPosition: (position: Vec2) => void
+  /**
+   * Commit unrecorded actor placement as one undo entry (no-op if unchanged
+   * or the actor already has a recording).
+   */
+  commitActorPlacement: (position: Vec2) => void
+  undoPlacement: () => void
+  redoPlacement: () => void
   clearLiveTrail: () => void
 
   play: () => void
@@ -246,7 +274,7 @@ interface EditorStore {
   finishClipGesture: (id: string, clip: ActorClip) => void
   undoClip: () => void
   redoClip: () => void
-  /** Undo the most recent clip or transform edit for the selected actor. */
+  /** Undo the most recent placement, clip, or transform edit for the selected actor. */
   undoActorEdit: () => void
   redoActorEdit: () => void
 
@@ -410,10 +438,31 @@ function clearClipEditState() {
   }
 }
 
+function clearPlacementEditState() {
+  return {
+    placementUndoStack: [] as Vec2[],
+    placementRedoStack: [] as Vec2[],
+  }
+}
+
 function clearActorEditOrder() {
   return {
     actorEditOrder: [] as ActorEditKind[],
     actorEditRedoOrder: [] as ActorEditKind[],
+  }
+}
+
+/** Drop placement entries once a take starts or the actor becomes recorded. */
+function clearPlacementHistory(state: {
+  actorEditOrder: ActorEditKind[]
+  actorEditRedoOrder: ActorEditKind[]
+}) {
+  return {
+    ...clearPlacementEditState(),
+    actorEditOrder: state.actorEditOrder.filter((k) => k !== 'placement'),
+    actorEditRedoOrder: state.actorEditRedoOrder.filter(
+      (k) => k !== 'placement',
+    ),
   }
 }
 
@@ -423,6 +472,7 @@ function clearHistoryForActorSwitch() {
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
+    ...clearPlacementEditState(),
     ...clearActorEditOrder(),
   }
 }
@@ -482,8 +532,9 @@ function pushTransformHistory(
     selectedTransformId: selectedId,
     transformUndoStack: [...state.transformUndoStack, prev].slice(-MAX_UNDO),
     transformRedoStack: [],
-    // New transform action clears all actor-edit redo (clip + transform).
+    // New transform action clears all actor-edit redo.
     clipRedoStack: [],
+    placementRedoStack: [],
     actorEditOrder: pushEditOrder(state.actorEditOrder, 'transform'),
     actorEditRedoOrder: [],
   }
@@ -517,6 +568,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
+    ...clearPlacementEditState(),
     ...clearActorEditOrder(),
 
     armRecording: () => {
@@ -549,6 +601,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         actionAnnouncement: 'Recording',
         ...clearEditState(),
         ...clearTransformEditState(),
+        ...clearPlacementHistory(state),
         // New take on the selected actor clears its transform + path edits.
         project: withSelectedActor(
           state.project,
@@ -592,6 +645,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           playbackHead: 0,
           ...clearEditState(),
           ...clearTransformEditState(),
+          ...clearPlacementHistory(state),
           project: nextProject,
           livePosition: recording
             ? {
@@ -609,7 +663,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     setRestPosition: (position) =>
       set((state) => ({
-        livePosition: position,
+        livePosition: {
+          x: clamp(position.x, 0, 1),
+          y: clamp(position.y, 0, 1),
+        },
         project: withSelectedActor(
           state.project,
           state.selectedActorId,
@@ -622,6 +679,117 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           }),
         ),
       })),
+
+    commitActorPlacement: (position) => {
+      const state = get()
+      const actor = getSelected(state)
+      if (actor.recording) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing' ||
+        state.mode === 'playing'
+      ) {
+        return
+      }
+      const next = {
+        x: clamp(position.x, 0, 1),
+        y: clamp(position.y, 0, 1),
+      }
+      const prev = cloneRestPosition(actor.restPosition)
+      if (restPositionsEqual(prev, next)) {
+        // Keep live/rest aligned without a history entry.
+        set({ livePosition: next })
+        return
+      }
+      set({
+        livePosition: next,
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, restPosition: next }),
+        ),
+        placementUndoStack: [...state.placementUndoStack, prev].slice(
+          -MAX_UNDO,
+        ),
+        placementRedoStack: [],
+        clipRedoStack: [],
+        transformRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'placement'),
+        actorEditRedoOrder: [],
+      })
+    },
+
+    undoPlacement: () => {
+      const state = get()
+      if (state.placementUndoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing' ||
+        state.mode === 'playing'
+      ) {
+        return
+      }
+      const actor = getSelected(state)
+      if (actor.recording) return
+      const previous =
+        state.placementUndoStack[state.placementUndoStack.length - 1]!
+      const current = cloneRestPosition(actor.restPosition)
+      const restored = cloneRestPosition(previous)
+      set({
+        livePosition: restored,
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, restPosition: restored }),
+        ),
+        placementUndoStack: state.placementUndoStack.slice(0, -1),
+        placementRedoStack: [...state.placementRedoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'placement'),
+        actorEditRedoOrder: pushEditOrder(
+          state.actorEditRedoOrder,
+          'placement',
+        ),
+      })
+    },
+
+    redoPlacement: () => {
+      const state = get()
+      if (state.placementRedoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing' ||
+        state.mode === 'playing'
+      ) {
+        return
+      }
+      const actor = getSelected(state)
+      if (actor.recording) return
+      const next = state.placementRedoStack[state.placementRedoStack.length - 1]!
+      const current = cloneRestPosition(actor.restPosition)
+      const restored = cloneRestPosition(next)
+      set({
+        livePosition: restored,
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, restPosition: restored }),
+        ),
+        placementRedoStack: state.placementRedoStack.slice(0, -1),
+        placementUndoStack: [...state.placementUndoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        actorEditRedoOrder: popKindFromOrder(
+          state.actorEditRedoOrder,
+          'placement',
+        ),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'placement'),
+      })
+    },
 
     clearLiveTrail: () => set({ liveTrail: [] }),
 
@@ -928,6 +1096,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           livePosition: { ...actor.restPosition },
           ...clearEditState(),
           ...clearTransformEditState(),
+          ...clearPlacementHistory(state),
           project: withSelectedActor(
             state.project,
             state.selectedActorId,
@@ -943,6 +1112,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     createNamedProject: (name) => {
       if (!isValidProjectName(name)) return false
+      cancelIdleDrag()
       const project = createEmptyPersistableProject(
         captureViewportStageAspect(),
         sanitizeProjectName(name),
@@ -986,6 +1156,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     },
 
     applyPersistedSnapshot: (snapshot) => {
+      cancelIdleDrag()
       const project: Project = {
         version: 1,
         name:
@@ -1033,6 +1204,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       ) {
         return
       }
+      cancelIdleDrag()
       const actor = findActor(state.project.actors, id)!
       const livePosition = selectActorPositionForActor(
         state.project,
@@ -1149,6 +1321,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       ) {
         return false
       }
+      cancelIdleDrag()
       const id = state.selectedActorId
       const index = state.project.actors.findIndex((a) => a.id === id)
       const actors = state.project.actors.filter((a) => a.id !== id)
@@ -1213,6 +1386,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         clipUndoStack: [...state.clipUndoStack, prev].slice(-MAX_UNDO),
         clipRedoStack: [],
         transformRedoStack: [],
+        placementRedoStack: [],
         actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
         actorEditRedoOrder: [],
       })
@@ -1278,6 +1452,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         clipUndoStack: [...state.clipUndoStack, baseline].slice(-MAX_UNDO),
         clipRedoStack: [],
         transformRedoStack: [],
+        placementRedoStack: [],
         actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
         actorEditRedoOrder: [],
       })
@@ -1351,6 +1526,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'clip') {
         get().undoClip()
+        return
+      }
+      if (kind === 'placement') {
+        get().undoPlacement()
       }
     },
 
@@ -1370,6 +1549,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'clip') {
         get().redoClip()
+        return
+      }
+      if (kind === 'placement') {
+        get().redoPlacement()
       }
     },
 

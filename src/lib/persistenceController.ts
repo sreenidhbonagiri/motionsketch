@@ -15,6 +15,7 @@ import { createEmptyPersistableProject } from '../core/persist/document'
 import type { Project } from '../core/types'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import { downloadTextFile, stampFilename, stampProjectFilename } from './download'
+import { cancelIdleDrag } from './recordingController'
 import { useEditorStore } from '../state/store'
 
 export type PersistenceStatus =
@@ -134,6 +135,7 @@ export function getAppPersistenceController(): PersistenceController {
 }
 
 function enterFreshUntitledCanvas() {
+  cancelIdleDrag()
   const fresh = createEmptyPersistableProject(captureViewportStageAspect())
   useEditorStore.setState({
     project: fresh,
