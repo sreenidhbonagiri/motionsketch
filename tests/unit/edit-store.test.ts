@@ -1,9 +1,29 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { applyHandleDelta } from '../../src/core/edit'
+import {
+  applyHandleDelta,
+  makeGeometryEdit,
+  selectHandleIndices,
+} from '../../src/core/edit'
 import { findActor } from '../../src/core/sceneActor'
 import { selectProcessedPath } from '../../src/state/selectors'
 import { useEditorStore } from '../../src/state/store'
 import { makeActor, makeProject, makeRecording } from './helpers/project'
+import type { MotionSample } from '../../src/core/types'
+
+function noisyBendSamples(n = 41): MotionSample[] {
+  const mid = Math.floor(n / 2)
+  return Array.from({ length: n }, (_, i) => {
+    const t = i * 25
+    if (i <= mid) {
+      const u = i / mid
+      const jag = i > 2 && i < mid - 1 ? ((i % 2) * 2 - 1) * 0.035 : 0
+      return { t, x: 0.15 + 0.35 * u, y: 0.2 + 0.3 * u + jag }
+    }
+    const u = (i - mid) / (n - 1 - mid)
+    const jag = i > mid + 1 && i < n - 2 ? ((i % 2) * 2 - 1) * 0.035 : 0
+    return { t, x: 0.5 + 0.35 * u + jag, y: 0.5 - 0.25 * u }
+  })
+}
 
 function selectedActor() {
   const state = useEditorStore.getState()
@@ -198,5 +218,70 @@ describe('edit store', () => {
     expect(useEditorStore.getState().actionAnnouncement).toMatch(
       /can’t be removed/i,
     )
+  })
+
+  it('smooth bend commits one undo entry; no-op does not grow history', () => {
+    useEditorStore.getState().enterEditMode()
+    const samples = noisyBendSamples()
+    const handles = selectHandleIndices(samples.length, 9)
+    const mid = handles[Math.floor(handles.length / 2)]!
+    const ge = makeGeometryEdit(samples, 0.3, handles)
+    useEditorStore.setState({
+      editSession: ge,
+      geometryEdit: ge,
+      selectedHandleIndex: mid,
+      undoStack: [],
+      redoStack: [],
+      project: {
+        ...useEditorStore.getState().project,
+        actors: useEditorStore.getState().project.actors.map((a, i) =>
+          i === 0 ? { ...a, geometryEdit: ge } : a,
+        ),
+      },
+    })
+
+    const apex = {
+      x: useEditorStore.getState().editSession!.samples[mid]!.x,
+      y: useEditorStore.getState().editSession!.samples[mid]!.y,
+    }
+    expect(useEditorStore.getState().smoothSelectedBend()).toBe(true)
+    expect(useEditorStore.getState().undoStack).toHaveLength(1)
+    expect(useEditorStore.getState().editSession!.samples[mid]!.x).toBeCloseTo(
+      apex.x,
+      6,
+    )
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(/Smoothed/)
+
+    // Second smooth may still change or become no-op; force no-op via endpoint.
+    useEditorStore.getState().setSelectedHandleIndex(0)
+    const stackLen = useEditorStore.getState().undoStack.length
+    expect(useEditorStore.getState().smoothSelectedBend()).toBe(false)
+    expect(useEditorStore.getState().undoStack).toHaveLength(stackLen)
+
+    useEditorStore.getState().setSelectedHandleIndex(mid)
+    useEditorStore.getState().undoEdit()
+    expect(useEditorStore.getState().editSession!.samples).toEqual(samples)
+  })
+
+  it('make corner rejects straight geometry without undo noise', () => {
+    useEditorStore.getState().enterEditMode()
+    const straight: MotionSample[] = Array.from({ length: 41 }, (_, i) => ({
+      t: i * 25,
+      x: 0.1 + (0.8 * i) / 40,
+      y: 0.5,
+    }))
+    const handles = selectHandleIndices(straight.length, 9)
+    const mid = handles[Math.floor(handles.length / 2)]!
+    const ge = makeGeometryEdit(straight, 0.3, handles)
+    useEditorStore.setState({
+      editSession: ge,
+      geometryEdit: ge,
+      selectedHandleIndex: mid,
+      undoStack: [],
+      redoStack: [],
+    })
+    expect(useEditorStore.getState().makeSelectedCorner()).toBe(false)
+    expect(useEditorStore.getState().undoStack).toHaveLength(0)
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(/straight/i)
   })
 })

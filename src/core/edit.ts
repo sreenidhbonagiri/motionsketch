@@ -550,3 +550,656 @@ export function isEndpointHandle(
 ): boolean {
   return sampleIndex === 0 || sampleIndex === sampleCount - 1
 }
+
+/** Max aspect-aware displacement to treat two paths as identical (no-op). */
+export const LOCAL_BEND_NOOP_EPS = 1e-6
+
+/**
+ * Turning / bulge thresholds (aspect-aware units and radians).
+ * Below these, Smooth bend / Make corner report no meaningful effect.
+ */
+const LOCAL_BEND_STRAIGHT_ANGLE = 0.12 // ~7°
+const LOCAL_BEND_MIN_BULGE = 0.004
+const LOCAL_SMOOTH_MIN_ROUGHNESS = 0.0025
+const LOCAL_SMOOTH_ITERATIONS = 3
+const LOCAL_SMOOTH_BLEND = 0.55
+const LOCAL_CORNER_BLEND = 0.85
+
+export type LocalBendFailReason =
+  | 'endpoint'
+  | 'missing'
+  | 'no-selection'
+  | 'zero-neighborhood'
+  | 'no-effect'
+  | 'straight'
+
+export type LocalBendResult =
+  | { ok: true; samples: MotionSample[] }
+  | { ok: false; reason: LocalBendFailReason }
+
+export type LocalBendAvailability = {
+  enabled: boolean
+  reason: LocalBendFailReason | null
+  /** Short accessible explanation when disabled. */
+  message: string | null
+}
+
+export type LocalBendNeighborhood = {
+  /** Inclusive left boundary (previous handle or start). */
+  lo: number
+  /** Inclusive right boundary (next handle or end). */
+  hi: number
+  handleIndex: number
+  arcs: number[]
+  stageAspect: number
+}
+
+function failMessage(reason: LocalBendFailReason): string {
+  switch (reason) {
+    case 'endpoint':
+      return 'Select an interior point — start and end stay anchored.'
+    case 'missing':
+    case 'no-selection':
+      return 'Select an interior handle first.'
+    case 'zero-neighborhood':
+      return 'Not enough room between neighboring handles.'
+    case 'straight':
+      return 'Path is already straight here — nothing to sharpen.'
+    case 'no-effect':
+      return 'No meaningful change at this point.'
+    default:
+      return 'Action unavailable.'
+  }
+}
+
+/**
+ * Hard neighborhood for local bend edits: between the previous and next
+ * handle along the path (endpoints count as boundaries). Samples at those
+ * boundaries are never moved.
+ */
+export function localBendNeighborhood(
+  samples: MotionSample[],
+  handleIndices: number[],
+  handleIndex: number,
+  stageAspect = 1,
+): LocalBendNeighborhood | null {
+  if (
+    samples.length < 3 ||
+    handleIndex <= 0 ||
+    handleIndex >= samples.length - 1
+  ) {
+    return null
+  }
+  const handles = normalizeHandleIndices(samples.length, handleIndices)
+  if (!handles.includes(handleIndex)) return null
+  const at = handles.indexOf(handleIndex)
+  const lo = handles[at - 1] ?? 0
+  const hi = handles[at + 1] ?? samples.length - 1
+  if (hi - lo < 2) return null
+  return {
+    lo,
+    hi,
+    handleIndex,
+    arcs: cumulativeArcLengths(samples, stageAspect),
+    stageAspect: clampStageAspect(stageAspect),
+  }
+}
+
+function stationaryRunBounds(
+  samples: MotionSample[],
+  index: number,
+  stageAspect: number,
+): { lo: number; hi: number } {
+  const aspect = clampStageAspect(stageAspect)
+  const origin = samples[index]!
+  let lo = index
+  let hi = index
+  while (
+    lo > 0 &&
+    aspectDistance(
+      samples[lo - 1]!.x,
+      samples[lo - 1]!.y,
+      origin.x,
+      origin.y,
+      aspect,
+    ) <= STATIONARY_EPS
+  ) {
+    lo -= 1
+  }
+  while (
+    hi < samples.length - 1 &&
+    aspectDistance(
+      samples[hi + 1]!.x,
+      samples[hi + 1]!.y,
+      origin.x,
+      origin.y,
+      aspect,
+    ) <= STATIONARY_EPS
+  ) {
+    hi += 1
+  }
+  return { lo, hi }
+}
+
+/**
+ * Samples that must not move: neighborhood boundaries, every handle, and
+ * intentional pauses that do not contain the active handle.
+ */
+function protectedSampleMask(
+  samples: MotionSample[],
+  neighborhood: LocalBendNeighborhood,
+  handleIndices: number[],
+): boolean[] {
+  const n = samples.length
+  const protectedMask = new Array<boolean>(n).fill(false)
+  const handles = normalizeHandleIndices(n, handleIndices)
+  for (const h of handles) protectedMask[h] = true
+  protectedMask[neighborhood.lo] = true
+  protectedMask[neighborhood.hi] = true
+  protectedMask[0] = true
+  protectedMask[n - 1] = true
+
+  const activeRun = stationaryRunBounds(
+    samples,
+    neighborhood.handleIndex,
+    neighborhood.stageAspect,
+  )
+  for (let i = neighborhood.lo; i <= neighborhood.hi; i++) {
+    if (protectedMask[i]) continue
+    const run = stationaryRunBounds(samples, i, neighborhood.stageAspect)
+    if (run.hi > run.lo) {
+      // Pause blob that is not the active handle’s run stays put.
+      if (run.hi < activeRun.lo || run.lo > activeRun.hi) {
+        for (let j = run.lo; j <= run.hi; j++) protectedMask[j] = true
+      }
+    }
+  }
+  return protectedMask
+}
+
+function neighborhoodWindowWeight(
+  arcs: number[],
+  index: number,
+  handleIndex: number,
+  lo: number,
+  hi: number,
+): number {
+  const sH = arcs[handleIndex]!
+  const sI = arcs[index]!
+  if (index === handleIndex) return 0
+  if (index <= lo || index >= hi) return 0
+  const sideMax =
+    index < handleIndex
+      ? Math.abs(sH - arcs[lo]!)
+      : Math.abs(arcs[hi]! - sH)
+  if (sideMax <= 1e-9) {
+    // Zero-length side: fall back to index span.
+    const span =
+      index < handleIndex ? handleIndex - lo : hi - handleIndex
+    if (span <= 0) return 0
+    const u = Math.abs(index - handleIndex) / span
+    return 0.5 * (1 + Math.cos(Math.PI * u))
+  }
+  const u = Math.abs(sI - sH) / sideMax
+  if (u >= 1) return 0
+  return 0.5 * (1 + Math.cos(Math.PI * u))
+}
+
+function pathMaxDelta(
+  a: MotionSample[],
+  b: MotionSample[],
+  stageAspect: number,
+): number {
+  const n = Math.min(a.length, b.length)
+  let max = 0
+  for (let i = 0; i < n; i++) {
+    const d = aspectDistance(a[i]!.x, a[i]!.y, b[i]!.x, b[i]!.y, stageAspect)
+    if (d > max) max = d
+  }
+  return max
+}
+
+function pointLineBulge(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  stageAspect: number,
+): number {
+  const aspect = clampStageAspect(stageAspect)
+  const abx = (bx - ax) * aspect
+  const aby = by - ay
+  const apx = (px - ax) * aspect
+  const apy = py - ay
+  const abLen2 = abx * abx + aby * aby
+  if (abLen2 <= 1e-12) {
+    return aspectDistance(px, py, ax, ay, aspect)
+  }
+  let t = (apx * abx + apy * aby) / abLen2
+  t = clamp01(t)
+  const qx = ax + (bx - ax) * t
+  const qy = ay + (by - ay) * t
+  return aspectDistance(px, py, qx, qy, aspect)
+}
+
+function turningAngleAt(
+  samples: MotionSample[],
+  index: number,
+  stageAspect: number,
+): number {
+  if (index <= 0 || index >= samples.length - 1) return 0
+  const aspect = clampStageAspect(stageAspect)
+  const a = samples[index - 1]!
+  const b = samples[index]!
+  const c = samples[index + 1]!
+  const inX = (b.x - a.x) * aspect
+  const inY = b.y - a.y
+  const outX = (c.x - b.x) * aspect
+  const outY = c.y - b.y
+  const inLen = Math.hypot(inX, inY)
+  const outLen = Math.hypot(outX, outY)
+  if (inLen < 1e-9 || outLen < 1e-9) return 0
+  const dot = (inX * outX + inY * outY) / (inLen * outLen)
+  return Math.acos(Math.min(1, Math.max(-1, dot)))
+}
+
+function maxNeighborhoodBulge(
+  samples: MotionSample[],
+  neighborhood: LocalBendNeighborhood,
+): number {
+  const { lo, hi, handleIndex, stageAspect } = neighborhood
+  const apex = samples[handleIndex]!
+  const left = samples[lo]!
+  const right = samples[hi]!
+  let max = 0
+  for (let i = lo + 1; i < handleIndex; i++) {
+    const s = samples[i]!
+    const bulge = pointLineBulge(
+      s.x,
+      s.y,
+      left.x,
+      left.y,
+      apex.x,
+      apex.y,
+      stageAspect,
+    )
+    if (bulge > max) max = bulge
+  }
+  for (let i = handleIndex + 1; i < hi; i++) {
+    const s = samples[i]!
+    const bulge = pointLineBulge(
+      s.x,
+      s.y,
+      apex.x,
+      apex.y,
+      right.x,
+      right.y,
+      stageAspect,
+    )
+    if (bulge > max) max = bulge
+  }
+  return max
+}
+
+function neighborhoodRoughness(
+  samples: MotionSample[],
+  neighborhood: LocalBendNeighborhood,
+  protectedMask: boolean[],
+): number {
+  const { lo, hi, handleIndex, stageAspect } = neighborhood
+  let sum = 0
+  let count = 0
+  for (let i = lo + 1; i < hi; i++) {
+    if (i === handleIndex || protectedMask[i]) continue
+    const angle = turningAngleAt(samples, i, stageAspect)
+    // Deviation from straight (π would be reverse; 0 is straight ahead).
+    sum += angle
+    count += 1
+  }
+  // Also include apex turning — noisy bends often peak there.
+  sum += turningAngleAt(samples, handleIndex, stageAspect)
+  count += 1
+  return count === 0 ? 0 : sum / count
+}
+
+function projectToSegment(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): Vec2 {
+  const abx = bx - ax
+  const aby = by - ay
+  const abLen2 = abx * abx + aby * aby
+  if (abLen2 <= 1e-12) return { x: ax, y: ay }
+  const t = clamp01(((px - ax) * abx + (py - ay) * aby) / abLen2)
+  return { x: ax + abx * t, y: ay + aby * t }
+}
+
+function lerpSamplePos(
+  from: MotionSample,
+  toX: number,
+  toY: number,
+  t: number,
+): { x: number; y: number } {
+  return {
+    x: clamp01(from.x + (toX - from.x) * t),
+    y: clamp01(from.y + (toY - from.y) * t),
+  }
+}
+
+/**
+ * Availability for Smooth bend: needs an interior handle, room between
+ * neighbors, and enough local roughness to improve.
+ */
+export function smoothBendAvailability(
+  samples: MotionSample[],
+  handleIndices: number[],
+  handleIndex: number | null,
+  stageAspect = 1,
+): LocalBendAvailability {
+  if (handleIndex === null) {
+    return {
+      enabled: false,
+      reason: 'no-selection',
+      message: failMessage('no-selection'),
+    }
+  }
+  if (isEndpointHandle(samples.length, handleIndex)) {
+    return {
+      enabled: false,
+      reason: 'endpoint',
+      message: failMessage('endpoint'),
+    }
+  }
+  const nb = localBendNeighborhood(
+    samples,
+    handleIndices,
+    handleIndex,
+    stageAspect,
+  )
+  if (!nb) {
+    return {
+      enabled: false,
+      reason: 'zero-neighborhood',
+      message: failMessage('zero-neighborhood'),
+    }
+  }
+  const mask = protectedSampleMask(samples, nb, handleIndices)
+  const activeRun = stationaryRunBounds(samples, handleIndex, stageAspect)
+  for (let i = activeRun.lo; i <= activeRun.hi; i++) mask[i] = true
+  let movable = 0
+  for (let i = nb.lo + 1; i < nb.hi; i++) {
+    if (!mask[i]) movable += 1
+  }
+  if (movable === 0) {
+    return {
+      enabled: false,
+      reason: 'zero-neighborhood',
+      message: failMessage('zero-neighborhood'),
+    }
+  }
+  const roughness = neighborhoodRoughness(samples, nb, mask)
+  if (roughness < LOCAL_SMOOTH_MIN_ROUGHNESS) {
+    return {
+      enabled: false,
+      reason: 'no-effect',
+      message: 'Bend is already smooth here.',
+    }
+  }
+  return { enabled: true, reason: null, message: null }
+}
+
+/**
+ * Availability for Make corner: needs a real bend or rounded bulge — not a
+ * straight segment through the handle.
+ */
+export function makeCornerAvailability(
+  samples: MotionSample[],
+  handleIndices: number[],
+  handleIndex: number | null,
+  stageAspect = 1,
+): LocalBendAvailability {
+  if (handleIndex === null) {
+    return {
+      enabled: false,
+      reason: 'no-selection',
+      message: failMessage('no-selection'),
+    }
+  }
+  if (isEndpointHandle(samples.length, handleIndex)) {
+    return {
+      enabled: false,
+      reason: 'endpoint',
+      message: failMessage('endpoint'),
+    }
+  }
+  const nb = localBendNeighborhood(
+    samples,
+    handleIndices,
+    handleIndex,
+    stageAspect,
+  )
+  if (!nb) {
+    return {
+      enabled: false,
+      reason: 'zero-neighborhood',
+      message: failMessage('zero-neighborhood'),
+    }
+  }
+  const mask = protectedSampleMask(samples, nb, handleIndices)
+  const activeRun = stationaryRunBounds(samples, handleIndex, stageAspect)
+  for (let i = activeRun.lo; i <= activeRun.hi; i++) mask[i] = true
+  let movable = 0
+  for (let i = nb.lo + 1; i < nb.hi; i++) {
+    if (!mask[i]) movable += 1
+  }
+  if (movable === 0) {
+    return {
+      enabled: false,
+      reason: 'zero-neighborhood',
+      message: failMessage('zero-neighborhood'),
+    }
+  }
+  const turn = turningAngleAt(samples, handleIndex, stageAspect)
+  const bulge = maxNeighborhoodBulge(samples, nb)
+  const nearlyStraight =
+    turn < LOCAL_BEND_STRAIGHT_ANGLE && bulge < LOCAL_BEND_MIN_BULGE
+  if (nearlyStraight) {
+    return {
+      enabled: false,
+      reason: 'straight',
+      message: failMessage('straight'),
+    }
+  }
+  return { enabled: true, reason: null, message: null }
+}
+
+/**
+ * Smooth bend: constrained Laplacian on the local neighborhood.
+ * Preserves the selected handle position, neighboring handles, endpoints,
+ * timestamps, and protected stationary runs.
+ */
+export function smoothBendAtHandle(
+  samples: MotionSample[],
+  handleIndices: number[],
+  handleIndex: number,
+  stageAspect = 1,
+): LocalBendResult {
+  const availability = smoothBendAvailability(
+    samples,
+    handleIndices,
+    handleIndex,
+    stageAspect,
+  )
+  if (!availability.enabled) {
+    return {
+      ok: false,
+      reason: availability.reason ?? 'no-effect',
+    }
+  }
+  const nb = localBendNeighborhood(
+    samples,
+    handleIndices,
+    handleIndex,
+    stageAspect,
+  )!
+  const protectedMask = protectedSampleMask(samples, nb, handleIndices)
+  // Force-preserve the apex sample (and its pause run).
+  const activeRun = stationaryRunBounds(samples, handleIndex, stageAspect)
+  for (let i = activeRun.lo; i <= activeRun.hi; i++) {
+    protectedMask[i] = true
+  }
+
+  let current = copyPath(samples)
+  for (let iter = 0; iter < LOCAL_SMOOTH_ITERATIONS; iter++) {
+    const next = copyPath(current)
+    for (let i = nb.lo + 1; i < nb.hi; i++) {
+      if (protectedMask[i]) continue
+      const w = neighborhoodWindowWeight(
+        nb.arcs,
+        i,
+        handleIndex,
+        nb.lo,
+        nb.hi,
+      )
+      if (w <= 1e-6) continue
+      const prev = current[i - 1]!
+      const succ = current[i + 1]!
+      const targetX = (prev.x + succ.x) * 0.5
+      const targetY = (prev.y + succ.y) * 0.5
+      const blend = LOCAL_SMOOTH_BLEND * w
+      const pos = lerpSamplePos(current[i]!, targetX, targetY, blend)
+      next[i] = { t: current[i]!.t, x: pos.x, y: pos.y }
+    }
+    current = next
+  }
+
+  // Re-assert apex / pause run / boundaries exactly.
+  const apex = samples[handleIndex]!
+  for (let i = activeRun.lo; i <= activeRun.hi; i++) {
+    current[i] = { t: samples[i]!.t, x: apex.x, y: apex.y }
+  }
+  current[nb.lo] = { ...samples[nb.lo]! }
+  current[nb.hi] = { ...samples[nb.hi]! }
+  for (const h of normalizeHandleIndices(samples.length, handleIndices)) {
+    current[h] = { t: samples[h]!.t, x: samples[h]!.x, y: samples[h]!.y }
+  }
+
+  if (pathMaxDelta(samples, current, stageAspect) < LOCAL_BEND_NOOP_EPS) {
+    return { ok: false, reason: 'no-effect' }
+  }
+  return { ok: true, samples: current }
+}
+
+/**
+ * Make corner: pull each side of the neighborhood toward the chords through
+ * the selected handle so incoming/outgoing sections meet more sharply.
+ * Does not move the handle. No-ops on straight local geometry.
+ */
+export function makeCornerAtHandle(
+  samples: MotionSample[],
+  handleIndices: number[],
+  handleIndex: number,
+  stageAspect = 1,
+): LocalBendResult {
+  const availability = makeCornerAvailability(
+    samples,
+    handleIndices,
+    handleIndex,
+    stageAspect,
+  )
+  if (!availability.enabled) {
+    return {
+      ok: false,
+      reason: availability.reason ?? 'no-effect',
+    }
+  }
+  const nb = localBendNeighborhood(
+    samples,
+    handleIndices,
+    handleIndex,
+    stageAspect,
+  )!
+  const protectedMask = protectedSampleMask(samples, nb, handleIndices)
+  const activeRun = stationaryRunBounds(samples, handleIndex, stageAspect)
+  for (let i = activeRun.lo; i <= activeRun.hi; i++) {
+    protectedMask[i] = true
+  }
+
+  const next = copyPath(samples)
+  const apex = samples[handleIndex]!
+  const left = samples[nb.lo]!
+  const right = samples[nb.hi]!
+
+  for (let i = nb.lo + 1; i < handleIndex; i++) {
+    if (protectedMask[i]) continue
+    const w = neighborhoodWindowWeight(
+      nb.arcs,
+      i,
+      handleIndex,
+      nb.lo,
+      nb.hi,
+    )
+    if (w <= 1e-6) continue
+    const onChord = projectToSegment(
+      samples[i]!.x,
+      samples[i]!.y,
+      left.x,
+      left.y,
+      apex.x,
+      apex.y,
+    )
+    const pos = lerpSamplePos(
+      samples[i]!,
+      onChord.x,
+      onChord.y,
+      LOCAL_CORNER_BLEND * w,
+    )
+    next[i] = { t: samples[i]!.t, x: pos.x, y: pos.y }
+  }
+  for (let i = handleIndex + 1; i < nb.hi; i++) {
+    if (protectedMask[i]) continue
+    const w = neighborhoodWindowWeight(
+      nb.arcs,
+      i,
+      handleIndex,
+      nb.lo,
+      nb.hi,
+    )
+    if (w <= 1e-6) continue
+    const onChord = projectToSegment(
+      samples[i]!.x,
+      samples[i]!.y,
+      apex.x,
+      apex.y,
+      right.x,
+      right.y,
+    )
+    const pos = lerpSamplePos(
+      samples[i]!,
+      onChord.x,
+      onChord.y,
+      LOCAL_CORNER_BLEND * w,
+    )
+    next[i] = { t: samples[i]!.t, x: pos.x, y: pos.y }
+  }
+
+  for (let i = activeRun.lo; i <= activeRun.hi; i++) {
+    next[i] = { t: samples[i]!.t, x: apex.x, y: apex.y }
+  }
+  next[nb.lo] = { ...samples[nb.lo]! }
+  next[nb.hi] = { ...samples[nb.hi]! }
+  for (const h of normalizeHandleIndices(samples.length, handleIndices)) {
+    next[h] = { t: samples[h]!.t, x: samples[h]!.x, y: samples[h]!.y }
+  }
+
+  if (pathMaxDelta(samples, next, stageAspect) < LOCAL_BEND_NOOP_EPS) {
+    return { ok: false, reason: 'no-effect' }
+  }
+  return { ok: true, samples: next }
+}

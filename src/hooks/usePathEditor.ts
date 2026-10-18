@@ -52,6 +52,8 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   const removeSelectedPathHandle = useEditorStore(
     (s) => s.removeSelectedPathHandle,
   )
+  const smoothSelectedBend = useEditorStore((s) => s.smoothSelectedBend)
+  const makeSelectedCorner = useEditorStore((s) => s.makeSelectedCorner)
   const setPathAddMode = useEditorStore((s) => s.setPathAddMode)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
@@ -390,6 +392,17 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         return
       }
 
+      if (key === 's' || key === 'S') {
+        event.preventDefault()
+        smoothSelectedBend()
+        return
+      }
+      if (key === 'c' || key === 'C') {
+        event.preventDefault()
+        makeSelectedCorner()
+        return
+      }
+
       const selected = useEditorStore.getState().selectedHandleIndex
       if (selected === null) return
 
@@ -425,6 +438,8 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     setPathAddCandidateIndex,
     addPathHandleAt,
     removeSelectedPathHandle,
+    smoothSelectedBend,
+    makeSelectedCorner,
     announceAction,
     setSelectedHandleIndex,
   ])

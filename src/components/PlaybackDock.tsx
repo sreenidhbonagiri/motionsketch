@@ -1,5 +1,10 @@
 import { localToProject } from '../core/clip'
-import { isEndpointHandle, MAX_PATH_HANDLES } from '../core/edit'
+import {
+  isEndpointHandle,
+  makeCornerAvailability,
+  MAX_PATH_HANDLES,
+  smoothBendAvailability,
+} from '../core/edit'
 import { traversalElapsedMs } from '../core/playback'
 import { useConfirm } from '../hooks/useConfirm'
 import { stopFromUi } from '../lib/recordingController'
@@ -63,6 +68,9 @@ export function PlaybackDock() {
   const editSession = useEditorStore((s) => s.editSession)
   const addPathHandleAt = useEditorStore((s) => s.addPathHandleAt)
   const pathAddCandidateIndex = useEditorStore((s) => s.pathAddCandidateIndex)
+  const smoothSelectedBend = useEditorStore((s) => s.smoothSelectedBend)
+  const makeSelectedCorner = useEditorStore((s) => s.makeSelectedCorner)
+  const stageAspect = useEditorStore((s) => s.project.stageAspect)
   const confirm = useConfirm()
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
@@ -74,6 +82,24 @@ export function PlaybackDock() {
     !isEndpointHandle(editSession.samples.length, selectedHandleIndex)
   const handleCount = editSession?.handleIndices.length ?? 0
   const canAddMoreHandles = handleCount < MAX_PATH_HANDLES
+  const smoothAvail =
+    editing && editSession
+      ? smoothBendAvailability(
+          editSession.samples,
+          editSession.handleIndices,
+          selectedHandleIndex,
+          stageAspect,
+        )
+      : { enabled: false, reason: null, message: 'Select an interior handle first.' }
+  const cornerAvail =
+    editing && editSession
+      ? makeCornerAvailability(
+          editSession.samples,
+          editSession.handleIndices,
+          selectedHandleIndex,
+          stageAspect,
+        )
+      : { enabled: false, reason: null, message: 'Select an interior handle first.' }
   const hasRecording = !!recording
   const playbackDisabled = !hasAnyRecording || isRecordingLike
   const editPathDisabled =
@@ -102,7 +128,7 @@ export function PlaybackDock() {
       dockStatus =
         'Add point: the ghost sits on the sample that will become the handle. Click near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
     } else {
-      dockStatus = `Drag to reshape · [ ] cycle points · arrows nudge · Delete removes an interior handle (shape stays) · Add point for local control. ${handleCount} of ${MAX_PATH_HANDLES} handles.`
+      dockStatus = `Drag to reshape · [ ] cycle · Smooth bend / Make corner on the selected point · Delete removes an interior handle · Add point for local control. ${handleCount} of ${MAX_PATH_HANDLES} handles.`
     }
   } else if (mode === 'armed') {
     dockStatus =
@@ -311,6 +337,36 @@ export function PlaybackDock() {
             </button>
             <button
               type="button"
+              data-testid="btn-smooth-bend"
+              onClick={() => smoothSelectedBend()}
+              disabled={!smoothAvail.enabled}
+              aria-describedby="path-smooth-help"
+              title={
+                smoothAvail.enabled
+                  ? 'Smooth the bend near the selected point (S)'
+                  : (smoothAvail.message ?? 'Smooth bend unavailable')
+              }
+              className={btnSecondary}
+            >
+              Smooth bend
+            </button>
+            <button
+              type="button"
+              data-testid="btn-make-corner"
+              onClick={() => makeSelectedCorner()}
+              disabled={!cornerAvail.enabled}
+              aria-describedby="path-corner-help"
+              title={
+                cornerAvail.enabled
+                  ? 'Sharpen the corner at the selected point (C)'
+                  : (cornerAvail.message ?? 'Make corner unavailable')
+              }
+              className={btnSecondary}
+            >
+              Make corner
+            </button>
+            <button
+              type="button"
               data-testid="btn-restore-path"
               onClick={restoreRecordedPath}
               className={btnQuiet}
@@ -488,6 +544,18 @@ export function PlaybackDock() {
             Remove the selected interior handle. The path geometry and timestamps
             stay the same; only the editing control is removed. Start and end
             points cannot be removed — they keep the path anchored.
+          </p>
+          <p id="path-smooth-help" className="sr-only">
+            Smooth bend eases abrupt direction changes near the selected
+            interior handle. The handle stays put; neighboring handles and
+            pauses outside the bend are protected. Keyboard shortcut S.
+            {smoothAvail.message ? ` ${smoothAvail.message}` : ''}
+          </p>
+          <p id="path-corner-help" className="sr-only">
+            Make corner pulls the path toward sharper incoming and outgoing
+            segments at the selected interior handle without moving that point.
+            Straight segments cannot be sharpened. Keyboard shortcut C.
+            {cornerAvail.message ? ` ${cornerAvail.message}` : ''}
           </p>
           <p
             data-testid="handle-selection-status"

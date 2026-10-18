@@ -10,9 +10,13 @@ import {
   copyGeometryEdit,
   copyPath,
   formatHandleSelectionAnnouncement,
+  makeCornerAtHandle,
+  makeCornerAvailability,
   makeGeometryEdit,
   MAX_PATH_HANDLES,
   removeHandleIndex,
+  smoothBendAtHandle,
+  smoothBendAvailability,
 } from '../core/edit'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
@@ -203,6 +207,10 @@ interface EditorStore {
   addPathHandleAt: (sampleIndex: number) => boolean
   /** Remove selected interior handle; geometry unchanged. */
   removeSelectedPathHandle: () => boolean
+  /** Local Smooth bend at the selected interior handle. */
+  smoothSelectedBend: () => boolean
+  /** Local Make corner at the selected interior handle. */
+  makeSelectedCorner: () => boolean
   beginHandleDrag: () => void
   updateEditPreview: (samples: MotionSample[]) => void
   commitHandleEdit: (samples: MotionSample[]) => void
@@ -1417,6 +1425,150 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           nextSelected,
           next.samples.length,
         )} Path shape unchanged.`,
+      })
+      return true
+    },
+
+    smoothSelectedBend: () => {
+      const state = get()
+      if (state.mode !== 'editing') return false
+      const base = state.editSession ?? state.geometryEdit
+      const selected = state.selectedHandleIndex
+      if (!base || selected === null) {
+        set({
+          actionAnnouncement: smoothBendAvailability(
+            base?.samples ?? [],
+            base?.handleIndices ?? [],
+            selected,
+            state.project.stageAspect,
+          ).message,
+        })
+        return false
+      }
+      const availability = smoothBendAvailability(
+        base.samples,
+        base.handleIndices,
+        selected,
+        state.project.stageAspect,
+      )
+      if (!availability.enabled) {
+        set({ actionAnnouncement: availability.message })
+        return false
+      }
+      const result = smoothBendAtHandle(
+        base.samples,
+        base.handleIndices,
+        selected,
+        state.project.stageAspect,
+      )
+      if (!result.ok) {
+        set({
+          actionAnnouncement:
+            result.reason === 'no-effect'
+              ? 'Bend is already smooth here.'
+              : (smoothBendAvailability(
+                  base.samples,
+                  base.handleIndices,
+                  selected,
+                  state.project.stageAspect,
+                ).message ?? 'Could not smooth that bend.'),
+        })
+        return false
+      }
+      const previous = copyGeometryEdit(base)
+      const next = makeGeometryEdit(
+        result.samples,
+        base.bakedSmoothing,
+        base.handleIndices,
+      )
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: next,
+        undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
+        redoStack: [],
+        editPreview: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        actionAnnouncement:
+          'Smoothed the bend at the selected point. Nearby handles stayed put.',
+      })
+      return true
+    },
+
+    makeSelectedCorner: () => {
+      const state = get()
+      if (state.mode !== 'editing') return false
+      const base = state.editSession ?? state.geometryEdit
+      const selected = state.selectedHandleIndex
+      if (!base || selected === null) {
+        set({
+          actionAnnouncement: makeCornerAvailability(
+            base?.samples ?? [],
+            base?.handleIndices ?? [],
+            selected,
+            state.project.stageAspect,
+          ).message,
+        })
+        return false
+      }
+      const availability = makeCornerAvailability(
+        base.samples,
+        base.handleIndices,
+        selected,
+        state.project.stageAspect,
+      )
+      if (!availability.enabled) {
+        set({ actionAnnouncement: availability.message })
+        return false
+      }
+      const result = makeCornerAtHandle(
+        base.samples,
+        base.handleIndices,
+        selected,
+        state.project.stageAspect,
+      )
+      if (!result.ok) {
+        set({
+          actionAnnouncement:
+            result.reason === 'straight'
+              ? 'Path is already straight here — nothing to sharpen.'
+              : result.reason === 'no-effect'
+                ? 'No meaningful corner change here.'
+                : (makeCornerAvailability(
+                    base.samples,
+                    base.handleIndices,
+                    selected,
+                    state.project.stageAspect,
+                  ).message ?? 'Could not sharpen that corner.'),
+        })
+        return false
+      }
+      const previous = copyGeometryEdit(base)
+      const next = makeGeometryEdit(
+        result.samples,
+        base.bakedSmoothing,
+        base.handleIndices,
+      )
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: next,
+        undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
+        redoStack: [],
+        editPreview: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        actionAnnouncement:
+          'Sharpened the corner at the selected point. Nearby handles stayed put.',
       })
       return true
     },
