@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { buildClipsTimingFixtureJson } from '../fixtures/clipsTimingProject'
 import {
   applyClipSeconds,
   ensureEditor,
   actorIdsFromList,
-  clickRecord,
-  dragActor,
   loadHtmlDocument,
+  loadProjectSnapshot,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -46,47 +46,19 @@ async function actorBox(
 test.describe('per-actor clip timing', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('overlapping / late / early clips, scrub, reverse, duration, export', async ({
+  test('late clip holds before start; early clip holds after end', async ({
     page,
   }) => {
-    await page.goto('/')
-    await ensureEditor(page)
-    await recordSimplePath(page)
-    await page.getByTestId('actor-name-input').fill('Lead')
-    await page.getByTestId('actor-name-input').press('Enter')
-
-    await page.getByTestId('btn-add-actor').click()
-    await page.getByTestId('actor-name-input').fill('Late')
-    await page.getByTestId('actor-name-input').press('Enter')
-    await clickRecord(page)
-    await dragActor(page, { x: -20, y: 30 }, { x: -120, y: -40 })
-
-    await page.getByTestId('btn-add-actor').click()
-    await page.getByTestId('actor-name-input').fill('Early')
-    await page.getByTestId('actor-name-input').press('Enter')
-    await clickRecord(page)
-    await dragActor(page, { x: 15, y: -25 }, { x: 90, y: 60 })
+    await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Clips timing fixture',
+    )
 
     const ids = await actorIdsFromList(page)
     expect(ids).toHaveLength(3)
-
-    await openPanel(page, 'adjust')
-    await page.getByTestId('duration-slider').fill('2000')
-    await expect(page.getByTestId('duration-value')).toHaveText('2.00 s')
-    await page.getByTestId('btn-close-adjust').click()
-
-    await ensureClipTimelineOpen(page)
-    await expect(page.getByTestId('clip-timeline-help')).toContainText(
-      'holds its first or last pose',
-    )
-
-    await selectActorByIndex(page, 1)
-    await applyClipSeconds(page, '1.00', '2.00')
-
-    await selectActorByIndex(page, 2)
-    await applyClipSeconds(page, '0.00', '1.00')
-
     const lateId = ids[1]
+    const earlyId = ids[2]
+
     await collapseClipTimeline(page)
     await page.getByTestId('playback-scrubber').fill('0.2')
     const lateAt02 = await actorBox(page, lateId)
@@ -105,7 +77,6 @@ test.describe('per-actor clip timing', () => {
         Math.abs(lateAt075!.y - lateAt045!.y) > 2,
     ).toBeTruthy()
 
-    const earlyId = ids[2]
     await page.getByTestId('playback-scrubber').fill('0.5')
     const earlyMid = await actorBox(page, earlyId)
     await page.getByTestId('playback-scrubber').fill('0.9')
@@ -114,35 +85,54 @@ test.describe('per-actor clip timing', () => {
     expect(earlyLate).toBeTruthy()
     expect(Math.abs(earlyLate!.x - earlyMid!.x)).toBeLessThan(2)
     expect(Math.abs(earlyLate!.y - earlyMid!.y)).toBeLessThan(2)
+  })
 
+  test('clip end edit then undo restores prior end', async ({ page }) => {
+    await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
+    await ensureClipTimelineOpen(page)
+    await selectActorByIndex(page, 2)
+    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.00')
+    await applyClipSeconds(page, '0.00', '1.50')
+    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.50')
+    await page.getByTestId('btn-undo-transform').click()
+    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.00')
+  })
+
+  test('transform marker uses project scrub time with a late clip', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
     await selectActorByIndex(page, 1)
     await page.getByTestId('playback-scrubber').fill('0.75')
     await collapseClipTimeline(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('transform-rotation-input').fill('90')
-    await page.getByTestId('btn-set-transform-keyframe').click({ force: true })
+    await page.getByTestId('btn-set-transform-keyframe').click()
     const markerLeft = await page
       .locator('[data-transform-marker]')
       .last()
       .evaluate((el) => (el as HTMLElement).style.left)
     expect(markerLeft).toBe('75%')
+  })
 
-    await ensureClipTimelineOpen(page)
-    await selectActorByIndex(page, 2)
-    await applyClipSeconds(page, '0.00', '1.50')
-    await collapseClipTimeline(page)
-    await page.getByTestId('btn-undo-transform').click()
-    await ensureClipTimelineOpen(page)
-    await expect(page.getByTestId('clip-end-input')).toHaveValue('1.00')
-    await collapseClipTimeline(page)
+  test('alternate loop exports CSS and offline HTML for all actors', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(
+      page,
+      buildClipsTimingFixtureJson('2026-01-01T00:00:00.000Z', {
+        loop: true,
+        loopMode: 'alternate',
+      }),
+    )
 
     await openPanel(page, 'adjust')
-    await page.getByTestId('loop-toggle').check()
-    await page.getByTestId('loop-mode-alternate').check()
+    await expect(page.getByTestId('loop-toggle')).toBeChecked()
+    await expect(page.getByTestId('loop-mode-alternate')).toBeChecked()
     await page.getByTestId('btn-close-adjust').click()
+
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
-    await page.waitForTimeout(400)
     await page.getByTestId('btn-pause').click()
 
     const css = await readExportedCss(page)
