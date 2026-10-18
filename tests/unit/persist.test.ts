@@ -17,6 +17,7 @@ import {
   loadStoredSnapshot,
   writeStoredSnapshot,
 } from '../../src/core/persist/storage'
+import { makeGeometryEdit } from '../../src/core/edit'
 import type { GeometryEdit, MotionSample, Project } from '../../src/core/types'
 import {
   createPersistenceController,
@@ -94,22 +95,24 @@ function resetStore(
     livePosition: { x: 0.2, y: 0.4 },
     liveTrail: [{ x: 0.1, y: 0.1 }],
     showPathComparison: true,
-    geometryEdit: geometryEdit
-      ? {
-          bakedSmoothing: geometryEdit.bakedSmoothing,
-          samples: geometryEdit.samples.map((s) => ({ ...s })),
-        }
-      : null,
-    editSession: geometryEdit
-      ? {
-          bakedSmoothing: geometryEdit.bakedSmoothing,
-          samples: geometryEdit.samples.map((s) => ({ ...s })),
-        }
-      : null,
-    undoStack: [makeSamples(5)],
-    redoStack: [makeSamples(5)],
+    geometryEdit: geometryEdit ? makeGeometryEdit(
+      geometryEdit.samples,
+      geometryEdit.bakedSmoothing,
+      geometryEdit.handleIndices,
+    ) : null,
+    editSession: geometryEdit ? makeGeometryEdit(
+      geometryEdit.samples,
+      geometryEdit.bakedSmoothing,
+      geometryEdit.handleIndices,
+    ) : null,
+    undoStack: geometryEdit
+      ? [makeGeometryEdit(makeSamples(5), geometryEdit.bakedSmoothing)]
+      : [],
+    redoStack: [],
     selectedHandleIndex: 3,
     editPreview: makeSamples(5),
+    pathAddMode: false,
+    pathAddCandidateIndex: null,
     selectedTransformId: null,
     transformUndoStack: [],
     transformRedoStack: [],
@@ -137,11 +140,9 @@ describe('persist document validation', () => {
     )
   })
 
-  it('round-trips committed geometry edits', () => {
-    const geometryEdit: GeometryEdit = {
-      bakedSmoothing: 0.35,
-      samples: makeSamples(16).map((s) => ({ ...s, y: s.y + 0.1 })),
-    }
+  it('round-trips committed geometry edits including handleIndices', () => {
+    const samples = makeSamples(16).map((s) => ({ ...s, y: s.y + 0.1 }))
+    const geometryEdit = makeGeometryEdit(samples, 0.35, [0, 4, 8, 15])
     const project = makePersistProject({
       actors: [makeActor({ geometryEdit, recording: makeRecording() })],
     })
@@ -149,10 +150,70 @@ describe('persist document validation', () => {
     const parsed = parseSnapshotJson(serializeSnapshot(snapshot))
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
+    expect(parsed.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
     expect(parsed.snapshot.project.actors[0].geometryEdit?.samples[0].y).toBeCloseTo(
       geometryEdit.samples[0].y,
       5,
     )
+    expect(parsed.snapshot.project.actors[0].geometryEdit?.handleIndices).toEqual([
+      0, 4, 8, 15,
+    ])
+  })
+
+  it('migrates geometryEdit without handleIndices to defaults', () => {
+    const samples = makeSamples(20)
+    const raw = JSON.stringify({
+      formatVersion: 8,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      project: {
+        version: 1,
+        name: 'Legacy handles',
+        actors: [
+          {
+            id: 'a1',
+            name: 'Actor 1',
+            appearance: {
+              kind: 'shape',
+              width: 0.12,
+              height: 0.12,
+              borderRadius: 0.28,
+              color: '#4f46e5',
+              image: null,
+            },
+            recording: {
+              recordedDurationMs: samples[samples.length - 1]!.t,
+              samples,
+            },
+            restPosition: { x: 0.35, y: 0.5 },
+            smoothing: 0.35,
+            steadySpeed: 0,
+            transform: { keyframes: [] },
+            geometryEdit: {
+              bakedSmoothing: 0.35,
+              samples,
+            },
+            clip: {
+              start: 0,
+              end: 1,
+              hideBeforeStart: false,
+              hideAfterEnd: false,
+            },
+          },
+        ],
+        playback: { durationMs: 1200, loop: false, loopMode: 'repeat' },
+        stageAspect: 1.6,
+      },
+    })
+    const parsed = parseSnapshotJson(raw)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    const ge = parsed.snapshot.project.actors[0]!.geometryEdit
+    expect(ge).toBeTruthy()
+    expect(ge!.handleIndices[0]).toBe(0)
+    expect(ge!.handleIndices[ge!.handleIndices.length - 1]).toBe(
+      samples.length - 1,
+    )
+    expect(ge!.samples).toHaveLength(samples.length)
   })
 
   it('rejects malformed JSON and incomplete objects', () => {

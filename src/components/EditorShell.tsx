@@ -349,8 +349,9 @@ export function EditorShell() {
               data-testid="edit-mode-hint"
               className="pointer-events-auto rounded-full border border-white/70 bg-white/90 px-3 py-1 text-center text-xs text-slate-600 shadow-sm backdrop-blur-md"
             >
-              Edit mode: drag handles to reshape the path. Timestamps stay
-              fixed.
+              Edit path: drag or nudge handles. Add point places a control on
+              the path without changing shape until you drag it. Remove handle
+              drops a control only.
             </p>
           )}
           {tip && (

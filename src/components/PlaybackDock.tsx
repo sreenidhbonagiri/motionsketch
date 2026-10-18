@@ -1,4 +1,5 @@
 import { localToProject } from '../core/clip'
+import { isEndpointHandle, MAX_PATH_HANDLES } from '../core/edit'
 import { traversalElapsedMs } from '../core/playback'
 import { useConfirm } from '../hooks/useConfirm'
 import { stopFromUi } from '../lib/recordingController'
@@ -53,10 +54,26 @@ export function PlaybackDock() {
   const undoActorEdit = useEditorStore((s) => s.undoActorEdit)
   const redoActorEdit = useEditorStore((s) => s.redoActorEdit)
   const selectTransformKeyframe = useEditorStore((s) => s.selectTransformKeyframe)
+  const pathAddMode = useEditorStore((s) => s.pathAddMode)
+  const setPathAddMode = useEditorStore((s) => s.setPathAddMode)
+  const removeSelectedPathHandle = useEditorStore(
+    (s) => s.removeSelectedPathHandle,
+  )
+  const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
+  const editSession = useEditorStore((s) => s.editSession)
+  const addPathHandleAt = useEditorStore((s) => s.addPathHandleAt)
+  const pathAddCandidateIndex = useEditorStore((s) => s.pathAddCandidateIndex)
   const confirm = useConfirm()
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
+  const canRemoveHandle =
+    editing &&
+    selectedHandleIndex !== null &&
+    editSession !== null &&
+    !isEndpointHandle(editSession.samples.length, selectedHandleIndex)
+  const handleCount = editSession?.handleIndices.length ?? 0
+  const canAddMoreHandles = handleCount < MAX_PATH_HANDLES
   const hasRecording = !!recording
   const playbackDisabled = !hasAnyRecording || isRecordingLike
   const editPathDisabled =
@@ -80,17 +97,22 @@ export function PlaybackDock() {
   // One contextual status for recording / selected-actor gaps. Empty-board Record
   // guidance stays on the existing stage tip (id=stage-empty-hint).
   let dockStatus: string | null = null
-  if (!editing) {
-    if (mode === 'armed') {
+  if (editing) {
+    if (pathAddMode) {
       dockStatus =
-        'Ready — drag the actor to capture motion. Cancel exits without saving a take.'
-    } else if (mode === 'recording') {
-      dockStatus = 'Recording… release the pointer to finish, or press Stop.'
-    } else if (hasAnyRecording && !hasRecording) {
-      dockStatus = `“${actorLabel}” has no path yet. Record for this actor to edit or reset its take. Play still uses other actors’ takes.`
-    } else if (mode === 'playing') {
-      dockStatus = 'Pause before editing the path.'
+        'Add point: the ghost sits on the sample that will become the handle. Click near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
+    } else {
+      dockStatus = `Drag to reshape · [ ] cycle points · arrows nudge · Delete removes an interior handle (shape stays) · Add point for local control. ${handleCount} of ${MAX_PATH_HANDLES} handles.`
     }
+  } else if (mode === 'armed') {
+    dockStatus =
+      'Ready — drag the actor to capture motion. Cancel exits without saving a take.'
+  } else if (mode === 'recording') {
+    dockStatus = 'Recording… release the pointer to finish, or press Stop.'
+  } else if (hasAnyRecording && !hasRecording) {
+    dockStatus = `“${actorLabel}” has no path yet. Record for this actor to edit or reset its take. Play still uses other actors’ takes.`
+  } else if (mode === 'playing') {
+    dockStatus = 'Pause before editing the path.'
   }
 
   const emptyBoardHintId = 'stage-empty-hint'
@@ -230,15 +252,71 @@ export function PlaybackDock() {
             </button>
             <button
               type="button"
+              data-testid="btn-path-add-mode"
+              onClick={() => setPathAddMode(!pathAddMode)}
+              disabled={!canAddMoreHandles}
+              aria-pressed={pathAddMode}
+              aria-describedby="path-add-help"
+              title={
+                canAddMoreHandles
+                  ? `Add a handle (${handleCount} of ${MAX_PATH_HANDLES})`
+                  : `Handle limit reached (${MAX_PATH_HANDLES}). Remove a handle first.`
+              }
+              className={
+                pathAddMode
+                  ? 'rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-teal-800'
+                  : btnSecondary
+              }
+            >
+              {pathAddMode ? 'Adding point…' : 'Add point'}
+            </button>
+            <button
+              type="button"
+              data-testid="btn-path-add-confirm"
+              onClick={() => {
+                const idx =
+                  pathAddCandidateIndex ??
+                  (editSession
+                    ? Math.floor(editSession.samples.length / 2)
+                    : null)
+                if (idx === null) return
+                addPathHandleAt(idx)
+              }}
+              disabled={!pathAddMode || pathAddCandidateIndex === null}
+              className={btnSecondary}
+            >
+              Place here
+            </button>
+            <button
+              type="button"
+              data-testid="btn-path-remove-handle"
+              onClick={() => removeSelectedPathHandle()}
+              disabled={!canRemoveHandle}
+              aria-describedby="path-remove-help"
+              title={
+                canRemoveHandle
+                  ? 'Remove the selected interior handle (path shape stays)'
+                  : selectedHandleIndex !== null &&
+                      editSession &&
+                      isEndpointHandle(
+                        editSession.samples.length,
+                        selectedHandleIndex,
+                      )
+                    ? 'Start and end points can’t be removed'
+                    : 'Select an interior handle to remove'
+              }
+              className={btnQuiet}
+            >
+              Remove handle
+            </button>
+            <button
+              type="button"
               data-testid="btn-restore-path"
               onClick={restoreRecordedPath}
               className={btnQuiet}
             >
               Restore recorded path
             </button>
-            <span className="hidden px-1 text-xs text-slate-500 sm:inline">
-              Drag handles · arrows nudge
-            </span>
           </>
         ) : (
           <>
@@ -396,6 +474,41 @@ export function PlaybackDock() {
         >
           {dockStatus}
         </p>
+      )}
+      {editing && (
+        <>
+          <p id="path-add-help" className="sr-only">
+            Toggle Add point mode. The dashed ghost marks the exact sample that
+            will become the handle. Click near the path or move the candidate with
+            arrow keys and confirm with Place here or Enter. Maximum{' '}
+            {MAX_PATH_HANDLES} handles. Currently {handleCount} of{' '}
+            {MAX_PATH_HANDLES}.
+          </p>
+          <p id="path-remove-help" className="sr-only">
+            Remove the selected interior handle. The path geometry and timestamps
+            stay the same; only the editing control is removed. Start and end
+            points cannot be removed — they keep the path anchored.
+          </p>
+          <p
+            data-testid="handle-selection-status"
+            className="sr-only"
+            aria-live="polite"
+          >
+            {editing &&
+            selectedHandleIndex !== null &&
+            editSession &&
+            editSession.handleIndices.includes(selectedHandleIndex)
+              ? `Point ${editSession.handleIndices.indexOf(selectedHandleIndex) + 1} of ${editSession.handleIndices.length}${
+                  isEndpointHandle(
+                    editSession.samples.length,
+                    selectedHandleIndex,
+                  )
+                    ? ' (endpoint)'
+                    : ''
+                }`
+              : ''}
+          </p>
+        </>
       )}
     </div>
   )

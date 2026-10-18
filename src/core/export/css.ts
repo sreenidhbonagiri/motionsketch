@@ -23,6 +23,7 @@ import type {
   SceneActor,
   TransformTrack,
 } from '../types'
+import { makeGeometryEdit } from '../edit'
 import { selectProcessedPathForActor } from '../../state/selectors'
 import { evaluateKeyframes } from './consistency'
 import { buildKeyframesFromProcessed } from './format'
@@ -619,17 +620,18 @@ export function generateCssSnippet(options: {
   }
   // Inject processed path via geometryEdit samples mapped from keyframes
   if (options.keyframes.length >= 2) {
-    project.actors[0].geometryEdit = {
-      bakedSmoothing: 0,
-      samples: options.keyframes.map((k) => ({
+    const ge = makeGeometryEdit(
+      options.keyframes.map((k) => ({
         t: k.offset * Math.max(1, options.durationMs),
         x: k.x,
         y: k.y,
       })),
-    }
-    project.actors[0].recording = {
+      0,
+    )
+    project.actors[0]!.geometryEdit = ge
+    project.actors[0]!.recording = {
       recordedDurationMs: options.durationMs,
-      samples: project.actors[0].geometryEdit.samples,
+      samples: ge.samples,
     }
   }
   return generateProjectCss(project)
@@ -669,10 +671,7 @@ export function exportCssFromRecording(options: {
         steadySpeed: options.steadySpeed ?? 0,
         transform: options.transform ?? { keyframes: [] },
         geometryEdit: options.processedPath?.length
-          ? {
-              bakedSmoothing: options.smoothing,
-              samples: options.processedPath,
-            }
+          ? makeGeometryEdit(options.processedPath, options.smoothing)
           : null,
         clip: fullClip(),
       },

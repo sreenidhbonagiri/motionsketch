@@ -156,7 +156,11 @@ describe('processed path cache', () => {
       actors: [
         {
           ...project.actors[0],
-          geometryEdit: { bakedSmoothing: 0.25, samples: edited },
+          geometryEdit: {
+            bakedSmoothing: 0.25,
+            samples: edited,
+            handleIndices: [0, Math.floor(edited.length / 2), edited.length - 1],
+          },
         },
       ],
     }

@@ -5,7 +5,15 @@ import {
   normalizeActorColor,
 } from '../core/actor'
 import type { ActorImageAsset } from '../core/imageAsset'
-import { copyPath } from '../core/edit'
+import {
+  addHandleIndex,
+  copyGeometryEdit,
+  copyPath,
+  formatHandleSelectionAnnouncement,
+  makeGeometryEdit,
+  MAX_PATH_HANDLES,
+  removeHandleIndex,
+} from '../core/edit'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
@@ -85,10 +93,15 @@ interface EditorStore {
    */
   geometryEdit: GeometryEdit | null
   editSession: GeometryEdit | null
-  undoStack: MotionSample[][]
-  redoStack: MotionSample[][]
+  /** Full geometry snapshots (samples + handleIndices) for path undo/redo. */
+  undoStack: GeometryEdit[]
+  redoStack: GeometryEdit[]
   selectedHandleIndex: number | null
   editPreview: MotionSample[] | null
+  /** When true, stage clicks near the path add an editable handle. */
+  pathAddMode: boolean
+  /** Ghost sample index while choosing where to add (keyboard / hover). */
+  pathAddCandidateIndex: number | null
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -184,6 +197,12 @@ interface EditorStore {
   exitEditMode: () => void
   restoreRecordedPath: () => void
   setSelectedHandleIndex: (index: number | null) => void
+  setPathAddMode: (on: boolean) => void
+  setPathAddCandidateIndex: (index: number | null) => void
+  /** Add handle at sample index; geometry unchanged. Returns false on failure. */
+  addPathHandleAt: (sampleIndex: number) => boolean
+  /** Remove selected interior handle; geometry unchanged. */
+  removeSelectedPathHandle: () => boolean
   beginHandleDrag: () => void
   updateEditPreview: (samples: MotionSample[]) => void
   commitHandleEdit: (samples: MotionSample[]) => void
@@ -208,11 +227,17 @@ function clearEditState() {
   return {
     geometryEdit: null as GeometryEdit | null,
     editSession: null as GeometryEdit | null,
-    undoStack: [] as MotionSample[][],
-    redoStack: [] as MotionSample[][],
+    undoStack: [] as GeometryEdit[],
+    redoStack: [] as GeometryEdit[],
     selectedHandleIndex: null as number | null,
     editPreview: null as MotionSample[] | null,
+    pathAddMode: false,
+    pathAddCandidateIndex: null as number | null,
   }
+}
+
+function geometryMirror(edit: GeometryEdit | null | undefined): GeometryEdit | null {
+  return edit ? copyGeometryEdit(edit) : null
 }
 
 function clearTransformEditState() {
@@ -801,12 +826,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         stageHint: 'default',
         selectedActorId,
         ...clearHistoryForActorSwitch(),
-        geometryEdit: first?.geometryEdit
-          ? {
-              bakedSmoothing: first.geometryEdit.bakedSmoothing,
-              samples: copyPath(first.geometryEdit.samples),
-            }
-          : null,
+        geometryEdit: geometryMirror(first?.geometryEdit),
         project,
       })
     },
@@ -845,12 +865,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         livePosition,
         mode: state.mode === 'playing' ? 'playing' : 'idle',
         ...clearHistoryForActorSwitch(),
-        geometryEdit: actor.geometryEdit
-          ? {
-              bakedSmoothing: actor.geometryEdit.bakedSmoothing,
-              samples: copyPath(actor.geometryEdit.samples),
-            }
-          : null,
+        geometryEdit: geometryMirror(actor.geometryEdit),
       })
     },
 
@@ -919,12 +934,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedActorId: copy.id,
         livePosition: { ...copy.restPosition },
         ...clearHistoryForActorSwitch(),
-        geometryEdit: copy.geometryEdit
-          ? {
-              bakedSmoothing: copy.geometryEdit.bakedSmoothing,
-              samples: copyPath(copy.geometryEdit.samples),
-            }
-          : null,
+        geometryEdit: geometryMirror(copy.geometryEdit),
         actionAnnouncement: `Duplicated ${source.name}.`,
       })
       return copy.id
@@ -952,12 +962,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedActorId: next.id,
         livePosition: { ...next.restPosition },
         ...clearHistoryForActorSwitch(),
-        geometryEdit: next.geometryEdit
-          ? {
-              bakedSmoothing: next.geometryEdit.bakedSmoothing,
-              samples: copyPath(next.geometryEdit.samples),
-            }
-          : null,
+        geometryEdit: geometryMirror(next.geometryEdit),
         actionAnnouncement: 'Actor deleted.',
       })
       return true
@@ -1193,27 +1198,32 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (!actor.recording) return
       if (state.mode === 'recording' || state.mode === 'armed') return
 
-      const samples = state.geometryEdit
-        ? copyPath(state.geometryEdit.samples)
-        : actor.geometryEdit
-          ? copyPath(actor.geometryEdit.samples)
-          : bakeEditablePathForActor(state.project, actor)
+      const source = state.geometryEdit ?? actor.geometryEdit
+      const samples = source
+        ? copyPath(source.samples)
+        : bakeEditablePathForActor(state.project, actor)
       if (samples.length < 2) return
 
-      const editSession: GeometryEdit = {
+      const editSession = makeGeometryEdit(
         samples,
-        bakedSmoothing:
-          state.geometryEdit?.bakedSmoothing ??
-          actor.geometryEdit?.bakedSmoothing ??
-          actor.smoothing,
-      }
+        source?.bakedSmoothing ?? actor.smoothing,
+        source?.handleIndices,
+      )
+      const selected = state.selectedHandleIndex ?? 0
 
       set({
         mode: 'editing',
         editSession,
         editPreview: null,
-        selectedHandleIndex: state.selectedHandleIndex ?? 0,
+        selectedHandleIndex: selected,
         selectedTransformId: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        actionAnnouncement: formatHandleSelectionAnnouncement(
+          editSession.handleIndices,
+          selected,
+          editSession.samples.length,
+        ),
       })
     },
 
@@ -1224,6 +1234,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         editSession: null,
         editPreview: null,
         pointerId: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
       })
     },
 
@@ -1243,6 +1255,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         editPreview: null,
         selectedHandleIndex: wasEditing ? 0 : null,
         editSession: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
       })
 
       if (wasEditing) {
@@ -1251,10 +1265,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         if (baked.length >= 2) {
           set({
             mode: 'editing',
-            editSession: {
-              samples: baked,
-              bakedSmoothing: actor.smoothing,
-            },
+            editSession: makeGeometryEdit(baked, actor.smoothing),
             selectedHandleIndex: 0,
           })
         } else {
@@ -1263,17 +1274,158 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
     },
 
-    setSelectedHandleIndex: (index) =>
+    setSelectedHandleIndex: (index) => {
+      const state = get()
+      const session = state.editSession
+      const announcement =
+        index !== null && session
+          ? formatHandleSelectionAnnouncement(
+              session.handleIndices,
+              index,
+              session.samples.length,
+            )
+          : state.actionAnnouncement
       set({
         selectedHandleIndex: index,
-        selectedTransformId: index !== null ? null : get().selectedTransformId,
-      }),
+        selectedTransformId: index !== null ? null : state.selectedTransformId,
+        actionAnnouncement: announcement,
+      })
+    },
+
+    setPathAddMode: (on) => {
+      const state = get()
+      if (state.mode !== 'editing') return
+      const session = state.editSession
+      if (
+        on &&
+        session &&
+        session.handleIndices.length >= MAX_PATH_HANDLES
+      ) {
+        set({
+          actionAnnouncement: `Handle limit reached (${MAX_PATH_HANDLES} of ${MAX_PATH_HANDLES}). Remove a handle before adding another.`,
+        })
+        return
+      }
+      const mid =
+        session && session.samples.length >= 2
+          ? Math.floor(session.samples.length / 2)
+          : null
+      set({
+        pathAddMode: on,
+        pathAddCandidateIndex: on ? (state.pathAddCandidateIndex ?? mid) : null,
+        actionAnnouncement: on
+          ? 'Add point mode. The ghost marks the sample that will become the handle.'
+          : state.actionAnnouncement,
+      })
+    },
+
+    setPathAddCandidateIndex: (index) => set({ pathAddCandidateIndex: index }),
+
+    addPathHandleAt: (sampleIndex) => {
+      const state = get()
+      if (state.mode !== 'editing') return false
+      const base = state.editSession ?? state.geometryEdit
+      if (!base) return false
+      const result = addHandleIndex(
+        base.samples.length,
+        base.handleIndices,
+        sampleIndex,
+      )
+      if (!result.ok) {
+        const message =
+          result.reason === 'duplicate'
+            ? 'A handle is already on that point.'
+            : result.reason === 'max'
+              ? `Handle limit reached (${MAX_PATH_HANDLES} of ${MAX_PATH_HANDLES}). Remove a handle before adding another.`
+              : result.reason === 'endpoint'
+                ? 'Start and end already have handles — pick a point between them.'
+                : 'Could not add a handle there.'
+        set({ actionAnnouncement: message })
+        return false
+      }
+      const previous = copyGeometryEdit(base)
+      const next = makeGeometryEdit(
+        base.samples,
+        base.bakedSmoothing,
+        result.handleIndices,
+      )
+      const ordinal = next.handleIndices.indexOf(result.sampleIndex) + 1
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: next,
+        undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
+        redoStack: [],
+        selectedHandleIndex: result.sampleIndex,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        editPreview: null,
+        actionAnnouncement: `Handle added — point ${ordinal} of ${next.handleIndices.length}. Drag it to reshape that bend.`,
+      })
+      return true
+    },
+
+    removeSelectedPathHandle: () => {
+      const state = get()
+      if (state.mode !== 'editing') return false
+      const base = state.editSession ?? state.geometryEdit
+      const selected = state.selectedHandleIndex
+      if (!base || selected === null) return false
+      const result = removeHandleIndex(
+        base.samples.length,
+        base.handleIndices,
+        selected,
+      )
+      if (!result.ok) {
+        set({
+          actionAnnouncement:
+            result.reason === 'endpoint'
+              ? 'Start and end points can’t be removed — they keep the path anchored.'
+              : 'Select an interior handle to remove.',
+        })
+        return false
+      }
+      const previous = copyGeometryEdit(base)
+      const next = makeGeometryEdit(
+        base.samples,
+        base.bakedSmoothing,
+        result.handleIndices,
+      )
+      // Prefer a nearby remaining handle for selection.
+      const nextSelected =
+        result.handleIndices.find((i) => i >= selected) ??
+        result.handleIndices[result.handleIndices.length - 1] ??
+        0
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: next,
+        undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
+        redoStack: [],
+        selectedHandleIndex: nextSelected,
+        editPreview: null,
+        actionAnnouncement: `Handle removed — ${formatHandleSelectionAnnouncement(
+          next.handleIndices,
+          nextSelected,
+          next.samples.length,
+        )} Path shape unchanged.`,
+      })
+      return true
+    },
 
     beginHandleDrag: () => {
       const state = get()
       const base = state.editSession ?? state.geometryEdit
       if (!base) return
-      set({ editPreview: copyPath(base.samples) })
+      set({ editPreview: copyPath(base.samples), pathAddMode: false })
     },
 
     updateEditPreview: (samples) => set({ editPreview: samples }),
@@ -1283,11 +1435,12 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const base = state.editSession ?? state.geometryEdit
       if (!base) return
 
-      const previous = copyPath(base.samples)
-      const next: GeometryEdit = {
-        bakedSmoothing: base.bakedSmoothing,
-        samples: copyPath(samples),
-      }
+      const previous = copyGeometryEdit(base)
+      const next = makeGeometryEdit(
+        samples,
+        base.bakedSmoothing,
+        base.handleIndices,
+      )
 
       set({
         project: withSelectedActor(
@@ -1310,11 +1463,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const current = state.editSession ?? state.geometryEdit
       if (!current || state.undoStack.length === 0) return
 
-      const previous = state.undoStack[state.undoStack.length - 1]
-      const next: GeometryEdit = {
-        bakedSmoothing: current.bakedSmoothing,
-        samples: copyPath(previous),
-      }
+      const previous = state.undoStack[state.undoStack.length - 1]!
+      const next = copyGeometryEdit(previous)
 
       set({
         project: withSelectedActor(
@@ -1325,10 +1475,15 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         geometryEdit: next,
         editSession: state.mode === 'editing' ? next : null,
         undoStack: state.undoStack.slice(0, -1),
-        redoStack: [...state.redoStack, copyPath(current.samples)].slice(
+        redoStack: [...state.redoStack, copyGeometryEdit(current)].slice(
           -MAX_UNDO,
         ),
         editPreview: null,
+        selectedHandleIndex: next.handleIndices.includes(
+          state.selectedHandleIndex ?? -1,
+        )
+          ? state.selectedHandleIndex
+          : (next.handleIndices[0] ?? 0),
       })
     },
 
@@ -1337,11 +1492,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const current = state.editSession ?? state.geometryEdit
       if (!current || state.redoStack.length === 0) return
 
-      const restored = state.redoStack[state.redoStack.length - 1]
-      const next: GeometryEdit = {
-        bakedSmoothing: current.bakedSmoothing,
-        samples: copyPath(restored),
-      }
+      const restored = state.redoStack[state.redoStack.length - 1]!
+      const next = copyGeometryEdit(restored)
 
       set({
         project: withSelectedActor(
@@ -1352,10 +1504,15 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         geometryEdit: next,
         editSession: state.mode === 'editing' ? next : null,
         redoStack: state.redoStack.slice(0, -1),
-        undoStack: [...state.undoStack, copyPath(current.samples)].slice(
+        undoStack: [...state.undoStack, copyGeometryEdit(current)].slice(
           -MAX_UNDO,
         ),
         editPreview: null,
+        selectedHandleIndex: next.handleIndices.includes(
+          state.selectedHandleIndex ?? -1,
+        )
+          ? state.selectedHandleIndex
+          : (next.handleIndices[0] ?? 0),
       })
     },
 

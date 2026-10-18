@@ -1,6 +1,6 @@
 import { cloneActor, coerceActor } from './actor'
+import { copyPath, makeGeometryEdit } from './edit'
 import { cloneClip, fullClip, parseActorClip } from './clip'
-import { copyPath } from './edit'
 import {
   cloneTransformTrack,
   emptyTransformTrack,
@@ -65,10 +65,11 @@ export function createSceneActor(
       partial?.transform ?? emptyTransformTrack(),
     ),
     geometryEdit: partial?.geometryEdit
-      ? {
-          bakedSmoothing: partial.geometryEdit.bakedSmoothing,
-          samples: copyPath(partial.geometryEdit.samples),
-        }
+      ? makeGeometryEdit(
+          partial.geometryEdit.samples,
+          partial.geometryEdit.bakedSmoothing,
+          partial.geometryEdit.handleIndices,
+        )
       : null,
     clip: cloneClip(partial?.clip ?? fullClip()),
   }
@@ -396,7 +397,31 @@ function parseGeometryEdit(
     }
     samples.push({ t, x, y })
   }
-  return { ok: true, value: { bakedSmoothing: baked, samples } }
+  let handleIndices: number[] | undefined
+  if (raw.handleIndices !== undefined && raw.handleIndices !== null) {
+    if (!Array.isArray(raw.handleIndices)) {
+      return {
+        ok: false,
+        error: `actors[${index}].geometryEdit.handleIndices must be an array.`,
+      }
+    }
+    const parsed: number[] = []
+    for (let i = 0; i < raw.handleIndices.length; i++) {
+      const v = raw.handleIndices[i]
+      if (typeof v !== 'number' || !Number.isFinite(v)) {
+        return {
+          ok: false,
+          error: `actors[${index}].geometryEdit.handleIndices[${i}] is invalid.`,
+        }
+      }
+      parsed.push(Math.round(v))
+    }
+    handleIndices = parsed
+  }
+  return {
+    ok: true,
+    value: makeGeometryEdit(samples, baked, handleIndices),
+  }
 }
 
 function parseRestPosition(

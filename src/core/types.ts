@@ -151,11 +151,20 @@ export type EditorMode =
  * Original recording.samples stay untouched. While this exists, spatial
  * smoothing is not reapplied (so handle moves are not erased); Steady Speed
  * may still retime the path for playback/export.
+ *
+ * `handleIndices` lists which samples show as editable controls. Adding or
+ * removing a handle changes only this list — sample positions and timestamps
+ * stay the same until the user drags or nudges a handle.
  */
 export interface GeometryEdit {
   samples: MotionSample[]
   /** Smoothing value used when this geometry was baked. */
   bakedSmoothing: number
+  /**
+   * Sample indices used as editable handles (always includes endpoints).
+   * Older projects omit this; loaders fill defaults via selectHandleIndices.
+   */
+  handleIndices: number[]
 }
 
 export interface Keyframe {

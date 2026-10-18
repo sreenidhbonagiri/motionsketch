@@ -36,8 +36,9 @@ import {
  * v6: per-actor clip timing (start/end on shared timeline).
  * v7: project.name (older files migrate to “Untitled project”).
  * v8: clip.hideBeforeStart / clip.hideAfterEnd (older → both off).
+ * v9: geometryEdit.handleIndices (older → evenly spaced defaults).
  */
-export const PERSIST_FORMAT_VERSION = 8 as const
+export const PERSIST_FORMAT_VERSION = 9 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
@@ -45,6 +46,7 @@ export const PERSIST_FORMAT_VERSION_V4 = 4 as const
 export const PERSIST_FORMAT_VERSION_V5 = 5 as const
 export const PERSIST_FORMAT_VERSION_V6 = 6 as const
 export const PERSIST_FORMAT_VERSION_V7 = 7 as const
+export const PERSIST_FORMAT_VERSION_V8 = 8 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -118,6 +120,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   const supported = [
     PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V8,
     PERSIST_FORMAT_VERSION_V7,
     PERSIST_FORMAT_VERSION_V6,
     PERSIST_FORMAT_VERSION_V5,

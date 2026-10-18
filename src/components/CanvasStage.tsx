@@ -100,7 +100,15 @@ export function CanvasStage() {
     onPointerCancel: onRecordPointerCancel,
   } = usePointerRecorder({ stageRef })
 
-  const { handleIndices, workingSamples, onHandlePointerDown } = usePathEditor({
+  const {
+    handleIndices,
+    workingSamples,
+    onHandlePointerDown,
+    onStagePointerDown,
+    onStagePointerMove,
+    pathAddMode,
+    pathAddCandidateIndex,
+  } = usePathEditor({
     stageRef,
   })
 
@@ -184,8 +192,18 @@ export function CanvasStage() {
     <div
       ref={stageRef}
       data-testid="stage"
-      className="absolute inset-0 touch-none overflow-hidden bg-[#eef1f6]"
-      onPointerMove={editing ? undefined : onRecordPointerMove}
+      data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
+      className={`absolute inset-0 touch-none overflow-hidden bg-[#eef1f6] ${
+        editing && pathAddMode ? 'cursor-crosshair' : ''
+      }`}
+      onPointerDown={editing && pathAddMode ? onStagePointerDown : undefined}
+      onPointerMove={
+        editing
+          ? pathAddMode
+            ? onStagePointerMove
+            : undefined
+          : onRecordPointerMove
+      }
       onPointerUp={editing ? undefined : onRecordPointerUp}
       onPointerCancel={editing ? undefined : onRecordPointerCancel}
     >
@@ -240,6 +258,8 @@ export function CanvasStage() {
           samples={workingSamples}
           handleIndices={handleIndices}
           selectedIndex={selectedHandleIndex}
+          candidateIndex={pathAddCandidateIndex}
+          addMode={pathAddMode}
           onHandlePointerDown={onHandlePointerDown}
         />
       )}

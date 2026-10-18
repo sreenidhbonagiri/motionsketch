@@ -153,6 +153,32 @@ export async function recordSimplePath(page: Page) {
   await expect(page.getByTestId('export-panel')).toBeVisible()
 }
 
+/**
+ * Load a persisted project snapshot once (does not re-seed on later reloads,
+ * so autosave round-trips stay intact).
+ */
+export async function loadProjectSnapshot(page: Page, snapshotJson: string) {
+  await page.goto('/')
+  await page.evaluate((raw) => {
+    localStorage.setItem('motionsketch.project.v1', raw)
+  }, snapshotJson)
+  await page.reload()
+  await ensureEditor(page)
+}
+
+/** Stage-local sample → page client coordinates (CSS px). */
+export async function clientPointForSample(
+  page: Page,
+  sample: { x: number; y: number },
+) {
+  const box = await page.getByTestId('stage').boundingBox()
+  expect(box).toBeTruthy()
+  return {
+    x: box!.x + sample.x * box!.width,
+    y: box!.y + sample.y * box!.height,
+  }
+}
+
 /** Set clip Start/End drafts and commit with Apply (blur alone does not commit). */
 export async function applyClipSeconds(
   page: Page,

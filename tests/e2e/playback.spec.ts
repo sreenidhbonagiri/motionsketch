@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { buildPathHandlesFixtureJson } from '../fixtures/pathHandlesProject'
 import {
   ensureEditor,
   clickRecord,
+  loadProjectSnapshot,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -13,24 +15,31 @@ test.describe('playback inspection', () => {
   test('pause/resume keeps continuity; scrub seeks; restart returns to start', async ({
     page,
   }) => {
-    await page.goto('/')
-    await ensureEditor(page)
-    await recordSimplePath(page)
+    // Straight-path fixture: scrubbed heads map to clearly different screen x.
+    await loadProjectSnapshot(page, buildPathHandlesFixtureJson())
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
+    await page.getByTestId('btn-close-adjust').click()
     await expect(page.getByTestId('playback-timeline')).toBeVisible()
     await expect(page.getByTestId('playback-total')).toHaveText('2.00 s')
 
+    // Wall-clock waits are racy: usePlaybackClock catch-up uses performance.now(),
+    // so a delayed rAF under load can jump the head near 0.5 and make the
+    // pause-vs-scrub position check fail. Drive time explicitly instead.
+    await page.clock.install({ time: new Date('2030-01-15T12:00:00.000Z') })
+    await page.clock.pauseAt(new Date('2030-01-15T12:00:01.000Z'))
+
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
-    await page.waitForTimeout(350)
+    // 400ms of 2000ms → head ≈ 0.2
+    await page.clock.runFor(400)
     await page.getByTestId('btn-pause').click()
 
     const pausedHead = Number(
       await page.getByTestId('playback-scrubber').inputValue(),
     )
-    expect(pausedHead).toBeGreaterThan(0.05)
-    expect(pausedHead).toBeLessThan(0.95)
+    expect(pausedHead).toBeGreaterThan(0.15)
+    expect(pausedHead).toBeLessThan(0.28)
 
     const actor = page.getByTestId('actor')
     const pausedBox = await actor.boundingBox()
@@ -42,26 +51,23 @@ test.describe('playback inspection', () => {
     const resumedHead = Number(
       await page.getByTestId('playback-scrubber').inputValue(),
     )
-    expect(Math.abs(resumedHead - pausedHead)).toBeLessThan(0.12)
+    expect(Math.abs(resumedHead - pausedHead)).toBeLessThan(0.05)
     await page.getByTestId('btn-pause').click()
 
-    await page.getByTestId('playback-scrubber').fill('0.5')
+    // Scrub far from the paused head on the straight fixture path.
+    await page.getByTestId('playback-scrubber').fill('0.8')
     await expect(page.getByTestId('btn-play')).toBeVisible()
-    await expect(page.getByTestId('playback-elapsed')).toHaveText('1.00 s')
-    const midBox = await actor.boundingBox()
-    expect(midBox).toBeTruthy()
-    expect(
-      Math.abs(midBox!.x - pausedBox!.x) > 1 ||
-        Math.abs(midBox!.y - pausedBox!.y) > 1,
-    ).toBeTruthy()
+    await expect(page.getByTestId('playback-elapsed')).toHaveText('1.60 s')
+    const scrubbedBox = await actor.boundingBox()
+    expect(scrubbedBox).toBeTruthy()
+    // Fixture x runs 0.1→0.9 across the stage; 0.2 vs 0.8 must move substantially.
+    expect(Math.abs(scrubbedBox!.x - pausedBox!.x)).toBeGreaterThan(40)
 
     await page.getByTestId('btn-restart').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
-    await expect
-      .poll(async () =>
-        Number(await page.getByTestId('playback-scrubber').inputValue()),
-      )
-      .toBeLessThan(0.15)
+    expect(
+      Number(await page.getByTestId('playback-scrubber').inputValue()),
+    ).toBeLessThan(0.02)
   })
 
   test('at end of non-looping playback, Play starts from the beginning', async ({

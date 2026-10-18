@@ -86,9 +86,14 @@ test.describe('path editing', () => {
     await page.getByTestId('btn-edit-path').click()
 
     const handle = page.locator('[data-testid^="path-handle-"]').nth(3)
-    await handle.click()
     const before = await handle.boundingBox()
     expect(before).toBeTruthy()
+    // Overlapping handles can intercept hit-testing; focus via coordinates.
+    await page.mouse.click(
+      before!.x + before!.width / 2,
+      before!.y + before!.height / 2,
+    )
+    await expect(handle).toHaveAttribute('aria-pressed', 'true')
 
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowRight')

@@ -12,6 +12,7 @@ import type {
   Project,
   TransformTrack,
 } from '../types'
+import { makeGeometryEdit } from '../edit'
 import { exportCssFromProject, resolveExportScope } from './css'
 import { fullClip } from '../clip'
 import {
@@ -313,10 +314,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
         steadySpeed: options.steadySpeed ?? 0,
         transform: options.transform ?? { keyframes: [] },
         geometryEdit: options.processedPath?.length
-          ? {
-              bakedSmoothing: options.smoothing,
-              samples: options.processedPath,
-            }
+          ? makeGeometryEdit(options.processedPath, options.smoothing)
           : null,
         clip: fullClip(),
       },

@@ -36,6 +36,8 @@ describe('edit store', () => {
       redoStack: [],
       selectedHandleIndex: null,
       editPreview: null,
+      pathAddMode: false,
+      pathAddCandidateIndex: null,
       stageHint: 'default',
       actionAnnouncement: null,
     })
@@ -143,5 +145,58 @@ describe('edit store', () => {
       editPreview: state.editPreview,
     })
     expect(path[mid].y).toBeCloseTo(edited[mid].y, 5)
+  })
+
+  it('add/remove handle is undoable and add alone does not move samples', () => {
+    useEditorStore.getState().enterEditMode()
+    const session = useEditorStore.getState().editSession!
+    const before = session.samples.map((s) => ({ ...s }))
+    const addAt = Math.floor(session.samples.length / 3)
+    expect(session.handleIndices.includes(addAt)).toBe(false)
+
+    expect(useEditorStore.getState().addPathHandleAt(addAt)).toBe(true)
+    const afterAdd = useEditorStore.getState().editSession!
+    expect(afterAdd.handleIndices).toContain(addAt)
+    expect(afterAdd.samples).toEqual(before)
+    expect(useEditorStore.getState().undoStack).toHaveLength(1)
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(
+      /Handle added — point \d+ of \d+/,
+    )
+
+    useEditorStore.getState().setSelectedHandleIndex(addAt)
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(
+      /Point \d+ of \d+/,
+    )
+    expect(useEditorStore.getState().removeSelectedPathHandle()).toBe(true)
+    expect(useEditorStore.getState().editSession!.handleIndices).not.toContain(
+      addAt,
+    )
+    expect(useEditorStore.getState().editSession!.samples).toEqual(before)
+
+    useEditorStore.getState().undoEdit()
+    expect(useEditorStore.getState().editSession!.handleIndices).toContain(addAt)
+    useEditorStore.getState().undoEdit()
+    expect(
+      useEditorStore.getState().editSession!.handleIndices.includes(addAt),
+    ).toBe(false)
+  })
+
+  it('announces selection and endpoint protection via setSelectedHandleIndex', () => {
+    useEditorStore.getState().enterEditMode()
+    const session = useEditorStore.getState().editSession!
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(
+      /Point 1 of \d+/,
+    )
+    const interior = session.handleIndices.find((i) => i !== 0 && i !== session.samples.length - 1)!
+    useEditorStore.getState().setSelectedHandleIndex(interior)
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(
+      /^Point \d+ of \d+\.$/,
+    )
+    useEditorStore.getState().setSelectedHandleIndex(0)
+    expect(useEditorStore.getState().actionAnnouncement).toContain('endpoint')
+    expect(useEditorStore.getState().removeSelectedPathHandle()).toBe(false)
+    expect(useEditorStore.getState().actionAnnouncement).toMatch(
+      /can’t be removed/i,
+    )
   })
 })
