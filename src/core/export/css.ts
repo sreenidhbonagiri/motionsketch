@@ -10,11 +10,6 @@ import {
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
 import {
-  cssActorClass,
-  cssAnimationName,
-  cssVisibilityAnimationName,
-} from '../sceneActor'
-import {
   evaluateTransform,
   formatTransformCss,
 } from '../transform'
@@ -31,6 +26,24 @@ import type {
 import { selectProcessedPathForActor } from '../../state/selectors'
 import { evaluateKeyframes } from './consistency'
 import { buildKeyframesFromProcessed } from './format'
+import {
+  MS_MOTION_OK_CLASS,
+  resolveExportScope,
+  scopedActorClass,
+  scopedActorSelector,
+  scopedAnimationName,
+  scopedStageSelector,
+  scopedVisibilityAnimationName,
+  type ExportCssOptions,
+  type ExportScope,
+} from './sceneScope'
+
+export type { ExportCssOptions, ExportScope } from './sceneScope'
+export {
+  fingerprintProjectScene,
+  resolveExportScope,
+  MS_MOTION_OK_CLASS,
+} from './sceneScope'
 
 /**
  * CSS keyframe percentage precision. Export starts at {@link CSS_OFFSET_MIN_DECIMALS}
@@ -209,7 +222,7 @@ function actorBoxRules(
   background: transparent;
   border: none;
   padding: 0;`,
-      htmlExample: `<div class="stage"><img class="${className}" src="your-image.png" alt="${actor.image.label.replace(/"/g, '')}" /></div>`,
+      htmlExample: `<img class="${className}" src="your-image.png" alt="${actor.image.label.replace(/"/g, '')}" />`,
       imageNote: ` * Image actor (.${className}): CSS alone does NOT embed the image bytes.
  * Host the file yourself (or use the HTML demo export, which embeds data URLs).
  * Use an <img class="${className}"> with the same intrinsic aspect ratio as in the editor.`,
@@ -221,7 +234,7 @@ function actorBoxRules(
     sizeDecl: `  width: ${size}cqmin;\n  aspect-ratio: 1;`,
     shapeDecls: `  border-radius: ${radiusPct}%;
   background: ${actor.color};`,
-    htmlExample: `<div class="stage"><div class="${className}"></div></div>`,
+    htmlExample: `<div class="${className}"></div>`,
     imageNote: '',
   }
 }
@@ -336,13 +349,12 @@ function generateActorCssBlock(options: {
   loop: boolean
   loopMode: LoopMode
   processedPath: MotionSample[]
+  scope: ExportScope
 }): string {
-  const className = cssActorClass(options.index, options.actorCount)
-  const animName = cssAnimationName(options.index, options.actorCount)
-  const visName = cssVisibilityAnimationName(
-    options.index,
-    options.actorCount,
-  )
+  const className = scopedActorClass(options.index, options.actorCount)
+  const selector = scopedActorSelector(options.scope, options.index)
+  const animName = scopedAnimationName(options.scope, options.index)
+  const visName = scopedVisibilityAnimationName(options.scope, options.index)
   const appearance = coerceActor(options.actor.appearance)
   const box = actorBoxRules(appearance, className)
   const track = options.actor.transform
@@ -375,7 +387,7 @@ ${vis.frames}
     const animLine = vis
       ? `\n  animation: ${visName} ${timing};`
       : ''
-    return `.${className} {
+    return `${selector} {
   position: absolute;
   left: 0;
   top: 0;
@@ -412,7 +424,7 @@ ${visKeyframes}`
     ? `\n  /* Visibility is a separate discrete animation (no fades). */`
     : ''
 
-  return `.${className} {
+  return `${selector} {
   position: absolute;
   left: 0;
   top: 0;
@@ -433,14 +445,18 @@ ${visKeyframes}`
 }
 
 /**
- * Multi-actor CSS export: one shared stage + timeline; unique class/animation per actor.
+ * Multi-actor CSS export: one scoped scene root + stage; unique keyframes per scene.
  */
-export function generateProjectCss(project: Project): string {
+export function generateProjectCss(
+  project: Project,
+  options: ExportCssOptions = {},
+): string {
   const durationMs = project.playback.durationMs
   const loop = project.playback.loop
   const loopMode = project.playback.loopMode
   const stageAspect = project.stageAspect
   const aspectCss = formatCssAspectRatio(stageAspect)
+  const scope = resolveExportScope(project, options)
 
   const hasAnyMotion = project.actors.some((a) => !!a.recording)
   if (!hasAnyMotion) {
@@ -455,7 +471,7 @@ export function generateProjectCss(project: Project): string {
 
   const actorCount = project.actors.length
   const htmlParts = project.actors.map((actor, index) => {
-    const cls = cssActorClass(index, actorCount)
+    const cls = scopedActorClass(index, actorCount)
     if (actor.appearance.kind === 'image' && actor.appearance.image) {
       return `<img class="${cls}" src="actor-${index + 1}.png" alt="${actor.name.replace(/"/g, '')}" />`
     }
@@ -467,7 +483,7 @@ export function generateProjectCss(project: Project): string {
       if (actor.appearance.kind !== 'image' || !actor.appearance.image) return ''
       return actorBoxRules(
         actor.appearance,
-        cssActorClass(i, actorCount),
+        scopedActorClass(i, actorCount),
       ).imageNote
     })
     .filter(Boolean)
@@ -488,14 +504,39 @@ export function generateProjectCss(project: Project): string {
         loop,
         loopMode,
         processedPath: processed,
+        scope,
       })
     })
     .join('\n')
 
-  return `/* MotionSketch multi-actor export
+  const stageSelector = scopedStageSelector(scope)
+  const reducedMotionBlock = `
+@media (prefers-reduced-motion: reduce) {
+  .${scope.rootClass}:not(.${MS_MOTION_OK_CLASS}) [class^="ms-actor"] {
+    animation: none !important;
+    /* Keep a meaningful static pose visible (base transform); ignore clip hide flags. */
+    visibility: visible !important;
+  }
+}
+`
+
+  return `/* MotionSketch scoped scene export
  *
- * Positioning assumptions:
- * - Place each actor element inside a .stage with position: relative and container-type: size.
+ * Scene isolation:
+ * - Wrap markup in <div class="${scope.rootClass}"> so rules never touch host .stage/.actor.
+ * - Keyframe names include a content fingerprint (${scope.sceneId}); project title alone is not used.
+ * - For a second independently controlled copy of the same scene, re-export with
+ *   instancePrefix (e.g. "hero-") or rename the root class + keyframe prefix together.
+ * - This stylesheet does not reset host page styles outside .${scope.rootClass}.
+ *
+ * Reduced motion:
+ * - Under prefers-reduced-motion: reduce, animations stay off until the scene root
+ *   also has class "${MS_MOTION_OK_CLASS}" (set by an explicit Play control).
+ * - The static pose uses each actor’s base transform (clip-start / rest) and forces
+ *   visibility so hide-before/hide-after cannot blank the scene.
+ *
+ * Positioning:
+ * - Place actors inside .${scope.stageClass} (position: relative; container-type: size).
  * - Shared Duration / loop / loopMode drive every actor’s animation together.
  * - Per-actor clips remap motion onto a start–end interval; outside that range the actor holds its first/last pose.
  * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
@@ -512,11 +553,13 @@ ${loopNote}
  *   Ncqmin → (N / 100) * min(stageWidth, stageHeight)
  *
  * Example HTML:
- * <div class="stage">
- *   ${htmlParts.join('\n *   ')}
+ * <div class="${scope.rootClass}">
+ *   <div class="${scope.stageClass}">
+ *     ${htmlParts.join('\n *     ')}
+ *   </div>
  * </div>
  */
-.stage {
+${stageSelector} {
   position: relative;
   container-type: size;
   width: 100%;
@@ -524,7 +567,8 @@ ${loopNote}
   overflow: hidden;
 }
 
-${actorBlocks}`
+${actorBlocks}
+${reducedMotionBlock}`
 }
 
 /** @deprecated single-actor helper — prefer generateProjectCss */
@@ -643,6 +687,34 @@ export function exportCssFromRecording(options: {
   return generateProjectCss(project)
 }
 
-export function exportCssFromProject(project: Project): string {
-  return generateProjectCss(project)
+export function exportCssFromProject(
+  project: Project,
+  options: ExportCssOptions = {},
+): string {
+  return generateProjectCss(project, options)
+}
+
+/** Build scene-root + stage markup matching {@link exportCssFromProject}. */
+export function buildExportSceneMarkup(
+  project: Project,
+  options: ExportCssOptions = {},
+): { scope: ExportScope; html: string } {
+  const scope = resolveExportScope(project, options)
+  const actorCount = project.actors.length
+  const actors = project.actors
+    .map((actor, index) => {
+      const cls = scopedActorClass(index, actorCount)
+      const appearance = coerceActor(actor.appearance)
+      if (appearance.kind === 'image' && appearance.image) {
+        return `<img class="${cls}" src="${appearance.image.dataUrl.replace(/"/g, '')}" alt="${appearance.image.label.replace(/"/g, '&quot;')}" />`
+      }
+      return `<div class="${cls}"></div>`
+    })
+    .join('\n    ')
+  const html = `<div class="${scope.rootClass}" data-ms-scene="${scope.sceneId}">
+  <div class="${scope.stageClass}">
+    ${actors}
+  </div>
+</div>`
+  return { scope, html }
 }

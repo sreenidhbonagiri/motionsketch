@@ -4,9 +4,14 @@ import {
   clampStageAspect,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
-import { cssActorClass } from '../sceneActor'
 import type { Actor, LoopMode, MotionSample, Project, TransformTrack } from '../types'
-import { exportCssFromProject, exportCssFromRecording } from './css'
+import { exportCssFromProject, resolveExportScope } from './css'
+import { fullClip } from '../clip'
+import {
+  MS_MOTION_OK_CLASS,
+  scopedActorClass,
+  type ExportCssOptions,
+} from './sceneScope'
 
 export interface HtmlDemoOptions {
   samples: MotionSample[]
@@ -33,9 +38,13 @@ export function isSafeCssForEmbed(css: string): boolean {
   return true
 }
 
-export function buildHtmlDemoFromProject(project: Project): string {
+export function buildHtmlDemoFromProject(
+  project: Project,
+  options: ExportCssOptions = {},
+): string {
   const stageAspect = clampStageAspect(project.stageAspect)
-  const css = exportCssFromProject(project)
+  const scope = resolveExportScope(project, options)
+  const css = exportCssFromProject(project, options)
   if (!isSafeCssForEmbed(css)) {
     throw new Error('Refusing to embed CSS that failed safety checks.')
   }
@@ -79,7 +88,7 @@ body {
   max-height: calc(100dvh - 5.5rem);
 }
 
-.demo-frame .stage {
+.demo-frame .${scope.stageClass} {
   width: 100%;
   max-width: 100%;
   max-height: 100%;
@@ -114,7 +123,7 @@ body {
   const actorCount = project.actors.length
   const actorMarkup = project.actors
     .map((actor, i) => {
-      const cls = cssActorClass(i, actorCount)
+      const cls = scopedActorClass(i, actorCount)
       const appearance = coerceActor(actor.appearance)
       const testId = i === 0 ? ' data-testid="demo-actor"' : ''
       if (appearance.kind === 'image' && appearance.image) {
@@ -122,10 +131,10 @@ body {
       }
       return `<div class="${cls}"${testId}></div>`
     })
-    .join('\n        ')
+    .join('\n          ')
 
-  const classList = project.actors.map((_, i) =>
-    cssActorClass(i, actorCount),
+  const actorClassList = project.actors.map((_, i) =>
+    scopedActorClass(i, actorCount),
   )
 
   return `<!DOCTYPE html>
@@ -144,26 +153,74 @@ ${css}
 <body>
   <div class="demo-shell">
     <div class="demo-frame">
-      <div class="stage" data-testid="demo-stage">
-        ${actorMarkup}
+      <div class="${scope.rootClass}" data-ms-scene="${scope.sceneId}" data-testid="demo-scene">
+        <div class="${scope.stageClass}" data-testid="demo-stage">
+          ${actorMarkup}
+        </div>
       </div>
     </div>
     <button type="button" class="demo-replay" data-testid="demo-replay" id="replay">Replay</button>
   </div>
   <script>
 (function () {
-  var selectors = ${JSON.stringify(classList.map((c) => '.' + c))};
+  var root = document.querySelector('[data-ms-scene="${scope.sceneId}"]');
   var button = document.getElementById('replay');
-  if (!button) return;
-  button.addEventListener('click', function () {
-    selectors.forEach(function (sel) {
-      var el = document.querySelector(sel);
-      if (!el) return;
+  var actorClasses = ${JSON.stringify(actorClassList)};
+  var motionOk = ${JSON.stringify(MS_MOTION_OK_CLASS)};
+  if (!root || !button) return;
+
+  var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function actors() {
+    return actorClasses.map(function (cls) {
+      return root.querySelector('.' + cls);
+    }).filter(Boolean);
+  }
+
+  function restartAnimations() {
+    actors().forEach(function (el) {
       el.style.animation = 'none';
       void el.offsetWidth;
       el.style.removeProperty('animation');
     });
+  }
+
+  function syncLabel() {
+    if (mq.matches && !root.classList.contains(motionOk)) {
+      button.textContent = 'Play animation';
+      button.setAttribute('data-demo-mode', 'play');
+    } else {
+      button.textContent = 'Replay';
+      button.setAttribute('data-demo-mode', 'replay');
+    }
+  }
+
+  function onPreferenceChange() {
+    if (!mq.matches) {
+      // Preference cleared: resume default autoplay semantics (no opt-in class).
+      root.classList.remove(motionOk);
+      restartAnimations();
+    } else if (!root.classList.contains(motionOk)) {
+      // Reduced motion engaged while idle: ensure static presentation.
+      restartAnimations();
+    }
+    syncLabel();
+  }
+
+  button.addEventListener('click', function () {
+    if (mq.matches) {
+      root.classList.add(motionOk);
+    }
+    restartAnimations();
+    syncLabel();
   });
+
+  if (typeof mq.addEventListener === 'function') {
+    mq.addEventListener('change', onPreferenceChange);
+  } else if (typeof mq.addListener === 'function') {
+    mq.addListener(onPreferenceChange);
+  }
+  syncLabel();
 })();
   </script>
 </body>
@@ -186,20 +243,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
   )
 
   // Bridge legacy single-actor options through the project exporter.
-  const css = exportCssFromRecording({
-    ...options,
-    actor,
-    durationMs,
-    stageAspect,
-  })
-
-  if (!isSafeCssForEmbed(css)) {
-    throw new Error('Refusing to embed CSS that failed safety checks.')
-  }
-
-  void css
-
-  const projectLike: Project = {
+  const project: Project = {
     version: 1,
     name: 'MotionSketch demo',
     actors: [
@@ -226,12 +270,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
               samples: options.processedPath,
             }
           : null,
-        clip: {
-          start: 0,
-          end: 1,
-          hideBeforeStart: false,
-          hideAfterEnd: false,
-        },
+        clip: fullClip(),
       },
     ],
     playback: {
@@ -242,5 +281,5 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
     stageAspect,
   }
 
-  return buildHtmlDemoFromProject(projectLike)
+  return buildHtmlDemoFromProject(project)
 }

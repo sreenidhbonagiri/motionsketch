@@ -41,7 +41,7 @@ describe('css export', () => {
       actor: DEFAULT_ACTOR,
     })
 
-    expect(css).toContain('@keyframes motionsketch')
+    expect(css).toMatch(/@keyframes ms-[a-f0-9]{8}/)
     expect(css).toContain('1200ms linear forwards')
     expect(css).toContain('container-type: size')
     expect(css).toContain('translate3d(')
@@ -54,7 +54,7 @@ describe('css export', () => {
     expect(keyframeBlock).not.toMatch(/\btop\s*:/)
     expect(css).not.toMatch(/\bease\b/)
     expect(css).toMatch(
-      /Example HTML:[\s\S]*<div class="stage">[\s\S]*<div class="actor"><\/div>/,
+      /Example HTML:[\s\S]*<div class="ms-scene-[a-f0-9]{8}">[\s\S]*<div class="ms-stage">[\s\S]*<div class="ms-actor"><\/div>/,
     )
   })
 
@@ -199,16 +199,18 @@ describe('css export', () => {
     ).toBeGreaterThan(0)
 
     const css = exportCssFromProject(project)
-    expect(css).toContain('.actor-1')
-    expect(css).toContain('.actor-2')
-    expect(css).toContain('@keyframes motionsketch-actor-1')
-    expect(css).toContain('@keyframes motionsketch-actor-2')
-    expect(css).toMatch(/\.actor-1\s*\{[^}]*z-index:\s*1/s)
-    expect(css).toMatch(/\.actor-2\s*\{[^}]*z-index:\s*2/s)
+    expect(css).toContain('.ms-actor-1')
+    expect(css).toContain('.ms-actor-2')
+    expect(css).toMatch(/@keyframes ms-[a-f0-9]{8}-a1/)
+    expect(css).toMatch(/@keyframes ms-[a-f0-9]{8}-a2/)
+    expect(css).toMatch(/\.ms-actor-1\s*\{[^}]*z-index:\s*1/s)
+    expect(css).toMatch(/\.ms-actor-2\s*\{[^}]*z-index:\s*2/s)
     expect(css).toContain('linear infinite alternate')
     // Example HTML lists actors in list/stacking order.
     const example = css.slice(css.indexOf('Example HTML:'))
-    expect(example.indexOf('actor-1')).toBeLessThan(example.indexOf('actor-2'))
+    expect(example.indexOf('ms-actor-1')).toBeLessThan(
+      example.indexOf('ms-actor-2'),
+    )
   })
 
   it('keeps near-final and final clip poses distinct under short clips', () => {

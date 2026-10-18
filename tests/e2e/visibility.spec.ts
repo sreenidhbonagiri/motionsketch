@@ -164,7 +164,7 @@ test.describe('per-actor visibility timing', () => {
     expect(await htmlVisibilityAt(page, 1)).toBe('hidden')
 
     // Actor 2 (stationary): visible [0.5, 1)
-    const stillSel = '.actor-2'
+    const stillSel = '.ms-actor-2'
     expect(await htmlVisibilityAt(page, 0.499, stillSel)).toBe('hidden')
     expect(await htmlVisibilityAt(page, 0.5, stillSel)).toBe('visible')
     expect(await htmlVisibilityAt(page, 0.999, stillSel)).toBe('visible')
@@ -236,8 +236,8 @@ test.describe('per-actor visibility timing', () => {
     await openPanel(page, 'export')
     await page.getByTestId('btn-view-css').click()
     const cssText = await page.getByTestId('css-output').inputValue()
-    expect(cssText).toContain('motionsketch-vis-actor-2')
-    expect(cssText).toMatch(/\.actor-2[\s\S]*visibility/)
+    expect(cssText).toMatch(/ms-[a-f0-9]{8}-vis-a2/)
+    expect(cssText).toMatch(/\.ms-actor-2[\s\S]*visibility/)
     expect(cssText).toContain('step-end')
     expect(cssText).not.toContain('step-start')
   })

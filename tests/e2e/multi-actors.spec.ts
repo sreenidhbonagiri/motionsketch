@@ -235,26 +235,27 @@ test.describe('multiple actors', () => {
     await dragActor(page, { x: -20, y: 10 }, { x: -110, y: 40 })
 
     const css = await readExportedCss(page)
-    expect(css).toContain('.actor-1')
-    expect(css).toContain('.actor-2')
-    expect(css).toContain('@keyframes motionsketch-actor-1')
-    expect(css).toContain('@keyframes motionsketch-actor-2')
+    expect(css).toContain('.ms-actor-1')
+    expect(css).toContain('.ms-actor-2')
+    expect(css).toMatch(/@keyframes ms-[a-f0-9]{8}-a1/)
+    expect(css).toMatch(/@keyframes ms-[a-f0-9]{8}-a2/)
+    expect(css).toContain('ms-scene-')
     expect(css).not.toMatch(/^\.actor\s*\{/m)
+    expect(css).not.toMatch(/^\.stage\s*\{/m)
 
     await openPanel(page, 'export')
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const html = await readDownloadText(await downloadPromise)
-    expect(html).toContain('actor-1')
-    expect(html).toContain('actor-2')
-    expect(html).toContain('motionsketch-actor-1')
-    expect(html).toContain('motionsketch-actor-2')
+    expect(html).toContain('ms-actor-1')
+    expect(html).toContain('ms-actor-2')
+    expect(html).toMatch(/ms-[a-f0-9]{8}-a1/)
     expect(html).not.toMatch(/https?:\/\//i)
 
     await page.setContent(html, { waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('demo-stage')).toBeVisible()
     await expect(page.getByTestId('demo-actor')).toBeVisible()
-    await expect(page.locator('.actor-2')).toBeVisible()
+    await expect(page.locator('.ms-actor-2')).toBeVisible()
   })
 
   test('imports a legacy single-actor project as one actor', async ({
@@ -308,9 +309,9 @@ test.describe('multiple actors', () => {
     await expect(page.getByTestId('btn-play')).toBeEnabled()
 
     const css = await readExportedCss(page)
-    expect(css).toContain('.actor')
-    expect(css).toContain('@keyframes motionsketch')
-    expect(css).not.toContain('.actor-1')
+    expect(css).toContain('.ms-actor')
+    expect(css).toMatch(/@keyframes ms-[a-f0-9]{8}/)
+    expect(css).not.toContain('.ms-actor-1')
   })
 
   test('rejects duplicate ids and missing assets without replacing', async ({

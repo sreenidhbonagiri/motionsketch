@@ -100,7 +100,7 @@ test.describe('image actors', () => {
 
     const css = await readExportedCss(page)
     expect(css).toMatch(/does NOT embed the image/i)
-    expect(css).toContain('<img class="actor"')
+    expect(css).toContain('<img class="ms-actor"')
 
     await openPanel(page, 'export')
     const downloadPromise = page.waitForEvent('download')
@@ -115,7 +115,7 @@ test.describe('image actors', () => {
     void html
     const fs = await import('node:fs')
     const demo = fs.readFileSync(path!, 'utf8')
-    expect(demo).toContain('<img class="actor"')
+    expect(demo).toContain('<img class="ms-actor"')
     expect(demo).toContain('data:image/png;base64,')
     expect(demo).not.toMatch(/https?:\/\//i)
 

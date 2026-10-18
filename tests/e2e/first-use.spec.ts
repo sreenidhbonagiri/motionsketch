@@ -38,7 +38,7 @@ test.describe('first-use guidance and export wording', () => {
       'Image assets are separate',
     )
     await expect(page.getByTestId('export-css-code-help')).toContainText(
-      'same animation code',
+      'same scoped scene code',
     )
     await expect(page.getByTestId('btn-export-download-project')).toHaveText(
       'Download project file',

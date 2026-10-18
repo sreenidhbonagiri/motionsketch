@@ -164,9 +164,9 @@ test.describe('per-actor clip timing', () => {
     expect(html.replace(/data:image\/[^"']+/g, '')).not.toMatch(/https?:\/\//i)
     await page.setContent(html, { waitUntil: 'domcontentloaded' })
     await expect(page.getByTestId('demo-stage')).toBeVisible()
-    await expect(page.locator('.actor-1')).toBeVisible()
-    await expect(page.locator('.actor-2')).toBeVisible()
-    await expect(page.locator('.actor-3')).toBeVisible()
+    await expect(page.locator('.ms-actor-1')).toBeVisible()
+    await expect(page.locator('.ms-actor-2')).toBeVisible()
+    await expect(page.locator('.ms-actor-3')).toBeVisible()
   })
 
   test('clip row selection does not arm recording', async ({ page }) => {

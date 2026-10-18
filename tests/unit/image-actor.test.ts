@@ -110,7 +110,7 @@ describe('image actor export', () => {
       transform: { keyframes: [] },
     })
     expect(css).toMatch(/does NOT embed the image/i)
-    expect(css).toContain('<img class="actor"')
+    expect(css).toContain('<img class="ms-actor"')
     expect(css).toContain('width: 18.00cqmin')
     expect(css).toMatch(/aspect-ratio:/)
     expect(css).not.toContain('background: #4f46e5')
@@ -137,7 +137,7 @@ describe('image actor export', () => {
       transform: { keyframes: [] },
     })
     expect(html).toContain('data-testid="demo-actor"')
-    expect(html).toContain('<img class="actor"')
+    expect(html).toContain('<img class="ms-actor"')
     expect(html).toContain(dataUrl)
     expect(html).not.toMatch(/https?:\/\//i)
   })

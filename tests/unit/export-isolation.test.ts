@@ -1,0 +1,119 @@
+import { describe, expect, it } from 'vitest'
+import {
+  exportCssFromProject,
+  fingerprintProjectScene,
+  resolveExportScope,
+} from '../../src/core/export/css'
+import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
+import { makeActor, makeProject, makeRecording } from './helpers/project'
+
+describe('scoped CSS export isolation', () => {
+  it('scopes stage/actors and uses content fingerprint keyframes', () => {
+    const project = makeProject({
+      name: 'Shared Title',
+      actors: [
+        makeActor({
+          id: 'a',
+          recording: makeRecording(12),
+          appearance: { color: '#0f766e' },
+        }),
+        makeActor({
+          id: 'b',
+          recording: makeRecording(12),
+          appearance: { color: '#c2410c' },
+        }),
+      ],
+      playback: { durationMs: 1800, loop: true, loopMode: 'alternate' },
+    })
+    const scope = resolveExportScope(project)
+    const css = exportCssFromProject(project)
+
+    expect(scope.sceneId).toMatch(/^[a-f0-9]{8}$/)
+    expect(css).toContain(`.${scope.rootClass} .ms-stage`)
+    expect(css).toContain(`.${scope.rootClass} .ms-actor-1`)
+    expect(css).toContain(`.${scope.rootClass} .ms-actor-2`)
+    expect(css).toContain(`@keyframes ms-${scope.sceneId}-a1`)
+    expect(css).toContain(`@keyframes ms-${scope.sceneId}-a2`)
+    expect(css).not.toMatch(/(^|\n)\.stage\s*\{/)
+    expect(css).not.toMatch(/(^|\n)\.actor-1\s*\{/)
+    expect(css).not.toContain('@keyframes motionsketch-actor-1')
+    expect(css).toContain('prefers-reduced-motion: reduce')
+    expect(css).toContain('ms-motion-ok')
+    expect(css).toContain('1800ms linear infinite alternate')
+  })
+
+  it('does not use project name alone for uniqueness', () => {
+    const sharedName = 'Twin'
+    const a = makeProject({
+      name: sharedName,
+      actors: [
+        makeActor({
+          id: 'x',
+          recording: makeRecording(10),
+          appearance: { color: '#111111' },
+          clip: {
+            start: 0.1,
+            end: 0.9,
+            hideBeforeStart: true,
+            hideAfterEnd: true,
+          },
+        }),
+      ],
+      playback: { durationMs: 1000, loop: false, loopMode: 'repeat' },
+    })
+    const b = makeProject({
+      name: sharedName,
+      actors: [
+        makeActor({
+          id: 'y',
+          recording: makeRecording(10),
+          appearance: { color: '#eeeeee' },
+          clip: {
+            start: 0.2,
+            end: 0.8,
+            hideBeforeStart: false,
+            hideAfterEnd: false,
+          },
+        }),
+      ],
+      playback: { durationMs: 2500, loop: false, loopMode: 'repeat' },
+    })
+    expect(fingerprintProjectScene(a)).not.toBe(fingerprintProjectScene(b))
+    const cssA = exportCssFromProject(a)
+    const cssB = exportCssFromProject(b)
+    expect(cssA).not.toBe(cssB)
+    expect(resolveExportScope(a).rootClass).not.toBe(
+      resolveExportScope(b).rootClass,
+    )
+  })
+
+  it('instancePrefix yields independently named copies', () => {
+    const project = makeProject({
+      actors: [makeActor({ recording: makeRecording(8) })],
+    })
+    const base = resolveExportScope(project)
+    const copy = resolveExportScope(project, { instancePrefix: 'hero-' })
+    expect(copy.rootClass).toBe(`hero-ms-scene-${base.sceneId}`)
+    expect(copy.sceneId).toBe(base.sceneId)
+
+    const cssBase = exportCssFromProject(project)
+    const cssCopy = exportCssFromProject(project, { instancePrefix: 'hero-' })
+    expect(cssBase).toContain(`@keyframes ms-${base.sceneId}`)
+    expect(cssCopy).toContain(`@keyframes hero-ms-${base.sceneId}`)
+    expect(cssCopy).toContain(`.hero-ms-scene-${base.sceneId} .ms-stage`)
+  })
+
+  it('HTML demo embeds scoped CSS and scene-local replay wiring', () => {
+    const project = makeProject({
+      actors: [makeActor({ recording: makeRecording(6) })],
+    })
+    const css = exportCssFromProject(project)
+    const html = buildHtmlDemoFromProject(project)
+    expect(html).toContain(css)
+    expect(html).toContain('data-testid="demo-scene"')
+    expect(html).toContain('data-ms-scene=')
+    expect(html).toContain('Play animation')
+    expect(html).toContain('ms-motion-ok')
+    expect(html).toContain('prefers-reduced-motion')
+  })
+})

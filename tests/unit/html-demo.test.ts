@@ -41,18 +41,20 @@ describe('html demo export', () => {
   it('is standalone: no external URLs, includes Replay outside the stage', () => {
     const html = buildHtmlDemo({ ...base, loop: false })
     expect(html).toMatch(/<!DOCTYPE html>/i)
+    expect(html).toContain('data-testid="demo-scene"')
     expect(html).toContain('data-testid="demo-stage"')
     expect(html).toContain('data-testid="demo-actor"')
     expect(html).toContain('data-testid="demo-replay"')
     expect(html).toContain('id="replay"')
     expect(html).toContain('demo-frame')
+    expect(html).toContain('ms-stage')
     expect(html).toMatch(/aspect-ratio:\s*16\s*\/\s*10/)
     expect(html).not.toMatch(/https?:\/\//i)
     expect(html).not.toMatch(/src\s*=\s*["'][^"']+["']/i)
     expect(html).not.toContain('@import')
-    // Replay button is a sibling of the frame, not inside .stage
+    // Replay button is a sibling of the frame, not inside the stage
     expect(html).toMatch(
-      /demo-stage[\s\S]*?<\/div>\s*<\/div>\s*<button[^>]*demo-replay/,
+      /demo-stage[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<button[^>]*demo-replay/,
     )
   })
 

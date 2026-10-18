@@ -1,4 +1,8 @@
 import { projectToLocal } from '../core/clip'
+import {
+  cachedApplySteadySpeed,
+  cachedProcessMotion,
+} from '../core/pathCache'
 import { applySteadySpeed, processMotion } from '../core/process'
 import { evaluate } from '../core/playback'
 import { findActor } from '../core/sceneActor'
@@ -20,6 +24,8 @@ export interface PathViewState {
  * Path used for display, playback, and CSS export for one actor.
  *
  * Priority: drag preview → edit session → committed geometry edit → live process.
+ * Unchanged recording/geometry inputs reuse a bounded processed-path cache so
+ * playback-head updates only evaluate the path (no re-smoothing).
  */
 export function selectProcessedPathForActor(
   project: Project,
@@ -33,20 +39,24 @@ export function selectProcessedPathForActor(
   const recording = actor.recording
   if (!recording) return []
 
+  const aspect = project.stageAspect
+
+  // Live drag preview changes every pointer move — do not fill the LRU.
+  if (view.editPreview) {
+    return applySteadySpeed(view.editPreview, actor.steadySpeed, aspect)
+  }
+
   const spatial =
-    view.editPreview ??
     view.editSession?.samples ??
     view.geometryEdit?.samples ??
     actor.geometryEdit?.samples ??
     null
 
-  const aspect = project.stageAspect
-
   if (spatial) {
-    return applySteadySpeed(spatial, actor.steadySpeed, aspect)
+    return cachedApplySteadySpeed(spatial, actor.steadySpeed, aspect)
   }
 
-  return processMotion(
+  return cachedProcessMotion(
     recording.samples,
     actor.smoothing,
     actor.steadySpeed,
@@ -77,7 +87,8 @@ export function bakeEditablePathForActor(
 ): MotionSample[] {
   const recording = actor.recording
   if (!recording) return []
-  return processMotion(
+  // Bake uses steadySpeed 0; share the same cache key space as processMotion.
+  return cachedProcessMotion(
     recording.samples,
     actor.smoothing,
     0,
@@ -146,4 +157,14 @@ export function selectActorPosition(
     view,
     true,
   )
+}
+
+/** Escape hatch when callers need an uncached process (tests / tooling). */
+export function processMotionUncached(
+  samples: MotionSample[],
+  smoothing: number,
+  steadySpeed: number,
+  stageAspect: number,
+): MotionSample[] {
+  return processMotion(samples, smoothing, steadySpeed, stageAspect)
 }

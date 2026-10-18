@@ -144,7 +144,9 @@ export function ExportPanel() {
           data-testid="export-css-help"
           className="text-[11px] leading-relaxed text-slate-500"
         >
-          Use the animation on your website. Image assets are separate.
+          Scoped CSS for your site (scene root + keyframes). Image assets are
+          separate. See the header comments for reduced motion and instance
+          prefixes.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -170,10 +172,10 @@ export function ExportPanel() {
           data-testid="export-css-code-help"
           className="text-[11px] leading-relaxed text-slate-500"
         >
-          Copy CSS and View CSS provide the same animation code
+          Copy CSS and View CSS provide the same scoped scene code
           {project.actors.length > 1
-            ? ' (unique classes per actor).'
-            : '.'}
+            ? ' (unique classes per actor inside the scene root).'
+            : ' (wrap in the documented scene root).'}
         </p>
       </div>
 

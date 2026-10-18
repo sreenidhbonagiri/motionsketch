@@ -194,24 +194,28 @@ export function projectHasAnyRecording(project: Project): boolean {
   return project.actors.some((a) => !!a.recording)
 }
 
-/** Unique class per actor. Single-actor projects keep legacy `.actor`. */
+/**
+ * @deprecated Unscoped names — use {@link scopedActorClass} from
+ * `./export/sceneScope` via {@link resolveExportScope}.
+ */
 export function cssActorClass(index: number, actorCount = 2): string {
-  if (actorCount <= 1) return 'actor'
-  return `actor-${index + 1}`
+  if (actorCount <= 1) return 'ms-actor'
+  return `ms-actor-${index + 1}`
 }
 
+/** @deprecated Use scopedAnimationName with resolveExportScope. */
 export function cssAnimationName(index: number, actorCount = 2): string {
-  if (actorCount <= 1) return 'motionsketch'
-  return `motionsketch-actor-${index + 1}`
+  if (actorCount <= 1) return 'ms-anim'
+  return `ms-anim-a${index + 1}`
 }
 
-/** Separate keyframes for discrete visibility (no fades). */
+/** @deprecated Use scopedVisibilityAnimationName with resolveExportScope. */
 export function cssVisibilityAnimationName(
   index: number,
   actorCount = 2,
 ): string {
-  if (actorCount <= 1) return 'motionsketch-vis'
-  return `motionsketch-vis-actor-${index + 1}`
+  if (actorCount <= 1) return 'ms-vis'
+  return `ms-vis-a${index + 1}`
 }
 
 function clamp01Local(value: number): number {

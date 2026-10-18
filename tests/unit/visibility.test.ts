@@ -180,7 +180,7 @@ describe('actor visibility timing', () => {
       ],
     })
     const css = exportCssFromProject(project)
-    expect(css).toMatch(/motionsketch-vis/)
+    expect(css).toMatch(/ms-[a-f0-9]{8}-vis/)
     expect(css).toContain('visibility: hidden')
     expect(css).toContain('visibility: visible')
     expect(css).toContain('step-end')
@@ -194,7 +194,7 @@ describe('actor visibility timing', () => {
     expect(vis!.frames).toMatch(/60(?:\.0+)?%\s*\{\s*visibility:\s*hidden/)
 
     const html = buildHtmlDemoFromProject(project)
-    expect(html).toContain('motionsketch-vis')
+    expect(html).toMatch(/ms-[a-f0-9]{8}-vis/)
     expect(html).toContain('visibility: hidden')
   })
 
@@ -233,8 +233,8 @@ describe('actor visibility timing', () => {
       ],
     })
     const css = exportCssFromProject(project)
-    expect(css).toContain('motionsketch-vis-actor-2')
-    expect(css).toMatch(/\.actor-2[\s\S]*animation:\s*motionsketch-vis-actor-2/)
+    expect(css).toMatch(/ms-[a-f0-9]{8}-vis-a2/)
+    expect(css).toMatch(/\.ms-actor-2[\s\S]*animation:\s*ms-[a-f0-9]{8}-vis-a2/)
   })
 })
 

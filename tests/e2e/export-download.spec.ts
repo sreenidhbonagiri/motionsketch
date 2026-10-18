@@ -79,7 +79,7 @@ test.describe('downloadable exports', () => {
     const animBefore = await actor.evaluate((el) =>
       getComputedStyle(el).animationName,
     )
-    expect(animBefore).toContain('motionsketch')
+    expect(animBefore).toMatch(/ms-[a-f0-9]{8}/)
 
     // Landscape fit: stage near 16/10 and fully inside viewport.
     await page.setViewportSize({ width: 1280, height: 720 })
@@ -101,7 +101,7 @@ test.describe('downloadable exports', () => {
     const animAfter = await actor.evaluate((el) =>
       getComputedStyle(el).animationName,
     )
-    expect(animAfter).toContain('motionsketch')
+    expect(animAfter).toMatch(/ms-[a-f0-9]{8}/)
 
     const external = requests.filter((u) => /^https?:/i.test(u))
     expect(external).toEqual([])
