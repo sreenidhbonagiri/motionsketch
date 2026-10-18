@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { readExportedCss, recordSimplePath } from './helpers'
+import {
+  ensureEditor,
+  readExportedCss,
+  recordSimplePath,
+} from './helpers'
 
 test.describe('path editing', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -8,6 +12,7 @@ test.describe('path editing', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
 
@@ -62,6 +67,7 @@ test.describe('path editing', () => {
 
   test('keyboard can nudge the selected handle', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('btn-edit-path').click()
 

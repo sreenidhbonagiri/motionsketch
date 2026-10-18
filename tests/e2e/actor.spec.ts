@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { openPanel, readExportedCss, recordSimplePath } from './helpers'
+import {
+  ensureEditor,
+  openPanel,
+  readExportedCss,
+  recordSimplePath,
+} from './helpers'
 
 test.describe('actor customization', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -8,6 +13,7 @@ test.describe('actor customization', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await page.getByTestId('playback-scrubber').fill('0.4')
@@ -46,6 +52,7 @@ test.describe('actor customization', () => {
 
   test('actor settings survive reload via autosave', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-size-slider').fill('0.2')
@@ -54,7 +61,7 @@ test.describe('actor customization', () => {
     await page.waitForTimeout(400)
     await openPanel(page, 'project')
     await expect(page.getByTestId('save-status')).toHaveText(
-      'Saved on this device',
+      'Saved in this browser',
     )
 
     await page.reload()

@@ -10,6 +10,12 @@ import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
 import { createEmptyPersistableProject } from '../core/persist/document'
+import {
+  commitProjectName,
+  DEFAULT_PROJECT_NAME,
+  isValidProjectName,
+  sanitizeProjectName,
+} from '../core/projectName'
 import { captureViewportStageAspect, clampStageAspect } from '../core/stageAspect'
 import {
   clampClip,
@@ -60,7 +66,11 @@ const MAX_UNDO = 40
 /** Chronological actor-edit kinds for unified clip/transform undo. */
 export type ActorEditKind = 'transform' | 'clip'
 
+/** Welcome = no intentional project yet; editor only after create/open/example. */
+export type WorkspacePhase = 'welcome' | 'editing'
+
 interface EditorStore {
+  workspace: WorkspacePhase
   project: Project
   selectedActorId: string
   mode: EditorMode
@@ -138,8 +148,17 @@ interface EditorStore {
   /** Clear the selected actor’s recording, path edits, and transform track. */
   resetRecording: () => void
 
+  /**
+   * Create a fresh board with the given name and enter the editor.
+   * Returns false when the name is invalid (caller should show validation).
+   */
+  createNamedProject: (name: string) => boolean
+  /** @deprecated Prefer createNamedProject — kept for transitional call sites. */
   newProject: () => void
+  /** Rename the project title only — does not touch actors or history. */
+  renameProject: (name: string) => void
   applyPersistedSnapshot: (snapshot: PersistedSnapshot) => void
+  enterWelcome: () => void
   hasReplaceableAnimation: () => boolean
   announceAction: (message: string | null) => void
 
@@ -304,6 +323,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
   const firstId = project.actors[0].id
 
   return {
+    workspace: 'welcome' as WorkspacePhase,
     project,
     selectedActorId: firstId,
     mode: 'idle',
@@ -716,9 +736,52 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         }
       }),
 
+    createNamedProject: (name) => {
+      if (!isValidProjectName(name)) return false
+      const project = createEmptyPersistableProject(
+        captureViewportStageAspect(),
+        sanitizeProjectName(name),
+      )
+      set({
+        workspace: 'editing',
+        mode: 'idle',
+        pointerId: null,
+        playbackHead: 0,
+        playbackDirection: 1,
+        playbackEpoch: get().playbackEpoch + 1,
+        liveTrail: [],
+        livePosition: { ...DEFAULT_REST_POSITION },
+        showPathComparison: false,
+        stageHint: 'new-project',
+        actionAnnouncement: `Created “${project.name}”. You can start drawing.`,
+        selectedActorId: project.actors[0].id,
+        ...clearHistoryForActorSwitch(),
+        project,
+      })
+      return true
+    },
+
     newProject: () => {
+      get().createNamedProject(DEFAULT_PROJECT_NAME)
+    },
+
+    renameProject: (name) => {
+      const state = get()
+      if (state.workspace !== 'editing') return
+      const next = commitProjectName(name, state.project.name)
+      if (next === state.project.name) return
+      set({
+        project: {
+          ...state.project,
+          name: next,
+        },
+      })
+    },
+
+    enterWelcome: () => {
       const project = createEmptyPersistableProject(captureViewportStageAspect())
       set({
+        workspace: 'welcome',
         mode: 'idle',
         pointerId: null,
         playbackHead: 0,
@@ -726,8 +789,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         liveTrail: [],
         livePosition: { ...DEFAULT_REST_POSITION },
         showPathComparison: false,
-        stageHint: 'new-project',
-        actionAnnouncement: 'New project created.',
+        stageHint: 'default',
+        actionAnnouncement: null,
         selectedActorId: project.actors[0].id,
         ...clearHistoryForActorSwitch(),
         project,
@@ -737,6 +800,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     applyPersistedSnapshot: (snapshot) => {
       const project: Project = {
         version: 1,
+        name:
+          sanitizeProjectName(snapshot.project.name) || DEFAULT_PROJECT_NAME,
         actors: snapshot.project.actors.map((a) => cloneSceneActor(a)),
         playback: { ...snapshot.project.playback },
         // Preserve the snapshot’s authored aspect (examples and imports).
@@ -748,6 +813,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       const selectedActorId = first.id
       set({
+        workspace: 'editing',
         mode: 'idle',
         pointerId: null,
         playbackHead: 0,

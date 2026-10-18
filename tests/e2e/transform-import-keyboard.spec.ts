@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { openPanel, recordSimplePath } from './helpers'
+import {
+  ensureEditor,
+  openPanel,
+  recordSimplePath,
+} from './helpers'
 
 test.describe('transform import + keyboard scope', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -8,6 +12,7 @@ test.describe('transform import + keyboard scope', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('playback-scrubber').fill('0.5')
     await openPanel(page, 'appearance')
@@ -73,6 +78,7 @@ test.describe('transform import + keyboard scope', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('playback-scrubber').fill('0.6')
     await openPanel(page, 'appearance')

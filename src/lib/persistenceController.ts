@@ -13,7 +13,7 @@ import {
 import { captureViewportStageAspect } from '../core/stageAspect'
 import { createEmptyPersistableProject } from '../core/persist/document'
 import type { Project } from '../core/types'
-import { downloadTextFile, stampFilename } from './download'
+import { downloadTextFile, stampFilename, stampProjectFilename } from './download'
 import { useEditorStore } from '../state/store'
 
 export type PersistenceStatus =
@@ -200,9 +200,12 @@ export function createPersistenceController(
   }
 
   const onStoreChange = (
-    state: { project: Project },
-    prev: { project: Project },
+    state: { project: Project; workspace?: string },
+    prev: { project: Project; workspace?: string },
   ) => {
+    // Never autosave the welcome placeholder — no intentional project yet.
+    if (state.workspace === 'welcome') return
+
     // Playhead/direction/mode UI updates keep the same project reference —
     // bail before any JSON serialization or image-bearing snapshots.
     if (state.project === prev.project) return
@@ -240,34 +243,44 @@ export function createPersistenceController(
 
       if (!storage) {
         setStatus('save-error')
+        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
+        useEditorStore.setState({
+          workspace: 'welcome',
+          project: fresh,
+          selectedActorId: fresh.actors[0].id,
+          livePosition: { ...fresh.actors[0].restPosition },
+        })
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
 
       const loaded = loadStoredSnapshot(storage)
       if (loaded.status === 'empty') {
-        useEditorStore.setState((state) => ({
-          project: {
-            ...createEmptyPersistableProject(captureViewportStageAspect()),
-          },
-          selectedActorId: state.selectedActorId,
-        }))
-        // Ensure selected id matches the fresh project.
+        // No saved project: stay on the welcome screen and do not persist a blank.
         const fresh = createEmptyPersistableProject(captureViewportStageAspect())
         useEditorStore.setState({
+          workspace: 'welcome',
           project: fresh,
           selectedActorId: fresh.actors[0].id,
           livePosition: { ...fresh.actors[0].restPosition },
+          mode: 'idle',
+          playbackHead: 0,
         })
-        lastWrittenFingerprint = fingerprint(
-          pickPersistable(useEditorStore.getState()),
-        )
+        lastWrittenFingerprint = ''
+        setStatus('idle')
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
 
       if (loaded.status === 'error') {
         setStatus('restore-error')
+        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
+        useEditorStore.setState({
+          workspace: 'welcome',
+          project: fresh,
+          selectedActorId: fresh.actors[0].id,
+          livePosition: { ...fresh.actors[0].restPosition },
+        })
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
@@ -276,6 +289,13 @@ export function createPersistenceController(
         quarantineRaw = loaded.raw
         saveBlocked = true
         setStatus('restore-error')
+        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
+        useEditorStore.setState({
+          workspace: 'welcome',
+          project: fresh,
+          selectedActorId: fresh.actors[0].id,
+          livePosition: { ...fresh.actors[0].restPosition },
+        })
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
@@ -307,7 +327,10 @@ export function createPersistenceController(
       quarantineRaw = null
       saveBlocked = false
       lastWrittenFingerprint = ''
-      writeSlice(pickPersistable(useEditorStore.getState()))
+      const state = useEditorStore.getState()
+      if (state.workspace === 'editing') {
+        writeSlice(pickPersistable(state))
+      }
     },
 
     afterSuccessfulReplace: () => {
@@ -317,7 +340,10 @@ export function createPersistenceController(
       }
       quarantineRaw = null
       saveBlocked = false
-      writeSlice(pickPersistable(useEditorStore.getState()))
+      const state = useEditorStore.getState()
+      if (state.workspace === 'editing') {
+        writeSlice(pickPersistable(state))
+      }
     },
 
     downloadCurrentProject: () => {
@@ -326,7 +352,7 @@ export function createPersistenceController(
         const snap = buildSnapshot(slice.project, null)
         return downloadTextFile(
           serializeSnapshot(snap),
-          stampFilename('motionsketch', 'json'),
+          stampProjectFilename(slice.project.name, 'json'),
           'application/json',
         )
       } catch (err) {

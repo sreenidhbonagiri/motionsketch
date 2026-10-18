@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  ensureEditor,
   openPanel,
   recordSimplePath,
   selectActorByIndex,
@@ -33,6 +34,7 @@ test.describe('unified actor edit undo', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await closeChromePanels(page)
 
@@ -86,6 +88,7 @@ test.describe('unified actor edit undo', () => {
 
   test('actor switch clears unified undo history', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('btn-add-actor').click()
     await selectActorByIndex(page, 0)

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
+  ensureEditor,
   actorIdsFromList,
   clickRecord,
   dragActor,
@@ -47,6 +48,7 @@ test.describe('per-actor clip timing', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('actor-name-input').fill('Lead')
     await page.getByTestId('actor-name-input').press('Enter')
@@ -169,6 +171,7 @@ test.describe('per-actor clip timing', () => {
 
   test('clip row selection does not arm recording', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('btn-add-actor').click()
     await ensureClipTimelineOpen(page)

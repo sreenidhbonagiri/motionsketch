@@ -1,4 +1,5 @@
 import { coerceActor } from '../actor'
+import { escapeHtmlText } from '../projectName'
 import {
   clampStageAspect,
   LEGACY_STAGE_ASPECT,
@@ -132,7 +133,7 @@ body {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MotionSketch demo</title>
+<title>${escapeHtmlText(project.name || 'MotionSketch demo')}</title>
 <style>
 ${chromeCss}
 </style>
@@ -200,6 +201,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
 
   const projectLike: Project = {
     version: 1,
+    name: 'MotionSketch demo',
     actors: [
       {
         id: 'a1',

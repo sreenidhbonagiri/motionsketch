@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  ensureEditor,
   clickRecord,
   openPanel,
   readExportedCss,
@@ -13,6 +14,7 @@ test.describe('playback inspection', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
@@ -66,6 +68,7 @@ test.describe('playback inspection', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('400')
@@ -92,6 +95,7 @@ test.describe('playback inspection', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('400')
@@ -109,6 +113,7 @@ test.describe('playback inspection', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('600')
@@ -215,6 +220,7 @@ test.describe('playback inspection', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await clickRecord(page, { replaceExisting: true })

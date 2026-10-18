@@ -4,6 +4,10 @@ import {
   serializeSnapshot,
   type PersistedSnapshot,
 } from '../core/persist/document'
+import {
+  DEFAULT_PROJECT_NAME,
+  sanitizeProjectName,
+} from '../core/projectName'
 import { cloneSceneActor } from '../core/sceneActor'
 import type { Project } from '../core/types'
 import { EXAMPLE_CATALOG, findExample, type ExampleId } from './catalog'
@@ -16,6 +20,7 @@ export type ExampleLoadResult = ExampleLoadOk | ExampleLoadErr
 export function cloneExampleProject(project: Project): Project {
   return {
     version: 1,
+    name: sanitizeProjectName(project.name) || DEFAULT_PROJECT_NAME,
     stageAspect: project.stageAspect,
     playback: { ...project.playback },
     actors: project.actors.map((a) => cloneSceneActor(a)),
@@ -25,13 +30,22 @@ export function cloneExampleProject(project: Project): Project {
 /**
  * Build a fresh example, round-trip through the normal persist validation
  * path, and return an isolated snapshot. Authored stageAspect is preserved.
+ * `projectName` becomes the editable project title (defaults to the example title).
  */
-export function loadExampleSnapshot(id: ExampleId): ExampleLoadResult {
+export function loadExampleSnapshot(
+  id: ExampleId,
+  projectName?: string,
+): ExampleLoadResult {
   const def = findExample(id)
   if (!def) {
     return { ok: false, error: `Unknown example “${id}”.` }
   }
   const fresh = cloneExampleProject(def.build())
+  const named =
+    sanitizeProjectName(projectName ?? def.title) ||
+    sanitizeProjectName(def.title) ||
+    DEFAULT_PROJECT_NAME
+  fresh.name = named
   const built = buildSnapshot(fresh, null, '1970-01-01T00:00:00.000Z')
   const parsed = parseSnapshotJson(serializeSnapshot(built))
   if (!parsed.ok) {

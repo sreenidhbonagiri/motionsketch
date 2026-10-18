@@ -1,3 +1,5 @@
+import { filenameStemFromProjectName } from '../core/projectName'
+
 /** Trigger a browser download for a text file. Returns false if the API fails. */
 export function downloadTextFile(
   text: string,
@@ -26,4 +28,12 @@ export function stampFilename(prefix: string, extension: string): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
   return `${prefix}-${stamp}.${extension}`
+}
+
+/** Download filename using a sanitized project-name stem + timestamp. */
+export function stampProjectFilename(
+  projectName: string,
+  extension: string,
+): string {
+  return stampFilename(filenameStemFromProjectName(projectName), extension)
 }

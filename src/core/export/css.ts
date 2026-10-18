@@ -464,6 +464,7 @@ export function generateCssSnippet(options: {
   }
   const project: Project = {
     version: 1,
+    name: 'Export',
     actors: [fakeActor],
     playback: {
       durationMs: options.durationMs,
@@ -504,6 +505,7 @@ export function exportCssFromRecording(options: {
 }): string {
   const project: Project = {
     version: 1,
+    name: 'Export',
     actors: [
       {
         id: 'a1',

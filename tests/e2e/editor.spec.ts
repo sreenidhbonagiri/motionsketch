@@ -1,11 +1,17 @@
 import { expect, test } from '@playwright/test'
-import { dragActor, openPanel, readExportedCss } from './helpers'
+import {
+  ensureEditor,
+  dragActor,
+  openPanel,
+  readExportedCss,
+} from './helpers'
 
 test.describe('MotionSketch editor', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
   test('drag without record does not show export panel', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await expect(page.getByTestId('actor')).toBeVisible()
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
@@ -17,6 +23,7 @@ test.describe('MotionSketch editor', () => {
 
   test('record, play, and export CSS', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
 
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('armed-hint')).toBeVisible()
@@ -50,6 +57,7 @@ test.describe('MotionSketch editor', () => {
 
   test('smoothing slider updates exported CSS', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 20, y: 40 }, { x: 160, y: -30 })
 
@@ -65,6 +73,7 @@ test.describe('MotionSketch editor', () => {
 
   test('path comparison toggle shows legend when enabled', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 20, y: 30 }, { x: 140, y: 50 })
 
@@ -83,6 +92,7 @@ test.describe('MotionSketch editor', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 25, y: -15 }, { x: 170, y: 55 })
 
@@ -99,6 +109,7 @@ test.describe('MotionSketch editor', () => {
 
   test('pointer cancel during record does not crash', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.getByTestId('btn-record').click()
 
     const actor = page.getByTestId('actor')

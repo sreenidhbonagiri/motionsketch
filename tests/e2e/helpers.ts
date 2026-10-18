@@ -1,5 +1,26 @@
 import { expect, type Page } from '@playwright/test'
 
+/**
+ * From a first visit (welcome screen), create a named project and enter the editor.
+ * No-ops if the editor is already showing (e.g. restored save).
+ */
+export async function ensureEditor(
+  page: Page,
+  name = 'Test project',
+) {
+  const welcome = page.getByTestId('welcome-screen')
+  if (await welcome.isVisible().catch(() => false)) {
+    await page.getByTestId('btn-welcome-create').click()
+    await expect(page.getByTestId('project-name-dialog')).toBeVisible()
+    await page.getByTestId('project-name-input').fill(name)
+    await page.getByTestId('btn-confirm-project-name').click()
+    await expect(page.getByTestId('app-shell')).toBeVisible()
+    await expect(page.getByTestId('btn-rename-project')).toContainText(name)
+    return
+  }
+  await expect(page.getByTestId('app-shell')).toBeVisible()
+}
+
 export async function dragActor(
   page: Page,
   from: { x: number; y: number },

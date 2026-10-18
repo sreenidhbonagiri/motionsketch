@@ -123,6 +123,8 @@ export interface SceneActor {
 
 export interface Project {
   version: 1
+  /** User-facing project title (local only; not an account). */
+  name: string
   actors: SceneActor[]
   playback: PlaybackSettings
   /**

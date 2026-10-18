@@ -47,6 +47,7 @@ export function buildLogoEntranceProject(): Project {
   ]
   return {
     version: 1,
+    name: 'Logo entrance',
     stageAspect: EXAMPLE_STAGE_ASPECT,
     playback: { durationMs, loop: false, loopMode: 'repeat' },
     actors: [
@@ -95,6 +96,7 @@ export function buildFollowTheLeaderProject(): Project {
 
   return {
     version: 1,
+    name: 'Follow the leader',
     stageAspect: EXAMPLE_STAGE_ASPECT,
     playback: { durationMs, loop: false, loopMode: 'repeat' },
     actors: [
@@ -173,6 +175,7 @@ export function buildOrbitProject(): Project {
 
   return {
     version: 1,
+    name: 'Orbit',
     stageAspect: EXAMPLE_STAGE_ASPECT,
     playback: { durationMs, loop: true, loopMode: 'repeat' },
     actors: [

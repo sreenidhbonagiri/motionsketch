@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { openPanel, readExportedCss } from './helpers'
+import {
+  ensureEditor,
+  openPanel,
+  readExportedCss,
+} from './helpers'
 
 test.describe('full-viewport recording', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -8,6 +12,7 @@ test.describe('full-viewport recording', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.getByTestId('btn-record').click()
 
     const actor = page.getByTestId('actor')

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  ensureEditor,
   clickRecord,
   openPanel,
   readExportedCss,
@@ -13,6 +14,7 @@ test.describe('transform keyframes', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await page.getByTestId('playback-scrubber').fill('0.5')
@@ -50,6 +52,7 @@ test.describe('transform keyframes', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('playback-scrubber').fill('0.75')
     await openPanel(page, 'appearance')
@@ -78,6 +81,7 @@ test.describe('transform keyframes', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('playback-scrubber').fill('0.5')
     await openPanel(page, 'appearance')

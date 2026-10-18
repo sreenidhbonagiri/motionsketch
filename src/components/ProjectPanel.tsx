@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { parseSnapshotJson } from '../core/persist/document'
+import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import {
   statusLabel,
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
+import { ProjectNameDialog } from './ProjectNameDialog'
 
 export function ProjectPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -13,13 +15,11 @@ export function ProjectPanel() {
   const titleId = useId()
   const [importError, setImportError] = useState<string | null>(null)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
+  const [nameOpen, setNameOpen] = useState(false)
 
-  const hasRecording = useEditorStore((s) =>
-    s.project.actors.some((a) => !!a.recording),
-  )
-  const newProject = useEditorStore((s) => s.newProject)
+  const project = useEditorStore((s) => s.project)
+  const createNamedProject = useEditorStore((s) => s.createNamedProject)
   const applyPersistedSnapshot = useEditorStore((s) => s.applyPersistedSnapshot)
-  const hasReplaceableAnimation = useEditorStore((s) => s.hasReplaceableAnimation)
   const announceAction = useEditorStore((s) => s.announceAction)
   const storeAnnouncement = useEditorStore((s) => s.actionAnnouncement)
 
@@ -33,8 +33,8 @@ export function ProjectPanel() {
   } = useProjectPersistence()
 
   const label = statusLabel(status)
+  const hasRecording = project.actors.some((a) => !!a.recording)
 
-  // Mirror store announcements (e.g. from newProject) into the visible status line.
   useEffect(() => {
     if (storeAnnouncement) {
       setActionStatus(storeAnnouncement)
@@ -51,29 +51,29 @@ export function ProjectPanel() {
     return () => dialog.removeEventListener('close', onClose)
   }, [])
 
-  const runNewProject = () => {
-    newProject()
-    discardStoredAndUnblock()
-    setImportError(null)
-    setActionStatus('New project created.')
-    announceAction('New project created.')
-  }
-
   const handleNewProject = () => {
-    if (!hasReplaceableAnimation()) {
-      runNewProject()
+    if (projectHasMeaningfulWork(project)) {
+      confirmDialogRef.current?.showModal()
       return
     }
-    confirmDialogRef.current?.showModal()
+    setNameOpen(true)
   }
 
   const closeConfirm = () => {
     confirmDialogRef.current?.close()
   }
 
-  const confirmNewProject = () => {
+  const confirmThenName = () => {
     closeConfirm()
-    runNewProject()
+    setNameOpen(true)
+  }
+
+  const finishNewProject = (name: string) => {
+    if (!createNamedProject(name)) return
+    setNameOpen(false)
+    discardStoredAndUnblock()
+    setImportError(null)
+    setActionStatus(`Created “${name}”.`)
   }
 
   const handleDownload = () => {
@@ -120,9 +120,9 @@ export function ProjectPanel() {
       return
     }
 
-    if (hasReplaceableAnimation()) {
+    if (projectHasMeaningfulWork(project)) {
       const ok = window.confirm(
-        'Open this project file? This replaces the current animation.',
+        'Open this project file? This replaces the current project, including actors, appearance, and motion.',
       )
       if (!ok) return
     }
@@ -131,7 +131,9 @@ export function ProjectPanel() {
     afterSuccessfulReplace()
     setImportError(null)
     setActionStatus(null)
-    announceAction(null)
+    announceAction(
+      `Opened “${parsed.snapshot.project.name}”. You can edit it like any project.`,
+    )
   }
 
   return (
@@ -247,8 +249,8 @@ export function ProjectPanel() {
             data-testid="new-project-confirm-copy"
             className="text-[11px] leading-relaxed text-slate-600"
           >
-            This replaces the current animation. Download it first if you want
-            to keep a copy.
+            This replaces the current project. Download it first if you want to
+            keep a copy. You’ll name the new project next.
           </p>
           <div className="flex flex-wrap justify-end gap-2">
             <button
@@ -262,14 +264,24 @@ export function ProjectPanel() {
             <button
               type="button"
               data-testid="btn-new-project-confirm"
-              onClick={confirmNewProject}
+              onClick={confirmThenName}
               className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
             >
-              Start new project
+              Continue
             </button>
           </div>
         </div>
       </dialog>
+
+      <ProjectNameDialog
+        open={nameOpen}
+        title="Name your new project"
+        description="Cancel keeps your current project unchanged."
+        confirmLabel="Create project"
+        initialName=""
+        onCancel={() => setNameOpen(false)}
+        onConfirm={finishNewProject}
+      />
     </div>
   )
 }

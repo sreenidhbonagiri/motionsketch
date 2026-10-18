@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { openPanel, readExportedCss, recordSimplePath } from './helpers'
+import {
+  ensureEditor,
+  openPanel,
+  readExportedCss,
+  recordSimplePath,
+} from './helpers'
 
 async function makePngBytes(
   page: import('@playwright/test').Page,
@@ -35,6 +40,7 @@ test.describe('image actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await page.getByTestId('playback-scrubber').fill('0.4')
@@ -121,7 +127,7 @@ test.describe('image actors', () => {
     const projPath = await proj.path()
     const projJson = fs.readFileSync(projPath!, 'utf8')
     const snap = JSON.parse(projJson)
-    expect(snap.formatVersion).toBe(6)
+    expect(snap.formatVersion).toBe(7)
     const appearance = snap.project.actors[0].appearance
     expect(appearance.kind).toBe('image')
     const assetId = appearance.image.assetId as string | undefined
@@ -136,6 +142,7 @@ test.describe('image actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await openPanel(page, 'appearance')
 
     const tall = await makePngBytes(page, 80, 320, '#cbd5e1')
@@ -185,6 +192,7 @@ test.describe('image actors', () => {
 
   test('storage failure does not show Saved', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.evaluate(() => {
       const proto = Object.getPrototypeOf(localStorage)
       // Force quota-style failures on write.
@@ -204,7 +212,7 @@ test.describe('image actors', () => {
     await openPanel(page, 'project')
     const status = page.getByTestId('save-status')
     if (await status.count()) {
-      await expect(status).not.toHaveText('Saved on this device')
+      await expect(status).not.toHaveText('Saved in this browser')
       await expect(status).toContainText(/Couldn't save|storage/i)
     }
     await expect(page.getByTestId('header-save-status')).toContainText(

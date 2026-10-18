@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { exportCssFromProject } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
-import { downloadTextFile, stampFilename } from '../lib/download'
+import { downloadTextFile, stampProjectFilename } from '../lib/download'
 import { copyText } from '../lib/clipboard'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { useEditorStore } from '../state/store'
@@ -57,7 +57,7 @@ export function ExportPanel() {
   const downloadCss = () => {
     const ok = downloadTextFile(
       css,
-      stampFilename('motionsketch', 'css'),
+      stampProjectFilename(project.name, 'css'),
       'text/css;charset=utf-8',
     )
     if (ok) announce('CSS download started.')
@@ -68,7 +68,7 @@ export function ExportPanel() {
       const html = buildHtmlDemoFromProject(project)
       const ok = downloadTextFile(
         html,
-        stampFilename('motionsketch-demo', 'html'),
+        stampProjectFilename(`${project.name}-demo`, 'html'),
         'text/html;charset=utf-8',
       )
       if (ok) announce('HTML demo download started.')

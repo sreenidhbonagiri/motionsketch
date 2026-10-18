@@ -36,9 +36,9 @@ export function useProjectPersistence() {
 export function statusLabel(status: PersistenceStatus): string | null {
   switch (status) {
     case 'saved':
-      return 'Saved on this device'
+      return 'Saved in this browser'
     case 'save-error':
-      return "Couldn't save on this device (storage full or unavailable)."
+      return "Couldn't save in this browser (storage full or unavailable)."
     case 'restore-error':
       return "Couldn't restore the saved project."
     default:

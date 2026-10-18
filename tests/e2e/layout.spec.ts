@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { openCssDialog, openPanel, recordSimplePath } from './helpers'
+import {
+  ensureEditor,
+  openCssDialog,
+  openPanel,
+  recordSimplePath,
+} from './helpers'
 
 async function assertFullyInViewport(
   page: import('@playwright/test').Page,
@@ -27,6 +32,7 @@ test.describe('workspace layout', () => {
     }) => {
       await page.setViewportSize(viewport)
       await page.goto('/')
+      await ensureEditor(page)
       await recordSimplePath(page)
 
       await expect(page.getByTestId('app-shell')).toBeVisible()
@@ -106,6 +112,7 @@ test.describe('workspace layout', () => {
   test('mobile 390x844: labeled menus stay reachable', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
+    await ensureEditor(page)
     // Keep the actor list collapsed so bottom chrome stays reachable.
     const listExpanded = await page
       .getByTestId('btn-toggle-actor-list')

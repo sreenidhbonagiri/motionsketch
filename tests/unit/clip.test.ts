@@ -132,6 +132,7 @@ describe('clip persistence', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
+    expect(result.snapshot.project.name).toBe('Untitled project')
     expect(result.snapshot.project.actors[0].clip).toEqual({ start: 0, end: 1 })
   })
 

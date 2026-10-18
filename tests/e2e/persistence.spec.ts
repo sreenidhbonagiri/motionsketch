@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
+  ensureEditor,
   acceptNextDialog,
   openPanel,
   readExportedCss,
@@ -9,22 +10,26 @@ import {
 async function waitForSaved(page: Page) {
   await openPanel(page, 'project')
   await expect(page.getByTestId('save-status')).toHaveText(
-    'Saved on this device',
+    'Saved in this browser',
   )
 }
 
-async function confirmNewProject(page: Page) {
+async function confirmNewProject(page: Page, name = 'Fresh board') {
   await openPanel(page, 'project')
   await page.getByTestId('btn-new-project').click()
   await expect(page.getByTestId('new-project-confirm')).toBeVisible()
   await expect(page.getByTestId('new-project-confirm-copy')).toContainText(
-    'This replaces the current animation',
+    'This replaces the current project',
   )
   await expect(page.getByTestId('btn-new-project-cancel')).toHaveText('Cancel')
   await expect(page.getByTestId('btn-new-project-confirm')).toHaveText(
-    'Start new project',
+    'Continue',
   )
   await page.getByTestId('btn-new-project-confirm').click()
+  await expect(page.getByTestId('project-name-dialog')).toBeVisible()
+  await page.getByTestId('project-name-input').fill(name)
+  await page.getByTestId('btn-confirm-project-name').click()
+  await expect(page.getByTestId('btn-rename-project')).toContainText(name)
 }
 
 test.describe('project persistence', () => {
@@ -34,6 +39,7 @@ test.describe('project persistence', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('loop-toggle').check()
@@ -49,7 +55,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('export-panel')).toBeVisible()
     await openPanel(page, 'project')
     await expect(page.getByTestId('save-status')).toHaveText(
-      'Saved on this device',
+      'Saved in this browser',
     )
     await expect(page.getByTestId('btn-play')).toBeEnabled()
     await openPanel(page, 'adjust')
@@ -72,6 +78,7 @@ test.describe('project persistence', () => {
 
   test('restores committed path edits after reload', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await page.getByTestId('btn-edit-path').click()
@@ -98,27 +105,30 @@ test.describe('project persistence', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await waitForSaved(page)
 
-    await confirmNewProject(page)
+    await confirmNewProject(page, 'Fresh board')
 
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
       'New project ready. Click Record to create an animation.',
     )
-    await expect(page.getByTestId('project-action-status')).toHaveText(
-      'New project created.',
-    )
-    await expect(page.getByTestId('action-live-region')).toHaveText(
-      'New project created.',
+    await expect(page.getByTestId('action-live-region')).toContainText(
+      /Created “Fresh board”/,
     )
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
-    // Dialog returns focus to New project; live region must not steal it.
-    await expect(page.getByTestId('btn-new-project')).toBeFocused()
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Fresh board',
+    )
 
     await page.reload()
+    await expect(page.getByTestId('app-shell')).toBeVisible()
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Fresh board',
+    )
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
@@ -128,6 +138,7 @@ test.describe('project persistence', () => {
 
   test('New project confirm can be cancelled', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await waitForSaved(page)
 
@@ -142,6 +153,7 @@ test.describe('project persistence', () => {
 
   test('Reset remains separate from New project', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('3000')
@@ -156,10 +168,8 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
 
-    // No animation left — New project does not open the replace confirm.
-    await openPanel(page, 'project')
-    await page.getByTestId('btn-new-project').click()
-    await expect(page.getByTestId('new-project-confirm')).toBeHidden()
+    // Playback settings still count as work — New project confirms, then names.
+    await confirmNewProject(page, 'After reset')
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('1.20 s')
     await expect(page.getByTestId('loop-toggle')).not.toBeChecked()
@@ -172,6 +182,7 @@ test.describe('project persistence', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await openPanel(page, 'project')
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
     await expect(page.getByTestId('btn-download-project')).toHaveText(
@@ -180,6 +191,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('download-project-help')).toHaveText(
       'Save this animation as a project file you can reopen.',
     )
+    await page.getByTestId('btn-close-project').click()
 
     await recordSimplePath(page)
     await waitForSaved(page)
@@ -188,7 +200,7 @@ test.describe('project persistence', () => {
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-project').click()
     const download = await downloadPromise
-    expect(download.suggestedFilename()).toMatch(/motionsketch-.*\.json/)
+    expect(download.suggestedFilename()).toMatch(/test-project-.*\.json/)
 
     await expect(page.getByTestId('project-action-status')).toHaveText(
       'Project download started.',
@@ -202,6 +214,7 @@ test.describe('project persistence', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await waitForSaved(page)
     const cssOriginal = await readExportedCss(page)
@@ -234,6 +247,7 @@ test.describe('project persistence', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await waitForSaved(page)
 

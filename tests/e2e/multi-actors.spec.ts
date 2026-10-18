@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
+  ensureEditor,
   acceptNextDialog,
   actorIdsFromList,
   clickRecord,
@@ -22,6 +23,7 @@ test.describe('multiple actors', () => {
 
   test('add, rename, duplicate, delete, and reorder', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await expect(page.getByTestId('actor-list')).toBeVisible()
     await expect(page.getByTestId('btn-add-actor')).toBeEnabled()
 
@@ -105,6 +107,7 @@ test.describe('multiple actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await openPanel(page, 'appearance')
@@ -180,6 +183,7 @@ test.describe('multiple actors', () => {
 
   test('transform history clears on actor selection', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('playback-scrubber').fill('0.5')
     await openPanel(page, 'appearance')
@@ -199,6 +203,7 @@ test.describe('multiple actors', () => {
 
   test('reset clears only the selected actor', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('btn-add-actor').click()
     await clickRecord(page)
@@ -223,6 +228,7 @@ test.describe('multiple actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.getByTestId('btn-add-actor').click()
     await clickRecord(page)
@@ -255,6 +261,7 @@ test.describe('multiple actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.waitForTimeout(400)
 
@@ -310,6 +317,7 @@ test.describe('multiple actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
     await page.waitForTimeout(400)
     await openPanel(page, 'adjust')
@@ -426,6 +434,7 @@ test.describe('multiple actors', () => {
 
   test('canvas click selects actor and scopes Appearance', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     if (
       (await page
         .getByTestId('btn-toggle-actor-list')

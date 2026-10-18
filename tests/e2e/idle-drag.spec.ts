@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { selectActorByIndex } from './helpers'
+import {
+  ensureEditor,
+  selectActorByIndex,
+} from './helpers'
 
 test.describe('idle drag unrecorded actors', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -8,6 +11,7 @@ test.describe('idle drag unrecorded actors', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await page.getByTestId('btn-add-actor').click()
     await selectActorByIndex(page, 0)
 
@@ -47,6 +51,7 @@ test.describe('idle drag unrecorded actors', () => {
 
   test('pointer cancel restores the prior rest position', async ({ page }) => {
     await page.goto('/')
+    await ensureEditor(page)
     const actor = page.getByTestId('actor')
     const before = await actor.boundingBox()
     expect(before).toBeTruthy()

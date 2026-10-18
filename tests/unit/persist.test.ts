@@ -84,6 +84,7 @@ function resetStore(
   const projectWithGeo = { ...project, actors }
   const first = projectWithGeo.actors[0]
   useEditorStore.setState({
+    workspace: 'editing',
     project: projectWithGeo,
     selectedActorId: first.id,
     mode: 'idle',
@@ -321,6 +322,8 @@ describe('persistence controller', () => {
       5,
     )
     expect(controller.getStatus()).toBe('saved')
+    expect(state.workspace).toBe('editing')
+    expect(state.project.name).toBe('Test project')
     controller.dispose()
   })
 
@@ -396,7 +399,10 @@ describe('persistence controller', () => {
     controller.restoreOnStartup()
     expect(controller.getStatus()).toBe('restore-error')
     expect(controller.isSaveBlocked()).toBe(true)
+    expect(useEditorStore.getState().workspace).toBe('welcome')
 
+    // Enter an intentional project; quarantine still blocks writes.
+    expect(useEditorStore.getState().createNamedProject('Recovered')).toBe(true)
     useEditorStore.getState().finishRecording(makeRecording())
     expect(storage.getItem(STORAGE_KEY)).toBe(bad)
 
@@ -422,6 +428,7 @@ describe('persistence controller', () => {
     )
     const controller = createPersistenceController(adapter)
     controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Quota')).toBe(true)
     useEditorStore.getState().finishRecording(makeRecording())
     expect(controller.getStatus()).toBe('save-error')
     controller.dispose()
@@ -437,6 +444,7 @@ describe('persistence controller', () => {
     )
     const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Debounce')).toBe(true)
 
     useEditorStore.getState().finishRecording(makeRecording())
     expect(storage.getItem(STORAGE_KEY)).toBeTruthy()
@@ -464,6 +472,8 @@ describe('persistence controller', () => {
     )
     const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Playhead')).toBe(true)
+    useEditorStore.getState().finishRecording(makeRecording())
     setItemSpy.mockClear()
 
     const stringifySpy = vi.spyOn(JSON, 'stringify')
@@ -491,6 +501,16 @@ describe('persistence controller', () => {
     // Real edits still save.
     useEditorStore.getState().setLoop(true)
     expect(setItemSpy).toHaveBeenCalled()
+    controller.dispose()
+  })
+
+  it('empty storage stays on welcome and does not persist a blank project', () => {
+    const storage = createMemoryStorage()
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    expect(useEditorStore.getState().workspace).toBe('welcome')
+    expect(storage.getItem(STORAGE_KEY)).toBeNull()
+    expect(controller.getStatus()).toBe('idle')
     controller.dispose()
   })
 })
@@ -558,7 +578,9 @@ describe('store applyPersistedSnapshot / newProject', () => {
     expect(state.geometryEdit).toBeNull()
     expect(state.mode).toBe('idle')
     expect(state.stageHint).toBe('new-project')
-    expect(state.actionAnnouncement).toBe('New project created.')
+    expect(state.actionAnnouncement).toBe(
+      'Created “Untitled project”. You can start drawing.',
+    )
   })
 
   it('Reset still only clears the recording, keeping playback settings', () => {

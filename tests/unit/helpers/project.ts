@@ -44,6 +44,7 @@ export function makeProject(overrides?: Partial<Project>): Project {
   const actor = makeActor()
   return {
     version: 1,
+    name: overrides?.name ?? 'Test project',
     actors: overrides?.actors ?? [actor],
     playback: overrides?.playback ?? {
       durationMs: 1200,

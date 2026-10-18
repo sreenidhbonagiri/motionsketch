@@ -13,6 +13,10 @@ import {
 } from '../sceneActor'
 import { emptyTransformTrack, parseTransformTrack } from '../transform'
 import {
+  DEFAULT_PROJECT_NAME,
+  sanitizeProjectName,
+} from '../projectName'
+import {
   DEFAULT_PLAYBACK,
   DEFAULT_STAGE_ASPECT,
   MAX_PLAYBACK_DURATION_MS,
@@ -30,13 +34,15 @@ import {
  * v1–v4: single-actor project (migrated to one SceneActor).
  * v5: multi-actor + shared timeline; image assets may be deduped.
  * v6: per-actor clip timing (start/end on shared timeline).
+ * v7: project.name (older files migrate to “Untitled project”).
  */
-export const PERSIST_FORMAT_VERSION = 6 as const
+export const PERSIST_FORMAT_VERSION = 7 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
 export const PERSIST_FORMAT_VERSION_V4 = 4 as const
 export const PERSIST_FORMAT_VERSION_V5 = 5 as const
+export const PERSIST_FORMAT_VERSION_V6 = 6 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -110,6 +116,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   const supported = [
     PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V6,
     PERSIST_FORMAT_VERSION_V5,
     PERSIST_FORMAT_VERSION_V4,
     PERSIST_FORMAT_VERSION_V3,
@@ -130,9 +137,13 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const assets = parseAssets(data.assets)
   if (!assets.ok) return assets
 
-  // v5–v6 multi-actor (v5 migrates missing clip → full timeline).
+  // v5–v7 multi-actor (v5 migrates missing clip → full; v7 requires/migrates name).
   if (formatVersion >= PERSIST_FORMAT_VERSION_V5) {
-    const project = validateMultiActorProject(data.project, assets.value)
+    const project = validateMultiActorProject(
+      data.project,
+      assets.value,
+      formatVersion,
+    )
     if (!project.ok) return project
     // Reject leftover top-level geometryEdit that would be ignored silently.
     if (data.geometryEdit != null) {
@@ -184,6 +195,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
       savedAt: data.savedAt,
       project: {
         version: 1,
+        name: DEFAULT_PROJECT_NAME,
         actors: [actor],
         playback: {
           durationMs: legacy.value.playback.durationMs,
@@ -219,9 +231,31 @@ function parseAssets(
   return { ok: true, value: out }
 }
 
+function parseProjectName(
+  value: unknown,
+  formatVersion: number,
+): { ok: true; value: string } | PersistParseErr {
+  if (value === undefined || value === null) {
+    // Pre-v7 files migrate to a stable default without changing animation data.
+    if (formatVersion < PERSIST_FORMAT_VERSION) {
+      return { ok: true, value: DEFAULT_PROJECT_NAME }
+    }
+    return { ok: false, error: 'project.name is required.' }
+  }
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'project.name must be a string.' }
+  }
+  const name = sanitizeProjectName(value)
+  if (name.length === 0) {
+    return { ok: false, error: 'project.name must be a non-empty string.' }
+  }
+  return { ok: true, value: name }
+}
+
 function validateMultiActorProject(
   value: unknown,
   assets: Record<string, ActorImage>,
+  formatVersion: number,
 ): { ok: true; value: Project } | PersistParseErr {
   if (!isRecord(value)) {
     return { ok: false, error: 'Missing or invalid project.' }
@@ -235,6 +269,9 @@ function validateMultiActorProject(
           : 'Missing or invalid project.version.',
     }
   }
+
+  const name = parseProjectName(value.name, formatVersion)
+  if (!name.ok) return name
 
   const playback = validatePlayback(value.playback)
   if (!playback.ok) return playback
@@ -278,6 +315,7 @@ function validateMultiActorProject(
     ok: true,
     value: {
       version: 1,
+      name: name.value,
       actors,
       playback: playback.value,
       stageAspect: stageAspect.value,
@@ -593,6 +631,7 @@ export function serializeSnapshotForDownload(snapshot: PersistedSnapshot): strin
 function cloneProject(project: Project): Project {
   return {
     version: 1,
+    name: sanitizeProjectName(project.name) || DEFAULT_PROJECT_NAME,
     actors: project.actors.map((a) => cloneSceneActor(a)),
     playback: { ...project.playback },
     stageAspect: clampStageAspect(project.stageAspect),
@@ -601,9 +640,12 @@ function cloneProject(project: Project): Project {
 
 export function createEmptyPersistableProject(
   stageAspect: number = DEFAULT_STAGE_ASPECT,
+  name: string = DEFAULT_PROJECT_NAME,
 ): Project {
+  const safeName = sanitizeProjectName(name) || DEFAULT_PROJECT_NAME
   return {
     version: 1,
+    name: safeName,
     actors: [createSceneActor({ name: 'Actor 1' })],
     playback: { ...DEFAULT_PLAYBACK },
     stageAspect: clampStageAspect(stageAspect),

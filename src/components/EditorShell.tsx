@@ -12,6 +12,7 @@ import { AppearancePanel } from './AppearancePanel'
 import { CanvasStage } from './CanvasStage'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
+import { ProjectNameInput } from './ProjectNameInput'
 import {
   FloatingPanel,
   type ChromePanel,
@@ -85,6 +86,8 @@ export function EditorShell() {
 
   const isEmptyProject = useEditorStore((s) => !projectHasMeaningfulWork(s.project))
   const showExamplesHint = isEmptyProject && !hintDismissed && !examplesOpen
+  const projectName = useEditorStore((s) => s.project.name)
+  const renameProject = useEditorStore((s) => s.renameProject)
 
   useEffect(() => {
     const onHidden = () => {
@@ -126,9 +129,15 @@ export function EditorShell() {
       >
         <div className="pointer-events-auto relative flex min-w-0 flex-wrap items-center gap-2">
           <div className="rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md">
-            <div className="text-sm font-semibold tracking-tight text-slate-900">
-              MotionSketch
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                MotionSketch
+              </span>
             </div>
+            <ProjectNameInput
+              committedName={projectName}
+              onCommit={renameProject}
+            />
             {saveLabel && (
               <p
                 data-testid="header-save-status"

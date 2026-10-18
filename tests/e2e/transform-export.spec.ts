@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { openPanel, recordSimplePath } from './helpers'
+import {
+  ensureEditor,
+  openPanel,
+  recordSimplePath,
+} from './helpers'
 
 async function makeWidePng(page: Page): Promise<Buffer> {
   const dataUrl = await page.evaluate(() => {
@@ -69,6 +73,7 @@ test.describe('transform export browser parity', () => {
     page,
   }) => {
     await page.goto('/')
+    await ensureEditor(page)
     await recordSimplePath(page)
 
     await openPanel(page, 'adjust')
