@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import {
   ensureEditor,
   clickRecord,
+  dragActor,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -108,13 +109,7 @@ test.describe('transform keyframes', () => {
     }
     // Fresh record
     await clickRecord(page, { replaceExisting: true })
-    const actor = page.getByTestId('actor')
-    const box = await actor.boundingBox()
-    expect(box).toBeTruthy()
-    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(box!.x + 120, box!.y + 40, { steps: 10 })
-    await page.mouse.up()
+    await dragActor(page, { x: 40, y: -10 }, { x: 120, y: 40 })
     await expect(page.getByTestId('btn-play')).toBeEnabled()
     await expect(page.locator('[data-transform-marker]')).toHaveCount(0)
   })

@@ -158,16 +158,28 @@ test.describe('starter examples', () => {
   test('gallery is keyboard accessible', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
-    await page.getByTestId('btn-examples').focus()
-    await page.keyboard.press('Enter')
+    // Target the control directly — page.keyboard after focus() is flaky on WebKit.
+    await page.getByTestId('btn-examples').press('Enter')
     await expect(page.getByTestId('examples-gallery')).toBeVisible()
     await expect(page.getByTestId('btn-close-examples')).toBeFocused()
 
     await page.keyboard.press('Tab')
-    await expect(page.locator(':focus')).toBeVisible()
+    // Focus stays inside the dialog (WebKit may not match a bare :focus locator).
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const gallery = document.querySelector(
+            '[data-testid="examples-gallery"]',
+          )
+          const active = document.activeElement
+          return !!(gallery && active && gallery.contains(active))
+        }),
+      )
+      .toBe(true)
 
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('examples-gallery')).toHaveCount(0)
+    await expect(page.getByTestId('btn-examples')).toBeFocused()
   })
 })
 

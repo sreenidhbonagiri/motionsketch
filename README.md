@@ -10,7 +10,7 @@ There is no hosted product URL in this repository. Run the app locally with the 
 | --- | --- |
 | **Node.js** | See `engines.node` in `package.json` (`^22.22.2` / `^24.15.0` / `>=26.0.0` — intersection of Vite 8, Vitest 5, and locked jsdom). CI uses **Node 22.22.2**. |
 | **npm** | Comes with Node; used for install and scripts. Prefer `npm ci` with the lockfile for CI-parity installs. |
-| **Browser** | A current Chromium-based browser for the editor. Playwright e2e uses Chromium only. |
+| **Browser** | A current desktop browser (Chromium, Firefox, or Safari/WebKit). Playwright e2e covers Chromium, Firefox, and Playwright WebKit — useful engine coverage, not every Safari/iOS version. |
 
 Check your versions with `node -v` and `npm -v`.
 
@@ -18,7 +18,7 @@ Check your versions with `node -v` and `npm -v`.
 
 ```bash
 npm install
-npx playwright install chromium   # needed for npm run test:e2e
+npx playwright install chromium firefox webkit   # needed for npm run test:e2e
 npm run dev
 ```
 
@@ -96,6 +96,8 @@ CSS uses a scene root class (content fingerprint, optional `instancePrefix`), st
 | **Project title** | Up to 60 characters. |
 | **Stage aspect** | Stored per project; resize does not rewrite samples. Editor may stretch vs. logical aspect; exports use stored aspect. See [`docs/stage-aspect.md`](docs/stage-aspect.md). |
 | **Reduced motion** | Gallery previews do not autoplay when `prefers-reduced-motion: reduce`. Exports pause CSS animation until `ms-motion-ok`. |
+| **Visibility boundaries** | Editor: visible on `[start, end)`. Exported CSS uses `step-end`. At the exact keyframe time, Firefox holds the previous value (jumps just after); Chromium/WebKit match the editor. Nearby times agree. Observable if you pause CSS/WAAPI on the exact boundary in Firefox — not during ordinary playback. |
+| **Playwright WebKit** | Engine coverage for automation, not a claim about every Safari/iOS build. Desktop Safari pointer behavior in trigger previews was not verified in a real Safari UI. |
 
 ## Scripts
 
@@ -105,12 +107,12 @@ CSS uses a scene root class (content fingerprint, optional `instancePrefix`), st
 | `npm run build` | Typecheck (`tsc -b`) and production build |
 | `npm run preview` | Serve the production build |
 | `npm test` | Vitest unit tests (`tests/unit`) |
-| `npm run test:e2e` | Playwright e2e (`tests/e2e`, Chromium) |
+| `npm run test:e2e` | Playwright e2e (`tests/e2e`; Chromium, Firefox, Playwright WebKit) |
 | `npm run lint` | Oxlint (warnings are reported; they do not fail the script today) |
 
 ## Continuous integration
 
-GitHub Actions runs on pushes to `main` and on pull requests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `npm ci`, lint, unit tests, production build, then the full Chromium e2e suite with `--retries=0`. Playwright installs Chromium and OS dependencies in CI and starts its own Vite server (`CI` is set, so `reuseExistingServer` is false).
+GitHub Actions runs on pushes to `main` and on pull requests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `npm ci`, lint, unit tests, and production build, then a matrix of e2e jobs (Chromium, Firefox, Playwright WebKit) each with `--retries=0`. Each matrix job installs only its browser (+ OS deps) and uploads a separate failure artifact. Playwright starts its own Vite server (`CI` is set, so `reuseExistingServer` is false). Playwright WebKit is engine coverage — not a claim that every Safari or iOS version was tested.
 
 ### Same checks locally
 
@@ -119,17 +121,19 @@ npm ci
 npm run lint
 npm test
 npm run build
-npx playwright install chromium          # once per machine
+npx playwright install chromium firefox webkit   # once per machine
 # Optional OS deps (closer to CI on Linux):
-# npx playwright install chromium --with-deps
+# npx playwright install --with-deps
 CI=1 npm run test:e2e -- --retries=0
+# Or one engine:
+# CI=1 npm run test:e2e -- --project=firefox --retries=0
 ```
 
 `CI=1` makes Playwright launch a fresh web server instead of reusing whatever is already on port 5173, and enables `forbidOnly`.
 
 ### Finding CI failures
 
-On GitHub: open the repository **Actions** tab → select the failed workflow run → inspect the failing step log. For e2e failures, download the **playwright-report** artifact (HTML report under `playwright-report/`, plus `test-results/` including traces retained on failure). Artifacts are kept for 7 days.
+On GitHub: open the repository **Actions** tab → select the failed workflow run → inspect the failing step log. For e2e failures, download the per-engine artifact (`playwright-chromium`, `playwright-firefox`, or `playwright-webkit`) containing `playwright-report/` and `test-results/` (traces retained on failure). Artifacts are kept for 7 days.
 
 ## Documentation
 

@@ -33,6 +33,20 @@ describe('recording', () => {
     expect(recording!.recordedDurationMs).toBe(150)
   })
 
+  it('counts a still hold via a later sample at the same position', () => {
+    // Engines (notably WebKit) may compress move timeStamps into a short
+    // window; the pointerup stamp at the held pose must extend duration.
+    let session = createSession()
+    session = pushSample(session, 0, 0.1, 0.1)
+    session = pushSample(session, 20, 0.5, 0.4)
+    session = pushSample(session, 20, 0.5, 0.4) // duplicate ignored
+    session = pushSample(session, 80, 0.5, 0.4) // hold / pointerup
+    const recording = finish(session)
+    expect(recording).not.toBeNull()
+    expect(recording!.samples).toHaveLength(3)
+    expect(recording!.recordedDurationMs).toBe(80)
+  })
+
   it('clamps sample coordinates', () => {
     let session = createSession()
     session = pushSample(session, 0, -1, 2)

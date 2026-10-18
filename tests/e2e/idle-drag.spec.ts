@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  dispatchActivePointerCancel,
   ensureEditor,
   selectActorByIndex,
 } from './helpers'
@@ -64,17 +65,8 @@ test.describe('idle drag unrecorded actors', () => {
     const during = await actor.boundingBox()
     expect(Math.abs(during!.x - before!.x)).toBeGreaterThan(15)
 
-    await page.evaluate(() => {
-      const stage = document.querySelector('[data-testid="stage"]')
-      if (!stage) throw new Error('missing stage')
-      stage.dispatchEvent(
-        new PointerEvent('pointercancel', {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 1,
-        }),
-      )
-    })
+    // Cancel is handled on the actor (pointer capture target).
+    await dispatchActivePointerCancel(page, '[data-testid="actor"]')
 
     // Ensure mouse is released so Playwright state is clean.
     await page.mouse.up().catch(() => undefined)

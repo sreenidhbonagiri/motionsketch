@@ -104,6 +104,10 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       }
 
       if (isRecordingActive()) {
+        // Stamp the release time so a post-move hold still counts toward
+        // minimum duration (WebKit often compresses move timeStamps).
+        const pos = useEditorStore.getState().livePosition
+        pushRecordingSample(event.timeStamp, pos)
         endDrag(true)
       } else {
         const pos = useEditorStore.getState().livePosition
@@ -126,6 +130,8 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       if (getActivePointerId() !== event.pointerId) return
 
       if (isRecordingActive()) {
+        const pos = useEditorStore.getState().livePosition
+        pushRecordingSample(event.timeStamp, pos)
         endDrag(true)
       } else {
         // Cancel restores the pre-drag rest pose; do not commit.

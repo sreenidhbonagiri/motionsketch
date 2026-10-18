@@ -117,6 +117,33 @@ describe('MotionSketchTrigger runtime', () => {
     expect(ctl.started).toBe(true)
   })
 
+  it('Play pointerup opts in without a click (WebKit focus+gesture path)', () => {
+    stubReducedMotion(true)
+    const api = installApi()
+    const { root, play } = mountScene({ waiting: true })
+    const ctl = api.init(root, {
+      mode: 'hover',
+      waitingClass: MS_WAITING_CLASS,
+      motionOkClass: MS_MOTION_OK_CLASS,
+      actorSelector: '[class^="ms-actor"]',
+    })
+
+    play.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    )
+    expect(root.classList.contains(MS_MOTION_OK_CLASS)).toBe(true)
+    expect(ctl.started).toBe(true)
+
+    // Same-turn click must not double-toggle waiting back on.
+    play.click()
+    expect(root.classList.contains(MS_MOTION_OK_CLASS)).toBe(true)
+    expect(ctl.started).toBe(true)
+  })
+
   it('click mode opts in on activation; automatic page-load stays blocked', () => {
     stubReducedMotion(true)
     const api = installApi()

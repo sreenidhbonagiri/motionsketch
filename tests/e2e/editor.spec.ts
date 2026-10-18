@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 import {
-  ensureEditor,
+  dispatchActivePointerCancel,
   dragActor,
+  ensureEditor,
   openPanel,
   readExportedCss,
 } from './helpers'
@@ -124,16 +125,7 @@ test.describe('MotionSketch editor', () => {
     await page.mouse.move(x + 80, y + 40, { steps: 10 })
     await page.waitForTimeout(60)
 
-    await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="actor"]')
-      el?.dispatchEvent(
-        new PointerEvent('pointercancel', {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 1,
-        }),
-      )
-    })
+    await dispatchActivePointerCancel(page)
 
     await expect(page.getByTestId('btn-record')).toBeVisible()
     await expect(page.locator('body')).toBeVisible()

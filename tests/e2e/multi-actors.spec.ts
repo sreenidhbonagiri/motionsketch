@@ -5,6 +5,7 @@ import {
   actorIdsFromList,
   clickRecord,
   dragActor,
+  loadHtmlDocument,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -265,7 +266,7 @@ test.describe('multiple actors', () => {
     expect(html).toMatch(/ms-[a-f0-9]{8}-a1/)
     expect(html).not.toMatch(/https?:\/\//i)
 
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
     await expect(page.getByTestId('demo-stage')).toBeVisible()
     await expect(page.getByTestId('demo-actor')).toBeVisible()
     await expect(page.locator('.ms-actor-2')).toBeVisible()

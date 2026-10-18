@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
   ensureEditor,
+  loadHtmlDocument,
   openPanel,
   recordSimplePath,
 } from './helpers'
@@ -124,7 +125,7 @@ test.describe('transform export browser parity', () => {
 
     // Match editor viewport aspect environment for the demo stage.
     await page.setViewportSize({ width: 1280, height: 800 })
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
 
     const demoActor = page.getByTestId('demo-actor')
     await expect(demoActor).toBeVisible()
@@ -134,14 +135,19 @@ test.describe('transform export browser parity', () => {
       const el = document.querySelector(
         '[data-testid="demo-actor"]',
       ) as HTMLElement
-      const anim = el.getAnimations()[0] as CSSAnimation | undefined
+      const anim = el.getAnimations().find((a) => {
+        const name = (a as Animation & { animationName?: unknown }).animationName
+        return typeof name === 'string' && name !== '' && name !== 'none'
+      })
       if (!anim) throw new Error('missing animation')
       anim.pause()
 
       const read = (tNorm: number) => {
         // One-way duration from animation-duration.
         const dur =
-          parseFloat(getComputedStyle(el).animationDuration) * 1000 || 1000
+          Number(anim.effect?.getTiming().duration) ||
+          parseFloat(getComputedStyle(el).animationDuration) * 1000 ||
+          1000
         anim.currentTime = tNorm * dur
         // Force style flush.
         void el.offsetWidth

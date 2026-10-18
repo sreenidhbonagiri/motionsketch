@@ -583,6 +583,10 @@ ${jsNote}
  * - Shared Duration / loop / loopMode drive every actor’s animation together.
  * - Per-actor clips remap motion onto a start–end interval; outside that range the actor holds its first/last pose.
  * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
+ *   At an exact step-end keyframe time, Firefox still shows the previous value and
+ *   jumps immediately afterward; Chromium/WebKit apply the new value at that time.
+ *   Editor JS stays inclusive at start / hidden at end. Continuous playback hides
+ *   the mismatch; pausing CSS/WAAPI on the exact boundary in Firefox can disagree.
  * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
  * - Actor size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
  * - Motion uses transform with linear timing; visibility is orthogonal (visibility + step-*).

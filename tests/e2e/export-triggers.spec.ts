@@ -329,6 +329,8 @@ test.describe('export playback triggers', () => {
     await expect(scene).toHaveClass(/ms-waiting/)
     await expect(scene).not.toHaveClass(/ms-motion-ok/)
 
+    // Pointer activation while the scene holds focus (WebKit historically
+    // suppressed click after focus; controller also listens for pointerup).
     await frame.getByTestId('demo-replay').click()
     await expect(scene).toHaveClass(/ms-motion-ok/)
     await expect(scene).not.toHaveClass(/ms-waiting/)
@@ -337,6 +339,13 @@ test.describe('export playback triggers', () => {
     await expect
       .poll(async () => scene.getAttribute('class'))
       .not.toContain('ms-motion-ok')
+
+    // Keyboard path stays independent of pointer.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await expect(scene).toHaveClass(/ms-waiting/)
+    await scene.focus()
+    await frame.getByTestId('demo-replay').press('Enter')
+    await expect(scene).toHaveClass(/ms-motion-ok/)
 
     await page.getByTestId('btn-close-trigger-preview').click()
   })

@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -56,13 +57,24 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
   const announceAction = useEditorStore((s) => s.announceAction)
   const confirm = useConfirm()
 
-  useEffect(() => {
-    previouslyFocused.current =
+  useLayoutEffect(() => {
+    const opener =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null
+    const examplesTrigger = document.querySelector(
+      '[data-testid="btn-examples"]',
+    )
+    previouslyFocused.current =
+      opener?.getAttribute('data-testid') === 'btn-examples'
+        ? opener
+        : examplesTrigger instanceof HTMLElement
+          ? examplesTrigger
+          : opener
     closeBtnRef.current?.focus()
+  }, [])
 
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (document.querySelector('dialog[open]')) return
@@ -73,30 +85,55 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
     window.addEventListener('keydown', onKey, true)
     return () => {
       window.removeEventListener('keydown', onKey, true)
-      previouslyFocused.current?.focus()
+      const restore = previouslyFocused.current
       previouslyFocused.current = null
+      // Defer restore; skip if the gallery remounted (React Strict Mode).
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (
+            restore &&
+            document.contains(restore) &&
+            !document.querySelector('[data-testid="examples-gallery"]')
+          ) {
+            restore.focus()
+          }
+        })
+      })
     }
   }, [onClose])
 
-  // Simple focus trap within the gallery panel.
+  // Keep Tab inside the dialog. WebKit's sequential focus navigation can leave
+  // the overlay without a full cycle trap (Chromium/Firefox follow DOM order).
   useEffect(() => {
     const panel = panelRef.current
     if (!panel) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return
-      const focusable = panel.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      const focusable = [
+        ...panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter(
+        (el) =>
+          !el.hasAttribute('disabled') &&
+          el.getAttribute('aria-hidden') !== 'true' &&
+          (el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0),
       )
       if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
       const active = document.activeElement
-      if (event.shiftKey && active === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
+      const index =
+        active instanceof HTMLElement ? focusable.indexOf(active) : -1
+      event.preventDefault()
+      if (event.shiftKey) {
+        const prev =
+          index <= 0 ? focusable[focusable.length - 1]! : focusable[index - 1]!
+        prev.focus()
+      } else {
+        const next =
+          index >= focusable.length - 1
+            ? focusable[0]!
+            : focusable[index + 1]!
+        next.focus()
       }
     }
     panel.addEventListener('keydown', onKeyDown)

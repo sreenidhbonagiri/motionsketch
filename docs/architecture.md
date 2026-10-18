@@ -24,7 +24,7 @@ pointer events
 | Playback sample | `src/core/playback.ts`, `src/hooks/usePlaybackClock.ts` |
 | Transform | `src/core/transform.ts` |
 | Render | `src/components/CanvasStage.tsx`, `src/components/Actor.tsx` |
-| Export | `src/core/export/css.ts`, `src/core/export/htmlDemo.ts`, `src/core/export/sceneScope.ts` |
+| Export | `src/core/export/css.ts`, `src/core/export/htmlDemo.ts`, `src/core/export/webPackage.ts`, `src/core/export/packageAssets.ts`, `src/core/export/sceneScope.ts` |
 | Persist | `src/core/persist/document.ts`, `src/core/persist/storage.ts`, `src/lib/persistenceController.ts` |
 | Editor state | `src/state/store.ts` |
 
@@ -36,7 +36,7 @@ pointer events
    - Gaussian spatial smoothing (`smoothing` 0…1), with stationary-run preservation so intentional pauses are not pulled toward neighbors.
    - Optional **Steady Speed** retiming (`steadySpeed` 0…1) along the path using aspect-aware distance (`src/core/stageAspect.ts`).
    - Resample to `CANONICAL_SAMPLE_COUNT` (120) and pin endpoints to the original take.
-4. **Path edit**: entering Edit path bakes a `GeometryEdit` (`geometryEdit` on `SceneActor`). While geometry exists, spatial smoothing is not reapplied (handle moves would be erased); Steady Speed may still retime for playback/export. Original `recording.samples` stay untouched.
+4. **Path edit**: entering Edit path bakes a `GeometryEdit` (`geometryEdit` on `SceneActor`) — typically `CANONICAL_SAMPLE_COUNT` samples with preserved timestamps. **Handles** are indices into that sample array (`handleIndices`), not a separate curve. Default placement is evenly spaced (`selectHandleIndices`); users can add/remove interior handles without changing sample positions until a drag/nudge. Drag influence uses aspect-aware **arc-length** cosine falloff (`src/core/edit.ts`), falling back to index distance on zero-length paths. While geometry exists, spatial smoothing is not reapplied; Steady Speed may still retime for playback/export. Original `recording.samples` stay untouched.
 5. **CSS simplification**: `processForCss` runs `processMotion` then Ramer–Douglas–Peucker down to at most `CSS_MAX_KEYFRAMES` (60).
 
 Selector priority for the path used in preview and export (`selectProcessedPathForActor`):
@@ -74,7 +74,7 @@ The editor maps normalized coordinates onto the full-bleed stage. If the window 
 | `stageClass` | Always `ms-stage`, selected under the root |
 | `motionOkClass` | `ms-motion-ok` — opt into motion when `prefers-reduced-motion: reduce` |
 
-Exported CSS scopes all rules under the root. Image assets are referenced in header comments for host wiring; the HTML demo embeds what it needs for offline play (`buildHtmlDemoFromProject`).
+Exported CSS scopes all rules under the root. Image assets are referenced in header comments for host wiring; the HTML demo embeds data URLs for offline play (`buildHtmlDemoFromProject`). The **web package** (`buildWebPackage` in `src/core/export/webPackage.ts`) zips the same scoped CSS as `animation.css`, a linked `index.html` with relative `assets/` files (deduped via `packageAssets.ts`), a generated `README.txt`, and portable `project.json`.
 
 ## Persistence and migrations
 
@@ -139,7 +139,9 @@ Recording, New/Open project, Reset actor, and similar replace operations are not
 - SVG images are static `<img>` data URLs only — no animated or scripted SVG markup.
 - Path undo is selection-scoped and independent of transform/clip unified undo.
 - Editor confirmation UI is app-owned (`ConfirmProvider` / `ConfirmDialog`); there is no native `window.confirm` in the product path.
-- Playwright config covers **Chromium** only (`playwright.config.ts`).
+- Playwright e2e covers **Chromium**, **Firefox**, and **Playwright WebKit** (`playwright.config.ts`). WebKit here is engine coverage — not every Safari/iOS version.
+- Exported visibility uses CSS `step-end` at exact clip boundaries. Firefox applies the new value just after the keyframe time; Chromium/WebKit apply it at the keyframe. Editor semantics remain inclusive start / hidden at end (`isActorVisibleAt`).
+- Trigger Play listens for `pointerup` and `click` so reduced-motion opt-in still works when WebKit suppresses `click` after the scene root held focus (observed under Playwright WebKit with trusted pointer events; desktop Safari UI not separately verified).
 
 ## Related docs
 

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
   ensureEditor,
+  loadHtmlDocument,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -69,7 +70,7 @@ test.describe('downloadable exports', () => {
     page.on('request', (req) => requests.push(req.url()))
 
     // Open as a local document (no server).
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
 
     await expect(page.getByTestId('demo-stage')).toBeVisible()
     await expect(page.getByTestId('demo-actor')).toBeVisible()

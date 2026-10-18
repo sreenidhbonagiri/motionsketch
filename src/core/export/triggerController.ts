@@ -135,8 +135,11 @@ export function buildTriggerControllerSource(): string {
     var pauseBtn = null;
     var playBtn = null;
     var onPlayClick = null;
+    var onPlayPointerUp = null;
     var onPauseClick = null;
     var onTapClick = null;
+    /** Dedupes pointerup + click on engines that fire both for one gesture. */
+    var playActivateLock = false;
     // Track mutations the controller owns so destroy() can restore the host.
     var owned = {
       waitingAdded: false,
@@ -360,10 +363,26 @@ export function buildTriggerControllerSource(): string {
       }
 
       if (playBtn) {
-        onPlayClick = function () {
+        function activatePlayFromControl() {
+          if (playActivateLock) return;
+          playActivateLock = true;
           beginPlayback({ optInReducedMotion: true });
+          setTimeout(function () {
+            playActivateLock = false;
+          }, 0);
+        }
+        onPlayClick = function () {
+          activatePlayFromControl();
+        };
+        // WebKit (Playwright): when a tabindex scene held focus, trusted
+        // pointerdown/up reach Play but click is suppressed. pointerup keeps
+        // reduced-motion opt-in reachable with a real pointer gesture.
+        onPlayPointerUp = function (event) {
+          if (typeof event.button === 'number' && event.button !== 0) return;
+          activatePlayFromControl();
         };
         playBtn.addEventListener('click', onPlayClick);
+        playBtn.addEventListener('pointerup', onPlayPointerUp);
       }
       if (pauseBtn) {
         onPauseClick = function () {
@@ -531,6 +550,9 @@ export function buildTriggerControllerSource(): string {
         }
         if (playBtn && onPlayClick) {
           playBtn.removeEventListener('click', onPlayClick);
+        }
+        if (playBtn && onPlayPointerUp) {
+          playBtn.removeEventListener('pointerup', onPlayPointerUp);
         }
         if (pauseBtn && onPauseClick) {
           pauseBtn.removeEventListener('click', onPauseClick);

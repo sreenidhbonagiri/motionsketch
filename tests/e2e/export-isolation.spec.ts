@@ -18,6 +18,7 @@ import {
   makeRecording,
   makeSamples,
 } from '../unit/helpers/project'
+import { loadHtmlDocument } from './helpers'
 
 test.describe('export scene isolation + reduced motion', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -68,7 +69,7 @@ test.describe('export scene isolation + reduced motion', () => {
       projectACopy: projectA,
       optionsACopy: { instancePrefix: 'copy-' },
     })
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
 
     const meta = await page.evaluate(() => {
       const w = window as unknown as {
@@ -100,14 +101,25 @@ test.describe('export scene isolation + reduced motion', () => {
             '[class^="ms-actor"]',
           ) as HTMLElement | null
           if (!stage || !actor) throw new Error('missing stage/actor')
-          const anims = actor
-            .getAnimations()
-            .filter((a) => a instanceof CSSAnimation)
-          const durCss = getComputedStyle(actor).animationDuration
-          const dur = (parseFloat(durCss) || 1) * 1000
+          const anims = actor.getAnimations().filter((a) => {
+            const name = (a as Animation & { animationName?: unknown })
+              .animationName
+            return typeof name === 'string' && name !== '' && name !== 'none'
+          })
+          let dur = 0
           for (const anim of anims) {
+            const d = Number(anim.effect?.getTiming().duration ?? 0)
+            if (d > dur) dur = d
+          }
+          if (!(dur > 0)) {
+            const durCss = getComputedStyle(actor).animationDuration
+            dur = (parseFloat(durCss) || 1) * 1000
+          }
+          for (const anim of anims) {
+            const d = Number(anim.effect?.getTiming().duration ?? dur)
+            if (!(d > 0)) continue
             anim.pause()
-            anim.currentTime = t * dur
+            anim.currentTime = t * d
           }
           void actor.offsetWidth
           const box = actor.getBoundingClientRect()
@@ -138,13 +150,15 @@ test.describe('export scene isolation + reduced motion', () => {
     expect(aMid.width).toBeGreaterThan(bMid.width)
     expect(aMid.bg).not.toBe(bMid.bg)
 
-    // Visibility flags on A: hidden before start / at end.
+    // Visibility flags on A — nearby samples (exact 0.15/0.85 are Firefox step-end).
     const aBefore = await sampleScene(meta.rootA, 0.05)
-    const aStart = await sampleScene(meta.rootA, 0.15)
-    const aEnd = await sampleScene(meta.rootA, 0.85)
+    const aInside = await sampleScene(meta.rootA, 0.16)
+    const aNearEnd = await sampleScene(meta.rootA, 0.84)
+    const aAfterEnd = await sampleScene(meta.rootA, 0.86)
     expect(aBefore.visibility).toBe('hidden')
-    expect(aStart.visibility).toBe('visible')
-    expect(aEnd.visibility).toBe('hidden')
+    expect(aInside.visibility).toBe('visible')
+    expect(aNearEnd.visibility).toBe('visible')
+    expect(aAfterEnd.visibility).toBe('hidden')
 
     // Host actor still uses host keyframes (not MotionSketch transforms).
     const hostTransform = await host.evaluate((el) => getComputedStyle(el).transform)
@@ -184,7 +198,7 @@ test.describe('export scene isolation + reduced motion', () => {
     const html = buildHtmlDemoFromProject(project)
 
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
 
     const scene = page.getByTestId('demo-scene')
     const actor = page.getByTestId('demo-actor')
@@ -280,7 +294,7 @@ test.describe('export scene isolation + reduced motion', () => {
       projectB,
       withReplayControls: true,
     })
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
 
     const meta = await page.evaluate(() => {
       const w = window as unknown as {
@@ -336,7 +350,7 @@ test.describe('export scene isolation + reduced motion', () => {
       optionsB: { ...EMBED_SCENE_B_OPTIONS },
       withReplayControls: true,
     })
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await loadHtmlDocument(page, html)
 
     const meta = await page.evaluate(() => {
       const w = window as unknown as {
@@ -388,22 +402,33 @@ test.describe('export scene isolation + reduced motion', () => {
     const actorB = page.locator(`.${meta.rootB} [class^="ms-actor"]`).first()
     await actorB.evaluate((el) => {
       for (const anim of el.getAnimations()) {
-        if (anim instanceof CSSAnimation) {
-          anim.pause()
-          anim.currentTime = 600
-        }
+        const name = (anim as Animation & { animationName?: unknown })
+          .animationName
+        if (typeof name !== 'string' || name === '' || name === 'none') continue
+        anim.pause()
+        anim.currentTime = 600
       }
     })
     const timeBefore = await actorB.evaluate((el) => {
-      const anim = el.getAnimations().find((a) => a instanceof CSSAnimation)
-      return anim instanceof CSSAnimation ? Number(anim.currentTime) : -1
+      const anim = el.getAnimations().find((a) => {
+        const name = (a as Animation & { animationName?: unknown }).animationName
+        return typeof name === 'string' && name !== '' && name !== 'none'
+      })
+      return anim && typeof anim.currentTime === 'number'
+        ? Number(anim.currentTime)
+        : -1
     })
     expect(timeBefore).toBeCloseTo(600, 0)
 
     await page.getByTestId('replay-a').click()
     const timeAfter = await actorB.evaluate((el) => {
-      const anim = el.getAnimations().find((a) => a instanceof CSSAnimation)
-      return anim instanceof CSSAnimation ? Number(anim.currentTime) : -1
+      const anim = el.getAnimations().find((a) => {
+        const name = (a as Animation & { animationName?: unknown }).animationName
+        return typeof name === 'string' && name !== '' && name !== 'none'
+      })
+      return anim && typeof anim.currentTime === 'number'
+        ? Number(anim.currentTime)
+        : -1
     })
     expect(timeAfter).toBeCloseTo(600, 0)
 

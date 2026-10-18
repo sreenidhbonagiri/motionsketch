@@ -34,11 +34,17 @@ export function FloatingPanel({
 
   useEffect(() => {
     if (!open) return
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null
-    returnFocusRef.current = previouslyFocused
+    // Prefer the chrome trigger (aria-controls). After a pointer click, WebKit
+    // often leaves document.activeElement on body before this effect runs.
+    const trigger = document.querySelector(
+      `[aria-controls="${id}-panel-root"]`,
+    )
+    returnFocusRef.current =
+      trigger instanceof HTMLElement
+        ? trigger
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null
     // Move focus into the panel without jumping straight to Close.
     panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
@@ -53,11 +59,22 @@ export function FloatingPanel({
       window.removeEventListener('keydown', onKey, true)
       const restore = returnFocusRef.current
       returnFocusRef.current = null
-      if (restore && document.contains(restore)) {
-        restore.focus()
-      }
+      // Defer restore until after unmount paint — WebKit needs two frames.
+      // Skip if the panel remounted (React Strict Mode cleanup).
+      const panelDomId = `${id}-panel-root`
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (
+            restore &&
+            document.contains(restore) &&
+            !document.getElementById(panelDomId)
+          ) {
+            restore.focus()
+          }
+        })
+      })
     }
-  }, [open, onClose])
+  }, [open, onClose, id])
 
   if (!open) return null
 

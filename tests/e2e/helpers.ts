@@ -1,5 +1,11 @@
 import { expect, type Page } from '@playwright/test'
 
+/** Load a standalone HTML document without keeping the Vite app URL as the document base. */
+export async function loadHtmlDocument(page: Page, html: string) {
+  await page.goto('about:blank')
+  await page.setContent(html, { waitUntil: 'domcontentloaded' })
+}
+
 /**
  * Wait for the editor canvas. Optionally rename the project header.
  * No-ops the rename when the name already matches.
@@ -34,10 +40,42 @@ export async function dragActor(
 
   await page.mouse.move(startX, startY)
   await page.mouse.down()
+  // Micro-move so engines that require movement after down arm capture.
+  await page.mouse.move(startX + 2, startY + 1, { steps: 2 })
   await page.mouse.move(startX + from.x, startY + from.y, { steps: 8 })
   await page.mouse.move(startX + to.x, startY + to.y, { steps: 12 })
-  await page.waitForTimeout(80)
+  // Brief hold: pointerup stamps duration (WebKit compresses move timeStamps).
+  await page.waitForTimeout(60)
   await page.mouse.up()
+}
+
+/**
+ * Dispatch pointercancel for common mouse pointer ids. Firefox uses 0;
+ * Chromium/WebKit use 1. The recorder ignores non-active ids. Targets the
+ * capture element (actor) and bubbles to the stage listener.
+ */
+export async function dispatchActivePointerCancel(
+  page: Page,
+  selector = '[data-testid="actor"]',
+) {
+  await page.evaluate((sel) => {
+    const targets = [
+      document.querySelector(sel),
+      document.querySelector('[data-testid="stage"]'),
+    ].filter(Boolean) as Element[]
+    if (targets.length === 0) throw new Error(`missing ${sel}`)
+    for (const el of targets) {
+      for (const pointerId of [0, 1]) {
+        el.dispatchEvent(
+          new PointerEvent('pointercancel', {
+            bubbles: true,
+            cancelable: true,
+            pointerId,
+          }),
+        )
+      }
+    }
+  }, selector)
 }
 
 /**

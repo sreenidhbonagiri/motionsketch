@@ -14,9 +14,9 @@ permissions:
 
 jobs:
   check:
-    name: Lint, test, build, e2e
+    name: Lint, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -40,19 +40,42 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+  e2e:
+    name: E2E (${{ matrix.project }})
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit]
 
-      - name: End-to-end tests (Chromium)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright ${{ matrix.project }}
+        run: npx playwright install ${{ matrix.project }} --with-deps
+
+      - name: End-to-end tests (${{ matrix.project }})
         # GitHub Actions sets CI=true, so Playwright starts its own webServer
         # (reuseExistingServer is false) and does not attach to an unrelated process.
-        run: npm run test:e2e -- --retries=0
+        run: npm run test:e2e -- --project=${{ matrix.project }} --retries=0
 
-      - name: Upload Playwright failure artifacts
+      - name: Upload Playwright failure artifacts (${{ matrix.project }})
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-${{ matrix.project }}
           path: |
             playwright-report/
             test-results/
