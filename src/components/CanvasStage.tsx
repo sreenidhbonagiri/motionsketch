@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { projectToLocal } from '../core/clip'
+import { isActorVisibleAt, projectToLocal } from '../core/clip'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
 import { findActor } from '../core/sceneActor'
@@ -194,6 +194,12 @@ export function CanvasStage() {
         !editing &&
         project.actors.map((actor, index) => {
           const isSelected = actor.id === selectedActorId
+          // Recording/armed need the active actor visible for dragging.
+          // Normal playback/idle never silently reveals a selected hidden actor.
+          const forceVisible =
+            isSelected && (mode === 'armed' || mode === 'recording')
+          const hidden =
+            !forceVisible && !isActorVisibleAt(playbackHead, actor.clip)
           const position = selectActorPositionForActor(
             project,
             actor,
@@ -222,6 +228,7 @@ export function CanvasStage() {
               selected={isSelected}
               armed={mode === 'armed' && isSelected}
               recording={mode === 'recording' && isSelected}
+              hidden={hidden}
               rotationDeg={xf.rotationDeg}
               scale={xf.scale}
               onPointerDown={(e) => onActorPointerDown(actor.id, e)}

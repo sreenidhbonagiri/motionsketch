@@ -10,19 +10,65 @@ export const MIN_CLIP_SPAN = 0.05
 export const DEFAULT_ACTOR_CLIP: ActorClip = Object.freeze({
   start: 0,
   end: 1,
+  hideBeforeStart: false,
+  hideAfterEnd: false,
 })
 
-export function cloneClip(clip: ActorClip): ActorClip {
-  return { start: clip.start, end: clip.end }
+/** Accept incomplete clip literals (tests / builders) and fill visibility defaults. */
+export type ActorClipInput = {
+  start: number
+  end: number
+  hideBeforeStart?: boolean
+  hideAfterEnd?: boolean
+}
+
+export function cloneClip(clip: ActorClipInput): ActorClip {
+  return {
+    start: clip.start,
+    end: clip.end,
+    hideBeforeStart: !!clip.hideBeforeStart,
+    hideAfterEnd: !!clip.hideAfterEnd,
+  }
 }
 
 export function fullClip(): ActorClip {
-  return { start: 0, end: 1 }
+  return {
+    start: 0,
+    end: 1,
+    hideBeforeStart: false,
+    hideAfterEnd: false,
+  }
 }
 
 /** True when the clip covers the entire shared timeline. */
 export function isFullClip(clip: ActorClip): boolean {
   return clip.start <= 1e-9 && clip.end >= 1 - 1e-9
+}
+
+/**
+ * Visibility on the shared project timeline (exportable half-open end):
+ * - Hide before: hidden for t < start; visible at start.
+ * - Hide after: hidden for t >= end (at end and after).
+ * - Flags off: holds first/last pose (always visible for paint).
+ */
+export function isActorVisibleAt(
+  projectT: number,
+  clip: ActorClip,
+): boolean {
+  const t = clamp01(projectT)
+  const c = clampClip(clip)
+  if (c.hideBeforeStart && t < c.start) return false
+  if (c.hideAfterEnd && t >= c.end) return false
+  return true
+}
+
+export function clipsEqual(a: ActorClip, b: ActorClip): boolean {
+  return (
+    Math.abs(a.start - b.start) < 1e-9 &&
+    Math.abs(a.end - b.end) < 1e-9 &&
+    !!a.hideBeforeStart === !!b.hideBeforeStart &&
+    !!a.hideAfterEnd === !!b.hideAfterEnd
+  )
 }
 
 /**
@@ -56,9 +102,9 @@ export function clipSpan(clip: ActorClip): number {
 
 /**
  * Clamp a clip into [0,1] with start < end and at least MIN_CLIP_SPAN.
- * Prefer preserving the requested span when possible.
+ * Prefer preserving the requested span when possible. Visibility flags pass through.
  */
-export function clampClip(clip: ActorClip): ActorClip {
+export function clampClip(clip: ActorClipInput): ActorClip {
   let start = clamp01(clip.start)
   let end = clamp01(clip.end)
   if (!(end > start)) {
@@ -75,7 +121,12 @@ export function clampClip(clip: ActorClip): ActorClip {
       start = Math.max(0, 1 - MIN_CLIP_SPAN)
     }
   }
-  return { start, end }
+  return {
+    start,
+    end,
+    hideBeforeStart: !!clip.hideBeforeStart,
+    hideAfterEnd: !!clip.hideAfterEnd,
+  }
 }
 
 /** Move a clip by delta in normalized project time, preserving length. */
@@ -92,32 +143,37 @@ export function moveClip(clip: ActorClip, delta: number): ActorClip {
     end = 1
     start = 1 - span
   }
-  return clampClip({ start, end })
+  return clampClip({ ...c, start, end })
 }
 
 /** Resize by setting a new start (keeps end); enforces minimum span. */
 export function resizeClipStart(clip: ActorClip, start: number): ActorClip {
-  const end = clamp01(clip.end)
+  const c = clampClip(clip)
+  const end = c.end
   const nextStart = Math.min(clamp01(start), end - MIN_CLIP_SPAN)
-  return clampClip({ start: Math.max(0, nextStart), end })
+  return clampClip({ ...c, start: Math.max(0, nextStart), end })
 }
 
 /** Resize by setting a new end (keeps start); enforces minimum span. */
 export function resizeClipEnd(clip: ActorClip, end: number): ActorClip {
-  const start = clamp01(clip.start)
+  const c = clampClip(clip)
+  const start = c.start
   const nextEnd = Math.max(clamp01(end), start + MIN_CLIP_SPAN)
-  return clampClip({ start, end: Math.min(1, nextEnd) })
+  return clampClip({ ...c, start, end: Math.min(1, nextEnd) })
 }
 
 export function clipFromSeconds(
   startSec: number,
   endSec: number,
   durationMs: number,
+  visibility?: Pick<ActorClip, 'hideBeforeStart' | 'hideAfterEnd'>,
 ): ActorClip {
   const durationSec = Math.max(durationMs / 1000, 1e-6)
   return clampClip({
     start: startSec / durationSec,
     end: endSec / durationSec,
+    hideBeforeStart: visibility?.hideBeforeStart ?? false,
+    hideAfterEnd: visibility?.hideAfterEnd ?? false,
   })
 }
 
@@ -135,6 +191,7 @@ export function clipToSeconds(
 
 /**
  * Parse/validate a clip from persisted JSON. Missing clip → full timeline.
+ * Missing visibility flags (pre-v8) → both off.
  */
 export function parseActorClip(
   value: unknown,
@@ -165,7 +222,35 @@ export function parseActorClip(
       error: `actors[${index}].clip.end must be greater than start.`,
     }
   }
-  const clamped = clampClip({ start: raw.start, end: raw.end })
+
+  let hideBeforeStart = false
+  if (raw.hideBeforeStart !== undefined && raw.hideBeforeStart !== null) {
+    if (typeof raw.hideBeforeStart !== 'boolean') {
+      return {
+        ok: false,
+        error: `actors[${index}].clip.hideBeforeStart must be a boolean.`,
+      }
+    }
+    hideBeforeStart = raw.hideBeforeStart
+  }
+
+  let hideAfterEnd = false
+  if (raw.hideAfterEnd !== undefined && raw.hideAfterEnd !== null) {
+    if (typeof raw.hideAfterEnd !== 'boolean') {
+      return {
+        ok: false,
+        error: `actors[${index}].clip.hideAfterEnd must be a boolean.`,
+      }
+    }
+    hideAfterEnd = raw.hideAfterEnd
+  }
+
+  const clamped = clampClip({
+    start: raw.start,
+    end: raw.end,
+    hideBeforeStart,
+    hideAfterEnd,
+  })
   if (clamped.end - clamped.start < MIN_CLIP_SPAN - 1e-9) {
     return {
       ok: false,

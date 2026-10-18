@@ -61,6 +61,8 @@ describe('unified clip/transform undo', () => {
     expect(afterFirstUndo.project.actors[0].clip).toEqual({
       start: 0.2,
       end: 0.8,
+      hideBeforeStart: false,
+      hideAfterEnd: false,
     })
 
     // Next = clip
@@ -68,6 +70,8 @@ describe('unified clip/transform undo', () => {
     expect(useEditorStore.getState().project.actors[0].clip).toEqual({
       start: 0,
       end: 1,
+      hideBeforeStart: false,
+      hideAfterEnd: false,
     })
 
     // Next = first transform

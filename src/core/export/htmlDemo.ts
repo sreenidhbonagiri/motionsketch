@@ -226,7 +226,12 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
               samples: options.processedPath,
             }
           : null,
-        clip: { start: 0, end: 1 },
+        clip: {
+          start: 0,
+          end: 1,
+          hideBeforeStart: false,
+          hideAfterEnd: false,
+        },
       },
     ],
     playback: {

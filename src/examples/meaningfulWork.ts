@@ -40,6 +40,7 @@ export function projectHasMeaningfulWork(project: Project): boolean {
   if (actor.transform.keyframes.length > 0) return true
   if (actor.geometryEdit) return true
   if (!isFullClip(actor.clip)) return true
+  if (actor.clip.hideBeforeStart || actor.clip.hideAfterEnd) return true
 
   if (project.playback.durationMs !== DEFAULT_PLAYBACK.durationMs) return true
   if (project.playback.loop !== DEFAULT_PLAYBACK.loop) return true

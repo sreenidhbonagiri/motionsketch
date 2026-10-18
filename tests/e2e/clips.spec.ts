@@ -75,7 +75,7 @@ test.describe('per-actor clip timing', () => {
 
     await ensureClipTimelineOpen(page)
     await expect(page.getByTestId('clip-timeline-help')).toContainText(
-      'not visibility',
+      'holds its first or last pose',
     )
 
     await selectActorByIndex(page, 1)

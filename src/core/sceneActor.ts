@@ -34,7 +34,10 @@ export function newActorId(): string {
 export const DEFAULT_REST_POSITION: Vec2 = { x: 0.35, y: 0.5 }
 
 export function createSceneActor(
-  partial?: Partial<SceneActor> & { name?: string },
+  partial?: Omit<Partial<SceneActor>, 'clip'> & {
+    name?: string
+    clip?: { start: number; end: number; hideBeforeStart?: boolean; hideAfterEnd?: boolean }
+  },
 ): SceneActor {
   const appearance = cloneActor(partial?.appearance ?? DEFAULT_ACTOR)
   return {
@@ -200,6 +203,15 @@ export function cssActorClass(index: number, actorCount = 2): string {
 export function cssAnimationName(index: number, actorCount = 2): string {
   if (actorCount <= 1) return 'motionsketch'
   return `motionsketch-actor-${index + 1}`
+}
+
+/** Separate keyframes for discrete visibility (no fades). */
+export function cssVisibilityAnimationName(
+  index: number,
+  actorCount = 2,
+): string {
+  if (actorCount <= 1) return 'motionsketch-vis'
+  return `motionsketch-vis-actor-${index + 1}`
 }
 
 function clamp01Local(value: number): number {

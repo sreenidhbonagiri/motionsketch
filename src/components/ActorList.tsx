@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isActorVisibleAt } from '../core/clip'
 import { MAX_ACTORS } from '../core/sceneActor'
 import { useEditorStore } from '../state/store'
 import { ActorNameInput } from './ActorNameInput'
@@ -6,8 +7,10 @@ import { ActorNameInput } from './ActorNameInput'
 export function ActorList() {
   const actors = useEditorStore((s) => s.project.actors)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
+  const playbackHead = useEditorStore((s) => s.playbackHead)
   const mode = useEditorStore((s) => s.mode)
   const selectActor = useEditorStore((s) => s.selectActor)
+  const scrubPlayback = useEditorStore((s) => s.scrubPlayback)
   const addActor = useEditorStore((s) => s.addActor)
   const duplicateSelectedActor = useEditorStore((s) => s.duplicateSelectedActor)
   const deleteSelectedActor = useEditorStore((s) => s.deleteSelectedActor)
@@ -22,6 +25,8 @@ export function ActorList() {
     mode === 'recording' || mode === 'armed' || mode === 'editing'
 
   const selected = actors.find((a) => a.id === selectedActorId)
+  const selectedHidden =
+    !!selected && !isActorVisibleAt(playbackHead, selected.clip)
 
   return (
     <div
@@ -51,6 +56,7 @@ export function ActorList() {
           >
             {actors.map((actor, index) => {
               const selectedRow = actor.id === selectedActorId
+              const hiddenNow = !isActorVisibleAt(playbackHead, actor.clip)
               return (
                 <li key={actor.id}>
                   <button
@@ -59,6 +65,7 @@ export function ActorList() {
                     aria-selected={selectedRow}
                     data-testid={`actor-list-item-${actor.id}`}
                     data-selected={selectedRow ? 'true' : 'false'}
+                    data-hidden-now={hiddenNow ? 'true' : 'false'}
                     disabled={busy && !selectedRow}
                     onClick={() => selectActor(actor.id)}
                     className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition ${
@@ -83,6 +90,7 @@ export function ActorList() {
                     <span className="shrink-0 text-[10px] opacity-70">
                       {index + 1}
                       {actor.recording ? ' · path' : ''}
+                      {hiddenNow ? ' · hidden' : ''}
                     </span>
                   </button>
                 </li>
@@ -100,6 +108,26 @@ export function ActorList() {
                 onCommit={(id, name) => renameActor(id, name)}
               />
             </label>
+          )}
+
+          {selected && selectedHidden && (
+            <div
+              data-testid="actor-hidden-indicator"
+              className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"
+            >
+              <p className="text-[11px] font-medium text-amber-950">
+                Hidden at this time
+              </p>
+              <button
+                type="button"
+                data-testid="btn-seek-clip-start"
+                disabled={busy}
+                onClick={() => scrubPlayback(selected.clip.start)}
+                className="rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950 transition hover:bg-amber-100 disabled:opacity-40"
+              >
+                Go to clip start
+              </button>
+            </div>
           )}
 
           <div className="flex flex-wrap gap-1.5">

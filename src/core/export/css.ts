@@ -3,13 +3,17 @@ import {
   actorContentAspect,
   coerceActor,
 } from '../actor'
-import { clampClip, isFullClip, localToProject } from '../clip'
+import { clampClip, fullClip, isFullClip, localToProject } from '../clip'
 import { clamp01 } from '../coords'
 import {
   formatCssAspectRatio,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
-import { cssActorClass, cssAnimationName } from '../sceneActor'
+import {
+  cssActorClass,
+  cssAnimationName,
+  cssVisibilityAnimationName,
+} from '../sceneActor'
 import {
   evaluateTransform,
   formatTransformCss,
@@ -250,6 +254,80 @@ function cssTransformAt(
   return `${pos} ${formatTransformCss(rotationDeg, scale)}`
 }
 
+/**
+ * Discrete visibility keyframes matching {@link isActorVisibleAt}:
+ * visible at start; when hide-after is on, hidden at and after end.
+ * Uses step-end on each interval (no epsilon keyframe times, no step-start).
+ * Paired as a second animation so motion stays linear.
+ */
+export function buildVisibilityKeyframesCss(
+  clip: ActorClip,
+): { initialHidden: boolean; frames: string } | null {
+  const c = clampClip(clip)
+  // start≈0: already at/after start — skip a no-op pre-roll segment.
+  const hideBefore = c.hideBeforeStart && c.start > 1e-9
+  // end≈1 still needs a 100% hidden stop when hide-after is enabled.
+  const hideAfter = c.hideAfterEnd
+  if (!hideBefore && !hideAfter) return null
+
+  type VisStop = {
+    t: number
+    visible: boolean
+    /** Timing for the interval after this stop. */
+    after: 'step-end' | null
+  }
+  const stops: VisStop[] = []
+
+  if (hideBefore) {
+    stops.push({ t: 0, visible: false, after: 'step-end' })
+    stops.push({
+      t: c.start,
+      visible: true,
+      after: hideAfter ? 'step-end' : null,
+    })
+  } else {
+    stops.push({
+      t: 0,
+      visible: true,
+      after: hideAfter ? 'step-end' : null,
+    })
+  }
+
+  if (hideAfter) {
+    const last = stops[stops.length - 1]
+    if (Math.abs(last.t - c.end) > 1e-9) {
+      if (last.after === null) last.after = 'step-end'
+      stops.push({ t: c.end, visible: false, after: null })
+    } else {
+      last.visible = false
+      last.after = null
+    }
+    if (c.end < 1 - 1e-9) {
+      const endStop = stops[stops.length - 1]
+      if (endStop.after === null) endStop.after = 'step-end'
+      stops.push({ t: 1, visible: false, after: null })
+    }
+  } else if (stops[stops.length - 1].t < 1 - 1e-9) {
+    const last = stops[stops.length - 1]
+    if (last.after === null) last.after = 'step-end'
+    stops.push({ t: 1, visible: last.visible, after: null })
+  }
+
+  const pcts = formatProjectOffsets(stops.map((s) => s.t))
+  const frames = stops
+    .map((s, i) => {
+      const vis = s.visible ? 'visible' : 'hidden'
+      const timing =
+        s.after === 'step-end'
+          ? ' animation-timing-function: step-end;'
+          : ''
+      return `  ${pcts[i]} { visibility: ${vis};${timing} }`
+    })
+    .join('\n')
+
+  return { initialHidden: hideBefore, frames }
+}
+
 function generateActorCssBlock(options: {
   actor: SceneActor
   index: number
@@ -261,6 +339,10 @@ function generateActorCssBlock(options: {
 }): string {
   const className = cssActorClass(options.index, options.actorCount)
   const animName = cssAnimationName(options.index, options.actorCount)
+  const visName = cssVisibilityAnimationName(
+    options.index,
+    options.actorCount,
+  )
   const appearance = coerceActor(options.actor.appearance)
   const box = actorBoxRules(appearance, className)
   const track = options.actor.transform
@@ -270,14 +352,29 @@ function generateActorCssBlock(options: {
     options.loop,
     options.loopMode,
   )
+  const clip = clampClip(options.actor.clip)
+  const vis = buildVisibilityKeyframesCss(clip)
+  const visAnimDecl = vis ? `, ${visName} ${timing}` : ''
+  const visInitial = vis?.initialHidden
+    ? `\n  visibility: hidden;`
+    : ''
+  const visKeyframes = vis
+    ? `
+
+@keyframes ${visName} {
+${vis.frames}
+}
+`
+    : ''
 
   if (options.processedPath.length < 2) {
-    // Static actor — rest position, optional identity transform hold.
+    // Static actor — rest position; optional discrete visibility animation.
     const x = options.actor.restPosition.x
     const y = options.actor.restPosition.y
     const xf = evaluateTransform(track, 0)
-    const tag = appearance.kind === 'image' ? 'img' : 'div'
-    void tag
+    const animLine = vis
+      ? `\n  animation: ${visName} ${timing};`
+      : ''
     return `.${className} {
   position: absolute;
   left: 0;
@@ -287,14 +384,13 @@ ${box.shapeDecls}
   transform: ${cssTransformAt(x, y, xf.rotationDeg, xf.scale, includeXf)};
   display: block;
   box-sizing: border-box;
-  z-index: ${options.index + 1};
+  z-index: ${options.index + 1};${visInitial}${animLine}
 }
-`
+${visKeyframes}`
   }
 
   const keyframes = buildKeyframesFromProcessed(options.processedPath)
   const localOffsets = unionExportOffsets(keyframes, track)
-  const clip = clampClip(options.actor.clip)
   const timeline = projectTimelineSamples(localOffsets, clip)
   const cssOffsets = formatProjectOffsets(timeline.map((s) => s.projectT))
   const startLocal = timeline[0]?.localT ?? 0
@@ -312,6 +408,9 @@ ${box.shapeDecls}
   const clipNote = isFullClip(clip)
     ? ''
     : `\n  /* Clip ${(clip.start * 100).toFixed(1)}%–${(clip.end * 100).toFixed(1)}% of shared timeline (holds outside). */`
+  const visNote = vis
+    ? `\n  /* Visibility is a separate discrete animation (no fades). */`
+    : ''
 
   return `.${className} {
   position: absolute;
@@ -320,17 +419,17 @@ ${box.shapeDecls}
 ${box.sizeDecl}
 ${box.shapeDecls}
   transform: ${cssTransformAt(startPos.x, startPos.y, startXf.rotationDeg, startXf.scale, includeXf)};
-  animation: ${animName} ${timing};
+  animation: ${animName} ${timing}${visAnimDecl};
   will-change: transform;
   display: block;
   box-sizing: border-box;
-  z-index: ${options.index + 1};${clipNote}
+  z-index: ${options.index + 1};${visInitial}${clipNote}${visNote}
 }
 
 @keyframes ${animName} {
 ${frames}
 }
-`
+${visKeyframes}`
 }
 
 /**
@@ -398,10 +497,11 @@ export function generateProjectCss(project: Project): string {
  * Positioning assumptions:
  * - Place each actor element inside a .stage with position: relative and container-type: size.
  * - Shared Duration / loop / loopMode drive every actor’s animation together.
- * - Per-actor clips remap motion onto a start–end interval; outside that range the actor holds its first/last pose (timing ≠ visibility).
+ * - Per-actor clips remap motion onto a start–end interval; outside that range the actor holds its first/last pose.
+ * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
  * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
  * - Actor size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
- * - Animation uses transform only (compositor-friendly); timing-function is linear.
+ * - Motion uses transform with linear timing; visibility is orthogonal (visibility + step-*).
  * - Transform order: translate → center → rotate → scale.
 ${loopNote}
  *${imageNotes ? `\n${imageNotes}\n *` : ''}
@@ -460,7 +560,7 @@ export function generateCssSnippet(options: {
     steadySpeed: 0,
     transform: options.transform ?? { keyframes: [] },
     geometryEdit: null,
-    clip: { start: 0, end: 1 },
+    clip: fullClip(),
   }
   const project: Project = {
     version: 1,
@@ -530,7 +630,7 @@ export function exportCssFromRecording(options: {
               samples: options.processedPath,
             }
           : null,
-        clip: { start: 0, end: 1 },
+        clip: fullClip(),
       },
     ],
     playback: {

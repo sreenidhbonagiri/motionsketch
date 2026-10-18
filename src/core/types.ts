@@ -88,12 +88,17 @@ export interface TransformTrack {
 
 /**
  * Active interval on the shared project timeline (normalized 0..1 progress).
- * Timing controls when the actor moves, not whether it is visible.
- * Default is the full timeline `{ start: 0, end: 1 }`.
+ * Motion holds outside the interval; optional flags hide the actor strictly
+ * before `start` and/or at-and-after `end` (visible at start; hidden at end
+ * when hide-after is on). Default is the full timeline with both flags off.
  */
 export interface ActorClip {
   start: number
   end: number
+  /** When true, hidden for projectT < start (visible at start). */
+  hideBeforeStart: boolean
+  /** When true, hidden for projectT >= end (hidden at end and after). */
+  hideAfterEnd: boolean
 }
 
 /**

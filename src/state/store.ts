@@ -19,6 +19,7 @@ import {
 import { captureViewportStageAspect, clampStageAspect } from '../core/stageAspect'
 import {
   clampClip,
+  clipsEqual,
   cloneClip,
   localToProject,
   projectToLocal,
@@ -998,12 +999,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       const next = clampClip(clip)
       const prev = cloneClip(actor.clip)
-      if (
-        Math.abs(prev.start - next.start) < 1e-9 &&
-        Math.abs(prev.end - next.end) < 1e-9
-      ) {
-        return
-      }
+      if (clipsEqual(prev, next)) return
       set({
         project: {
           ...state.project,
@@ -1057,10 +1053,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ? clipGestureBaseline.clip
           : cloneClip(actor.clip)
       clipGestureBaseline = null
-      if (
-        Math.abs(baseline.start - next.start) < 1e-9 &&
-        Math.abs(baseline.end - next.end) < 1e-9
-      ) {
+      if (clipsEqual(baseline, next)) {
         set({
           project: {
             ...state.project,

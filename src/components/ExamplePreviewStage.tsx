@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { projectToLocal } from '../core/clip'
+import { isActorVisibleAt, projectToLocal } from '../core/clip'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
 import { actorBorderRadiusCssPercent, actorDisplaySizePx } from '../core/actor'
@@ -90,7 +90,8 @@ export function ExamplePreviewStage({
       const position =
         path.length >= 2 ? evaluate(path, localT) : { ...actor.restPosition }
       const xf = evaluateTransform(actor.transform, localT)
-      return { actor, index, position, xf }
+      const hidden = !isActorVisibleAt(head, actor.clip)
+      return { actor, index, position, xf, hidden }
     })
   }, [project, head])
 
@@ -104,7 +105,7 @@ export function ExamplePreviewStage({
         className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-[#eef1f6]"
         style={{ aspectRatio: `${aspect}` }}
       >
-        {actors.map(({ actor, index, position, xf }) => {
+        {actors.map(({ actor, index, position, xf, hidden }) => {
           const { width, height } = actorDisplaySizePx(
             size.width,
             size.height,
@@ -118,6 +119,7 @@ export function ExamplePreviewStage({
             height,
             zIndex: 10 + index,
             transform: `translate(-50%, -50%) rotate(${xf.rotationDeg}deg) scale(${xf.scale})`,
+            visibility: hidden ? ('hidden' as const) : ('visible' as const),
           }
           if (appearance.kind === 'image' && appearance.image) {
             return (

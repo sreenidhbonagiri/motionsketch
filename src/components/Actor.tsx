@@ -13,6 +13,10 @@ interface ActorProps {
   selected: boolean
   armed: boolean
   recording: boolean
+  /** When true, not painted for hit-testing; still mounted for layout tests. */
+  hidden?: boolean
+  /** Explicit path-edit preview label (does not change saved visibility). */
+  editingPreview?: boolean
   rotationDeg?: number
   scale?: number
   onPointerDown: PointerEventHandler<HTMLElement>
@@ -29,6 +33,8 @@ export function Actor({
   selected,
   armed,
   recording,
+  hidden = false,
+  editingPreview = false,
   rotationDeg = 0,
   scale = 1,
   onPointerDown,
@@ -54,26 +60,34 @@ export function Actor({
     height,
     zIndex,
     transform: `translate(-50%, -50%) rotate(${rotationDeg}deg) scale(${scale})`,
-    boxShadow: shadow,
+    boxShadow: editingPreview
+      ? '0 0 0 2px rgba(180, 83, 9, 0.55), 0 12px 28px rgba(15, 23, 42, 0.18)'
+      : shadow,
+    visibility: hidden ? 'hidden' : 'visible',
+    pointerEvents: hidden ? 'none' : 'auto',
   }
 
   const label =
     actor.kind === 'image' && actor.image
       ? `Actor ${name}: ${actor.image.label}`
       : `Actor ${name}`
+  const ariaLabel = editingPreview ? `${label} (editing preview)` : label
 
   if (actor.kind === 'image' && actor.image) {
     return (
       // eslint-disable-next-line jsx-a11y/alt-text -- aria-label on interactive control
       <img
         role="button"
-        tabIndex={0}
-        aria-label={label}
+        tabIndex={hidden ? -1 : 0}
+        aria-label={ariaLabel}
         aria-pressed={selected}
+        aria-hidden={hidden ? true : undefined}
         data-testid={selected ? 'actor' : `actor-${actorId}`}
         data-actor-id={actorId}
         data-actor-kind="image"
         data-selected={selected ? 'true' : 'false'}
+        data-hidden={hidden ? 'true' : 'false'}
+        data-editing-preview={editingPreview ? 'true' : 'false'}
         src={actor.image.dataUrl}
         alt=""
         draggable={false}
@@ -83,7 +97,7 @@ export function Actor({
           background: 'transparent',
           borderRadius: 0,
         }}
-        onPointerDown={onPointerDown}
+        onPointerDown={hidden ? undefined : onPointerDown}
       />
     )
   }
@@ -93,20 +107,23 @@ export function Actor({
   return (
     <div
       role="button"
-      tabIndex={0}
-      aria-label={label}
+      tabIndex={hidden ? -1 : 0}
+      aria-label={ariaLabel}
       aria-pressed={selected}
+      aria-hidden={hidden ? true : undefined}
       data-testid={selected ? 'actor' : `actor-${actorId}`}
       data-actor-id={actorId}
       data-actor-kind="shape"
       data-selected={selected ? 'true' : 'false'}
+      data-hidden={hidden ? 'true' : 'false'}
+      data-editing-preview={editingPreview ? 'true' : 'false'}
       className="absolute cursor-grab touch-none select-none active:cursor-grabbing"
       style={{
         ...boxStyle,
         borderRadius: radius,
         background: actor.color,
       }}
-      onPointerDown={onPointerDown}
+      onPointerDown={hidden ? undefined : onPointerDown}
     />
   )
 }

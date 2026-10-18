@@ -10,19 +10,22 @@ import {
 import {
   MIN_CLIP_SPAN,
   clampClip,
+  cloneClip,
   clipFromSeconds,
   clipToSeconds,
+  isActorVisibleAt,
   moveClip,
   resizeClipEnd,
   resizeClipStart,
 } from '../core/clip'
+import type { ActorClip } from '../core/types'
 import { useEditorStore } from '../state/store'
 
 type DragKind = 'move' | 'start' | 'end'
 
 /**
  * Collapsible per-actor clip rows on the shared project timeline.
- * Timing controls when each actor moves (holds outside), not visibility.
+ * Timing controls when each actor moves; optional visibility hides outside the clip.
  */
 export function ClipTimeline() {
   const actors = useEditorStore((s) => s.project.actors)
@@ -54,7 +57,7 @@ export function ClipTimeline() {
     kind: DragKind
     originX: number
     trackWidth: number
-    baseline: { start: number; end: number }
+    baseline: ActorClip
   } | null>(null)
 
   // Draft numeric fields follow selection; commit on blur/Enter.
@@ -85,7 +88,7 @@ export function ClipTimeline() {
       kind,
       originX: event.clientX,
       trackWidth: rect.width,
-      baseline: { ...actor.clip },
+      baseline: cloneClip(actor.clip),
     }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -129,11 +132,18 @@ export function ClipTimeline() {
       if (!selected || busy) return
       commitActorClip(
         selected.id,
-        clipFromSeconds(startSec, endSec, durationMs),
+        clipFromSeconds(startSec, endSec, durationMs, selected.clip),
       )
     },
     [selected, busy, commitActorClip, durationMs],
   )
+
+  const commitVisibility = (
+    patch: Partial<Pick<ActorClip, 'hideBeforeStart' | 'hideAfterEnd'>>,
+  ) => {
+    if (!selected || busy) return
+    commitActorClip(selected.id, clampClip({ ...selected.clip, ...patch }))
+  }
 
   const nudgeSelected = (deltaStart: number, deltaEnd: number) => {
     if (!selected || busy) return
@@ -199,10 +209,11 @@ export function ClipTimeline() {
             data-testid="clip-timeline-help"
             className="text-[10px] leading-relaxed text-slate-500"
           >
-            Timing controls when each actor moves on the shared timeline — not
-            visibility. Outside its clip the actor holds its first or last pose.
-            Minimum clip length is {Math.round(MIN_CLIP_SPAN * 100)}% of the
-            project. Arrow keys nudge the selected clip; [ ] resize ends.
+            Timing controls when each actor moves on the shared timeline.
+            Outside its clip the actor holds its first or last pose unless you
+            hide it below. Minimum clip length is{' '}
+            {Math.round(MIN_CLIP_SPAN * 100)}% of the project. Arrow keys nudge
+            the selected clip; [ ] resize ends.
           </p>
 
           <div
@@ -293,69 +304,120 @@ export function ClipTimeline() {
           </div>
 
           {selected && (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="space-y-0.5">
-                <span className="text-[11px] text-slate-500">Start (s)</span>
-                <input
-                  id={startFieldId}
-                  data-testid="clip-start-input"
-                  type="number"
-                  inputMode="decimal"
-                  step={0.05}
-                  min={0}
-                  max={durationMs / 1000}
-                  disabled={busy}
-                  value={startDraft}
-                  onChange={(e) => setStartDraft(e.target.value)}
-                  onBlur={() => {
-                    const start = Number(startDraft)
-                    const end = Number(endDraft)
-                    if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                      setStartDraft(selectedSecs.startSec.toFixed(2))
-                      setEndDraft(selectedSecs.endSec.toFixed(2))
-                      return
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-0.5">
+                  <span className="text-[11px] text-slate-500">Start (s)</span>
+                  <input
+                    id={startFieldId}
+                    data-testid="clip-start-input"
+                    type="number"
+                    inputMode="decimal"
+                    step={0.05}
+                    min={0}
+                    max={durationMs / 1000}
+                    disabled={busy}
+                    value={startDraft}
+                    onChange={(e) => setStartDraft(e.target.value)}
+                    onBlur={() => {
+                      const start = Number(startDraft)
+                      const end = Number(endDraft)
+                      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+                        setStartDraft(selectedSecs.startSec.toFixed(2))
+                        setEndDraft(selectedSecs.endSec.toFixed(2))
+                        return
+                      }
+                      commitSeconds(start, end)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
+                  />
+                </label>
+                <label className="space-y-0.5">
+                  <span className="text-[11px] text-slate-500">End (s)</span>
+                  <input
+                    id={endFieldId}
+                    data-testid="clip-end-input"
+                    type="number"
+                    inputMode="decimal"
+                    step={0.05}
+                    min={0}
+                    max={durationMs / 1000}
+                    disabled={busy}
+                    value={endDraft}
+                    onChange={(e) => setEndDraft(e.target.value)}
+                    onBlur={() => {
+                      const start = Number(startDraft)
+                      const end = Number(endDraft)
+                      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+                        setStartDraft(selectedSecs.startSec.toFixed(2))
+                        setEndDraft(selectedSecs.endSec.toFixed(2))
+                        return
+                      }
+                      commitSeconds(start, end)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
+                  />
+                </label>
+              </div>
+
+              <fieldset
+                data-testid="clip-visibility-options"
+                className="space-y-1.5 rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2"
+                disabled={busy}
+              >
+                <legend className="px-0.5 text-[11px] font-medium text-slate-600">
+                  Visibility
+                </legend>
+                <p className="text-[10px] leading-relaxed text-slate-500">
+                  Off by default (holds the first/last pose). Hide-before hides
+                  until the start time (visible at start). Hide-after hides from
+                  the end time onward (hidden at end).
+                </p>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    data-testid="clip-hide-before"
+                    className="mt-0.5"
+                    checked={!!selected.clip.hideBeforeStart}
+                    disabled={busy}
+                    onChange={(e) =>
+                      commitVisibility({ hideBeforeStart: e.target.checked })
                     }
-                    commitSeconds(start, end)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.currentTarget.blur()
+                  />
+                  <span>Hide before clip starts</span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    data-testid="clip-hide-after"
+                    className="mt-0.5"
+                    checked={!!selected.clip.hideAfterEnd}
+                    disabled={busy}
+                    onChange={(e) =>
+                      commitVisibility({ hideAfterEnd: e.target.checked })
                     }
-                  }}
-                  className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
-                />
-              </label>
-              <label className="space-y-0.5">
-                <span className="text-[11px] text-slate-500">End (s)</span>
-                <input
-                  id={endFieldId}
-                  data-testid="clip-end-input"
-                  type="number"
-                  inputMode="decimal"
-                  step={0.05}
-                  min={0}
-                  max={durationMs / 1000}
-                  disabled={busy}
-                  value={endDraft}
-                  onChange={(e) => setEndDraft(e.target.value)}
-                  onBlur={() => {
-                    const start = Number(startDraft)
-                    const end = Number(endDraft)
-                    if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                      setStartDraft(selectedSecs.startSec.toFixed(2))
-                      setEndDraft(selectedSecs.endSec.toFixed(2))
-                      return
-                    }
-                    commitSeconds(start, end)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.currentTarget.blur()
-                    }
-                  }}
-                  className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
-                />
-              </label>
+                  />
+                  <span>Hide after clip ends</span>
+                </label>
+                {!isActorVisibleAt(playbackHead, selected.clip) && (
+                  <p
+                    data-testid="clip-hidden-now-hint"
+                    className="text-[10px] font-medium text-amber-800"
+                  >
+                    Hidden at the current time.
+                  </p>
+                )}
+              </fieldset>
             </div>
           )}
         </div>

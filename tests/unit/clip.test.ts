@@ -133,7 +133,12 @@ describe('clip persistence', () => {
     if (!result.ok) return
     expect(result.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
     expect(result.snapshot.project.name).toBe('Untitled project')
-    expect(result.snapshot.project.actors[0].clip).toEqual({ start: 0, end: 1 })
+    expect(result.snapshot.project.actors[0].clip).toEqual({
+      start: 0,
+      end: 1,
+      hideBeforeStart: false,
+      hideAfterEnd: false,
+    })
   })
 
   it('round-trips clip bounds in the current format', () => {
@@ -192,6 +197,8 @@ describe('clip store history', () => {
     expect(useEditorStore.getState().project.actors[0].clip).toEqual({
       start: 0,
       end: 1,
+      hideBeforeStart: false,
+      hideAfterEnd: false,
     })
     useEditorStore.getState().redoClip()
     expect(useEditorStore.getState().project.actors[0].clip.start).toBeCloseTo(

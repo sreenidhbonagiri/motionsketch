@@ -71,7 +71,7 @@ export function buildLogoEntranceProject(): Project {
           { t: 0.55, rotationDeg: 8, scale: 1.08 },
           { t: 1, rotationDeg: 0, scale: 1 },
         ]),
-        clip: { start: 0, end: 1 },
+        clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
       }),
     ],
   }
@@ -115,7 +115,7 @@ export function buildFollowTheLeaderProject(): Project {
         restPosition: { ...leaderPath[0] },
         smoothing: 0.15,
         steadySpeed: 0.2,
-        clip: { start: 0, end: 0.55 },
+        clip: { start: 0, end: 0.55, hideBeforeStart: false, hideAfterEnd: false },
       }),
       createSceneActor({
         id: 'ex-mid',
@@ -132,7 +132,7 @@ export function buildFollowTheLeaderProject(): Project {
         restPosition: { ...offsetPath(0.06)[0] },
         smoothing: 0.15,
         steadySpeed: 0.2,
-        clip: { start: 0.2, end: 0.75 },
+        clip: { start: 0.2, end: 0.75, hideBeforeStart: false, hideAfterEnd: false },
       }),
       createSceneActor({
         id: 'ex-tail',
@@ -149,7 +149,7 @@ export function buildFollowTheLeaderProject(): Project {
         restPosition: { ...offsetPath(-0.05)[0] },
         smoothing: 0.15,
         steadySpeed: 0.2,
-        clip: { start: 0.4, end: 1 },
+        clip: { start: 0.4, end: 1, hideBeforeStart: false, hideAfterEnd: false },
       }),
     ],
   }
@@ -194,7 +194,7 @@ export function buildOrbitProject(): Project {
         restPosition: { x: cx, y: cy },
         smoothing: 0,
         steadySpeed: 0,
-        clip: { start: 0, end: 1 },
+        clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
       }),
       createSceneActor({
         id: 'ex-sat',
@@ -217,7 +217,7 @@ export function buildOrbitProject(): Project {
           { t: 0.5, rotationDeg: 180, scale: 1 },
           { t: 1, rotationDeg: 360, scale: 1 },
         ]),
-        clip: { start: 0, end: 1 },
+        clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
       }),
     ],
   }
