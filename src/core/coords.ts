@@ -22,6 +22,25 @@ export function clientToNormalized(
   }
 }
 
+/**
+ * Stage-normalized pointer without clamping to the stage.
+ * Use for path translation deltas so edge drags do not jump when the
+ * pointer leaves the stage rect.
+ */
+export function clientToStageNormalized(
+  clientX: number,
+  clientY: number,
+  rect: DOMRect | { left: number; top: number; width: number; height: number },
+): Vec2 {
+  if (rect.width <= 0 || rect.height <= 0) {
+    return { x: 0.5, y: 0.5 }
+  }
+  return {
+    x: (clientX - rect.left) / rect.width,
+    y: (clientY - rect.top) / rect.height,
+  }
+}
+
 export function normalizedToCssPercent(value: number): number {
   return clamp01(value) * 100
 }

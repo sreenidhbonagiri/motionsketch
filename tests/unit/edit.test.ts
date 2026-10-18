@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addHandleIndex,
   applyHandleDelta,
+  applyPathTranslation,
   copyPath,
   cumulativeArcLengths,
   cycleHandleIndex,
@@ -12,14 +13,23 @@ import {
   formatHandleSelectionAnnouncement,
   influenceWeight,
   influenceWeightArc,
+  limitPathTranslationDelta,
   makeGeometryEdit,
   MAX_PATH_HANDLES,
   normalizeHandleIndices,
+  pathSampleBounds,
   removeHandleIndex,
+  samplesMatch,
   selectHandleIndices,
   stationaryRunCenterIndex,
   timestampsPreserved,
+  translatePathSamples,
 } from '../../src/core/edit'
+import {
+  buildPathMoveFixtureSamples,
+  PATH_MOVE_HANDLE_INDICES,
+  PATH_MOVE_PAUSE_INDICES,
+} from '../fixtures/pathMoveProject'
 import { buildKeyframesFromProcessed } from '../../src/core/export/format'
 import { maxPlaybackExportError } from '../../src/core/export/consistency'
 import { applySteadySpeed, processMotion } from '../../src/core/process'
@@ -321,5 +331,174 @@ describe('user-controlled handles', () => {
     expect(removed.ok).toBe(true)
     // Geometry stays at the dragged shape — removing the control is not a reshape.
     expect(dragged[addAt]!.y).toBeLessThan(baked[addAt]!.y)
+  })
+})
+
+describe('move entire path', () => {
+  it('translates every sample by the same delta and preserves timing/shape', () => {
+    const path = buildPathMoveFixtureSamples()
+    const delta = { x: 0.07, y: -0.05 }
+    const moved = translatePathSamples(path, delta)
+    expect(moved).toHaveLength(path.length)
+    expect(timestampsPreserved(path, moved)).toBe(true)
+    for (let i = 0; i < path.length; i++) {
+      expect(moved[i]!.x - path[i]!.x).toBeCloseTo(delta.x, 10)
+      expect(moved[i]!.y - path[i]!.y).toBeCloseTo(delta.y, 10)
+    }
+    // Stationary pause stays co-located after translation.
+    const pauseXs = PATH_MOVE_PAUSE_INDICES.map((i) => moved[i]!.x)
+    const pauseYs = PATH_MOVE_PAUSE_INDICES.map((i) => moved[i]!.y)
+    expect(new Set(pauseXs.map((v) => v.toFixed(8))).size).toBe(1)
+    expect(new Set(pauseYs.map((v) => v.toFixed(8))).size).toBe(1)
+    // Handle indices refer to the same samples (geometry only moved).
+    const edit = makeGeometryEdit(moved, 0.25, [...PATH_MOVE_HANDLE_INDICES])
+    expect(edit.handleIndices).toEqual([...PATH_MOVE_HANDLE_INDICES])
+  })
+
+  it('clamps a 0.2–0.8 path so every sample stays on stage', () => {
+    const path: MotionSample[] = [
+      { t: 0, x: 0.2, y: 0.2 },
+      { t: 50, x: 0.5, y: 0.5 },
+      { t: 100, x: 0.8, y: 0.8 },
+    ]
+    const { minX, maxX, minY, maxY } = pathSampleBounds(path)
+    expect(minX).toBeCloseTo(0.2, 10)
+    expect(maxX).toBeCloseTo(0.8, 10)
+
+    expect(limitPathTranslationDelta(path, { x: -1, y: 0 })).toEqual({
+      x: -minX,
+      y: 0,
+    })
+    expect(limitPathTranslationDelta(path, { x: 1, y: 0 })).toEqual({
+      x: 1 - maxX,
+      y: 0,
+    })
+    expect(limitPathTranslationDelta(path, { x: 0, y: -1 })).toEqual({
+      x: 0,
+      y: -minY,
+    })
+    expect(limitPathTranslationDelta(path, { x: 0, y: 1 })).toEqual({
+      x: 0,
+      y: 1 - maxY,
+    })
+
+    for (const edge of [
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+      { x: -1, y: -1 },
+      { x: 1, y: 1 },
+    ] as const) {
+      const moved = applyPathTranslation(path, edge)
+      const dx = moved[0]!.x - path[0]!.x
+      const dy = moved[0]!.y - path[0]!.y
+      for (let i = 0; i < path.length; i++) {
+        expect(moved[i]!.x - path[i]!.x).toBeCloseTo(dx, 10)
+        expect(moved[i]!.y - path[i]!.y).toBeCloseTo(dy, 10)
+        expect(moved[i]!.x).toBeGreaterThanOrEqual(0)
+        expect(moved[i]!.x).toBeLessThanOrEqual(1)
+        expect(moved[i]!.y).toBeGreaterThanOrEqual(0)
+        expect(moved[i]!.y).toBeLessThanOrEqual(1)
+        // Never per-sample clamp — edge samples sit exactly on the stage edge.
+      }
+      const bounds = pathSampleBounds(moved)
+      if (edge.x < 0) expect(bounds.minX).toBeCloseTo(0, 10)
+      if (edge.x > 0) expect(bounds.maxX).toBeCloseTo(1, 10)
+      if (edge.y < 0) expect(bounds.minY).toBeCloseTo(0, 10)
+      if (edge.y > 0) expect(bounds.maxY).toBeCloseTo(1, 10)
+    }
+  })
+
+  it('preserves out-of-bounds imports and only allows reducing overflow', () => {
+    const outsideRight = [
+      { t: 0, x: 1.2, y: 0.5 },
+      { t: 50, x: 1.4, y: 0.5 },
+      { t: 100, x: 1.6, y: 0.5 },
+    ]
+    expect(limitPathTranslationDelta(outsideRight, { x: 0, y: 0 })).toEqual({
+      x: 0,
+      y: 0,
+    })
+    expect(limitPathTranslationDelta(outsideRight, { x: 0.1, y: 0 })).toEqual({
+      x: 0,
+      y: 0,
+    })
+    const inward = limitPathTranslationDelta(outsideRight, { x: -0.05, y: 0 })
+    expect(inward.x).toBeCloseTo(-0.05, 10)
+    const moved = translatePathSamples(outsideRight, inward)
+    expect(samplesMatch(outsideRight, moved)).toBe(false)
+    expect(pathSampleBounds(moved).minX).toBeGreaterThan(1)
+
+    const outsideLeft = [
+      { t: 0, x: -0.4, y: 0.3 },
+      { t: 50, x: -0.2, y: 0.3 },
+      { t: 100, x: -0.1, y: 0.3 },
+    ]
+    expect(limitPathTranslationDelta(outsideLeft, { x: -0.2, y: 0 })).toEqual({
+      x: 0,
+      y: 0,
+    })
+    expect(limitPathTranslationDelta(outsideLeft, { x: 0.15, y: 0 }).x).toBeCloseTo(
+      0.15,
+      10,
+    )
+  })
+
+  it('does not use an inverted clamp for paths wider or taller than the stage', () => {
+    const oversized: MotionSample[] = [
+      { t: 0, x: -0.2, y: -0.1 },
+      { t: 50, x: 0.5, y: 0.5 },
+      { t: 100, x: 1.3, y: 1.2 },
+    ]
+    // Already overflows both sides — only zero translation is allowed.
+    expect(limitPathTranslationDelta(oversized, { x: 0.5, y: 0.5 })).toEqual({
+      x: 0,
+      y: 0,
+    })
+    expect(limitPathTranslationDelta(oversized, { x: -0.5, y: -0.5 })).toEqual({
+      x: 0,
+      y: 0,
+    })
+    expect(
+      samplesMatch(oversized, applyPathTranslation(oversized, { x: 0, y: 0 })),
+    ).toBe(true)
+  })
+
+  it('pointer and keyboard translation share applyPathTranslation rules', () => {
+    const path: MotionSample[] = [
+      { t: 0, x: 0.2, y: 0.4 },
+      { t: 40, x: 0.5, y: 0.4 },
+      { t: 80, x: 0.8, y: 0.4 },
+    ]
+    const pointerDelta = { x: 0.5, y: -0.25 }
+    const keyDelta = { x: 0.005, y: 0 } // one ArrowRight step
+    const fromPointer = applyPathTranslation(path, pointerDelta)
+    const fromKeys = applyPathTranslation(path, keyDelta)
+    // Same helper → same clamp for a huge pointer-like delta.
+    expect(fromPointer[0]!.x).toBeCloseTo(0.4, 10) // 0.2 + (1-0.8)
+    expect(fromPointer[2]!.x).toBeCloseTo(1, 10)
+    expect(fromKeys[0]!.x).toBeCloseTo(0.205, 10)
+    expect(
+      samplesMatch(
+        fromPointer,
+        translatePathSamples(
+          path,
+          limitPathTranslationDelta(path, pointerDelta),
+        ),
+      ),
+    ).toBe(true)
+  })
+
+  it('gesture baseline avoids accumulated rounding drift', () => {
+    const path = buildPathMoveFixtureSamples()
+    const baseline = copyPath(path)
+    let preview = baseline
+    // Simulate many pointer samples against the same baseline (not chaining).
+    for (let i = 1; i <= 40; i++) {
+      preview = applyPathTranslation(baseline, { x: 0.002 * i, y: -0.001 * i })
+    }
+    const expected = applyPathTranslation(baseline, { x: 0.08, y: -0.04 })
+    expect(samplesMatch(preview, expected)).toBe(true)
   })
 })

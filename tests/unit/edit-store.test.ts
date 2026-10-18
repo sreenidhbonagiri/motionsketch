@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   applyHandleDelta,
+  applyPathTranslation,
   makeGeometryEdit,
   selectHandleIndices,
 } from '../../src/core/edit'
+import { buildPathMoveFixtureSamples } from '../fixtures/pathMoveProject'
 import { findActor } from '../../src/core/sceneActor'
 import { selectProcessedPath } from '../../src/state/selectors'
 import { useEditorStore } from '../../src/state/store'
@@ -58,6 +60,7 @@ describe('edit store', () => {
       editPreview: null,
       pathAddMode: false,
       pathAddCandidateIndex: null,
+      pathTool: 'edit-points',
       stageHint: 'default',
       actionAnnouncement: null,
     })
@@ -283,5 +286,99 @@ describe('edit store', () => {
     expect(useEditorStore.getState().makeSelectedCorner()).toBe(false)
     expect(useEditorStore.getState().undoStack).toHaveLength(0)
     expect(useEditorStore.getState().actionAnnouncement).toMatch(/straight/i)
+  })
+
+  it('path translation commits one undo and leaves the recording intact', () => {
+    const samples = buildPathMoveFixtureSamples()
+    const ge = makeGeometryEdit(samples, 0.25, [0, 8, 16, 24, 32])
+    const recording = selectedActor().recording!
+    useEditorStore.setState({
+      project: {
+        ...useEditorStore.getState().project,
+        actors: [
+          {
+            ...selectedActor(),
+            recording: {
+              samples: samples.map((s) => ({ ...s })),
+              recordedDurationMs: recording.recordedDurationMs,
+            },
+            geometryEdit: ge,
+            transform: {
+              keyframes: [
+                { id: 'xf', t: 0.4, rotationDeg: 15, scale: 1.1 },
+              ],
+            },
+            clip: {
+              start: 0.1,
+              end: 0.9,
+              hideBeforeStart: true,
+              hideAfterEnd: false,
+            },
+          },
+        ],
+      },
+      geometryEdit: ge,
+    })
+    useEditorStore.getState().enterEditMode()
+    useEditorStore.getState().setPathTool('move-path')
+    expect(useEditorStore.getState().pathTool).toBe('move-path')
+    expect(useEditorStore.getState().pathAddMode).toBe(false)
+
+    const baseline = useEditorStore.getState().editSession!.samples
+    const moved = applyPathTranslation(baseline, { x: 0.06, y: -0.04 })
+    useEditorStore.getState().beginHandleDrag()
+    useEditorStore.getState().updateEditPreview(moved)
+    useEditorStore.getState().commitHandleEdit(moved)
+
+    expect(useEditorStore.getState().undoStack).toHaveLength(1)
+    const committed = useEditorStore.getState().geometryEdit!.samples
+    for (let i = 0; i < baseline.length; i++) {
+      expect(committed[i]!.x - baseline[i]!.x).toBeCloseTo(0.06, 8)
+      expect(committed[i]!.y - baseline[i]!.y).toBeCloseTo(-0.04, 8)
+      expect(committed[i]!.t).toBe(baseline[i]!.t)
+    }
+    // Recording + transform + clip untouched.
+    const actor = selectedActor()
+    expect(actor.recording!.samples[0]!.x).toBeCloseTo(samples[0]!.x, 8)
+    expect(actor.transform.keyframes[0]!.rotationDeg).toBe(15)
+    expect(actor.clip.start).toBe(0.1)
+    expect(actor.clip.hideBeforeStart).toBe(true)
+
+    useEditorStore.getState().commitHandleEdit(moved)
+    expect(useEditorStore.getState().undoStack).toHaveLength(1)
+
+    useEditorStore.getState().beginHandleDrag()
+    useEditorStore.getState().updateEditPreview(
+      applyPathTranslation(committed, { x: 0.2, y: 0 }),
+    )
+    useEditorStore.getState().cancelHandleDrag()
+    expect(useEditorStore.getState().editPreview).toBeNull()
+    expect(useEditorStore.getState().geometryEdit!.samples[0]!.x).toBeCloseTo(
+      committed[0]!.x,
+      8,
+    )
+
+    // Undo restores the pre-move geometry; redo reapplies the same shared delta.
+    useEditorStore.getState().undoEdit()
+    expect(
+      useEditorStore.getState().geometryEdit!.samples[0]!.x,
+    ).toBeCloseTo(baseline[0]!.x, 8)
+    useEditorStore.getState().redoEdit()
+    expect(
+      useEditorStore.getState().geometryEdit!.samples[0]!.x,
+    ).toBeCloseTo(committed[0]!.x, 8)
+
+    // Edge clamp: pushing past the stage still keeps every sample in [0,1].
+    const edgePush = applyPathTranslation(
+      useEditorStore.getState().editSession!.samples,
+      { x: 5, y: 5 },
+    )
+    useEditorStore.getState().commitHandleEdit(edgePush)
+    for (const s of useEditorStore.getState().geometryEdit!.samples) {
+      expect(s.x).toBeGreaterThanOrEqual(0)
+      expect(s.x).toBeLessThanOrEqual(1)
+      expect(s.y).toBeGreaterThanOrEqual(0)
+      expect(s.y).toBeLessThanOrEqual(1)
+    }
   })
 })

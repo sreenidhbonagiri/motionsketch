@@ -60,7 +60,9 @@ export function PlaybackDock() {
   const redoActorEdit = useEditorStore((s) => s.redoActorEdit)
   const selectTransformKeyframe = useEditorStore((s) => s.selectTransformKeyframe)
   const pathAddMode = useEditorStore((s) => s.pathAddMode)
+  const pathTool = useEditorStore((s) => s.pathTool)
   const setPathAddMode = useEditorStore((s) => s.setPathAddMode)
+  const setPathTool = useEditorStore((s) => s.setPathTool)
   const removeSelectedPathHandle = useEditorStore(
     (s) => s.removeSelectedPathHandle,
   )
@@ -124,11 +126,14 @@ export function PlaybackDock() {
   // guidance stays on the existing stage tip (id=stage-empty-hint).
   let dockStatus: string | null = null
   if (editing) {
-    if (pathAddMode) {
+    if (pathTool === 'move-path') {
+      dockStatus =
+        'Move path: drag the path to slide every sample by the same amount. Focus the path, then arrow keys nudge (Shift for larger steps). Escape cancels an in-progress move. Bounds keep every path sample on stage when the path starts in bounds — the actor’s rotated or scaled box may still extend past the edges.'
+    } else if (pathAddMode) {
       dockStatus =
         'Add point: the ghost sits on the sample that will become the handle. Click near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
     } else {
-      dockStatus = `Drag to reshape · [ ] cycle · Smooth bend / Make corner on the selected point · Delete removes an interior handle · Add point for local control. ${handleCount} of ${MAX_PATH_HANDLES} handles.`
+      dockStatus = `Edit points: drag or nudge handles · [ ] cycle · Smooth bend / Make corner · Delete removes an interior handle · Add point for local control. ${handleCount} of ${MAX_PATH_HANDLES} handles.`
     }
   } else if (mode === 'armed') {
     dockStatus =
@@ -276,17 +281,60 @@ export function PlaybackDock() {
             >
               Redo
             </button>
+            <div
+              data-testid="path-tool-toggle"
+              className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+              role="group"
+              aria-label="Path edit tool"
+            >
+              <button
+                type="button"
+                data-testid="btn-path-tool-points"
+                onClick={() => setPathTool('edit-points')}
+                aria-pressed={pathTool === 'edit-points'}
+                className={
+                  pathTool === 'edit-points'
+                    ? 'rounded-md bg-slate-900 px-2.5 py-1 text-sm font-medium text-white'
+                    : 'rounded-md px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-white'
+                }
+              >
+                Edit points
+              </button>
+              <button
+                type="button"
+                data-testid="btn-path-tool-move"
+                onClick={() => {
+                  setPathTool('move-path')
+                  requestAnimationFrame(() => {
+                    document
+                      .querySelector<HTMLElement>('[data-testid="path-move-overlay"]')
+                      ?.focus()
+                  })
+                }}
+                aria-pressed={pathTool === 'move-path'}
+                aria-describedby="path-move-help"
+                className={
+                  pathTool === 'move-path'
+                    ? 'rounded-md bg-teal-700 px-2.5 py-1 text-sm font-medium text-white'
+                    : 'rounded-md px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-white'
+                }
+              >
+                Move path
+              </button>
+            </div>
             <button
               type="button"
               data-testid="btn-path-add-mode"
               onClick={() => setPathAddMode(!pathAddMode)}
-              disabled={!canAddMoreHandles}
+              disabled={pathTool === 'move-path' || !canAddMoreHandles}
               aria-pressed={pathAddMode}
               aria-describedby="path-add-help"
               title={
-                canAddMoreHandles
-                  ? `Add a handle (${handleCount} of ${MAX_PATH_HANDLES})`
-                  : `Handle limit reached (${MAX_PATH_HANDLES}). Remove a handle first.`
+                pathTool === 'move-path'
+                  ? 'Switch to Edit points to add handles'
+                  : canAddMoreHandles
+                    ? `Add a handle (${handleCount} of ${MAX_PATH_HANDLES})`
+                    : `Handle limit reached (${MAX_PATH_HANDLES}). Remove a handle first.`
               }
               className={
                 pathAddMode
@@ -308,7 +356,11 @@ export function PlaybackDock() {
                 if (idx === null) return
                 addPathHandleAt(idx)
               }}
-              disabled={!pathAddMode || pathAddCandidateIndex === null}
+              disabled={
+                pathTool === 'move-path' ||
+                !pathAddMode ||
+                pathAddCandidateIndex === null
+              }
               className={btnSecondary}
             >
               Place here
@@ -317,19 +369,21 @@ export function PlaybackDock() {
               type="button"
               data-testid="btn-path-remove-handle"
               onClick={() => removeSelectedPathHandle()}
-              disabled={!canRemoveHandle}
+              disabled={pathTool === 'move-path' || !canRemoveHandle}
               aria-describedby="path-remove-help"
               title={
-                canRemoveHandle
-                  ? 'Remove the selected interior handle (path shape stays)'
-                  : selectedHandleIndex !== null &&
-                      editSession &&
-                      isEndpointHandle(
-                        editSession.samples.length,
-                        selectedHandleIndex,
-                      )
-                    ? 'Start and end points can’t be removed'
-                    : 'Select an interior handle to remove'
+                pathTool === 'move-path'
+                  ? 'Switch to Edit points to remove handles'
+                  : canRemoveHandle
+                    ? 'Remove the selected interior handle (path shape stays)'
+                    : selectedHandleIndex !== null &&
+                        editSession &&
+                        isEndpointHandle(
+                          editSession.samples.length,
+                          selectedHandleIndex,
+                        )
+                      ? 'Start and end points can’t be removed'
+                      : 'Select an interior handle to remove'
               }
               className={btnQuiet}
             >
@@ -339,12 +393,14 @@ export function PlaybackDock() {
               type="button"
               data-testid="btn-smooth-bend"
               onClick={() => smoothSelectedBend()}
-              disabled={!smoothAvail.enabled}
+              disabled={pathTool === 'move-path' || !smoothAvail.enabled}
               aria-describedby="path-smooth-help"
               title={
-                smoothAvail.enabled
-                  ? 'Smooth the bend near the selected point (S)'
-                  : (smoothAvail.message ?? 'Smooth bend unavailable')
+                pathTool === 'move-path'
+                  ? 'Switch to Edit points to smooth a bend'
+                  : smoothAvail.enabled
+                    ? 'Smooth the bend near the selected point (S)'
+                    : (smoothAvail.message ?? 'Smooth bend unavailable')
               }
               className={btnSecondary}
             >
@@ -354,12 +410,14 @@ export function PlaybackDock() {
               type="button"
               data-testid="btn-make-corner"
               onClick={() => makeSelectedCorner()}
-              disabled={!cornerAvail.enabled}
+              disabled={pathTool === 'move-path' || !cornerAvail.enabled}
               aria-describedby="path-corner-help"
               title={
-                cornerAvail.enabled
-                  ? 'Sharpen the corner at the selected point (C)'
-                  : (cornerAvail.message ?? 'Make corner unavailable')
+                pathTool === 'move-path'
+                  ? 'Switch to Edit points to sharpen a corner'
+                  : cornerAvail.enabled
+                    ? 'Sharpen the corner at the selected point (C)'
+                    : (cornerAvail.message ?? 'Make corner unavailable')
               }
               className={btnSecondary}
             >
@@ -533,6 +591,14 @@ export function PlaybackDock() {
       )}
       {editing && (
         <>
+          <p id="path-move-help" className="sr-only">
+            Move path translates every sample by one shared delta. Drag the path
+            on the stage, or focus it and use arrow keys to nudge. Hold Shift for
+            a larger step. Escape or pointer cancel restores the baseline without
+            an undo entry. Stage bounds keep every sample center on stage when
+            the path starts in bounds; the actor’s rotated or scaled appearance
+            may still extend past the stage.
+          </p>
           <p id="path-add-help" className="sr-only">
             Toggle Add point mode. The dashed ghost marks the exact sample that
             will become the handle. Click near the path or move the candidate with

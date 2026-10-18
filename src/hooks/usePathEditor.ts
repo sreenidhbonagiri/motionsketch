@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { clientToNormalized } from '../core/coords'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { clientToNormalized, clientToStageNormalized } from '../core/coords'
 import {
   applyHandleDelta,
+  applyPathTranslation,
   copyPath,
   cycleHandleIndex,
   cycleWithinHandles,
@@ -10,6 +11,10 @@ import {
   HANDLE_DRAG_THRESHOLD_PX,
   isEndpointHandle,
   PATH_ADD_HIT_TOLERANCE_PX,
+  PATH_MOVE_HIT_TOLERANCE_PX,
+  PATH_MOVE_NUDGE_STEP,
+  PATH_MOVE_NUDGE_STEP_SHIFT,
+  samplesMatch,
 } from '../core/edit'
 import type { MotionSample } from '../core/types'
 import { isEditableKeyboardTarget } from './useTransformShortcuts'
@@ -32,12 +37,35 @@ type PendingHandlePointer = {
   target: HTMLElement
 }
 
+type PendingMovePointer = {
+  pointerId: number
+  originNorm: { x: number; y: number }
+  baseSamples: MotionSample[]
+  dragging: boolean
+  target: Element
+}
+
+type MoveNudgeGesture = {
+  baseline: MotionSample[]
+  dx: number
+  dy: number
+  keys: Set<string>
+}
+
+const ARROW_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+])
+
 export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   const mode = useEditorStore((s) => s.mode)
   const editSession = useEditorStore((s) => s.editSession)
   const editPreview = useEditorStore((s) => s.editPreview)
   const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
   const pathAddMode = useEditorStore((s) => s.pathAddMode)
+  const pathTool = useEditorStore((s) => s.pathTool)
   const pathAddCandidateIndex = useEditorStore((s) => s.pathAddCandidateIndex)
   const stageAspect = useEditorStore((s) => s.project.stageAspect)
   const beginHandleDrag = useEditorStore((s) => s.beginHandleDrag)
@@ -55,15 +83,22 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   const smoothSelectedBend = useEditorStore((s) => s.smoothSelectedBend)
   const makeSelectedCorner = useEditorStore((s) => s.makeSelectedCorner)
   const setPathAddMode = useEditorStore((s) => s.setPathAddMode)
+  const setPathTool = useEditorStore((s) => s.setPathTool)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
   const announceAction = useEditorStore((s) => s.announceAction)
 
   const pendingRef = useRef<PendingHandlePointer | null>(null)
+  const pendingMoveRef = useRef<PendingMovePointer | null>(null)
+  const moveNudgeRef = useRef<MoveNudgeGesture | null>(null)
+  const movePathFocusedRef = useRef(false)
+  const [moveHovered, setMoveHovered] = useState(false)
+  const [moveDragging, setMoveDragging] = useState(false)
+  const [movePathFocused, setMovePathFocused] = useState(false)
 
   const workingSamples = editPreview ?? editSession?.samples ?? null
-
   const handleIndices = editSession ? editSession.handleIndices : []
+  const moveTool = mode === 'editing' && pathTool === 'move-path'
 
   const finishDrag = useCallback(
     (pointerId: number, commit: boolean) => {
@@ -84,10 +119,50 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     [commitHandleEdit, cancelHandleDrag],
   )
 
+  const finishMoveDrag = useCallback(
+    (pointerId: number, commit: boolean) => {
+      const pending = pendingMoveRef.current
+      if (!pending || pending.pointerId !== pointerId) return
+
+      if (pending.dragging) {
+        if (commit) {
+          const preview = useEditorStore.getState().editPreview
+          if (preview && !samplesMatch(pending.baseSamples, preview)) {
+            commitHandleEdit(preview)
+          } else {
+            cancelHandleDrag()
+          }
+        } else {
+          cancelHandleDrag()
+        }
+      }
+      pendingMoveRef.current = null
+      setMoveDragging(false)
+    },
+    [commitHandleEdit, cancelHandleDrag],
+  )
+
+  const endMoveNudge = useCallback(
+    (commit: boolean) => {
+      const gesture = moveNudgeRef.current
+      if (!gesture) return
+      moveNudgeRef.current = null
+      if (commit) {
+        const preview = useEditorStore.getState().editPreview
+        if (preview && !samplesMatch(gesture.baseline, preview)) {
+          commitHandleEdit(preview)
+          return
+        }
+      }
+      cancelHandleDrag()
+    },
+    [commitHandleEdit, cancelHandleDrag],
+  )
+
   const onHandlePointerDown = useCallback(
     (handleIndex: number, event: React.PointerEvent<HTMLElement>) => {
       if (mode !== 'editing' || !editSession) return
-      if (pathAddMode) return
+      if (pathAddMode || pathTool === 'move-path') return
 
       event.preventDefault()
       event.stopPropagation()
@@ -115,11 +190,8 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         prevSelected !== null &&
         effectiveCluster.includes(prevSelected)
       ) {
-        // Keep current selection so a drag reshapes the active handle;
-        // a tap without movement cycles on pointerup.
         pick = prevSelected
       } else {
-        // Closest handle in the cluster to the pointer (screen space).
         let best = effectiveCluster[0]!
         let bestDist = Infinity
         for (const index of effectiveCluster) {
@@ -231,6 +303,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       mode,
       editSession,
       pathAddMode,
+      pathTool,
       stageRef,
       setSelectedHandleIndex,
       beginHandleDrag,
@@ -238,6 +311,151 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       finishDrag,
     ],
   )
+
+  const onMovePathPointerDown = useCallback(
+    (event: React.PointerEvent<SVGElement>) => {
+      if (mode !== 'editing' || pathTool !== 'move-path' || !editSession) return
+      if (event.button !== 0) return
+
+      const rect = stageRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const hit = findNearestPathHit(
+        editPreview ?? editSession.samples,
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+        rect.width,
+        rect.height,
+        stageAspect,
+      )
+      if (!hit || hit.distancePx > PATH_MOVE_HIT_TOLERANCE_PX) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      endMoveNudge(true)
+
+      const origin = clientToStageNormalized(event.clientX, event.clientY, rect)
+      const base = copyPath(editSession.samples)
+      const target = event.currentTarget
+      const pointerId = event.pointerId
+      try {
+        target.setPointerCapture(pointerId)
+      } catch {
+        // ignore
+      }
+
+      pendingMoveRef.current = {
+        pointerId,
+        originNorm: origin,
+        baseSamples: base,
+        dragging: false,
+        target,
+      }
+      setMoveDragging(false)
+
+      const onMove = (e: PointerEvent) => {
+        const pending = pendingMoveRef.current
+        if (!pending || e.pointerId !== pointerId) return
+        const stageRect = stageRef.current?.getBoundingClientRect()
+        if (!stageRect) return
+        const p = clientToStageNormalized(e.clientX, e.clientY, stageRect)
+        const delta = {
+          x: p.x - pending.originNorm.x,
+          y: p.y - pending.originNorm.y,
+        }
+        const movedPx = Math.hypot(
+          (p.x - pending.originNorm.x) * stageRect.width,
+          (p.y - pending.originNorm.y) * stageRect.height,
+        )
+        if (!pending.dragging) {
+          if (movedPx < HANDLE_DRAG_THRESHOLD_PX) return
+          pending.dragging = true
+          setMoveDragging(true)
+          beginHandleDrag()
+        }
+        updateEditPreview(applyPathTranslation(pending.baseSamples, delta))
+      }
+
+      const onUp = (e: PointerEvent) => {
+        if (e.pointerId !== pointerId) return
+        cleanup()
+        finishMoveDrag(pointerId, true)
+      }
+
+      const onCancel = (e: PointerEvent) => {
+        if (e.pointerId !== pointerId) return
+        cleanup()
+        finishMoveDrag(pointerId, false)
+      }
+
+      const cleanup = () => {
+        target.removeEventListener('pointermove', onMove)
+        target.removeEventListener('pointerup', onUp)
+        target.removeEventListener('pointercancel', onCancel)
+        try {
+          target.releasePointerCapture(pointerId)
+        } catch {
+          // already released
+        }
+      }
+
+      target.addEventListener('pointermove', onMove)
+      target.addEventListener('pointerup', onUp)
+      target.addEventListener('pointercancel', onCancel)
+    },
+    [
+      mode,
+      pathTool,
+      editSession,
+      editPreview,
+      stageRef,
+      stageAspect,
+      beginHandleDrag,
+      updateEditPreview,
+      finishMoveDrag,
+      endMoveNudge,
+    ],
+  )
+
+  const onMovePathPointerMove = useCallback(
+    (event: React.PointerEvent<SVGElement>) => {
+      if (mode !== 'editing' || pathTool !== 'move-path' || !editSession) {
+        setMoveHovered(false)
+        return
+      }
+      if (pendingMoveRef.current?.dragging) {
+        setMoveHovered(true)
+        return
+      }
+      const rect = stageRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const samples = editPreview ?? editSession.samples
+      const hit = findNearestPathHit(
+        samples,
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+        rect.width,
+        rect.height,
+        stageAspect,
+      )
+      setMoveHovered(!!hit && hit.distancePx <= PATH_MOVE_HIT_TOLERANCE_PX)
+    },
+    [mode, pathTool, editSession, editPreview, stageRef, stageAspect],
+  )
+
+  const onMovePathPointerLeave = useCallback(() => {
+    if (!pendingMoveRef.current?.dragging) setMoveHovered(false)
+  }, [])
+
+  const onMovePathFocus = useCallback(() => {
+    movePathFocusedRef.current = true
+    setMovePathFocused(true)
+  }, [])
+
+  const onMovePathBlur = useCallback(() => {
+    movePathFocusedRef.current = false
+    setMovePathFocused(false)
+    endMoveNudge(true)
+  }, [endMoveNudge])
 
   const tryAddAtClient = useCallback(
     (clientX: number, clientY: number) => {
@@ -271,16 +489,18 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
   const onStagePointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       if (mode !== 'editing' || !pathAddMode || !editSession) return
+      if (pathTool === 'move-path') return
       if (event.button !== 0) return
       event.preventDefault()
       tryAddAtClient(event.clientX, event.clientY)
     },
-    [mode, pathAddMode, editSession, tryAddAtClient],
+    [mode, pathAddMode, pathTool, editSession, tryAddAtClient],
   )
 
   const onStagePointerMove = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       if (mode !== 'editing' || !pathAddMode || !editSession) return
+      if (pathTool === 'move-path') return
       const rect = stageRef.current?.getBoundingClientRect()
       if (!rect) return
       const hit = findNearestPathHit(
@@ -300,6 +520,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     [
       mode,
       pathAddMode,
+      pathTool,
       editSession,
       stageRef,
       stageAspect,
@@ -320,6 +541,7 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
         !event.shiftKey
       ) {
         event.preventDefault()
+        endMoveNudge(true)
         undoEdit()
         return
       }
@@ -329,17 +551,78 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
           (key.toLowerCase() === 'z' && event.shiftKey))
       ) {
         event.preventDefault()
+        endMoveNudge(true)
         redoEdit()
         return
       }
 
+      const tool = useEditorStore.getState().pathTool
       const addMode = useEditorStore.getState().pathAddMode
       const session = useEditorStore.getState().editSession
       if (!session) return
 
-      if (key === 'Escape' && addMode) {
+      if (key === 'Escape') {
+        if (pendingMoveRef.current) {
+          event.preventDefault()
+          const pointerId = pendingMoveRef.current.pointerId
+          finishMoveDrag(pointerId, false)
+          return
+        }
+        if (moveNudgeRef.current) {
+          event.preventDefault()
+          endMoveNudge(false)
+          announceAction('Move cancelled.')
+          return
+        }
+        if (pendingRef.current?.dragging) {
+          event.preventDefault()
+          finishDrag(pendingRef.current.pointerId, false)
+          return
+        }
+        if (addMode) {
+          event.preventDefault()
+          setPathAddMode(false)
+          return
+        }
+        return
+      }
+
+      if (tool === 'move-path') {
+        if (!movePathFocusedRef.current) return
+        if (!ARROW_KEYS.has(key)) return
         event.preventDefault()
-        setPathAddMode(false)
+
+        const step = event.shiftKey
+          ? PATH_MOVE_NUDGE_STEP_SHIFT
+          : PATH_MOVE_NUDGE_STEP
+        let dx = 0
+        let dy = 0
+        if (key === 'ArrowLeft') dx = -step
+        else if (key === 'ArrowRight') dx = step
+        else if (key === 'ArrowUp') dy = -step
+        else if (key === 'ArrowDown') dy = step
+
+        let gesture = moveNudgeRef.current
+        if (!gesture) {
+          gesture = {
+            baseline: copyPath(session.samples),
+            dx: 0,
+            dy: 0,
+            keys: new Set(),
+          }
+          moveNudgeRef.current = gesture
+          beginHandleDrag()
+        }
+        gesture.keys.add(key)
+        // Held-key repeats accumulate on the gesture baseline (one undo later).
+        gesture.dx += dx
+        gesture.dy += dy
+        updateEditPreview(
+          applyPathTranslation(gesture.baseline, {
+            x: gesture.dx,
+            y: gesture.dy,
+          }),
+        )
         return
       }
 
@@ -426,8 +709,22 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
       )
     }
 
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (!moveNudgeRef.current) return
+      if (!ARROW_KEYS.has(event.key)) return
+      const gesture = moveNudgeRef.current
+      gesture.keys.delete(event.key)
+      if (gesture.keys.size === 0) {
+        endMoveNudge(true)
+      }
+    }
+
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [
     mode,
     editSession,
@@ -442,7 +739,24 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     makeSelectedCorner,
     announceAction,
     setSelectedHandleIndex,
+    beginHandleDrag,
+    updateEditPreview,
+    endMoveNudge,
+    finishMoveDrag,
+    finishDrag,
   ])
+
+  // Cancel in-flight move gestures when leaving the tool (refs only).
+  useEffect(() => {
+    if (moveTool) return
+    movePathFocusedRef.current = false
+    if (pendingMoveRef.current) {
+      finishMoveDrag(pendingMoveRef.current.pointerId, false)
+    }
+    if (moveNudgeRef.current) {
+      endMoveNudge(false)
+    }
+  }, [moveTool, finishMoveDrag, endMoveNudge])
 
   return {
     workingSamples,
@@ -450,8 +764,18 @@ export function usePathEditor({ stageRef }: UsePathEditorOptions) {
     selectedHandleIndex,
     pathAddMode,
     pathAddCandidateIndex,
+    pathTool,
+    moveTool,
+    moveHovered: moveTool && (moveHovered || movePathFocused),
+    moveDragging: moveTool && moveDragging,
+    setPathTool,
     onHandlePointerDown,
     onStagePointerDown,
     onStagePointerMove,
+    onMovePathPointerDown,
+    onMovePathPointerMove,
+    onMovePathPointerLeave,
+    onMovePathFocus,
+    onMovePathBlur,
   }
 }

@@ -14,7 +14,9 @@ import {
   makeCornerAvailability,
   makeGeometryEdit,
   MAX_PATH_HANDLES,
+  type PathEditTool,
   removeHandleIndex,
+  samplesMatch,
   smoothBendAtHandle,
   smoothBendAvailability,
 } from '../core/edit'
@@ -107,6 +109,8 @@ interface EditorStore {
   pathAddMode: boolean
   /** Ghost sample index while choosing where to add (keyboard / hover). */
   pathAddCandidateIndex: number | null
+  /** Edit points (handles) vs whole-path translation while in Edit path mode. */
+  pathTool: PathEditTool
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -205,6 +209,7 @@ interface EditorStore {
   setSelectedHandleIndex: (index: number | null) => void
   setPathAddMode: (on: boolean) => void
   setPathAddCandidateIndex: (index: number | null) => void
+  setPathTool: (tool: PathEditTool) => void
   /** Add handle at sample index; geometry unchanged. Returns false on failure. */
   addPathHandleAt: (sampleIndex: number) => boolean
   /** Remove selected interior handle; geometry unchanged. */
@@ -243,6 +248,7 @@ function clearEditState() {
     editPreview: null as MotionSample[] | null,
     pathAddMode: false,
     pathAddCandidateIndex: null as number | null,
+    pathTool: 'edit-points' as PathEditTool,
   }
 }
 
@@ -1240,6 +1246,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedTransformId: null,
         pathAddMode: false,
         pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
         actionAnnouncement: formatHandleSelectionAnnouncement(
           editSession.handleIndices,
           selected,
@@ -1257,6 +1264,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pointerId: null,
         pathAddMode: false,
         pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
       })
     },
 
@@ -1278,6 +1286,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         editSession: null,
         pathAddMode: false,
         pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
       })
 
       if (wasEditing) {
@@ -1332,8 +1341,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ? Math.floor(session.samples.length / 2)
           : null
       set({
+        pathTool: 'edit-points',
         pathAddMode: on,
         pathAddCandidateIndex: on ? (state.pathAddCandidateIndex ?? mid) : null,
+        editPreview: on ? null : state.editPreview,
         actionAnnouncement: on
           ? 'Add point mode. The ghost marks the sample that will become the handle.'
           : state.actionAnnouncement,
@@ -1341,6 +1352,26 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     },
 
     setPathAddCandidateIndex: (index) => set({ pathAddCandidateIndex: index }),
+
+    setPathTool: (tool) => {
+      const state = get()
+      if (state.mode !== 'editing') return
+      if (tool === state.pathTool) return
+      set({
+        pathTool: tool,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        editPreview: null,
+        actionAnnouncement:
+          tool === 'move-path'
+            ? 'Move path: drag the path to reposition it. Arrow keys nudge when the path is focused; Shift for larger steps. Escape cancels an in-progress move. Bounds keep sample centers on stage when the path starts in bounds.'
+            : formatHandleSelectionAnnouncement(
+                state.editSession?.handleIndices ?? [],
+                state.selectedHandleIndex ?? 0,
+                state.editSession?.samples.length ?? 0,
+              ),
+      })
+    },
 
     addPathHandleAt: (sampleIndex) => {
       const state = get()
@@ -1599,6 +1630,12 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const state = get()
       const base = state.editSession ?? state.geometryEdit
       if (!base) return
+
+      // Zero-distance / cancelled-equivalent gestures must not create undo noise.
+      if (samplesMatch(base.samples, samples)) {
+        set({ editPreview: null })
+        return
+      }
 
       const previous = copyGeometryEdit(base)
       const next = makeGeometryEdit(

@@ -1,4 +1,4 @@
-import { clamp01 } from './coords'
+import { clamp, clamp01 } from './coords'
 import { aspectDistance, clampStageAspect } from './stageAspect'
 import type { GeometryEdit, MotionSample, Vec2 } from './types'
 
@@ -26,8 +26,18 @@ export const HANDLE_OVERLAP_HIT_PX = 14
 /** Pointer must move at least this far (CSS px) before a drag reshapes the path. */
 export const HANDLE_DRAG_THRESHOLD_PX = 5
 
+/** Screen-space hit radius (CSS px) for starting a Move path drag on the stroke. */
+export const PATH_MOVE_HIT_TOLERANCE_PX = 18
+
+/** Normalized nudge step for Move path arrow keys (Shift multiplies by 4). */
+export const PATH_MOVE_NUDGE_STEP = 0.005
+export const PATH_MOVE_NUDGE_STEP_SHIFT = 0.02
+
 /** Co-located samples closer than this (aspect-aware) form a stationary run. */
 const STATIONARY_EPS = 0.003
+
+/** Active tool while the editor is in Edit path mode. */
+export type PathEditTool = 'edit-points' | 'move-path'
 
 /** Copy samples without sharing references. */
 export function copyPath(samples: MotionSample[]): MotionSample[] {
@@ -276,6 +286,114 @@ export function timestampsPreserved(
   if (before.length !== after.length) return false
   for (let i = 0; i < before.length; i++) {
     if (before[i]!.t !== after[i]!.t) return false
+  }
+  return true
+}
+
+/** Axis-aligned bounds of path sample centers (normalized stage space). */
+export function pathSampleBounds(samples: MotionSample[]): {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+} {
+  if (samples.length === 0) {
+    return { minX: 0.5, maxX: 0.5, minY: 0.5, maxY: 0.5 }
+  }
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const sample of samples) {
+    if (sample.x < minX) minX = sample.x
+    if (sample.x > maxX) maxX = sample.x
+    if (sample.y < minY) minY = sample.y
+    if (sample.y > maxY) maxY = sample.y
+  }
+  return { minX, maxX, minY, maxY }
+}
+
+/**
+ * Limit a shared path translation so sample centers stay on stage when the
+ * baseline already fits. Actor size, rotation, and scale are ignored — only
+ * sample centers count.
+ *
+ * In-bounds baseline (every sample in [0,1]):
+ *   dx ∈ [-minX, 1−maxX], dy ∈ [-minY, 1−maxY]
+ *
+ * Imported / overflowing geometry:
+ * - Zero delta is returned unchanged (no silent reshape).
+ * - Translation may reduce overflow but must not increase left or right
+ *   overflow on an axis (same for top/bottom).
+ * - Paths wider or taller than the stage already overflow both sides; the
+ *   allowed interval collapses to {0} so the path is not silently forced
+ *   onto the stage (no inverted clamp).
+ */
+export function limitPathTranslationDelta(
+  samples: MotionSample[],
+  delta: Vec2,
+): Vec2 {
+  if (samples.length === 0) return { x: 0, y: 0 }
+  if (delta.x === 0 && delta.y === 0) return { x: 0, y: 0 }
+
+  const { minX, maxX, minY, maxY } = pathSampleBounds(samples)
+
+  const limitAxis = (min: number, max: number, d: number): number => {
+    // Keep per-side overflow from growing. For a fully in-bounds path this is
+    // exactly d ∈ [-min, 1-max]. For oversized paths (max-min > 1) both sides
+    // already overflow and the interval is {0}.
+    const lo = min >= 0 ? -min : 0
+    const hi = max <= 1 ? 1 - max : 0
+    if (lo > hi) return 0
+    return clamp(d, lo, hi)
+  }
+
+  return {
+    x: limitAxis(minX, maxX, delta.x),
+    y: limitAxis(minY, maxY, delta.y),
+  }
+}
+
+/**
+ * Translate every sample by the same delta. Preserves timestamps, count, and
+ * relative shape. Does not clamp per-sample (use {@link limitPathTranslationDelta}
+ * first when enforcing sample-center stage bounds).
+ */
+export function translatePathSamples(
+  samples: MotionSample[],
+  delta: Vec2,
+): MotionSample[] {
+  if (samples.length === 0) return []
+  if (delta.x === 0 && delta.y === 0) return copyPath(samples)
+  return samples.map((sample) => ({
+    t: sample.t,
+    x: sample.x + delta.x,
+    y: sample.y + delta.y,
+  }))
+}
+
+/** Apply a bounds-limited whole-path translation from a gesture baseline. */
+export function applyPathTranslation(
+  baseline: MotionSample[],
+  delta: Vec2,
+): MotionSample[] {
+  return translatePathSamples(baseline, limitPathTranslationDelta(baseline, delta))
+}
+
+/** Max aspect-aware displacement to treat two paths as identical (no-op). */
+export const LOCAL_BEND_NOOP_EPS = 1e-6
+
+/** True when sample arrays match within an epsilon (geometry no-op check). */
+export function samplesMatch(
+  a: MotionSample[],
+  b: MotionSample[],
+  eps = LOCAL_BEND_NOOP_EPS,
+): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i]!.t !== b[i]!.t) return false
+    if (Math.abs(a[i]!.x - b[i]!.x) > eps) return false
+    if (Math.abs(a[i]!.y - b[i]!.y) > eps) return false
   }
   return true
 }
@@ -550,9 +668,6 @@ export function isEndpointHandle(
 ): boolean {
   return sampleIndex === 0 || sampleIndex === sampleCount - 1
 }
-
-/** Max aspect-aware displacement to treat two paths as identical (no-op). */
-export const LOCAL_BEND_NOOP_EPS = 1e-6
 
 /**
  * Turning / bulge thresholds (aspect-aware units and radians).

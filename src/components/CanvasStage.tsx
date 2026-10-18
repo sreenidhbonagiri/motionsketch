@@ -14,6 +14,7 @@ import {
 import { useEditorStore } from '../state/store'
 import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
+import { PathMoveOverlay } from './PathMoveOverlay'
 
 function drawGrid(
   ctx: CanvasRenderingContext2D,
@@ -108,6 +109,15 @@ export function CanvasStage() {
     onStagePointerMove,
     pathAddMode,
     pathAddCandidateIndex,
+    pathTool,
+    moveTool,
+    moveHovered,
+    moveDragging,
+    onMovePathPointerDown,
+    onMovePathPointerMove,
+    onMovePathPointerLeave,
+    onMovePathFocus,
+    onMovePathBlur,
   } = usePathEditor({
     stageRef,
   })
@@ -193,13 +203,18 @@ export function CanvasStage() {
       ref={stageRef}
       data-testid="stage"
       data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
+      data-path-tool={editing ? pathTool : undefined}
       className={`absolute inset-0 touch-none overflow-hidden bg-[#eef1f6] ${
         editing && pathAddMode ? 'cursor-crosshair' : ''
       }`}
-      onPointerDown={editing && pathAddMode ? onStagePointerDown : undefined}
+      onPointerDown={
+        editing && pathAddMode && pathTool === 'edit-points'
+          ? onStagePointerDown
+          : undefined
+      }
       onPointerMove={
         editing
-          ? pathAddMode
+          ? pathAddMode && pathTool === 'edit-points'
             ? onStagePointerMove
             : undefined
           : onRecordPointerMove
@@ -253,7 +268,19 @@ export function CanvasStage() {
             />
           )
         })}
-      {editing && workingSamples && size.width > 0 && (
+      {editing && workingSamples && size.width > 0 && moveTool && (
+        <PathMoveOverlay
+          samples={workingSamples}
+          hovered={moveHovered}
+          dragging={moveDragging}
+          onPointerDown={onMovePathPointerDown}
+          onPointerMove={onMovePathPointerMove}
+          onPointerLeave={onMovePathPointerLeave}
+          onFocus={onMovePathFocus}
+          onBlur={onMovePathBlur}
+        />
+      )}
+      {editing && workingSamples && size.width > 0 && !moveTool && (
         <PathHandles
           samples={workingSamples}
           handleIndices={handleIndices}
