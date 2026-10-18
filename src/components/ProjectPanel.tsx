@@ -230,6 +230,7 @@ export function ProjectPanel() {
           data-testid="btn-download-project"
           onClick={handleDownload}
           disabled={!canDownloadProject}
+          aria-describedby="download-project-help"
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Download project file
@@ -256,7 +257,9 @@ export function ProjectPanel() {
         data-testid="download-project-help"
         className="text-[11px] leading-relaxed text-slate-500"
       >
-        Reopen and edit in MotionSketch.
+        {canDownloadProject
+          ? 'Download a JSON file you can reopen and edit in MotionSketch.'
+          : 'Record a path (or recover from a save error) before downloading a project file.'}
       </p>
 
       <dialog

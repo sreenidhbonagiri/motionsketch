@@ -17,6 +17,7 @@ import {
   moveClip,
   resizeClipEnd,
   resizeClipStart,
+  validateClipSecondsDraft,
 } from '../core/clip'
 import type { ActorClip } from '../core/types'
 import { useEditorStore } from '../state/store'
@@ -51,6 +52,8 @@ export function ClipTimeline() {
     : { startSec: 0, endSec: 0 }
   const startFieldId = useId()
   const endFieldId = useId()
+  const draftHelpId = useId()
+  const draftErrorId = useId()
 
   const dragRef = useRef<{
     id: string
@@ -60,14 +63,40 @@ export function ClipTimeline() {
     baseline: ActorClip
   } | null>(null)
 
-  // Draft numeric fields follow selection; commit on blur/Enter.
+  // Local Start/End draft — commit only via Apply or Enter (not blur).
   const [startDraft, setStartDraft] = useState('0.00')
   const [endDraft, setEndDraft] = useState('0.00')
-  useEffect(() => {
-    if (!selected) return
+  const [draftDirty, setDraftDirty] = useState(false)
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const draftActorIdRef = useRef<string | null>(null)
+
+  const syncDraftFromCommitted = useCallback(() => {
     setStartDraft(selectedSecs.startSec.toFixed(2))
     setEndDraft(selectedSecs.endSec.toFixed(2))
-  }, [selected?.id, selectedSecs.startSec, selectedSecs.endSec])
+    setDraftDirty(false)
+    setDraftError(null)
+  }, [selectedSecs.startSec, selectedSecs.endSec])
+
+  // Actor switch: discard any uncommitted draft (never apply to the new actor).
+  useEffect(() => {
+    if (!selected) return
+    if (draftActorIdRef.current === selected.id) return
+    draftActorIdRef.current = selected.id
+    syncDraftFromCommitted()
+  }, [selected?.id, syncDraftFromCommitted])
+
+  // Keep drafts aligned with committed clip while the user is not editing.
+  useEffect(() => {
+    if (!selected || draftDirty) return
+    if (draftActorIdRef.current !== selected.id) return
+    setStartDraft(selectedSecs.startSec.toFixed(2))
+    setEndDraft(selectedSecs.endSec.toFixed(2))
+  }, [
+    selected?.id,
+    selectedSecs.startSec,
+    selectedSecs.endSec,
+    draftDirty,
+  ])
 
   const onPointerDownClip = (
     actorId: string,
@@ -127,16 +156,39 @@ export function ClipTimeline() {
     if (actor) finishClipGesture(drag.id, actor.clip)
   }
 
-  const commitSeconds = useCallback(
-    (startSec: number, endSec: number) => {
-      if (!selected || busy) return
-      commitActorClip(
-        selected.id,
-        clipFromSeconds(startSec, endSec, durationMs, selected.clip),
-      )
-    },
-    [selected, busy, commitActorClip, durationMs],
-  )
+  const applyDraft = useCallback(() => {
+    if (!selected || busy) return false
+    const parsed = validateClipSecondsDraft(startDraft, endDraft, durationMs)
+    if (!parsed.ok) {
+      setDraftError(parsed.error)
+      return false
+    }
+    commitActorClip(
+      selected.id,
+      clipFromSeconds(
+        parsed.startSec,
+        parsed.endSec,
+        durationMs,
+        selected.clip,
+      ),
+    )
+    setStartDraft(parsed.startSec.toFixed(2))
+    setEndDraft(parsed.endSec.toFixed(2))
+    setDraftDirty(false)
+    setDraftError(null)
+    return true
+  }, [
+    selected,
+    busy,
+    startDraft,
+    endDraft,
+    durationMs,
+    commitActorClip,
+  ])
+
+  const restoreDraft = useCallback(() => {
+    syncDraftFromCommitted()
+  }, [syncDraftFromCommitted])
 
   const commitVisibility = (
     patch: Partial<Pick<ActorClip, 'hideBeforeStart' | 'hideAfterEnd'>>,
@@ -149,7 +201,21 @@ export function ClipTimeline() {
     if (!selected || busy) return
     const span = durationMs / 1000
     const secs = clipToSeconds(selected.clip, durationMs)
-    commitSeconds(secs.startSec + deltaStart * span, secs.endSec + deltaEnd * span)
+    const parsed = validateClipSecondsDraft(
+      secs.startSec + deltaStart * span,
+      secs.endSec + deltaEnd * span,
+      durationMs,
+    )
+    if (!parsed.ok) return
+    commitActorClip(
+      selected.id,
+      clipFromSeconds(
+        parsed.startSec,
+        parsed.endSec,
+        durationMs,
+        selected.clip,
+      ),
+    )
   }
 
   const onRowKeyDown = (actorId: string, event: KeyboardEvent<HTMLElement>) => {
@@ -182,7 +248,34 @@ export function ClipTimeline() {
     }
   }
 
+  const onDraftKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      applyDraft()
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      restoreDraft()
+    }
+  }
+
+  const markDraft = (start: string, end: string) => {
+    setStartDraft(start)
+    setEndDraft(end)
+    setDraftDirty(true)
+    setDraftError(null)
+  }
+
   if (!hasAnyRecording || !selected) return null
+
+  const draftDescribedBy = [
+    draftHelpId,
+    draftError ? draftErrorId : null,
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div
@@ -318,22 +411,10 @@ export function ClipTimeline() {
                     max={durationMs / 1000}
                     disabled={busy}
                     value={startDraft}
-                    onChange={(e) => setStartDraft(e.target.value)}
-                    onBlur={() => {
-                      const start = Number(startDraft)
-                      const end = Number(endDraft)
-                      if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                        setStartDraft(selectedSecs.startSec.toFixed(2))
-                        setEndDraft(selectedSecs.endSec.toFixed(2))
-                        return
-                      }
-                      commitSeconds(start, end)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur()
-                      }
-                    }}
+                    aria-invalid={draftError ? true : undefined}
+                    aria-describedby={draftDescribedBy}
+                    onChange={(e) => markDraft(e.target.value, endDraft)}
+                    onKeyDown={onDraftKeyDown}
                     className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>
@@ -349,26 +430,46 @@ export function ClipTimeline() {
                     max={durationMs / 1000}
                     disabled={busy}
                     value={endDraft}
-                    onChange={(e) => setEndDraft(e.target.value)}
-                    onBlur={() => {
-                      const start = Number(startDraft)
-                      const end = Number(endDraft)
-                      if (!Number.isFinite(start) || !Number.isFinite(end)) {
-                        setStartDraft(selectedSecs.startSec.toFixed(2))
-                        setEndDraft(selectedSecs.endSec.toFixed(2))
-                        return
-                      }
-                      commitSeconds(start, end)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur()
-                      }
-                    }}
+                    aria-invalid={draftError ? true : undefined}
+                    aria-describedby={draftDescribedBy}
+                    onChange={(e) => markDraft(startDraft, e.target.value)}
+                    onKeyDown={onDraftKeyDown}
                     className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>
               </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="btn-apply-clip-times"
+                  disabled={busy || !draftDirty}
+                  onClick={() => applyDraft()}
+                  className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+                >
+                  Apply
+                </button>
+                <p
+                  id={draftHelpId}
+                  data-testid="clip-times-help"
+                  className="text-[10px] leading-relaxed text-slate-500"
+                >
+                  Apply or Enter commits Start and End together. Escape restores
+                  the last committed times. Leaving the fields or switching
+                  actors discards an unapplied draft.
+                </p>
+              </div>
+
+              {draftError && (
+                <p
+                  id={draftErrorId}
+                  data-testid="clip-times-error"
+                  role="alert"
+                  className="text-[11px] font-medium text-amber-900"
+                >
+                  {draftError}
+                </p>
+              )}
 
               <fieldset
                 data-testid="clip-visibility-options"

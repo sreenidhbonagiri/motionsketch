@@ -26,7 +26,7 @@ test.describe('MotionSketch editor', () => {
     await ensureEditor(page)
 
     await page.getByTestId('btn-record').click()
-    await expect(page.getByTestId('armed-hint')).toBeVisible()
+    await expect(page.getByTestId('dock-status')).toContainText(/drag the actor/i)
 
     await dragActor(page, { x: 30, y: -20 }, { x: 180, y: 60 })
 

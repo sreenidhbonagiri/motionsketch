@@ -355,6 +355,7 @@ export function EditorShell() {
           )}
           {tip && (
             <p
+              id="stage-empty-hint"
               data-testid="stage-empty-hint"
               className="pointer-events-auto rounded-full border border-white/60 bg-white/85 px-3 py-1 text-center text-xs text-slate-600 shadow-sm backdrop-blur-md"
             >

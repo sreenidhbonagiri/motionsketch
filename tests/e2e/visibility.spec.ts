@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
 import { makeActor, makeProject, makeRecording } from '../unit/helpers/project'
 import {
+  applyClipSeconds,
   ensureEditor,
   openPanel,
   recordSimplePath,
@@ -63,9 +64,7 @@ test.describe('per-actor visibility timing', () => {
 
     await openClipTimeline(page)
     // 0.4s–1.6s of a 2s timeline → 0.2–0.8 normalized.
-    await page.getByTestId('clip-start-input').fill('0.40')
-    await page.getByTestId('clip-end-input').fill('1.60')
-    await page.getByTestId('clip-end-input').blur()
+    await applyClipSeconds(page, '0.40', '1.60')
     await page.getByTestId('clip-hide-before').check()
     await page.getByTestId('clip-hide-after').check()
 
@@ -216,9 +215,7 @@ test.describe('per-actor visibility timing', () => {
     await page.getByTestId('btn-add-actor').click()
     await selectActorByIndex(page, 1)
     await openClipTimeline(page)
-    await page.getByTestId('clip-start-input').fill('0.30')
-    await page.getByTestId('clip-end-input').fill('0.90')
-    await page.getByTestId('clip-end-input').blur()
+    await applyClipSeconds(page, '0.30', '0.90')
     await page.getByTestId('clip-hide-before').check()
     await page.getByTestId('clip-hide-after').check()
     await expect(page.getByTestId('clip-hide-before')).toBeChecked()
@@ -251,9 +248,7 @@ test.describe('per-actor visibility timing', () => {
     await page.getByTestId('btn-close-adjust').click()
 
     await openClipTimeline(page)
-    await page.getByTestId('clip-start-input').fill('1.00')
-    await page.getByTestId('clip-end-input').fill('2.00')
-    await page.getByTestId('clip-end-input').blur()
+    await applyClipSeconds(page, '1.00', '2.00')
     await page.getByTestId('clip-hide-before').check()
     await expect(page.getByTestId('clip-hide-after')).not.toBeChecked()
 

@@ -103,6 +103,11 @@ export function AppearancePanel() {
               name={kindGroupId}
               checked={actor.kind === 'image'}
               disabled={!actor.image && actor.kind !== 'image'}
+              aria-describedby={
+                !actor.image && actor.kind !== 'image'
+                  ? 'actor-image-type-help'
+                  : undefined
+              }
               onChange={() => {
                 if (actor.image) setActorKind('image')
               }}
@@ -115,6 +120,15 @@ export function AppearancePanel() {
           Shape color and corners are kept when you switch to Image, then restored
           when you switch back.
         </p>
+        {!actor.image && actor.kind !== 'image' && (
+          <p
+            id="actor-image-type-help"
+            data-testid="actor-image-type-help"
+            className="text-xs leading-relaxed text-slate-500"
+          >
+            Upload an image below to enable the Image type.
+          </p>
+        )}
       </fieldset>
 
       <div data-testid="actor-panel" className="space-y-3">

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
+  applyClipSeconds,
   ensureEditor,
   actorIdsFromList,
   clickRecord,
@@ -79,14 +80,10 @@ test.describe('per-actor clip timing', () => {
     )
 
     await selectActorByIndex(page, 1)
-    await page.getByTestId('clip-start-input').fill('1.00')
-    await page.getByTestId('clip-end-input').fill('2.00')
-    await page.getByTestId('clip-end-input').blur()
+    await applyClipSeconds(page, '1.00', '2.00')
 
     await selectActorByIndex(page, 2)
-    await page.getByTestId('clip-start-input').fill('0.00')
-    await page.getByTestId('clip-end-input').fill('1.00')
-    await page.getByTestId('clip-end-input').blur()
+    await applyClipSeconds(page, '0.00', '1.00')
 
     const lateId = ids[1]
     await collapseClipTimeline(page)
@@ -131,8 +128,7 @@ test.describe('per-actor clip timing', () => {
 
     await ensureClipTimelineOpen(page)
     await selectActorByIndex(page, 2)
-    await page.getByTestId('clip-end-input').fill('1.50')
-    await page.getByTestId('clip-end-input').blur()
+    await applyClipSeconds(page, '0.00', '1.50')
     await collapseClipTimeline(page)
     await page.getByTestId('btn-undo-transform').click()
     await ensureClipTimelineOpen(page)

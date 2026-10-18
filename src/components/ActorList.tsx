@@ -153,6 +153,7 @@ export function ActorList() {
               type="button"
               data-testid="btn-delete-actor"
               disabled={busy || actors.length <= 1}
+              aria-describedby="actor-list-help"
               onClick={() => {
                 const label = selected?.name?.trim() || 'this actor'
                 if (
@@ -189,12 +190,18 @@ export function ActorList() {
             </button>
           </div>
           <p
+            id="actor-list-help"
             data-testid="actor-list-help"
             className="text-[10px] leading-relaxed text-slate-500"
           >
             List order is stacking (later on top). Path and transform edits
             apply to the selected actor only. Switching actors clears path and
             transform undo history for the previous selection.
+            {actors.length <= 1
+              ? ' Delete stays unavailable while only one actor remains.'
+              : busy
+                ? ' Actor list actions pause while recording or editing a path.'
+                : ''}
           </p>
         </div>
       )}

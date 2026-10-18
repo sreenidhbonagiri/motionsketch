@@ -129,7 +129,7 @@ export function AdjustPanel() {
           max={1}
           step={0.01}
           value={steadySpeed}
-          disabled={!hasAnyRecording}
+          disabled={!selectedHasRecording}
           aria-describedby="steady-speed-help"
           onChange={(e) => setSteadySpeed(Number(e.target.value))}
           className="w-full accent-teal-700 disabled:opacity-40"
@@ -139,7 +139,9 @@ export function AdjustPanel() {
           data-testid="steady-speed-help"
           className="text-xs leading-relaxed text-slate-500"
         >
-          Evens out movement speed while keeping pauses.
+          {selectedHasRecording
+            ? 'Evens out movement speed while keeping pauses.'
+            : 'Record a path for this actor to adjust Steady Speed.'}
         </p>
       </div>
 
@@ -150,19 +152,20 @@ export function AdjustPanel() {
             data-testid="loop-toggle"
             type="checkbox"
             checked={loop}
-            disabled={!selectedHasRecording || editing}
+            disabled={!hasAnyRecording || editing}
             onChange={(e) => setLoop(e.target.checked)}
             className="size-4 accent-teal-700 disabled:opacity-40"
           />
         </label>
         <p className="text-xs leading-relaxed text-slate-500">
-          Off plays once forward. On, choose how it continues.
+          Shared for the project. Off plays once forward. On, choose how it
+          continues.
         </p>
 
         {loop && (
           <fieldset
             data-testid="loop-mode-fieldset"
-            disabled={!selectedHasRecording || editing}
+            disabled={!hasAnyRecording || editing}
             className="space-y-2 disabled:opacity-40"
           >
             <legend className="sr-only">Loop mode</legend>

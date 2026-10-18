@@ -57,6 +57,10 @@ export function PlaybackDock() {
   const editing = mode === 'editing'
   const hasRecording = !!recording
   const playbackDisabled = !hasAnyRecording || isRecordingLike
+  const editPathDisabled =
+    !hasRecording || isRecordingLike || mode === 'playing'
+  const resetDisabled = !recording || isRecordingLike
+  const dockStatusId = 'dock-status'
 
   const elapsedMs = traversalElapsedMs(
     playbackHead,
@@ -68,6 +72,47 @@ export function PlaybackDock() {
   const valueText = goingBack
     ? `${formatSeconds(elapsedMs)} of ${formatSeconds(durationMs)}, backward`
     : `${formatSeconds(elapsedMs)} of ${formatSeconds(durationMs)}`
+
+  const actorLabel = selectedActor?.name?.trim() || 'the selected actor'
+
+  // One contextual status for recording / selected-actor gaps. Empty-board Record
+  // guidance stays on the existing stage tip (id=stage-empty-hint).
+  let dockStatus: string | null = null
+  if (!editing) {
+    if (mode === 'armed') {
+      dockStatus =
+        'Ready — drag the actor to capture motion. Cancel exits without saving a take.'
+    } else if (mode === 'recording') {
+      dockStatus = 'Recording… release the pointer to finish, or press Stop.'
+    } else if (hasAnyRecording && !hasRecording) {
+      dockStatus = `“${actorLabel}” has no path yet. Record for this actor to edit or reset its take. Play still uses other actors’ takes.`
+    } else if (mode === 'playing') {
+      dockStatus = 'Pause before editing the path.'
+    }
+  }
+
+  const emptyBoardHintId = 'stage-empty-hint'
+  const playbackDescribedBy = playbackDisabled
+    ? dockStatus
+      ? dockStatusId
+      : !hasAnyRecording
+        ? emptyBoardHintId
+        : undefined
+    : undefined
+  const editDescribedBy = editPathDisabled
+    ? dockStatus
+      ? dockStatusId
+      : !hasAnyRecording
+        ? emptyBoardHintId
+        : undefined
+    : undefined
+  const resetDescribedBy = resetDisabled
+    ? dockStatus
+      ? dockStatusId
+      : !hasAnyRecording
+        ? emptyBoardHintId
+        : undefined
+    : undefined
 
   return (
     <div
@@ -229,7 +274,6 @@ export function PlaybackDock() {
                 type="button"
                 data-testid="btn-pause"
                 onClick={pause}
-                disabled={playbackDisabled}
                 className={btnSecondary}
               >
                 Pause
@@ -240,6 +284,7 @@ export function PlaybackDock() {
                 data-testid="btn-play"
                 onClick={() => play()}
                 disabled={playbackDisabled}
+                aria-describedby={playbackDescribedBy}
                 className={btnSecondary}
               >
                 Play
@@ -251,6 +296,7 @@ export function PlaybackDock() {
               data-testid="btn-restart"
               onClick={() => restartPlayback()}
               disabled={playbackDisabled}
+              aria-describedby={playbackDescribedBy}
               className={btnSecondary}
             >
               Restart
@@ -260,7 +306,8 @@ export function PlaybackDock() {
               type="button"
               data-testid="btn-edit-path"
               onClick={enterEditMode}
-              disabled={!hasRecording || isRecordingLike || mode === 'playing'}
+              disabled={editPathDisabled}
+              aria-describedby={editDescribedBy}
               className={btnSecondary}
             >
               Edit path
@@ -301,9 +348,9 @@ export function PlaybackDock() {
                 }
                 resetRecording()
               }}
-              disabled={!recording && mode === 'idle'}
+              disabled={resetDisabled}
+              aria-describedby={resetDescribedBy}
               className={btnQuiet}
-              title="Reset selected actor’s take"
             >
               Reset actor
             </button>
@@ -318,18 +365,19 @@ export function PlaybackDock() {
                 Restore recorded path
               </button>
             )}
-
-            {mode === 'armed' && (
-              <span
-                data-testid="armed-hint"
-                className="px-2 text-xs text-slate-500"
-              >
-                Ready — drag the actor
-              </span>
-            )}
           </>
         )}
       </div>
+
+      {dockStatus && (
+        <p
+          id={dockStatusId}
+          data-testid="dock-status"
+          className="text-center text-xs leading-relaxed text-slate-500"
+        >
+          {dockStatus}
+        </p>
+      )}
     </div>
   )
 }

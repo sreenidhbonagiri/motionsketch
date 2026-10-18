@@ -129,6 +129,18 @@ export async function recordSimplePath(page: Page) {
   await expect(page.getByTestId('export-panel')).toBeVisible()
 }
 
+/** Set clip Start/End drafts and commit with Apply (blur alone does not commit). */
+export async function applyClipSeconds(
+  page: Page,
+  startSec: string | number,
+  endSec: string | number,
+) {
+  await page.getByTestId('clip-start-input').fill(String(startSec))
+  await page.getByTestId('clip-end-input').fill(String(endSec))
+  await page.getByTestId('btn-apply-clip-times').click()
+  await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+}
+
 /** @deprecated use openPanel */
 export async function openSettings(page: Page) {
   await openPanel(page, 'adjust')

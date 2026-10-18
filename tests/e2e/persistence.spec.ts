@@ -195,8 +195,8 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('btn-download-project')).toHaveText(
       'Download project file',
     )
-    await expect(page.getByTestId('download-project-help')).toHaveText(
-      'Reopen and edit in MotionSketch.',
+    await expect(page.getByTestId('download-project-help')).toContainText(
+      'Record a path',
     )
     await page.getByTestId('btn-close-project').click()
 

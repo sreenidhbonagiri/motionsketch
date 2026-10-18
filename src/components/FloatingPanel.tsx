@@ -30,10 +30,17 @@ export function FloatingPanel({
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!open) return
-    closeRef.current?.focus()
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    returnFocusRef.current = previouslyFocused
+    // Move focus into the panel without jumping straight to Close.
+    panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (document.querySelector('dialog[open]')) return
@@ -42,7 +49,14 @@ export function FloatingPanel({
       onClose()
     }
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      const restore = returnFocusRef.current
+      returnFocusRef.current = null
+      if (restore && document.contains(restore)) {
+        restore.focus()
+      }
+    }
   }, [open, onClose])
 
   if (!open) return null
@@ -55,7 +69,8 @@ export function FloatingPanel({
       role="dialog"
       aria-modal="false"
       aria-labelledby={titleId}
-      className={`pointer-events-auto absolute top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-[max(5.5rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:w-auto ${
+      tabIndex={-1}
+      className={`pointer-events-auto absolute top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-[max(5.5rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:w-auto ${
         align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}

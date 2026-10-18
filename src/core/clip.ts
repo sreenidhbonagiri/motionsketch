@@ -177,6 +177,61 @@ export function clipFromSeconds(
   })
 }
 
+export type ClipSecondsDraftResult =
+  | { ok: true; startSec: number; endSec: number }
+  | { ok: false; error: string }
+
+/**
+ * Validate Start/End second drafts for explicit Apply (no silent clamping).
+ */
+export function validateClipSecondsDraft(
+  startRaw: string | number,
+  endRaw: string | number,
+  durationMs: number,
+): ClipSecondsDraftResult {
+  if (typeof startRaw === 'string' && startRaw.trim() === '') {
+    return {
+      ok: false,
+      error: 'Enter valid start and end times in seconds.',
+    }
+  }
+  if (typeof endRaw === 'string' && endRaw.trim() === '') {
+    return {
+      ok: false,
+      error: 'Enter valid start and end times in seconds.',
+    }
+  }
+  const startSec = typeof startRaw === 'number' ? startRaw : Number(startRaw)
+  const endSec = typeof endRaw === 'number' ? endRaw : Number(endRaw)
+  if (!Number.isFinite(startSec) || !Number.isFinite(endSec)) {
+    return {
+      ok: false,
+      error: 'Enter valid start and end times in seconds.',
+    }
+  }
+  const durationSec = durationMs / 1000
+  if (!(durationSec > 0)) {
+    return { ok: false, error: 'Project duration must be greater than zero.' }
+  }
+  if (startSec < 0 || endSec < 0) {
+    return { ok: false, error: 'Times cannot be negative.' }
+  }
+  if (startSec > durationSec + 1e-9 || endSec > durationSec + 1e-9) {
+    return {
+      ok: false,
+      error: `Times must be within 0–${durationSec.toFixed(2)} s.`,
+    }
+  }
+  const minSpanSec = MIN_CLIP_SPAN * durationSec
+  if (endSec - startSec < minSpanSec - 1e-9) {
+    return {
+      ok: false,
+      error: `End must be at least ${minSpanSec.toFixed(2)} s after start (${Math.round(MIN_CLIP_SPAN * 100)}% of the project).`,
+    }
+  }
+  return { ok: true, startSec, endSec }
+}
+
 export function clipToSeconds(
   clip: ActorClip,
   durationMs: number,

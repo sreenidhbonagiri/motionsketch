@@ -7,6 +7,7 @@ import {
   projectToLocal,
   resizeClipEnd,
   resizeClipStart,
+  validateClipSecondsDraft,
 } from '../../src/core/clip'
 import {
   exportCssFromProject,
@@ -45,6 +46,21 @@ describe('clip mapping', () => {
     expect(resizeClipStart({ start: 0.2, end: 0.8 }, 0.79).end - resizeClipStart({ start: 0.2, end: 0.8 }, 0.79).start).toBeGreaterThanOrEqual(
       MIN_CLIP_SPAN - 1e-9,
     )
+  })
+
+  it('validateClipSecondsDraft rejects bad drafts without inventing values', () => {
+    expect(validateClipSecondsDraft('', '1', 2000).ok).toBe(false)
+    expect(validateClipSecondsDraft('abc', '1', 2000).ok).toBe(false)
+    expect(validateClipSecondsDraft('0.5', '0.5', 2000).ok).toBe(false)
+    expect(validateClipSecondsDraft('1.5', '1.52', 2000).ok).toBe(false)
+    expect(validateClipSecondsDraft('-0.1', '1', 2000).ok).toBe(false)
+    expect(validateClipSecondsDraft('0', '3', 2000).ok).toBe(false)
+    const ok = validateClipSecondsDraft('0.4', '1.6', 2000)
+    expect(ok.ok).toBe(true)
+    if (ok.ok) {
+      expect(ok.startSec).toBe(0.4)
+      expect(ok.endSec).toBe(1.6)
+    }
   })
 })
 

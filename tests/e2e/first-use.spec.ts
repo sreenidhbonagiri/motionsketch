@@ -19,8 +19,8 @@ test.describe('first-use guidance and export wording', () => {
     )
 
     await page.getByTestId('btn-record').click()
-    await expect(page.getByTestId('armed-hint')).toBeVisible()
-    await expect(page.getByTestId('armed-hint')).toContainText(/drag the actor/i)
+    await expect(page.getByTestId('dock-status')).toBeVisible()
+    await expect(page.getByTestId('dock-status')).toContainText(/drag the actor/i)
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
 
     await page.getByTestId('btn-stop').click()
