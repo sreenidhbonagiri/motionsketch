@@ -21,6 +21,7 @@ import {
 import { ActorList } from './ActorList'
 import { ClipTimeline } from './ClipTimeline'
 import { PlaybackDock } from './PlaybackDock'
+import { PolishPanel } from './PolishPanel'
 import { ProjectPanel } from './ProjectPanel'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
@@ -41,6 +42,7 @@ export function EditorShell() {
   )
   const mode = useEditorStore((s) => s.mode)
   const editing = mode === 'editing'
+  const polishSession = useEditorStore((s) => s.polishSession)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const actor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -342,7 +344,8 @@ export function EditorShell() {
         className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
       >
         <div className="flex w-full max-w-2xl flex-col items-center gap-2">
-          {!editing && <ClipTimeline />}
+          {!editing && !polishSession && <ClipTimeline />}
+          {polishSession && <PolishPanel />}
           <PlaybackDock />
           {tip && (
             <p

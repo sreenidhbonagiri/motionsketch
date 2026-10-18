@@ -94,6 +94,7 @@ export function CanvasStage() {
   const editPreview = useEditorStore((s) => s.editPreview)
   const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
+  const polishSession = useEditorStore((s) => s.polishSession)
 
   const {
     onActorPointerDown,
@@ -148,42 +149,70 @@ export function CanvasStage() {
         drawPath(ctx, size.width, size.height, liveTrail, '#0f766e', 2.5, 0.85)
       }
     } else if (selected?.recording) {
-      const rawSamples = selected.recording.samples
-      const processed = selectProcessedPathForActor(
-        project,
-        selected,
-        pathView,
-      )
-      if (showPathComparison && !editing && rawSamples.length >= 2) {
-        drawPath(
-          ctx,
-          size.width,
-          size.height,
-          rawSamples,
-          '#94a3b8',
-          2,
-          0.7,
-          true,
-        )
-      }
-      if (processed.length >= 2) {
-        drawPath(
-          ctx,
-          size.width,
-          size.height,
-          processed,
-          '#0f766e',
-          2.75,
-          0.95,
-        )
-        if (!editing) {
-          const localT = projectToLocal(playbackHead, selected.clip)
-          drawPlayhead(
+      if (polishSession) {
+        const original = polishSession.baseline.samples
+        const polished = polishSession.previewSamples
+        if (original.length >= 2) {
+          drawPath(
             ctx,
             size.width,
             size.height,
-            evaluate(processed, localT),
+            original,
+            '#94a3b8',
+            2.25,
+            0.75,
+            true,
           )
+        }
+        if (polished.length >= 2) {
+          drawPath(
+            ctx,
+            size.width,
+            size.height,
+            polished,
+            '#0f766e',
+            2.75,
+            0.95,
+          )
+        }
+      } else {
+        const rawSamples = selected.recording.samples
+        const processed = selectProcessedPathForActor(
+          project,
+          selected,
+          pathView,
+        )
+        if (showPathComparison && !editing && rawSamples.length >= 2) {
+          drawPath(
+            ctx,
+            size.width,
+            size.height,
+            rawSamples,
+            '#94a3b8',
+            2,
+            0.7,
+            true,
+          )
+        }
+        if (processed.length >= 2) {
+          drawPath(
+            ctx,
+            size.width,
+            size.height,
+            processed,
+            '#0f766e',
+            2.75,
+            0.95,
+          )
+          if (!editing) {
+            const localT = projectToLocal(playbackHead, selected.clip)
+            drawPlayhead(
+              ctx,
+              size.width,
+              size.height,
+              evaluate(processed, localT),
+            )
+          }
         }
       }
     }
@@ -197,6 +226,7 @@ export function CanvasStage() {
     showPathComparison,
     playbackHead,
     editing,
+    polishSession,
   ])
 
   return (
@@ -270,7 +300,11 @@ export function CanvasStage() {
             />
           )
         })}
-      {editing && workingSamples && size.width > 0 && moveTool && (
+      {editing &&
+        !polishSession &&
+        workingSamples &&
+        size.width > 0 &&
+        moveTool && (
         <PathMoveOverlay
           samples={workingSamples}
           hovered={moveHovered}
@@ -282,7 +316,11 @@ export function CanvasStage() {
           onBlur={onMovePathBlur}
         />
       )}
-      {editing && workingSamples && size.width > 0 && !moveTool && (
+      {editing &&
+        !polishSession &&
+        workingSamples &&
+        size.width > 0 &&
+        !moveTool && (
         <PathHandles
           samples={workingSamples}
           handleIndices={handleIndices}

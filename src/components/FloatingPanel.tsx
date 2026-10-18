@@ -53,6 +53,7 @@ export function FloatingPanel({
       if (document.querySelector('dialog[open]')) return
       // Path edit gestures / Add point own Escape first.
       const editor = useEditorStore.getState()
+      if (editor.polishSession) return
       if (
         editor.mode === 'editing' &&
         (editor.pathGestureActive ||

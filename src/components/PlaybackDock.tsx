@@ -55,6 +55,8 @@ export function PlaybackDock() {
   const setPlaybackHead = useEditorStore((s) => s.setPlaybackHead)
   const enterEditMode = useEditorStore((s) => s.enterEditMode)
   const exitEditMode = useEditorStore((s) => s.exitEditMode)
+  const beginPolishSession = useEditorStore((s) => s.beginPolishSession)
+  const polishSession = useEditorStore((s) => s.polishSession)
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
@@ -109,7 +111,13 @@ export function PlaybackDock() {
   const hasRecording = !!recording
   const playbackDisabled = !hasAnyRecording || isRecordingLike
   const editPathDisabled =
-    !hasRecording || isRecordingLike || mode === 'playing'
+    !hasRecording || isRecordingLike || mode === 'playing' || !!polishSession
+  const polishDisabled =
+    !hasRecording ||
+    isRecordingLike ||
+    mode === 'playing' ||
+    !!polishSession ||
+    pathGestureActive
   const resetDisabled = !recording || isRecordingLike
   const dockStatusId = 'dock-status'
 
@@ -511,6 +519,17 @@ export function PlaybackDock() {
               className={btnSecondary}
             >
               Edit path
+            </button>
+
+            <button
+              type="button"
+              data-testid="btn-polish-motion"
+              onClick={() => beginPolishSession()}
+              disabled={polishDisabled}
+              title="Preview a gentler path while keeping pauses and corners"
+              className={btnSecondary}
+            >
+              Polish motion
             </button>
 
             <button

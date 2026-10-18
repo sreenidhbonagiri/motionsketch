@@ -20,6 +20,7 @@ import {
   smoothBendAtHandle,
   smoothBendAvailability,
 } from '../core/edit'
+import { polishMotion } from '../core/polish'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
@@ -77,6 +78,17 @@ import {
   selectActorPositionForActor,
 } from './selectors'
 
+/** Ephemeral Polish motion preview — never persisted until Apply. */
+export type PolishSession = {
+  baseline: GeometryEdit
+  previewSamples: MotionSample[]
+  strength: number
+  changed: boolean
+  reason: string | null
+  timingAdjusted: boolean
+  maxDeviation: number
+}
+
 const MAX_UNDO = 40
 
 /** Chronological actor-edit kinds for unified clip/transform undo. */
@@ -116,6 +128,8 @@ interface EditorStore {
    * the drag threshold). Floating panels must not steal Escape meanwhile.
    */
   pathGestureActive: boolean
+  /** Non-destructive Polish motion preview (null when inactive). */
+  polishSession: PolishSession | null
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -231,6 +245,11 @@ interface EditorStore {
   undoEdit: () => void
   redoEdit: () => void
 
+  beginPolishSession: () => boolean
+  setPolishStrength: (strength: number) => void
+  applyPolish: () => boolean
+  cancelPolish: () => void
+
   selectTransformKeyframe: (id: string | null) => void
   upsertTransformAtPlayhead: (rotationDeg: number, scale: number) => void
   commitTransformKeyframe: (input: {
@@ -256,6 +275,28 @@ function clearEditState() {
     pathAddCandidateIndex: null as number | null,
     pathTool: 'edit-points' as PathEditTool,
     pathGestureActive: false,
+    polishSession: null as PolishSession | null,
+  }
+}
+
+function runPolishPreview(
+  baseline: GeometryEdit,
+  strength: number,
+  stageAspect: number,
+): Omit<PolishSession, 'baseline' | 'strength'> & {
+  previewSamples: MotionSample[]
+} {
+  const result = polishMotion(baseline.samples, {
+    strength,
+    stageAspect,
+    anchorIndices: baseline.handleIndices,
+  })
+  return {
+    previewSamples: result.samples,
+    changed: result.changed,
+    reason: result.reason ?? null,
+    timingAdjusted: result.timingAdjusted,
+    maxDeviation: result.maxDeviation,
   }
 }
 
@@ -493,6 +534,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     play: () => {
       const state = get()
       if (!projectHasAnyRecording(state.project)) return
+      if (state.polishSession) return
       if (
         state.mode === 'editing' ||
         state.mode === 'armed' ||
@@ -1260,6 +1302,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddMode: false,
         pathAddCandidateIndex: null,
         pathTool: 'edit-points',
+        polishSession: null,
         // Mode transition once; selected-point copy lives in handle-selection-status.
         actionAnnouncement: 'Edit points',
       })
@@ -1275,6 +1318,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddMode: false,
         pathAddCandidateIndex: null,
         pathTool: 'edit-points',
+        polishSession: null,
       })
     },
 
@@ -1676,6 +1720,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     undoEdit: () => {
       const state = get()
+      if (state.polishSession) return
       const current = state.editSession ?? state.geometryEdit
       if (!current || state.undoStack.length === 0) return
 
@@ -1705,6 +1750,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     redoEdit: () => {
       const state = get()
+      if (state.polishSession) return
       const current = state.editSession ?? state.geometryEdit
       if (!current || state.redoStack.length === 0) return
 
@@ -1729,6 +1775,124 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         )
           ? state.selectedHandleIndex
           : (next.handleIndices[0] ?? 0),
+      })
+    },
+
+    beginPolishSession: () => {
+      const state = get()
+      if (
+        state.mode === 'armed' ||
+        state.mode === 'recording' ||
+        state.mode === 'playing'
+      ) {
+        return false
+      }
+      if (state.pathGestureActive || state.editPreview) return false
+      const actor = getSelected(state)
+      if (!actor.recording) return false
+
+      const source =
+        state.editSession ??
+        state.geometryEdit ??
+        actor.geometryEdit ??
+        null
+      let baseline: GeometryEdit
+      if (source) {
+        baseline = copyGeometryEdit(source)
+      } else {
+        const baked = bakeEditablePathForActor(state.project, actor)
+        if (baked.length < 2) return false
+        baseline = makeGeometryEdit(baked, actor.smoothing)
+      }
+
+      const strength = 0.55
+      const preview = runPolishPreview(
+        baseline,
+        strength,
+        state.project.stageAspect,
+      )
+      set({
+        polishSession: {
+          baseline,
+          strength,
+          ...preview,
+        },
+        pathAddMode: false,
+        editPreview: null,
+        actionAnnouncement: 'Polish motion preview',
+      })
+      return true
+    },
+
+    setPolishStrength: (strength) => {
+      const state = get()
+      const session = state.polishSession
+      if (!session) return
+      const nextStrength = clamp(strength, 0, 1)
+      const preview = runPolishPreview(
+        session.baseline,
+        nextStrength,
+        state.project.stageAspect,
+      )
+      set({
+        polishSession: {
+          baseline: session.baseline,
+          strength: nextStrength,
+          ...preview,
+        },
+      })
+    },
+
+    applyPolish: () => {
+      const state = get()
+      const session = state.polishSession
+      if (!session) return false
+      if (!session.changed) {
+        set({
+          polishSession: null,
+          actionAnnouncement:
+            session.reason ?? 'Nothing to polish — left unchanged.',
+        })
+        return false
+      }
+
+      const previous = copyGeometryEdit(session.baseline)
+      const next = makeGeometryEdit(
+        session.previewSamples,
+        session.baseline.bakedSmoothing,
+        session.baseline.handleIndices,
+      )
+
+      const editing = state.mode === 'editing'
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: editing ? next : state.editSession,
+        undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
+        redoStack: [],
+        polishSession: null,
+        editPreview: null,
+        selectedHandleIndex: editing
+          ? next.handleIndices.includes(state.selectedHandleIndex ?? -1)
+            ? state.selectedHandleIndex
+            : (next.handleIndices[0] ?? 0)
+          : state.selectedHandleIndex,
+        actionAnnouncement: session.timingAdjusted
+          ? 'Polished motion applied. Speed within moving sections may be redistributed; transform keyframes keep the same times.'
+          : 'Polished motion applied.',
+      })
+      return true
+    },
+
+    cancelPolish: () => {
+      if (!get().polishSession) return
+      set({
+        polishSession: null,
+        actionAnnouncement: 'Polish cancelled.',
       })
     },
 
