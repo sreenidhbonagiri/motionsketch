@@ -3,7 +3,7 @@ import {
   clampStageAspect,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
-import type { Actor, LoopMode, MotionSample } from '../types'
+import type { Actor, LoopMode, MotionSample, TransformTrack } from '../types'
 import { exportCssFromRecording } from './css'
 
 export interface HtmlDemoOptions {
@@ -16,6 +16,7 @@ export interface HtmlDemoOptions {
   loopMode?: LoopMode
   stageAspect?: number
   processedPath?: MotionSample[] | null
+  transform?: TransformTrack | null
 }
 
 /**

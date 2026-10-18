@@ -40,6 +40,8 @@ export function ExportPanel() {
 
   const stageAspect = project.stageAspect
 
+  const transform = project.transform
+
   const exportOptions = useMemo(() => {
     if (!recording) return null
     return {
@@ -52,6 +54,7 @@ export function ExportPanel() {
       loopMode,
       stageAspect,
       processedPath,
+      transform,
     }
   }, [
     recording,
@@ -63,6 +66,7 @@ export function ExportPanel() {
     loopMode,
     stageAspect,
     processedPath,
+    transform,
   ])
 
   const css = useMemo(() => {

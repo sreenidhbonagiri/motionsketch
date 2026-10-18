@@ -9,6 +9,7 @@ import {
   MIN_ACTOR_SIZE,
 } from '../core/types'
 import { useEditorStore } from '../state/store'
+import { TransformSection } from './TransformSection'
 
 function formatSizePercent(size: number): string {
   return `${Math.round(size * 100)}% of stage`
@@ -295,6 +296,8 @@ export function AppearancePanel() {
               </p>
             )}
         </div>
+
+        <TransformSection />
       </div>
     </div>
   )

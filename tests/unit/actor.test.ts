@@ -80,6 +80,7 @@ describe('actor store + export consistency', () => {
           loopMode: 'repeat',
         },
       stageAspect: 1.6,
+      transform: { keyframes: [] },
       },
       playbackHead: 0.4,
     })
@@ -141,6 +142,7 @@ describe('actor persistence compatibility', () => {
           loopMode: 'repeat',
         },
       stageAspect: 1.6,
+      transform: { keyframes: [] },
       },
       geometryEdit: null,
     })
@@ -175,6 +177,7 @@ describe('actor persistence compatibility', () => {
           loopMode: 'repeat',
         },
       stageAspect: 1.6,
+      transform: { keyframes: [] },
       },
       geometryEdit: null,
     })

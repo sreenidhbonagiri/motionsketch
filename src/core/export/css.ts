@@ -7,7 +7,18 @@ import {
   formatCssAspectRatio,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
-import type { Actor, Keyframe, LoopMode, MotionSample } from '../types'
+import {
+  evaluateTransform,
+  formatTransformCss,
+} from '../transform'
+import type {
+  Actor,
+  Keyframe,
+  LoopMode,
+  MotionSample,
+  TransformTrack,
+} from '../types'
+import { evaluateKeyframes } from './consistency'
 import { buildKeyframes, buildKeyframesFromProcessed } from './format'
 
 function formatOffset(offset: number): string {
@@ -79,12 +90,45 @@ function actorBoxRules(actor: Actor): {
 }
 
 /**
+ * Union of position keyframe offsets and transform key times.
+ * Position and transform are evaluated independently at each required time.
+ */
+export function unionExportOffsets(
+  positionKeyframes: Keyframe[],
+  transform: TransformTrack | null | undefined,
+): number[] {
+  const offsets = new Set<number>()
+  for (const kf of positionKeyframes) {
+    offsets.add(clamp01(kf.offset))
+  }
+  if (transform) {
+    for (const k of transform.keyframes) {
+      offsets.add(clamp01(k.t))
+    }
+  }
+  return [...offsets].sort((a, b) => a - b)
+}
+
+function cssTransformAt(
+  x: number,
+  y: number,
+  rotationDeg: number,
+  scale: number,
+  includeRotateScale: boolean,
+): string {
+  const pos = `translate3d(${formatCq(x, 'cqw')}, ${formatCq(y, 'cqh')}, 0) translate(-50%, -50%)`
+  if (!includeRotateScale) return pos
+  return `${pos} ${formatTransformCss(rotationDeg, scale)}`
+}
+
+/**
  * Transform-based CSS export using container query units.
  *
  * Positioning model:
  * - `.stage` is `position: relative` and `container-type: size`
  * - Actor center is at `(x * 100cqw, y * 100cqh)` of the stage
  * - `translate(-50%, -50%)` centers the actor on that point (element-relative)
+ * - rotate/scale follow centering so they orbit the actor center, not the path
  * - Size uses cqmin: longer box edge = actor.width × min(stageW, stageH)
  */
 export function generateCssSnippet(options: {
@@ -95,6 +139,7 @@ export function generateCssSnippet(options: {
   loopMode?: LoopMode
   animationName?: string
   stageAspect?: number
+  transform?: TransformTrack | null
 }): string {
   const {
     keyframes,
@@ -104,6 +149,7 @@ export function generateCssSnippet(options: {
     loopMode = 'repeat',
     animationName = 'motionsketch',
     stageAspect = LEGACY_STAGE_ASPECT,
+    transform = null,
   } = options
   const aspectCss = formatCssAspectRatio(stageAspect)
 
@@ -111,7 +157,12 @@ export function generateCssSnippet(options: {
     return '/* No recording to export */\n'
   }
 
-  const start = keyframes[0]
+  const track = transform ?? { keyframes: [] }
+  const includeXf = track.keyframes.length > 0
+  const offsets = unionExportOffsets(keyframes, track)
+
+  const startPos = evaluateKeyframes(keyframes, offsets[0] ?? 0)
+  const startXf = evaluateTransform(track, offsets[0] ?? 0)
   const timing = animationTiming(durationMs, loop, loopMode)
   const box = actorBoxRules(actor)
 
@@ -121,11 +172,15 @@ export function generateCssSnippet(options: {
       ? ' * Loop: back and forth (animation-direction: alternate). Duration is one way; a full cycle is 2×.'
       : ' * Loop: repeat (infinite). End and start may jump if they differ — no bridging segment is added.'
 
-  const frames = keyframes
-    .map((kf) => {
-      const x = formatCq(kf.x, 'cqw')
-      const y = formatCq(kf.y, 'cqh')
-      return `  ${formatOffset(kf.offset)} { transform: translate3d(${x}, ${y}, 0) translate(-50%, -50%); }`
+  const xfNote = includeXf
+    ? ' * Transform: rotate/scale keyframes (linear, unwrapped degrees). Order: translate → center → rotate → scale.'
+    : ''
+
+  const frames = offsets
+    .map((offset) => {
+      const pos = evaluateKeyframes(keyframes, offset)
+      const xf = evaluateTransform(track, offset)
+      return `  ${formatOffset(offset)} { transform: ${cssTransformAt(pos.x, pos.y, xf.rotationDeg, xf.scale, includeXf)}; }`
     })
     .join('\n')
 
@@ -139,6 +194,7 @@ export function generateCssSnippet(options: {
  * - Actor size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
  * - Animation uses transform only (compositor-friendly); timing-function is linear.
 ${loopNote}
+${xfNote}
  *${imageBlock}
  * Browser support: container query units (cqw/cqh/cqmin).
  * Fallback for a fixed-size stage (replace the cq* lengths with px):
@@ -163,7 +219,7 @@ ${loopNote}
   top: 0;
 ${box.sizeDecl}
 ${box.shapeDecls}
-  transform: translate3d(${formatCq(start.x, 'cqw')}, ${formatCq(start.y, 'cqh')}, 0) translate(-50%, -50%);
+  transform: ${cssTransformAt(startPos.x, startPos.y, startXf.rotationDeg, startXf.scale, includeXf)};
   animation: ${animationName} ${timing};
   will-change: transform;
   display: block;
@@ -186,6 +242,7 @@ export function exportCssFromRecording(options: {
   loopMode?: LoopMode
   stageAspect?: number
   processedPath?: MotionSample[] | null
+  transform?: TransformTrack | null
 }): string {
   const stageAspect = options.stageAspect ?? LEGACY_STAGE_ASPECT
   const keyframes = options.processedPath?.length
@@ -203,5 +260,6 @@ export function exportCssFromRecording(options: {
     loop: options.loop ?? false,
     loopMode: options.loopMode ?? 'repeat',
     stageAspect,
+    transform: options.transform ?? null,
   })
 }

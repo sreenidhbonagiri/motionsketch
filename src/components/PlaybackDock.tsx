@@ -16,9 +16,13 @@ const btnQuiet =
 export function PlaybackDock() {
   const mode = useEditorStore((s) => s.mode)
   const recording = useEditorStore((s) => s.project.recording)
+  const transformKeys = useEditorStore((s) => s.project.transform.keyframes)
+  const selectedTransformId = useEditorStore((s) => s.selectedTransformId)
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const undoStack = useEditorStore((s) => s.undoStack)
   const redoStack = useEditorStore((s) => s.redoStack)
+  const transformUndoStack = useEditorStore((s) => s.transformUndoStack)
+  const transformRedoStack = useEditorStore((s) => s.transformRedoStack)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const loop = useEditorStore((s) => s.project.playback.loop)
   const loopMode = useEditorStore((s) => s.project.playback.loopMode)
@@ -36,6 +40,9 @@ export function PlaybackDock() {
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
   const undoEdit = useEditorStore((s) => s.undoEdit)
   const redoEdit = useEditorStore((s) => s.redoEdit)
+  const undoTransform = useEditorStore((s) => s.undoTransform)
+  const redoTransform = useEditorStore((s) => s.redoTransform)
+  const selectTransformKeyframe = useEditorStore((s) => s.selectTransformKeyframe)
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
@@ -74,6 +81,38 @@ export function PlaybackDock() {
               {formatSeconds(durationMs)}
             </span>
           </div>
+          {transformKeys.length > 0 && (
+            <div
+              data-testid="transform-markers"
+              className="relative h-3 w-full"
+              role="list"
+              aria-label="Transform keyframes"
+            >
+              {transformKeys.map((kf) => {
+                const selected = kf.id === selectedTransformId
+                return (
+                  <button
+                    key={kf.id}
+                    type="button"
+                    role="listitem"
+                    data-testid={`transform-marker-${kf.id}`}
+                    data-transform-marker
+                    data-selected={selected ? 'true' : 'false'}
+                    aria-label={`Transform keyframe at ${Math.round(kf.t * 100)} percent, ${Math.round(kf.rotationDeg)} degrees, scale ${kf.scale.toFixed(2)}`}
+                    aria-pressed={selected}
+                    disabled={isRecordingLike}
+                    onClick={() => selectTransformKeyframe(kf.id)}
+                    className={`absolute top-0 size-3 -translate-x-1/2 rounded-sm border transition disabled:opacity-40 ${
+                      selected
+                        ? 'border-teal-800 bg-teal-600'
+                        : 'border-slate-400 bg-slate-200 hover:bg-teal-200'
+                    }`}
+                    style={{ left: `${kf.t * 100}%` }}
+                  />
+                )
+              })}
+            </div>
+          )}
           <label className="sr-only" htmlFor="playback-scrubber">
             Playback position along the path (start to end). Scrubbing pauses
             and resumes forward from the chosen point.
@@ -91,7 +130,10 @@ export function PlaybackDock() {
             aria-valuemax={1}
             aria-valuenow={Number(playbackHead.toFixed(3))}
             aria-valuetext={valueText}
-            onChange={(e) => scrubPlayback(Number(e.target.value))}
+            onChange={(e) => {
+              selectTransformKeyframe(null)
+              scrubPlayback(Number(e.target.value))
+            }}
             className="w-full accent-teal-700 disabled:opacity-40"
           />
         </div>
@@ -206,6 +248,25 @@ export function PlaybackDock() {
               className={btnSecondary}
             >
               Edit path
+            </button>
+
+            <button
+              type="button"
+              data-testid="btn-undo-transform"
+              onClick={undoTransform}
+              disabled={transformUndoStack.length === 0 || isRecordingLike}
+              className={btnQuiet}
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              data-testid="btn-redo-transform"
+              onClick={redoTransform}
+              disabled={transformRedoStack.length === 0 || isRecordingLike}
+              className={btnQuiet}
+            >
+              Redo
             </button>
 
             <button

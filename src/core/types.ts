@@ -68,6 +68,24 @@ export interface PlaybackSettings {
   loopMode: LoopMode
 }
 
+/**
+ * Rotation/scale keyframe. Time is normalized progress (0..1) along Duration
+ * so changing Duration keeps relative placement. Steady Speed does not move these.
+ */
+export interface TransformKeyframe {
+  id: string
+  /** Normalized progress along playback [0, 1] */
+  t: number
+  /** Unwrapped degrees (0→360 is a full spin). */
+  rotationDeg: number
+  /** Uniform scale about the actor center; typically 0.1–4. */
+  scale: number
+}
+
+export interface TransformTrack {
+  keyframes: TransformKeyframe[]
+}
+
 export interface Project {
   version: 1
   actor: Actor
@@ -79,6 +97,11 @@ export interface Project {
    * Older projects without the field migrate to 16/10 (LEGACY_STAGE_ASPECT).
    */
   stageAspect: number
+  /**
+   * Rotation/scale animation. Empty → identity (0°, scale 1).
+   * Older projects migrate to an empty track.
+   */
+  transform: TransformTrack
 }
 
 export type EditorMode =
@@ -131,12 +154,17 @@ export const DEFAULT_PLAYBACK: PlaybackSettings = {
 /** Default logical stage for new in-memory projects before viewport capture. */
 export const DEFAULT_STAGE_ASPECT = 16 / 10
 
+export const DEFAULT_TRANSFORM_TRACK: TransformTrack = {
+  keyframes: [],
+}
+
 export const DEFAULT_PROJECT: Project = {
   version: 1,
   actor: DEFAULT_ACTOR,
   recording: null,
   playback: DEFAULT_PLAYBACK,
   stageAspect: DEFAULT_STAGE_ASPECT,
+  transform: DEFAULT_TRANSFORM_TRACK,
 }
 
 export const MIN_RECORDING_SAMPLES = 2

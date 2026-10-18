@@ -12,7 +12,14 @@ import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
 import { captureViewportStageAspect, clampStageAspect } from '../core/stageAspect'
 import {
+  cloneTransformTrack,
+  emptyTransformTrack,
+  removeTransformKeyframe,
+  upsertTransformKeyframe,
+} from '../core/transform'
+import {
   DEFAULT_PROJECT,
+  DEFAULT_TRANSFORM_TRACK,
   MAX_PLAYBACK_DURATION_MS,
   MIN_PLAYBACK_DURATION_MS,
   type EditorMode,
@@ -21,6 +28,7 @@ import {
   type MotionSample,
   type Project,
   type Recording,
+  type TransformTrack,
   type Vec2,
 } from '../core/types'
 import { bakeEditablePath } from './selectors'
@@ -59,6 +67,11 @@ interface EditorStore {
   /** Live preview while a handle drag is in progress. */
   editPreview: MotionSample[] | null
 
+  /** Selected rotation/scale keyframe id (mutually exclusive with path edit). */
+  selectedTransformId: string | null
+  transformUndoStack: TransformTrack[]
+  transformRedoStack: TransformTrack[]
+
   /**
    * Transient stage tip after New project (not persisted).
    * Cleared when the user starts recording again.
@@ -88,6 +101,8 @@ interface EditorStore {
   scrubPlayback: (tNorm: number) => void
   setPlaybackHead: (tNorm: number) => void
   setPlaybackDirection: (direction: PlaybackDirection) => void
+  /** Atomic playhead + direction update (avoids pause/resume desync). */
+  setPlaybackSample: (tNorm: number, direction: PlaybackDirection) => void
   stopPlayback: () => void
 
   setDurationMs: (ms: number) => void
@@ -124,6 +139,20 @@ interface EditorStore {
   cancelHandleDrag: () => void
   undoEdit: () => void
   redoEdit: () => void
+
+  selectTransformKeyframe: (id: string | null) => void
+  /** Commit rotation/scale at the paused playhead (one history entry). */
+  upsertTransformAtPlayhead: (rotationDeg: number, scale: number) => void
+  /** Update selected keyframe values and/or time (one history entry). */
+  commitTransformKeyframe: (input: {
+    id: string
+    t: number
+    rotationDeg: number
+    scale: number
+  }) => void
+  deleteSelectedTransform: () => void
+  undoTransform: () => void
+  redoTransform: () => void
 }
 
 const initialPosition: Vec2 = { x: 0.35, y: 0.5 }
@@ -139,12 +168,40 @@ function clearEditState() {
   }
 }
 
+function clearTransformEditState() {
+  return {
+    selectedTransformId: null as string | null,
+    transformUndoStack: [] as TransformTrack[],
+    transformRedoStack: [] as TransformTrack[],
+  }
+}
+
+function pushTransformHistory(
+  state: EditorStore,
+  nextTrack: TransformTrack,
+  selectedId: string | null,
+): Partial<EditorStore> {
+  const prev = cloneTransformTrack(
+    state.project.transform ?? emptyTransformTrack(),
+  )
+  return {
+    project: {
+      ...state.project,
+      transform: nextTrack,
+    },
+    selectedTransformId: selectedId,
+    transformUndoStack: [...state.transformUndoStack, prev].slice(-MAX_UNDO),
+    transformRedoStack: [],
+  }
+}
+
 export const useEditorStore = create<EditorStore>((set, get) => ({
   project: {
     ...DEFAULT_PROJECT,
     actor: cloneActor(DEFAULT_PROJECT.actor),
     playback: { ...DEFAULT_PROJECT.playback },
     stageAspect: DEFAULT_PROJECT.stageAspect,
+    transform: cloneTransformTrack(DEFAULT_TRANSFORM_TRACK),
   },
   mode: 'idle',
   pointerId: null,
@@ -157,6 +214,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   stageHint: 'default',
   actionAnnouncement: null,
   ...clearEditState(),
+  ...clearTransformEditState(),
 
   armRecording: () => {
     const { mode } = get()
@@ -171,6 +229,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   beginRecording: (pointerId, position) => {
+    const state = get()
     set({
       mode: 'recording',
       pointerId,
@@ -180,6 +239,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       playbackDirection: 1,
       stageHint: 'default',
       ...clearEditState(),
+      ...clearTransformEditState(),
+      // New take replaces the previous animation’s transform track.
+      project: {
+        ...state.project,
+        transform: emptyTransformTrack(),
+      },
     })
   },
 
@@ -197,9 +262,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       liveTrail: [],
       playbackHead: 0,
       ...clearEditState(),
+      ...clearTransformEditState(),
       project: {
         ...state.project,
         recording,
+        // New take clears transform track; asset replacement does not.
+        transform: emptyTransformTrack(),
         playback: {
           ...state.project.playback,
           durationMs: recording
@@ -294,6 +362,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setPlaybackHead: (tNorm) => set({ playbackHead: clamp(tNorm, 0, 1) }),
 
   setPlaybackDirection: (direction) => set({ playbackDirection: direction }),
+
+  setPlaybackSample: (tNorm, direction) =>
+    set({
+      playbackHead: clamp(tNorm, 0, 1),
+      playbackDirection: direction,
+    }),
 
   stopPlayback: () => set({ mode: 'idle' }),
 
@@ -488,9 +562,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       liveTrail: [],
       livePosition: initialPosition,
       ...clearEditState(),
+      ...clearTransformEditState(),
       project: {
         ...state.project,
         recording: null,
+        transform: emptyTransformTrack(),
       },
     })),
 
@@ -506,6 +582,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       stageHint: 'new-project',
       actionAnnouncement: 'New project created.',
       ...clearEditState(),
+      ...clearTransformEditState(),
       project: {
         version: 1,
         actor: cloneActor(DEFAULT_PROJECT.actor),
@@ -513,6 +590,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         playback: { ...DEFAULT_PROJECT.playback },
         // Capture available viewport once; never rewrite on later resize.
         stageAspect: captureViewportStageAspect(),
+        transform: emptyTransformTrack(),
       },
     }),
 
@@ -542,6 +620,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       redoStack: [],
       selectedHandleIndex: null,
       editPreview: null,
+      ...clearTransformEditState(),
       project: {
         version: 1,
         actor: cloneActor(snapshot.project.actor),
@@ -553,6 +632,9 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           : null,
         playback: { ...snapshot.project.playback },
         stageAspect: clampStageAspect(snapshot.project.stageAspect),
+        transform: cloneTransformTrack(
+          snapshot.project.transform ?? emptyTransformTrack(),
+        ),
       },
     })
   },
@@ -578,11 +660,13 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
 
     // Pause playback by leaving 'playing'; path editing owns the stage.
+    // Clear transform selection so path / transform gestures stay mutually exclusive.
     set({
       mode: 'editing',
       editSession,
       editPreview: null,
       selectedHandleIndex: state.selectedHandleIndex ?? 0,
+      selectedTransformId: null,
     })
   },
 
@@ -625,7 +709,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
   },
 
-  setSelectedHandleIndex: (index) => set({ selectedHandleIndex: index }),
+  setSelectedHandleIndex: (index) =>
+    set({
+      selectedHandleIndex: index,
+      selectedTransformId: index !== null ? null : get().selectedTransformId,
+    }),
 
   beginHandleDrag: () => {
     const state = get()
@@ -695,6 +783,124 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       redoStack: state.redoStack.slice(0, -1),
       undoStack: [...state.undoStack, copyPath(current.samples)].slice(-MAX_UNDO),
       editPreview: null,
+    })
+  },
+
+  selectTransformKeyframe: (id) => {
+    const state = get()
+    if (state.mode === 'editing' || state.mode === 'armed' || state.mode === 'recording') {
+      return
+    }
+    if (id === null) {
+      set({ selectedTransformId: null })
+      return
+    }
+    const kf = state.project.transform?.keyframes.find((k) => k.id === id)
+    if (!kf) return
+    set({
+      mode: 'idle',
+      selectedTransformId: id,
+      selectedHandleIndex: null,
+      playbackHead: clamp(kf.t, 0, 1),
+      playbackDirection: 1,
+    })
+  },
+
+  upsertTransformAtPlayhead: (rotationDeg, scale) => {
+    const state = get()
+    if (!state.project.recording) return
+    if (
+      state.mode === 'editing' ||
+      state.mode === 'armed' ||
+      state.mode === 'recording'
+    ) {
+      return
+    }
+    const t = clamp(state.playbackHead, 0, 1)
+    const current = state.project.transform ?? emptyTransformTrack()
+    const { track, keyframeId } = upsertTransformKeyframe(current, {
+      t,
+      rotationDeg,
+      scale,
+      id: state.selectedTransformId ?? undefined,
+    })
+    set({
+      mode: 'idle',
+      ...pushTransformHistory(state, track, keyframeId),
+    })
+  },
+
+  commitTransformKeyframe: (input) => {
+    const state = get()
+    if (!state.project.recording) return
+    if (state.mode === 'editing') return
+    const current = state.project.transform ?? emptyTransformTrack()
+    if (!current.keyframes.some((k) => k.id === input.id)) return
+    const { track, keyframeId } = upsertTransformKeyframe(current, input)
+    set({
+      mode: 'idle',
+      playbackHead: clamp(input.t, 0, 1),
+      ...pushTransformHistory(state, track, keyframeId),
+    })
+  },
+
+  deleteSelectedTransform: () => {
+    const state = get()
+    const id = state.selectedTransformId
+    if (!id) return
+    const current = state.project.transform ?? emptyTransformTrack()
+    if (!current.keyframes.some((k) => k.id === id)) return
+    const next = removeTransformKeyframe(current, id)
+    set({
+      ...pushTransformHistory(state, next, null),
+    })
+  },
+
+  undoTransform: () => {
+    const state = get()
+    if (state.mode === 'editing') return
+    if (state.transformUndoStack.length === 0) return
+    const previous = state.transformUndoStack[state.transformUndoStack.length - 1]
+    const current = cloneTransformTrack(
+      state.project.transform ?? emptyTransformTrack(),
+    )
+    const selectedStill =
+      state.selectedTransformId &&
+      previous.keyframes.some((k) => k.id === state.selectedTransformId)
+        ? state.selectedTransformId
+        : null
+    set({
+      project: {
+        ...state.project,
+        transform: cloneTransformTrack(previous),
+      },
+      transformUndoStack: state.transformUndoStack.slice(0, -1),
+      transformRedoStack: [...state.transformRedoStack, current].slice(-MAX_UNDO),
+      selectedTransformId: selectedStill,
+    })
+  },
+
+  redoTransform: () => {
+    const state = get()
+    if (state.mode === 'editing') return
+    if (state.transformRedoStack.length === 0) return
+    const restored = state.transformRedoStack[state.transformRedoStack.length - 1]
+    const current = cloneTransformTrack(
+      state.project.transform ?? emptyTransformTrack(),
+    )
+    const selectedStill =
+      state.selectedTransformId &&
+      restored.keyframes.some((k) => k.id === state.selectedTransformId)
+        ? state.selectedTransformId
+        : null
+    set({
+      project: {
+        ...state.project,
+        transform: cloneTransformTrack(restored),
+      },
+      transformRedoStack: state.transformRedoStack.slice(0, -1),
+      transformUndoStack: [...state.transformUndoStack, current].slice(-MAX_UNDO),
+      selectedTransformId: selectedStill,
     })
   },
 }))

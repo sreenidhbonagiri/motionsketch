@@ -12,8 +12,7 @@ export function usePlaybackClock(): void {
   const loop = useEditorStore((s) => s.project.playback.loop)
   const loopMode = useEditorStore((s) => s.project.playback.loopMode)
   const playbackEpoch = useEditorStore((s) => s.playbackEpoch)
-  const setPlaybackHead = useEditorStore((s) => s.setPlaybackHead)
-  const setPlaybackDirection = useEditorStore((s) => s.setPlaybackDirection)
+  const setPlaybackSample = useEditorStore((s) => s.setPlaybackSample)
   const stopPlayback = useEditorStore((s) => s.stopPlayback)
 
   const originElapsedRef = useRef(0)
@@ -41,9 +40,10 @@ export function usePlaybackClock(): void {
 
     const tick = (now: number) => {
       const elapsed = now - startedAtRef.current + originElapsedRef.current
+      // Head + direction must commit together; a pause between separate
+      // updates desyncs elapsedFromPlayhead on resume and causes jumps.
       const sample = tNormFromElapsed(elapsed, durationMs, loop, loopMode)
-      setPlaybackHead(sample.tNorm)
-      setPlaybackDirection(sample.direction)
+      setPlaybackSample(sample.tNorm, sample.direction)
 
       if (sample.finished) {
         stopPlayback()
@@ -68,8 +68,7 @@ export function usePlaybackClock(): void {
     loop,
     loopMode,
     playbackEpoch,
-    setPlaybackHead,
-    setPlaybackDirection,
+    setPlaybackSample,
     stopPlayback,
   ])
 }

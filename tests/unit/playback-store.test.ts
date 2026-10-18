@@ -36,6 +36,7 @@ describe('playback store controls', () => {
           loopMode: 'repeat',
         },
       stageAspect: 1.6,
+        transform: { keyframes: [] },
       },
       mode: 'idle',
       pointerId: null,
@@ -47,6 +48,9 @@ describe('playback store controls', () => {
       showPathComparison: false,
       geometryEdit: null,
       editSession: null,
+      selectedTransformId: null,
+      transformUndoStack: [],
+      transformRedoStack: [],
       undoStack: [],
       redoStack: [],
       selectedHandleIndex: null,
@@ -137,6 +141,27 @@ describe('playback store controls', () => {
     expect(useEditorStore.getState().mode).toBe('idle')
     expect(useEditorStore.getState().playbackHead).toBeCloseTo(0.3)
     expect(useEditorStore.getState().playbackDirection).toBe(1)
+  })
+
+  it('setPlaybackSample commits head and direction atomically', () => {
+    useEditorStore.getState().setPlaybackSample(0.62, -1)
+    const state = useEditorStore.getState()
+    expect(state.playbackHead).toBeCloseTo(0.62)
+    expect(state.playbackDirection).toBe(-1)
+  })
+
+  it('resume after reverse pause keeps direction for elapsed remap', () => {
+    useEditorStore.getState().setLoop(true)
+    useEditorStore.getState().setLoopMode('alternate')
+    useEditorStore.setState({
+      mode: 'idle',
+      playbackHead: 0.67,
+      playbackDirection: -1,
+    })
+    useEditorStore.getState().play()
+    expect(useEditorStore.getState().mode).toBe('playing')
+    expect(useEditorStore.getState().playbackHead).toBeCloseTo(0.67)
+    expect(useEditorStore.getState().playbackDirection).toBe(-1)
   })
 
   it('changing loop mode while playing re-anchors without stopping', () => {

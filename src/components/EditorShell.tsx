@@ -4,6 +4,7 @@ import {
   statusLabel,
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
+import { useTransformShortcuts } from '../hooks/useTransformShortcuts'
 import { endDrag, isRecordingActive } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 import { AdjustPanel } from './AdjustPanel'
@@ -22,6 +23,7 @@ const chromeBtn =
 
 export function EditorShell() {
   usePlaybackClock()
+  useTransformShortcuts()
   const { status } = useProjectPersistence()
   const saveLabel = statusLabel(status)
   const stageHint = useEditorStore((s) => s.stageHint)

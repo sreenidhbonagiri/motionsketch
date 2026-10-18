@@ -9,6 +9,10 @@ interface ActorProps {
   stageHeight: number
   armed: boolean
   recording: boolean
+  /** Unwrapped degrees; applied after centering. */
+  rotationDeg?: number
+  /** Uniform scale about center; typically 0.1–4. */
+  scale?: number
   onPointerDown: PointerEventHandler<HTMLElement>
 }
 
@@ -19,6 +23,8 @@ export function Actor({
   stageHeight,
   armed,
   recording,
+  rotationDeg = 0,
+  scale = 1,
   onPointerDown,
 }: ActorProps) {
   const { width, height } = actorDisplaySizePx(
@@ -38,7 +44,8 @@ export function Actor({
     top: `${position.y * 100}%`,
     width,
     height,
-    transform: 'translate(-50%, -50%)',
+    // Center first, then rotate/scale so the path center is unchanged.
+    transform: `translate(-50%, -50%) rotate(${rotationDeg}deg) scale(${scale})`,
     boxShadow: shadow,
   }
 

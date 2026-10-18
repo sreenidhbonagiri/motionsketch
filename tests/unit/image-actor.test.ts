@@ -101,6 +101,7 @@ describe('image actor export', () => {
       durationMs: 1000,
       actor,
       stageAspect: 1.6,
+      transform: { keyframes: [] },
     })
     expect(css).toMatch(/does NOT embed the image/i)
     expect(css).toContain('<img class="actor"')
@@ -127,6 +128,7 @@ describe('image actor export', () => {
       durationMs: 800,
       actor,
       stageAspect: 1.6,
+      transform: { keyframes: [] },
     })
     expect(html).toContain('data-testid="demo-actor"')
     expect(html).toContain('<img class="actor"')
@@ -136,7 +138,7 @@ describe('image actor export', () => {
 })
 
 describe('image actor persistence', () => {
-  it('round-trips an embedded image in format v3', () => {
+  it('round-trips an embedded image in the current persist format', () => {
     const dataUrl = tinyPngDataUrl()
     const raw = JSON.stringify({
       formatVersion: PERSIST_FORMAT_VERSION,
@@ -166,6 +168,7 @@ describe('image actor persistence', () => {
           loopMode: 'repeat',
         },
         stageAspect: 1.6,
+        transform: { keyframes: [] },
       },
       geometryEdit: null,
     })

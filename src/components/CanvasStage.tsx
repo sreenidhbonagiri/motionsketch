@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { evaluate } from '../core/playback'
+import { evaluateTransform } from '../core/transform'
 import type { MotionSample, Vec2 } from '../core/types'
 import { usePathEditor } from '../hooks/usePathEditor'
 import { usePointerRecorder } from '../hooks/usePointerRecorder'
@@ -109,6 +110,10 @@ export function CanvasStage() {
     mode,
     pathView,
   )
+  const actorTransform = evaluateTransform(
+    project.transform ?? { keyframes: [] },
+    playbackHead,
+  )
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -188,6 +193,8 @@ export function CanvasStage() {
           stageHeight={size.height}
           armed={mode === 'armed'}
           recording={mode === 'recording'}
+          rotationDeg={actorTransform.rotationDeg}
+          scale={actorTransform.scale}
           onPointerDown={onActorPointerDown}
         />
       )}

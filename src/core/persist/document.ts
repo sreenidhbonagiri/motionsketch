@@ -4,6 +4,11 @@ import {
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
 import {
+  cloneTransformTrack,
+  emptyTransformTrack,
+  parseTransformTrack,
+} from '../transform'
+import {
   DEFAULT_ACTOR,
   DEFAULT_PLAYBACK,
   DEFAULT_STAGE_ASPECT,
@@ -19,12 +24,14 @@ import {
 
 /**
  * Envelope version for localStorage / download files.
- * v1 → v2: adds project.stageAspect (migrated to 16/10 when missing).
- * v2 → v3: actor.kind / actor.image for custom image actors (coerced on older files).
+ * v1 → v2: stageAspect
+ * v2 → v3: actor.kind / actor.image
+ * v3 → v4: project.transform (rotation/scale keyframes)
  */
-export const PERSIST_FORMAT_VERSION = 3 as const
+export const PERSIST_FORMAT_VERSION = 4 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
+export const PERSIST_FORMAT_VERSION_V3 = 3 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -83,6 +90,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   if (
     formatVersion !== PERSIST_FORMAT_VERSION &&
+    formatVersion !== PERSIST_FORMAT_VERSION_V3 &&
     formatVersion !== PERSIST_FORMAT_VERSION_V2 &&
     formatVersion !== PERSIST_FORMAT_VERSION_LEGACY
   ) {
@@ -148,6 +156,10 @@ function validateProject(
   const stageAspect = coerceStageAspect(value.stageAspect, formatVersion)
   if (!stageAspect.ok) return stageAspect
 
+  // Missing transform → empty track (v1–v3 migration). Present but invalid → reject.
+  const transform = parseTransformTrack(value.transform)
+  if (!transform.ok) return transform
+
   // Actor is coerced with defaults so older / partial files still load.
   return {
     ok: true,
@@ -157,6 +169,7 @@ function validateProject(
       recording: recording.value,
       playback: playback.value,
       stageAspect: stageAspect.value,
+      transform: transform.value,
     },
   }
 }
@@ -340,6 +353,9 @@ function cloneProject(project: Project): Project {
       : null,
     playback: { ...project.playback },
     stageAspect: clampStageAspect(project.stageAspect),
+    transform: cloneTransformTrack(
+      project.transform ?? emptyTransformTrack(),
+    ),
   }
 }
 
@@ -359,6 +375,7 @@ export function createEmptyPersistableProject(
     recording: null,
     playback: { ...DEFAULT_PLAYBACK },
     stageAspect: clampStageAspect(stageAspect),
+    transform: { keyframes: [] },
   }
 }
 

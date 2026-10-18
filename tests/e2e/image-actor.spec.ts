@@ -121,7 +121,7 @@ test.describe('image actors', () => {
     const projPath = await proj.path()
     const projJson = fs.readFileSync(projPath!, 'utf8')
     const snap = JSON.parse(projJson)
-    expect(snap.formatVersion).toBe(3)
+    expect(snap.formatVersion).toBe(4)
     expect(snap.project.actor.kind).toBe('image')
     expect(snap.project.actor.image.dataUrl).toContain('data:image/png')
   })

@@ -59,6 +59,7 @@ function makeProject(overrides?: Partial<Project>): Project {
       loopMode: 'repeat',
     },
     stageAspect: 1.6,
+    transform: { keyframes: [] },
     ...overrides,
   }
 }
@@ -82,6 +83,9 @@ function resetStore(project: Project = makeProject(), geometryEdit: GeometryEdit
     redoStack: [makeSamples(5)],
     selectedHandleIndex: 3,
     editPreview: makeSamples(5),
+    selectedTransformId: null,
+    transformUndoStack: [],
+    transformRedoStack: [],
     stageHint: 'default',
     actionAnnouncement: null,
   })

@@ -67,6 +67,7 @@ export function isSliderOnlyChange(
     loopMode: prev.project.playback.loopMode,
     version: prev.project.version,
     geometryEdit: prev.geometryEdit,
+    transform: prev.project.transform,
   })
   const nextAnchor = JSON.stringify({
     recording: next.project.recording,
@@ -74,6 +75,7 @@ export function isSliderOnlyChange(
     loopMode: next.project.playback.loopMode,
     version: next.project.version,
     geometryEdit: next.geometryEdit,
+    transform: next.project.transform,
   })
   if (prevAnchor !== nextAnchor) return false
 

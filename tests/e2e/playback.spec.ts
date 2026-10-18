@@ -111,27 +111,94 @@ test.describe('playback inspection', () => {
     await page.getByTestId('loop-mode-alternate').check()
     await expect(page.getByTestId('loop-mode-alternate')).toBeChecked()
 
+    // Transform track so pause/resume also holds rotation/scale.
+    await openPanel(page, 'appearance')
+    await page.getByTestId('playback-scrubber').fill('0')
+    await page.getByTestId('transform-rotation-input').fill('0')
+    await page.getByTestId('transform-scale-slider').fill('1')
+    await page.getByTestId('btn-set-transform-keyframe').click()
+    await page.getByTestId('playback-scrubber').fill('1')
+    await page.getByTestId('transform-rotation-input').fill('360')
+    await page.getByTestId('transform-scale-slider').fill('2')
+    await page.getByTestId('btn-set-transform-keyframe').click()
+    // Return to start so the clock run measures from t=0 forward→reverse.
+    await page.getByTestId('playback-scrubber').fill('0')
+
+    // Deterministic clock: wall-clock waits were racy under load (a delayed
+    // RAF after resume could advance ~200ms+ and fail a 0.25 head delta).
+    // pauseAt must be strictly after install time (install can tick past `time`).
+    await page.clock.install({ time: new Date('2030-01-15T12:00:00.000Z') })
+    await page.clock.pauseAt(new Date('2030-01-15T12:00:01.000Z'))
+
     await page.getByTestId('btn-play').click()
-    // Past one traversal → should be on the backward pass.
-    await page.waitForTimeout(800)
     await expect(page.getByTestId('btn-pause')).toBeVisible()
+    // One-way duration 600ms → at 800ms we are on the backward pass (~t=0.667).
+    await page.clock.runFor(800)
     await expect(page.getByTestId('playback-elapsed')).toContainText('←')
 
     await page.getByTestId('btn-pause').click()
-    const pausedHead = Number(
-      await page.getByTestId('playback-scrubber').inputValue(),
-    )
-    expect(pausedHead).toBeGreaterThan(0.05)
-    expect(pausedHead).toBeLessThan(0.95)
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+
+    const paused = await page.evaluate(() => {
+      const head = Number(
+        (document.querySelector(
+          '[data-testid="playback-scrubber"]',
+        ) as HTMLInputElement).value,
+      )
+      const actor = document.querySelector('[data-testid="actor"]') as HTMLElement
+      const style = getComputedStyle(actor)
+      return {
+        head,
+        transform: style.transform,
+        left: actor.style.left,
+        top: actor.style.top,
+      }
+    })
+    expect(paused.head).toBeGreaterThan(0.5)
+    expect(paused.head).toBeLessThan(0.85)
+    expect(paused.transform).not.toBe('none')
+
+    // Hold while paused (clock can advance; playback must not).
+    await page.clock.runFor(200)
+    const held = await page.evaluate(() => {
+      const head = Number(
+        (document.querySelector(
+          '[data-testid="playback-scrubber"]',
+        ) as HTMLInputElement).value,
+      )
+      const actor = document.querySelector('[data-testid="actor"]') as HTMLElement
+      return { head, transform: getComputedStyle(actor).transform }
+    })
+    expect(held.head).toBeCloseTo(paused.head, 3)
+    expect(held.transform).toBe(paused.transform)
 
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
-    await page.waitForTimeout(80)
-    // Still moving (resume from reverse), not stuck / restarted at 0.
-    const resumed = Number(
-      await page.getByTestId('playback-scrubber').inputValue(),
-    )
-    expect(Math.abs(resumed - pausedHead)).toBeLessThan(0.25)
+    // Continue backward ~100ms → head decreases by ~0.167, no jump/restart.
+    await page.clock.runFor(100)
+    await expect(page.getByTestId('playback-elapsed')).toContainText('←')
+
+    const resumed = await page.evaluate(() => {
+      const head = Number(
+        (document.querySelector(
+          '[data-testid="playback-scrubber"]',
+        ) as HTMLInputElement).value,
+      )
+      const actor = document.querySelector('[data-testid="actor"]') as HTMLElement
+      return {
+        head,
+        transform: getComputedStyle(actor).transform,
+        left: actor.style.left,
+        top: actor.style.top,
+      }
+    })
+    expect(resumed.head).toBeLessThan(paused.head)
+    expect(paused.head - resumed.head).toBeGreaterThan(0.08)
+    expect(paused.head - resumed.head).toBeLessThan(0.22)
+    // Still reverse-progressing along the same path (no teleport to start).
+    expect(resumed.head).toBeGreaterThan(0.3)
+    // Transform continues along the track (not frozen at pause, not reset).
+    expect(resumed.transform).not.toBe(paused.transform)
 
     await page.getByTestId('btn-pause').click()
     const css = await readExportedCss(page)
