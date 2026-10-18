@@ -3,8 +3,9 @@ import {
   clampStageAspect,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
-import type { Actor, LoopMode, MotionSample, TransformTrack } from '../types'
-import { exportCssFromRecording } from './css'
+import { cssActorClass } from '../sceneActor'
+import type { Actor, LoopMode, MotionSample, Project, TransformTrack } from '../types'
+import { exportCssFromProject, exportCssFromRecording } from './css'
 
 export interface HtmlDemoOptions {
   samples: MotionSample[]
@@ -21,7 +22,6 @@ export interface HtmlDemoOptions {
 
 /**
  * Reject CSS that could break out of a <style> block or pull remote assets.
- * Exporter comments may mention HTML tags; only real breakout vectors are blocked.
  */
 export function isSafeCssForEmbed(css: string): boolean {
   if (css.length === 0) return false
@@ -32,34 +32,13 @@ export function isSafeCssForEmbed(css: string): boolean {
   return true
 }
 
-/**
- * Build a standalone HTML demo that embeds the same CSS as View/Copy/Download CSS.
- * No external assets or network requests.
- */
-export function buildHtmlDemo(options: HtmlDemoOptions): string {
-  const actor = coerceActor(options.actor)
-  const durationMs =
-    typeof options.durationMs === 'number' && Number.isFinite(options.durationMs)
-      ? Math.max(0, Math.round(options.durationMs))
-      : 0
-
-  const stageAspect = clampStageAspect(
-    options.stageAspect ?? LEGACY_STAGE_ASPECT,
-  )
-
-  const css = exportCssFromRecording({
-    ...options,
-    actor,
-    durationMs,
-    stageAspect,
-  })
-
+export function buildHtmlDemoFromProject(project: Project): string {
+  const stageAspect = clampStageAspect(project.stageAspect)
+  const css = exportCssFromProject(project)
   if (!isSafeCssForEmbed(css)) {
     throw new Error('Refusing to embed CSS that failed safety checks.')
   }
 
-  // Page chrome only — motion comes entirely from the embedded exporter CSS.
-  // Fit the project's stored aspect inside the viewport without cropping.
   const chromeCss = `*,
 *::before,
 *::after {
@@ -94,7 +73,6 @@ body {
   max-width: 100%;
 }
 
-/* Fit the project's stored stage aspect inside the viewport without cropping. */
 .demo-frame {
   width: min(100%, calc((100dvh - 5.5rem) * ${stageAspect}));
   max-height: calc(100dvh - 5.5rem);
@@ -132,12 +110,22 @@ body {
   outline-offset: 2px;
 }`
 
-  const isImage = actor.kind === 'image' && !!actor.image
-  // Embed image as data URL inside <img> — offline, no external requests.
-  // Never inject raw SVG markup into the document.
-  const actorMarkup = isImage
-    ? `<img class="actor" data-testid="demo-actor" src="${actor.image!.dataUrl.replace(/"/g, '')}" alt="${actor.image!.label.replace(/"/g, '&quot;')}" />`
-    : `<div class="actor" data-testid="demo-actor"></div>`
+  const actorCount = project.actors.length
+  const actorMarkup = project.actors
+    .map((actor, i) => {
+      const cls = cssActorClass(i, actorCount)
+      const appearance = coerceActor(actor.appearance)
+      const testId = i === 0 ? ' data-testid="demo-actor"' : ''
+      if (appearance.kind === 'image' && appearance.image) {
+        return `<img class="${cls}"${testId} src="${appearance.image.dataUrl.replace(/"/g, '')}" alt="${appearance.image.label.replace(/"/g, '&quot;')}" />`
+      }
+      return `<div class="${cls}"${testId}></div>`
+    })
+    .join('\n        ')
+
+  const classList = project.actors.map((_, i) =>
+    cssActorClass(i, actorCount),
+  )
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -163,17 +151,89 @@ ${css}
   </div>
   <script>
 (function () {
-  var actor = document.querySelector('.actor');
+  var selectors = ${JSON.stringify(classList.map((c) => '.' + c))};
   var button = document.getElementById('replay');
-  if (!actor || !button) return;
+  if (!button) return;
   button.addEventListener('click', function () {
-    actor.style.animation = 'none';
-    void actor.offsetWidth;
-    actor.style.removeProperty('animation');
+    selectors.forEach(function (sel) {
+      var el = document.querySelector(sel);
+      if (!el) return;
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.removeProperty('animation');
+    });
   });
 })();
   </script>
 </body>
 </html>
 `
+}
+
+/**
+ * Build a standalone HTML demo that embeds the same CSS as View/Copy/Download CSS.
+ */
+export function buildHtmlDemo(options: HtmlDemoOptions): string {
+  const actor = coerceActor(options.actor)
+  const durationMs =
+    typeof options.durationMs === 'number' && Number.isFinite(options.durationMs)
+      ? Math.max(0, Math.round(options.durationMs))
+      : 0
+
+  const stageAspect = clampStageAspect(
+    options.stageAspect ?? LEGACY_STAGE_ASPECT,
+  )
+
+  // Bridge legacy single-actor options through the project exporter.
+  const css = exportCssFromRecording({
+    ...options,
+    actor,
+    durationMs,
+    stageAspect,
+  })
+
+  if (!isSafeCssForEmbed(css)) {
+    throw new Error('Refusing to embed CSS that failed safety checks.')
+  }
+
+  void css
+
+  const projectLike: Project = {
+    version: 1,
+    actors: [
+      {
+        id: 'a1',
+        name: 'Actor 1',
+        appearance: actor,
+        recording:
+          options.samples.length >= 2
+            ? {
+                recordedDurationMs: durationMs,
+                samples: options.samples,
+              }
+            : null,
+        restPosition: options.samples[0]
+          ? { x: options.samples[0].x, y: options.samples[0].y }
+          : { x: 0.5, y: 0.5 },
+        smoothing: options.smoothing,
+        steadySpeed: options.steadySpeed ?? 0,
+        transform: options.transform ?? { keyframes: [] },
+        geometryEdit: options.processedPath?.length
+          ? {
+              bakedSmoothing: options.smoothing,
+              samples: options.processedPath,
+            }
+          : null,
+        clip: { start: 0, end: 1 },
+      },
+    ],
+    playback: {
+      durationMs,
+      loop: options.loop ?? false,
+      loopMode: options.loopMode ?? 'repeat',
+    },
+    stageAspect,
+  }
+
+  return buildHtmlDemoFromProject(projectLike)
 }

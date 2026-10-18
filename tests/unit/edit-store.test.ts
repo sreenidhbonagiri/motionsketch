@@ -1,45 +1,24 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { applyHandleDelta } from '../../src/core/edit'
-import type { MotionSample, Recording } from '../../src/core/types'
+import { findActor } from '../../src/core/sceneActor'
 import { selectProcessedPath } from '../../src/state/selectors'
 import { useEditorStore } from '../../src/state/store'
+import { makeActor, makeProject, makeRecording } from './helpers/project'
 
-function makeRecording(): Recording {
-  const samples: MotionSample[] = Array.from({ length: 30 }, (_, i) => ({
-    t: i * 40,
-    x: 0.2 + i * 0.02,
-    y: 0.4,
-  }))
-  return {
-    samples,
-    recordedDurationMs: samples[samples.length - 1].t,
-  }
+function selectedActor() {
+  const state = useEditorStore.getState()
+  return findActor(state.project.actors, state.selectedActorId)!
 }
 
 describe('edit store', () => {
   beforeEach(() => {
+    const project = makeProject({
+      actors: [makeActor({ recording: makeRecording(30) })],
+    })
+    const first = project.actors[0]
     useEditorStore.setState({
-      project: {
-        version: 1,
-        actor: {
-          kind: 'shape',
-          width: 0.12,
-          height: 0.12,
-          borderRadius: 0.28,
-          color: '#4f46e5',
-          image: null,
-        },
-        recording: makeRecording(),
-        playback: {
-          durationMs: 1200,
-          smoothing: 0.35,
-          steadySpeed: 0,
-          loop: false,
-          loopMode: 'repeat',
-        },
-      stageAspect: 1.6,
-        transform: { keyframes: [] },
-      },
+      project,
+      selectedActorId: first.id,
       mode: 'idle',
       pointerId: null,
       playbackHead: 0,
@@ -128,14 +107,14 @@ describe('edit store', () => {
     expect(state.geometryEdit).toBeNull()
     expect(state.undoStack).toHaveLength(0)
     expect(state.project.playback.durationMs).toBe(2400)
-    expect(state.project.playback.steadySpeed).toBe(0.5)
+    expect(selectedActor().steadySpeed).toBe(0.5)
     // Still editing with a fresh bake from the recording.
     expect(state.mode).toBe('editing')
     expect(state.editSession).not.toBeNull()
   })
 
   it('blocks recording while editing and keeps original samples intact', () => {
-    const original = useEditorStore.getState().project.recording!.samples[5]
+    const original = selectedActor().recording!.samples[5]
     useEditorStore.getState().enterEditMode()
     useEditorStore.getState().armRecording()
     expect(useEditorStore.getState().mode).toBe('editing')
@@ -144,7 +123,7 @@ describe('edit store', () => {
     useEditorStore.getState().commitHandleEdit(
       applyHandleDelta(session.samples, 5, { x: 0.15, y: 0.1 }),
     )
-    const raw = useEditorStore.getState().project.recording!.samples[5]
+    const raw = selectedActor().recording!.samples[5]
     expect(raw.x).toBeCloseTo(original.x, 5)
     expect(raw.y).toBeCloseTo(original.y, 5)
   })

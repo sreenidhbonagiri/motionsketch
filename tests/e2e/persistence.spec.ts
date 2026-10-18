@@ -1,5 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openPanel, readExportedCss, recordSimplePath } from './helpers'
+import {
+  acceptNextDialog,
+  openPanel,
+  readExportedCss,
+  recordSimplePath,
+} from './helpers'
 
 async function waitForSaved(page: Page) {
   await openPanel(page, 'project')
@@ -143,6 +148,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await page.getByTestId('loop-toggle').check()
 
+    acceptNextDialog(page, true)
     await page.getByTestId('btn-reset').click()
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)

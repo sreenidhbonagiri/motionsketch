@@ -1,11 +1,16 @@
 import { useEffect, useRef } from 'react'
+import { projectToLocal } from '../core/clip'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
+import { findActor } from '../core/sceneActor'
 import type { MotionSample, Vec2 } from '../core/types'
 import { usePathEditor } from '../hooks/usePathEditor'
 import { usePointerRecorder } from '../hooks/usePointerRecorder'
 import { useStageSize } from '../hooks/useStageSize'
-import { selectActorPosition, selectProcessedPath } from '../state/selectors'
+import {
+  selectActorPositionForActor,
+  selectProcessedPathForActor,
+} from '../state/selectors'
 import { useEditorStore } from '../state/store'
 import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
@@ -40,14 +45,13 @@ function drawPath(
   dashed = false,
 ) {
   if (samples.length < 2) return
-
   ctx.save()
   ctx.globalAlpha = alpha
   ctx.strokeStyle = color
   ctx.lineWidth = lineWidth
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
-  ctx.setLineDash(dashed ? [6, 5] : [])
+  if (dashed) ctx.setLineDash([6, 6])
   ctx.beginPath()
   ctx.moveTo(samples[0].x * width, samples[0].y * height)
   for (let i = 1; i < samples.length; i++) {
@@ -61,12 +65,12 @@ function drawPlayhead(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  pos: Vec2,
+  position: Vec2,
 ) {
   ctx.save()
   ctx.fillStyle = '#0f766e'
   ctx.beginPath()
-  ctx.arc(pos.x * width, pos.y * height, 4.5, 0, Math.PI * 2)
+  ctx.arc(position.x * width, position.y * height, 4.5, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 }
@@ -78,6 +82,7 @@ export function CanvasStage() {
   const size = useStageSize(stageRef)
 
   const project = useEditorStore((s) => s.project)
+  const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const mode = useEditorStore((s) => s.mode)
   const playbackHead = useEditorStore((s) => s.playbackHead)
   const livePosition = useEditorStore((s) => s.livePosition)
@@ -100,20 +105,12 @@ export function CanvasStage() {
   })
 
   const editing = mode === 'editing'
-  const pathView = { geometryEdit, editSession, editPreview }
-  const processed = selectProcessedPath(project, pathView)
-  const rawSamples = project.recording?.samples ?? []
-  const position = selectActorPosition(
-    project,
-    playbackHead,
-    livePosition,
-    mode,
-    pathView,
-  )
-  const actorTransform = evaluateTransform(
-    project.transform ?? { keyframes: [] },
-    playbackHead,
-  )
+  const selected = findActor(project.actors, selectedActorId)
+  const pathView = {
+    geometryEdit,
+    editSession,
+    editPreview,
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -131,8 +128,14 @@ export function CanvasStage() {
       if (liveTrail.length >= 2) {
         drawPath(ctx, size.width, size.height, liveTrail, '#0f766e', 2.5, 0.85)
       }
-    } else if (rawSamples.length >= 2) {
-      if (showPathComparison && !editing) {
+    } else if (selected?.recording) {
+      const rawSamples = selected.recording.samples
+      const processed = selectProcessedPathForActor(
+        project,
+        selected,
+        pathView,
+      )
+      if (showPathComparison && !editing && rawSamples.length >= 2) {
         drawPath(
           ctx,
           size.width,
@@ -155,11 +158,12 @@ export function CanvasStage() {
           0.95,
         )
         if (!editing) {
+          const localT = projectToLocal(playbackHead, selected.clip)
           drawPlayhead(
             ctx,
             size.width,
             size.height,
-            evaluate(processed, playbackHead),
+            evaluate(processed, localT),
           )
         }
       }
@@ -168,8 +172,9 @@ export function CanvasStage() {
     size,
     mode,
     liveTrail,
-    rawSamples,
-    processed,
+    selected,
+    project,
+    pathView,
     showPathComparison,
     playbackHead,
     editing,
@@ -185,19 +190,44 @@ export function CanvasStage() {
       onPointerCancel={editing ? undefined : onRecordPointerCancel}
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-      {size.width > 0 && !editing && (
-        <Actor
-          actor={project.actor}
-          position={position}
-          stageWidth={size.width}
-          stageHeight={size.height}
-          armed={mode === 'armed'}
-          recording={mode === 'recording'}
-          rotationDeg={actorTransform.rotationDeg}
-          scale={actorTransform.scale}
-          onPointerDown={onActorPointerDown}
-        />
-      )}
+      {size.width > 0 &&
+        !editing &&
+        project.actors.map((actor, index) => {
+          const isSelected = actor.id === selectedActorId
+          const position = selectActorPositionForActor(
+            project,
+            actor,
+            playbackHead,
+            livePosition,
+            mode,
+            isSelected ? pathView : {
+              geometryEdit: actor.geometryEdit,
+              editSession: null,
+              editPreview: null,
+            },
+            isSelected,
+          )
+          const localT = projectToLocal(playbackHead, actor.clip)
+          const xf = evaluateTransform(actor.transform, localT)
+          return (
+            <Actor
+              key={actor.id}
+              actor={actor.appearance}
+              actorId={actor.id}
+              name={actor.name}
+              position={position}
+              stageWidth={size.width}
+              stageHeight={size.height}
+              zIndex={10 + index}
+              selected={isSelected}
+              armed={mode === 'armed' && isSelected}
+              recording={mode === 'recording' && isSelected}
+              rotationDeg={xf.rotationDeg}
+              scale={xf.scale}
+              onPointerDown={(e) => onActorPointerDown(actor.id, e)}
+            />
+          )
+        })}
       {editing && workingSamples && size.width > 0 && (
         <PathHandles
           samples={workingSamples}

@@ -7,7 +7,13 @@ import {
   validateSvgMarkup,
   type ActorImageAsset,
 } from '../../src/core/imageAsset'
-import { PERSIST_FORMAT_VERSION, parseSnapshotJson } from '../../src/core/persist/document'
+import {
+  PERSIST_FORMAT_VERSION,
+  buildSnapshot,
+  parseSnapshotJson,
+  serializeSnapshot,
+} from '../../src/core/persist/document'
+import { makeActor, makeProject } from './helpers/project'
 import { DEFAULT_ACTOR, type MotionSample } from '../../src/core/types'
 
 const samples: MotionSample[] = [
@@ -140,44 +146,38 @@ describe('image actor export', () => {
 describe('image actor persistence', () => {
   it('round-trips an embedded image in the current persist format', () => {
     const dataUrl = tinyPngDataUrl()
-    const raw = JSON.stringify({
-      formatVersion: PERSIST_FORMAT_VERSION,
-      savedAt: '2026-01-01T00:00:00.000Z',
-      project: {
-        version: 1,
-        actor: {
-          kind: 'image',
-          width: 0.2,
-          height: 0.2,
-          borderRadius: 0.28,
-          color: '#4f46e5',
-          image: {
-            mimeType: 'image/png',
-            dataUrl,
-            naturalWidth: 1,
-            naturalHeight: 1,
-            label: 'Dot',
+    const project = makeProject({
+      actors: [
+        makeActor({
+          recording: { samples, recordedDurationMs: 200 },
+          appearance: {
+            kind: 'image',
+            width: 0.2,
+            height: 0.2,
+            borderRadius: 0.28,
+            color: '#4f46e5',
+            image: {
+              mimeType: 'image/png',
+              dataUrl,
+              naturalWidth: 1,
+              naturalHeight: 1,
+              label: 'Dot',
+            },
           },
-        },
-        recording: { samples, recordedDurationMs: 200 },
-        playback: {
-          durationMs: 1200,
-          smoothing: 0.35,
-          steadySpeed: 0,
-          loop: false,
-          loopMode: 'repeat',
-        },
-        stageAspect: 1.6,
-        transform: { keyframes: [] },
-      },
-      geometryEdit: null,
+        }),
+      ],
     })
+    const raw = serializeSnapshot(
+      buildSnapshot(project, null, '2026-01-01T00:00:00.000Z'),
+    )
     const parsed = parseSnapshotJson(raw)
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
-    expect(parsed.snapshot.project.actor.kind).toBe('image')
-    expect(parsed.snapshot.project.actor.image?.dataUrl).toBe(dataUrl)
-    expect(parsed.snapshot.project.actor.image?.label).toBe('Dot')
+    expect(parsed.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
+    const appearance = parsed.snapshot.project.actors[0].appearance
+    expect(appearance.kind).toBe('image')
+    expect(appearance.image?.dataUrl).toBe(dataUrl)
+    expect(appearance.image?.label).toBe('Dot')
   })
 
   it('rejects unsafe SVG payloads in coerceActorImage', () => {

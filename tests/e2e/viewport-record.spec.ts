@@ -59,12 +59,16 @@ test.describe('full-viewport recording', () => {
       const snap = JSON.parse(raw) as {
         project: {
           stageAspect: number
-          recording: { samples: Array<{ x: number; y: number }> }
+          actors: Array<{
+            recording: { samples: Array<{ x: number; y: number }> } | null
+          }>
         }
       }
+      const recording = snap.project.actors[0]?.recording
+      if (!recording) return null
       return {
         aspect: snap.project.stageAspect,
-        samples: snap.project.recording.samples,
+        samples: recording.samples,
       }
     })
     expect(samples).toBeTruthy()
@@ -97,10 +101,13 @@ test.describe('full-viewport recording', () => {
       const snap = JSON.parse(raw) as {
         project: {
           stageAspect: number
-          recording: { samples: Array<{ x: number; y: number }> }
+          actors: Array<{
+            recording: { samples: Array<{ x: number; y: number }> } | null
+          }>
         }
       }
-      const s = snap.project.recording.samples
+      const s = snap.project.actors[0]?.recording?.samples
+      if (!s) return null
       return {
         aspect: snap.project.stageAspect,
         first: s[0],

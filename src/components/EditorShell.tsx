@@ -15,8 +15,11 @@ import {
   FloatingPanel,
   type ChromePanel,
 } from './FloatingPanel'
+import { ActorList } from './ActorList'
+import { ClipTimeline } from './ClipTimeline'
 import { PlaybackDock } from './PlaybackDock'
 import { ProjectPanel } from './ProjectPanel'
+import { projectHasAnyRecording } from '../core/sceneActor'
 
 const chromeBtn =
   'inline-flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md transition hover:bg-white'
@@ -28,13 +31,21 @@ export function EditorShell() {
   const saveLabel = statusLabel(status)
   const stageHint = useEditorStore((s) => s.stageHint)
   const actionAnnouncement = useEditorStore((s) => s.actionAnnouncement)
-  const hasRecording = useEditorStore((s) => !!s.project.recording)
+  const hasRecording = useEditorStore((s) =>
+    projectHasAnyRecording(s.project),
+  )
   const mode = useEditorStore((s) => s.mode)
   const editing = mode === 'editing'
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
-  const actor = useEditorStore((s) => s.project.actor)
-  const actorColor = actor.color
-  const actorIsImage = actor.kind === 'image' && !!actor.image
+  const actor = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return (
+      s.project.actors.find((a) => a.id === id)?.appearance ??
+      s.project.actors[0]?.appearance
+    )
+  })
+  const actorColor = actor?.color ?? '#4f46e5'
+  const actorIsImage = actor?.kind === 'image' && !!actor.image
 
   const [openPanel, setOpenPanel] = useState<ChromePanel | null>(null)
 
@@ -265,12 +276,20 @@ export function EditorShell() {
         </div>
       </header>
 
+      {/* Actor list — left, above the dock */}
+      {!editing && (
+        <div className="pointer-events-none absolute bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-3 z-40 sm:bottom-24 sm:left-4">
+          <ActorList />
+        </div>
+      )}
+
       {/* Bottom dock */}
       <div
         data-testid="toolbar-slot"
         className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
       >
         <div className="flex w-full max-w-2xl flex-col items-center gap-2">
+          {!editing && <ClipTimeline />}
           <PlaybackDock />
           {editing && (
             <p

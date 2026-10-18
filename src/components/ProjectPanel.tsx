@@ -14,7 +14,9 @@ export function ProjectPanel() {
   const [importError, setImportError] = useState<string | null>(null)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
 
-  const hasRecording = useEditorStore((s) => !!s.project.recording)
+  const hasRecording = useEditorStore((s) =>
+    s.project.actors.some((a) => !!a.recording),
+  )
   const newProject = useEditorStore((s) => s.newProject)
   const applyPersistedSnapshot = useEditorStore((s) => s.applyPersistedSnapshot)
   const hasReplaceableAnimation = useEditorStore((s) => s.hasReplaceableAnimation)
@@ -79,6 +81,12 @@ export function ProjectPanel() {
     if (downloadCurrentProject()) {
       setActionStatus('Project download started.')
       announceAction('Project download started.')
+    } else {
+      const message =
+        useEditorStore.getState().actionAnnouncement ??
+        'Could not download the project file.'
+      setActionStatus(message)
+      setImportError(null)
     }
   }
 

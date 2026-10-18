@@ -1,19 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { exportCssFromRecording } from '../../src/core/export/css'
+import { findActor } from '../../src/core/sceneActor'
 import {
+  MAX_PROJECT_JSON_CHARS,
   PERSIST_FORMAT_VERSION,
   STORAGE_KEY,
   buildSnapshot,
   parseSnapshotJson,
   serializeSnapshot,
+  serializeSnapshotForDownload,
   validateSnapshot,
 } from '../../src/core/persist/document'
+import { MAX_ACTORS } from '../../src/core/sceneActor'
 import {
   createMemoryStorage,
   loadStoredSnapshot,
   writeStoredSnapshot,
 } from '../../src/core/persist/storage'
-import type { GeometryEdit, MotionSample, Project, Recording } from '../../src/core/types'
+import type { GeometryEdit, MotionSample, Project } from '../../src/core/types'
 import {
   createPersistenceController,
   isSliderOnlyChange,
@@ -22,51 +26,66 @@ import {
 } from '../../src/lib/persistenceController'
 import { selectProcessedPath } from '../../src/state/selectors'
 import { useEditorStore } from '../../src/state/store'
+import {
+  makeActor,
+  makeProject,
+  makeRecording,
+  makeSamples,
+} from './helpers/project'
 
-function makeSamples(count = 20): MotionSample[] {
-  return Array.from({ length: count }, (_, i) => ({
-    t: i * 40,
-    x: 0.2 + i * 0.02,
-    y: 0.4 + (i % 3) * 0.01,
-  }))
-}
-
-function makeRecording(): Recording {
-  const samples = makeSamples()
+function legacyProjectFrom(base: Project) {
+  const actor = base.actors[0]
   return {
-    samples,
-    recordedDurationMs: samples[samples.length - 1].t,
+    version: 1 as const,
+    actor: actor.appearance,
+    recording: actor.recording,
+    playback: {
+      durationMs: base.playback.durationMs,
+      smoothing: actor.smoothing,
+      steadySpeed: actor.steadySpeed,
+      loop: base.playback.loop,
+      loopMode: base.playback.loopMode,
+    },
+    stageAspect: base.stageAspect,
+    transform: actor.transform,
   }
 }
 
-function makeProject(overrides?: Partial<Project>): Project {
-  return {
-    version: 1,
-    actor: {
-      kind: 'shape',
-      width: 0.12,
-      height: 0.12,
-      borderRadius: 0.28,
-      color: '#4f46e5',
-      image: null,
-    },
-    recording: makeRecording(),
+function makePersistProject(overrides?: Partial<Project>): Project {
+  return makeProject({
+    actors: [
+      makeActor({
+        steadySpeed: 0.2,
+        recording: makeRecording(),
+        ...(overrides?.actors?.[0] ?? {}),
+      }),
+    ],
     playback: {
       durationMs: 1200,
-      smoothing: 0.35,
-      steadySpeed: 0.2,
       loop: true,
       loopMode: 'repeat',
+      ...(overrides?.playback ?? {}),
     },
-    stageAspect: 1.6,
-    transform: { keyframes: [] },
-    ...overrides,
-  }
+    stageAspect: overrides?.stageAspect ?? 1.6,
+    ...(overrides?.actors ? { actors: overrides.actors } : {}),
+  })
 }
 
-function resetStore(project: Project = makeProject(), geometryEdit: GeometryEdit | null = null) {
+function resetStore(
+  project: Project = makePersistProject(),
+  geometryEdit: GeometryEdit | null = null,
+) {
+  const actors =
+    geometryEdit != null
+      ? project.actors.map((a, i) =>
+          i === 0 ? { ...a, geometryEdit } : a,
+        )
+      : project.actors
+  const projectWithGeo = { ...project, actors }
+  const first = projectWithGeo.actors[0]
   useEditorStore.setState({
-    project,
+    project: projectWithGeo,
+    selectedActorId: first.id,
     mode: 'idle',
     pointerId: null,
     playbackHead: 0.7,
@@ -75,9 +94,17 @@ function resetStore(project: Project = makeProject(), geometryEdit: GeometryEdit
     livePosition: { x: 0.2, y: 0.4 },
     liveTrail: [{ x: 0.1, y: 0.1 }],
     showPathComparison: true,
-    geometryEdit,
+    geometryEdit: geometryEdit
+      ? {
+          bakedSmoothing: geometryEdit.bakedSmoothing,
+          samples: geometryEdit.samples.map((s) => ({ ...s })),
+        }
+      : null,
     editSession: geometryEdit
-      ? { ...geometryEdit, samples: geometryEdit.samples.map((s) => ({ ...s })) }
+      ? {
+          bakedSmoothing: geometryEdit.bakedSmoothing,
+          samples: geometryEdit.samples.map((s) => ({ ...s })),
+        }
       : null,
     undoStack: [makeSamples(5)],
     redoStack: [makeSamples(5)],
@@ -93,7 +120,7 @@ function resetStore(project: Project = makeProject(), geometryEdit: GeometryEdit
 
 describe('persist document validation', () => {
   it('round-trips a project with playback settings', () => {
-    const project = makeProject()
+    const project = makePersistProject()
     const snapshot = buildSnapshot(project, null, '2026-01-01T00:00:00.000Z')
     const raw = serializeSnapshot(snapshot)
     const parsed = parseSnapshotJson(raw)
@@ -101,22 +128,24 @@ describe('persist document validation', () => {
     if (!parsed.ok) return
     expect(parsed.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
     expect(parsed.snapshot.project.playback).toEqual(project.playback)
-    expect(parsed.snapshot.project.recording?.samples).toHaveLength(
-      project.recording!.samples.length,
+    expect(parsed.snapshot.project.actors[0].recording?.samples).toHaveLength(
+      project.actors[0].recording!.samples.length,
     )
   })
 
   it('round-trips committed geometry edits', () => {
-    const project = makeProject()
     const geometryEdit: GeometryEdit = {
       bakedSmoothing: 0.35,
       samples: makeSamples(16).map((s) => ({ ...s, y: s.y + 0.1 })),
     }
-    const snapshot = buildSnapshot(project, geometryEdit)
+    const project = makePersistProject({
+      actors: [makeActor({ geometryEdit, recording: makeRecording() })],
+    })
+    const snapshot = buildSnapshot(project, null)
     const parsed = parseSnapshotJson(serializeSnapshot(snapshot))
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
-    expect(parsed.snapshot.geometryEdit?.samples[0].y).toBeCloseTo(
+    expect(parsed.snapshot.project.actors[0].geometryEdit?.samples[0].y).toBeCloseTo(
       geometryEdit.samples[0].y,
       5,
     )
@@ -137,7 +166,7 @@ describe('persist document validation', () => {
   })
 
   it('rejects unsupported format versions', () => {
-    const project = makeProject()
+    const project = makePersistProject()
     const snapshot = buildSnapshot(project, null)
     const result = validateSnapshot({ ...snapshot, formatVersion: 99 })
     expect(result.ok).toBe(false)
@@ -146,14 +175,15 @@ describe('persist document validation', () => {
   })
 
   it('defaults missing loopMode to repeat for older projects', () => {
-    const project = makeProject()
-    const { loopMode: _ignored, ...playbackWithoutMode } = project.playback
+    const base = makePersistProject()
+    const legacy = legacyProjectFrom(base)
+    const { loopMode: _ignored, ...playbackWithoutMode } = legacy.playback
     void _ignored
     const result = validateSnapshot({
       formatVersion: 1,
       savedAt: '2026-01-01T00:00:00.000Z',
       project: {
-        ...project,
+        ...legacy,
         playback: playbackWithoutMode,
       },
       geometryEdit: null,
@@ -164,8 +194,9 @@ describe('persist document validation', () => {
   })
 
   it('migrates format v1 projects to stageAspect 16/10 without rewriting samples', () => {
-    const project = makeProject()
-    const { stageAspect: _drop, ...projectWithoutAspect } = project
+    const base = makePersistProject()
+    const legacy = legacyProjectFrom(base)
+    const { stageAspect: _drop, ...projectWithoutAspect } = legacy
     void _drop
     const result = validateSnapshot({
       formatVersion: 1,
@@ -177,17 +208,33 @@ describe('persist document validation', () => {
     if (!result.ok) return
     expect(result.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
     expect(result.snapshot.project.stageAspect).toBeCloseTo(1.6, 5)
-    expect(result.snapshot.project.recording?.samples).toEqual(
-      project.recording?.samples,
+    expect(result.snapshot.project.actors[0].recording?.samples).toEqual(
+      base.actors[0].recording?.samples,
     )
   })
 
   it('rejects geometryEdit without a recording', () => {
-    const snapshot = buildSnapshot(makeProject({ recording: null }), {
-      bakedSmoothing: 0.2,
-      samples: makeSamples(8),
+    const result = validateSnapshot({
+      formatVersion: 1,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      project: {
+        version: 1,
+        recording: null,
+        playback: {
+          durationMs: 1200,
+          smoothing: 0.35,
+          steadySpeed: 0,
+          loop: false,
+          loopMode: 'repeat',
+        },
+        stageAspect: 1.6,
+        transform: { keyframes: [] },
+      },
+      geometryEdit: {
+        bakedSmoothing: 0.2,
+        samples: makeSamples(8),
+      },
     })
-    const result = validateSnapshot(snapshot)
     expect(result.ok).toBe(false)
   })
 })
@@ -203,7 +250,7 @@ describe('persist storage failures', () => {
     }
     const result = writeStoredSnapshot(
       adapter,
-      buildSnapshot(makeProject(), null),
+      buildSnapshot(makePersistProject(), null),
     )
     expect(result).toEqual({ status: 'error', error: 'quota' })
   })
@@ -232,20 +279,26 @@ describe('persistence controller', () => {
   })
 
   it('restores persistable fields and clears transient UI state', () => {
-    const project = makeProject()
     const geometryEdit: GeometryEdit = {
       bakedSmoothing: 0.35,
       samples: makeSamples(12).map((s) => ({ ...s, x: Math.min(1, s.x + 0.05) })),
     }
-    const snapshot = buildSnapshot(project, geometryEdit)
+    const project = makePersistProject({
+      actors: [makeActor({ geometryEdit, steadySpeed: 0.2, recording: makeRecording() })],
+    })
+    const snapshot = buildSnapshot(project, null)
     const storage = createMemoryStorage({
       [STORAGE_KEY]: serializeSnapshot(snapshot),
     })
 
-    // Dirty transient state before restore
-    resetStore(makeProject({ recording: null }), null)
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: null })],
+      }),
+      null,
+    )
 
-    const controller = createPersistenceController({ storage, debounceMs: 20 })
+    const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
 
     const state = useEditorStore.getState()
@@ -258,7 +311,7 @@ describe('persistence controller', () => {
     expect(state.editPreview).toBeNull()
     expect(state.editSession).toBeNull()
     expect(state.project.playback.loop).toBe(true)
-    expect(state.project.playback.steadySpeed).toBe(0.2)
+    expect(state.project.actors[0].steadySpeed).toBe(0.2)
     expect(state.geometryEdit?.samples[0].x).toBeCloseTo(
       geometryEdit.samples[0].x,
       5,
@@ -268,40 +321,58 @@ describe('persistence controller', () => {
   })
 
   it('preserves playback/export consistency after restore', () => {
-    const project = makeProject()
     const geometryEdit: GeometryEdit = {
       bakedSmoothing: 0.35,
       samples: makeSamples(18).map((s) => ({ ...s, y: 0.55 })),
     }
-    const beforePath = selectProcessedPath(project, { geometryEdit, editSession: null, editPreview: null })
+    const project = makePersistProject({
+      actors: [
+        makeActor({
+          geometryEdit,
+          steadySpeed: 0.2,
+          recording: makeRecording(),
+        }),
+      ],
+    })
+    const actor = project.actors[0]
+    const beforePath = selectProcessedPath(
+      project,
+      { geometryEdit, editSession: null, editPreview: null },
+      actor.id,
+    )
     const beforeCss = exportCssFromRecording({
-      samples: project.recording!.samples,
-      smoothing: project.playback.smoothing,
-      steadySpeed: project.playback.steadySpeed,
+      samples: actor.recording!.samples,
+      smoothing: actor.smoothing,
+      steadySpeed: actor.steadySpeed,
       durationMs: project.playback.durationMs,
-      actor: project.actor,
+      actor: actor.appearance,
       processedPath: beforePath,
     })
 
     const storage = createMemoryStorage({
-      [STORAGE_KEY]: serializeSnapshot(buildSnapshot(project, geometryEdit)),
+      [STORAGE_KEY]: serializeSnapshot(buildSnapshot(project, null)),
     })
-    resetStore(makeProject({ recording: null }))
-    const controller = createPersistenceController({ storage })
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: null })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
 
     const state = useEditorStore.getState()
+    const restored = findActor(state.project.actors, state.selectedActorId)!
     const afterPath = selectProcessedPath(state.project, {
       geometryEdit: state.geometryEdit,
       editSession: null,
       editPreview: null,
     })
     const afterCss = exportCssFromRecording({
-      samples: state.project.recording!.samples,
-      smoothing: state.project.playback.smoothing,
-      steadySpeed: state.project.playback.steadySpeed,
+      samples: restored.recording!.samples,
+      smoothing: restored.smoothing,
+      steadySpeed: restored.steadySpeed,
       durationMs: state.project.playback.durationMs,
-      actor: state.project.actor,
+      actor: restored.appearance,
       processedPath: afterPath,
     })
 
@@ -312,8 +383,12 @@ describe('persistence controller', () => {
   it('does not overwrite quarantined invalid data on later edits', () => {
     const bad = '{"formatVersion":99,"savedAt":"nope"}'
     const storage = createMemoryStorage({ [STORAGE_KEY]: bad })
-    resetStore(makeProject({ recording: null }))
-    const controller = createPersistenceController({ storage, debounceMs: 10 })
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: null })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
     expect(controller.getStatus()).toBe('restore-error')
     expect(controller.isSaveBlocked()).toBe(true)
@@ -336,11 +411,12 @@ describe('persistence controller', () => {
       },
       removeItem: () => undefined,
     }
-    resetStore(makeProject({ recording: null }))
-    const controller = createPersistenceController({
-      storage: adapter,
-      debounceMs: 5,
-    })
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: null })],
+      }),
+    )
+    const controller = createPersistenceController(adapter)
     controller.restoreOnStartup()
     useEditorStore.getState().finishRecording(makeRecording())
     expect(controller.getStatus()).toBe('save-error')
@@ -350,8 +426,12 @@ describe('persistence controller', () => {
   it('debounces slider updates but saves recording completion immediately', () => {
     vi.useFakeTimers()
     const storage = createMemoryStorage()
-    resetStore(makeProject({ recording: null }))
-    const controller = createPersistenceController({ storage, debounceMs: 200 })
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: null })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
     controller.restoreOnStartup()
 
     useEditorStore.getState().finishRecording(makeRecording())
@@ -361,7 +441,7 @@ describe('persistence controller', () => {
     useEditorStore.getState().setDurationMs(2000)
     expect(storage.getItem(STORAGE_KEY)).toBe(afterRecord)
 
-    vi.advanceTimersByTime(199)
+    vi.advanceTimersByTime(349)
     expect(storage.getItem(STORAGE_KEY)).toBe(afterRecord)
     vi.advanceTimersByTime(2)
     const afterSlider = storage.getItem(STORAGE_KEY)!
@@ -373,16 +453,15 @@ describe('persistence controller', () => {
 
 describe('slider change detection', () => {
   it('detects duration/smoothing/steadySpeed-only changes', () => {
-    const base = pickPersistable({
-      project: makeProject(),
-      geometryEdit: null,
-    })
+    const base = pickPersistable({ project: makePersistProject() })
     const slid = pickPersistable({
       project: {
         ...base.project,
-        playback: { ...base.project.playback, durationMs: 2400, smoothing: 0.1 },
+        playback: { ...base.project.playback, durationMs: 2400 },
+        actors: base.project.actors.map((a, i) =>
+          i === 0 ? { ...a, smoothing: 0.1 } : a,
+        ),
       },
-      geometryEdit: null,
     })
     expect(isSliderOnlyChange(base, slid)).toBe(true)
 
@@ -391,22 +470,29 @@ describe('slider change detection', () => {
         ...base.project,
         playback: { ...base.project.playback, loop: !base.project.playback.loop },
       },
-      geometryEdit: null,
     })
     expect(isSliderOnlyChange(base, looped)).toBe(false)
   })
 
   it('debounces actor appearance-only changes', () => {
-    const base = pickPersistable({
-      project: makeProject(),
-      geometryEdit: null,
-    })
+    const base = pickPersistable({ project: makePersistProject() })
     const recolored = pickPersistable({
       project: {
         ...base.project,
-        actor: { ...base.project.actor, color: '#112233', width: 0.2, height: 0.2 },
+        actors: base.project.actors.map((a, i) =>
+          i === 0
+            ? {
+                ...a,
+                appearance: {
+                  ...a.appearance,
+                  color: '#112233',
+                  width: 0.2,
+                  height: 0.2,
+                },
+              }
+            : a,
+        ),
       },
-      geometryEdit: null,
     })
     expect(isSliderOnlyChange(base, recolored)).toBe(true)
   })
@@ -422,7 +508,7 @@ describe('store applyPersistedSnapshot / newProject', () => {
     useEditorStore.getState().setLoop(true)
     useEditorStore.getState().newProject()
     const state = useEditorStore.getState()
-    expect(state.project.recording).toBeNull()
+    expect(state.project.actors[0].recording).toBeNull()
     expect(state.project.playback.durationMs).toBe(1200)
     expect(state.project.playback.loop).toBe(false)
     expect(state.geometryEdit).toBeNull()
@@ -436,8 +522,195 @@ describe('store applyPersistedSnapshot / newProject', () => {
     useEditorStore.getState().setLoop(true)
     useEditorStore.getState().resetRecording()
     const state = useEditorStore.getState()
-    expect(state.project.recording).toBeNull()
+    expect(state.project.actors[0].recording).toBeNull()
     expect(state.project.playback.durationMs).toBe(3000)
     expect(state.project.playback.loop).toBe(true)
+  })
+})
+
+describe('multi-actor persist reliability', () => {
+  const PNG =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  it('migrates v2–v4 legacy projects preserving appearance, motion, edits, transform, duration, and loop', () => {
+    const samples = makeSamples(12)
+    const geometryEdit: GeometryEdit = {
+      bakedSmoothing: 0.4,
+      samples: samples.map((s) => ({ ...s, x: s.x + 0.05 })),
+    }
+    const transform = {
+      keyframes: [
+        { id: 'k0', t: 0, rotationDeg: 0, scale: 1 },
+        { id: 'k1', t: 1, rotationDeg: 180, scale: 1.25 },
+      ],
+    }
+    const actor = {
+      kind: 'shape' as const,
+      width: 0.18,
+      height: 0.18,
+      borderRadius: 0.25,
+      color: '#0f766e',
+      image: null,
+    }
+
+    for (const formatVersion of [2, 3, 4] as const) {
+      const result = validateSnapshot({
+        formatVersion,
+        savedAt: '2026-01-01T00:00:00.000Z',
+        project: {
+          version: 1,
+          actor,
+          recording: { samples, recordedDurationMs: samples[samples.length - 1].t },
+          playback: {
+            durationMs: 2400,
+            smoothing: 0.55,
+            steadySpeed: 0.3,
+            loop: true,
+            loopMode: 'alternate',
+          },
+          stageAspect: 1.6,
+          ...(formatVersion >= 4 ? { transform } : {}),
+        },
+        geometryEdit: formatVersion >= 2 ? geometryEdit : null,
+      })
+      expect(result.ok, `format ${formatVersion}`).toBe(true)
+      if (!result.ok) return
+      const migrated = result.snapshot.project
+      expect(migrated.actors).toHaveLength(1)
+      expect(migrated.actors[0].appearance.color).toBe('#0f766e')
+      expect(migrated.actors[0].appearance.width).toBeCloseTo(0.18)
+      expect(migrated.actors[0].recording?.samples).toEqual(samples)
+      expect(migrated.actors[0].smoothing).toBeCloseTo(0.55)
+      expect(migrated.actors[0].steadySpeed).toBeCloseTo(0.3)
+      expect(migrated.actors[0].geometryEdit?.samples[0].x).toBeCloseTo(
+        geometryEdit.samples[0].x,
+        5,
+      )
+      expect(migrated.playback.durationMs).toBe(2400)
+      expect(migrated.playback.loop).toBe(true)
+      expect(migrated.playback.loopMode).toBe('alternate')
+      if (formatVersion >= 4) {
+        expect(migrated.actors[0].transform.keyframes).toHaveLength(2)
+        expect(migrated.actors[0].transform.keyframes[1].rotationDeg).toBe(180)
+      } else {
+        expect(migrated.actors[0].transform.keyframes).toEqual([])
+      }
+    }
+  })
+
+  it('deduplicates shared image bytes on download and restores them on import', () => {
+    const image = {
+      mimeType: 'image/png' as const,
+      dataUrl: PNG,
+      naturalWidth: 1,
+      naturalHeight: 1,
+      label: 'Shared',
+    }
+    const project = makeProject({
+      actors: [
+        makeActor({
+          id: 'a',
+          name: 'One',
+          appearance: {
+            kind: 'image',
+            width: 0.2,
+            height: 0.1,
+            borderRadius: 0,
+            color: '#000000',
+            image,
+          },
+        }),
+        makeActor({
+          id: 'b',
+          name: 'Two',
+          appearance: {
+            kind: 'image',
+            width: 0.1,
+            height: 0.2,
+            borderRadius: 0,
+            color: '#000000',
+            image: { ...image },
+          },
+        }),
+      ],
+    })
+    const raw = serializeSnapshotForDownload(buildSnapshot(project, null))
+    expect(raw.split(PNG).length - 1).toBe(1)
+    const wire = JSON.parse(raw) as {
+      assets: Record<string, { dataUrl: string }>
+      project: {
+        actors: Array<{ appearance: { image: { assetId?: string } } }>
+      }
+    }
+    expect(Object.keys(wire.assets)).toHaveLength(1)
+    const assetId = Object.keys(wire.assets)[0]
+    expect(wire.project.actors[0].appearance.image.assetId).toBe(assetId)
+    expect(wire.project.actors[1].appearance.image.assetId).toBe(assetId)
+
+    const parsed = parseSnapshotJson(raw)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.snapshot.project.actors[0].appearance.image?.dataUrl).toBe(PNG)
+    expect(parsed.snapshot.project.actors[1].appearance.image?.dataUrl).toBe(PNG)
+  })
+
+  it('rejects duplicate actor ids and missing asset references without accepting the snapshot', () => {
+    const base = makePersistProject()
+    const a = makeActor({ id: 'same', name: 'A' })
+    const b = makeActor({ id: 'same', name: 'B' })
+    const dup = validateSnapshot({
+      formatVersion: PERSIST_FORMAT_VERSION,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      project: { ...base, actors: [a, b] },
+    })
+    expect(dup.ok).toBe(false)
+    if (dup.ok) return
+    expect(dup.error).toMatch(/Duplicate actor id/)
+
+    const missing = validateSnapshot({
+      formatVersion: PERSIST_FORMAT_VERSION,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      project: {
+        ...base,
+        actors: [
+          {
+            ...a,
+            id: 'img-actor',
+            appearance: {
+              kind: 'image',
+              width: 0.2,
+              height: 0.2,
+              borderRadius: 0,
+              color: '#111111',
+              image: { assetId: 'missing-img' },
+            },
+          },
+        ],
+      },
+      assets: {},
+    })
+    expect(missing.ok).toBe(false)
+    if (missing.ok) return
+    expect(missing.error).toMatch(/missing assets\[missing-img\]/)
+  })
+
+  it('enforces actor count and project JSON size limits', () => {
+    const actors = Array.from({ length: MAX_ACTORS + 1 }, (_, i) =>
+      makeActor({ id: `a${i}`, name: `A${i}` }),
+    )
+    const tooMany = validateSnapshot({
+      formatVersion: PERSIST_FORMAT_VERSION,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      project: { ...makePersistProject(), actors },
+    })
+    expect(tooMany.ok).toBe(false)
+    if (tooMany.ok) return
+    expect(tooMany.error).toMatch(new RegExp(`maximum is ${MAX_ACTORS}`))
+
+    const oversized = 'x'.repeat(MAX_PROJECT_JSON_CHARS + 1)
+    const parsed = parseSnapshotJson(oversized)
+    expect(parsed.ok).toBe(false)
+    if (parsed.ok) return
+    expect(parsed.error).toMatch(/too large/)
   })
 })

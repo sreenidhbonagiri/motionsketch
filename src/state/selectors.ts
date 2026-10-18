@@ -1,6 +1,14 @@
+import { projectToLocal } from '../core/clip'
 import { applySteadySpeed, processMotion } from '../core/process'
 import { evaluate } from '../core/playback'
-import type { GeometryEdit, MotionSample, Project, Vec2 } from '../core/types'
+import { findActor } from '../core/sceneActor'
+import type {
+  GeometryEdit,
+  MotionSample,
+  Project,
+  SceneActor,
+  Vec2,
+} from '../core/types'
 
 export interface PathViewState {
   geometryEdit: GeometryEdit | null
@@ -9,12 +17,44 @@ export interface PathViewState {
 }
 
 /**
- * Path used for display, playback, and CSS export.
+ * Path used for display, playback, and CSS export for one actor.
  *
  * Priority: drag preview → edit session → committed geometry edit → live process.
- * Spatial smoothing is not re-run over baked/edited samples (predictable handles).
- * Steady Speed may still retime whatever spatial path wins.
  */
+export function selectProcessedPathForActor(
+  project: Project,
+  actor: SceneActor,
+  view: PathViewState = {
+    geometryEdit: null,
+    editSession: null,
+    editPreview: null,
+  },
+): MotionSample[] {
+  const recording = actor.recording
+  if (!recording) return []
+
+  const spatial =
+    view.editPreview ??
+    view.editSession?.samples ??
+    view.geometryEdit?.samples ??
+    actor.geometryEdit?.samples ??
+    null
+
+  const aspect = project.stageAspect
+
+  if (spatial) {
+    return applySteadySpeed(spatial, actor.steadySpeed, aspect)
+  }
+
+  return processMotion(
+    recording.samples,
+    actor.smoothing,
+    actor.steadySpeed,
+    aspect,
+  )
+}
+
+/** @deprecated Use selectProcessedPathForActor — kept for transitional call sites. */
 export function selectProcessedPath(
   project: Project,
   view: PathViewState = {
@@ -22,64 +62,83 @@ export function selectProcessedPath(
     editSession: null,
     editPreview: null,
   },
+  actorId?: string | null,
 ): MotionSample[] {
-  const recording = project.recording
-  if (!recording) return []
-
-  const spatial =
-    view.editPreview ??
-    view.editSession?.samples ??
-    view.geometryEdit?.samples ??
-    null
-
-  const aspect = project.stageAspect
-
-  if (spatial) {
-    return applySteadySpeed(spatial, project.playback.steadySpeed, aspect)
-  }
-
-  return processMotion(
-    recording.samples,
-    project.playback.smoothing,
-    project.playback.steadySpeed,
-    aspect,
-  )
+  const actor =
+    (actorId ? findActor(project.actors, actorId) : null) ??
+    project.actors[0]
+  if (!actor) return []
+  return selectProcessedPathForActor(project, actor, view)
 }
 
-/** Spatial-only bake used when entering edit mode (Steady Speed applied later). */
-export function bakeEditablePath(project: Project): MotionSample[] {
-  const recording = project.recording
+export function bakeEditablePathForActor(
+  project: Project,
+  actor: SceneActor,
+): MotionSample[] {
+  const recording = actor.recording
   if (!recording) return []
   return processMotion(
     recording.samples,
-    project.playback.smoothing,
+    actor.smoothing,
     0,
     project.stageAspect,
   )
 }
 
+/** @deprecated */
+export function bakeEditablePath(
+  project: Project,
+  actorId?: string | null,
+): MotionSample[] {
+  const actor =
+    (actorId ? findActor(project.actors, actorId) : null) ??
+    project.actors[0]
+  if (!actor) return []
+  return bakeEditablePathForActor(project, actor)
+}
+
+export function selectActorPositionForActor(
+  project: Project,
+  actor: SceneActor,
+  playbackHead: number,
+  livePosition: Vec2,
+  mode: string,
+  view?: PathViewState,
+  isSelected = false,
+): Vec2 {
+  if (isSelected && (mode === 'recording' || mode === 'armed')) {
+    return livePosition
+  }
+
+  const path = selectProcessedPathForActor(project, actor, view)
+  if (path.length === 0) {
+    return actor.restPosition
+  }
+
+  const localT = projectToLocal(playbackHead, actor.clip)
+  return evaluate(path, localT)
+}
+
+/** @deprecated */
 export function selectActorPosition(
   project: Project,
   playbackHead: number,
   livePosition: Vec2,
   mode: string,
   view?: PathViewState,
+  actorId?: string | null,
 ): Vec2 {
-  if (mode === 'recording' || mode === 'armed') {
-    return livePosition
-  }
-
-  // Hide actor playhead drive while editing — path handles own the interaction.
-  if (mode === 'editing') {
-    const path = selectProcessedPath(project, view)
-    if (path.length === 0) return livePosition
-    return evaluate(path, playbackHead)
-  }
-
-  const path = selectProcessedPath(project, view)
-  if (path.length === 0) {
-    return livePosition
-  }
-
-  return evaluate(path, playbackHead)
+  const actor =
+    (actorId ? findActor(project.actors, actorId) : null) ??
+    project.actors[0]
+  if (!actor) return livePosition
+  return selectActorPositionForActor(
+    project,
+    actor,
+    playbackHead,
+    livePosition,
+    mode,
+    view,
+    true,
+  )
 }

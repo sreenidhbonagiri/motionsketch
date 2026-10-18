@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { maxPlaybackExportError } from '../../src/core/export/consistency'
-import { exportCssFromRecording } from '../../src/core/export/css'
+import {
+  exportCssFromProject,
+  exportCssFromRecording,
+} from '../../src/core/export/css'
 import { buildKeyframes } from '../../src/core/export/format'
 import { processMotion } from '../../src/core/process'
+import { selectProcessedPathForActor } from '../../src/state/selectors'
 import { DEFAULT_ACTOR, type MotionSample } from '../../src/core/types'
+import { makeActor, makeProject, makeRecording } from './helpers/project'
 
 const samples: MotionSample[] = [
   { t: 0, x: 0.1, y: 0.2 },
@@ -45,7 +50,9 @@ describe('css export', () => {
     expect(keyframeBlock).not.toMatch(/\bleft\s*:/)
     expect(keyframeBlock).not.toMatch(/\btop\s*:/)
     expect(css).not.toMatch(/\bease\b/)
-    expect(css).toContain('<div class="stage"><div class="actor"></div></div>')
+    expect(css).toMatch(
+      /Example HTML:[\s\S]*<div class="stage">[\s\S]*<div class="actor"><\/div>/,
+    )
   })
 
   it('documents correct px fallback conversion for cq units', () => {
@@ -146,5 +153,58 @@ describe('css export', () => {
     })
     expect(alternate).toContain('1000ms linear infinite alternate')
     expect(alternate).toContain('full cycle is 2×')
+  })
+
+  it('scopes multi-actor selectors, keyframes, and stacking order independently', () => {
+    const project = makeProject({
+      actors: [
+        makeActor({
+          id: 'a1',
+          name: 'Shape',
+          smoothing: 0,
+          recording: makeRecording(10),
+          restPosition: { x: 0.2, y: 0.5 },
+        }),
+        makeActor({
+          id: 'a2',
+          name: 'Other',
+          smoothing: 0.9,
+          recording: makeRecording(10),
+          restPosition: { x: 0.8, y: 0.5 },
+        }),
+      ],
+      playback: { durationMs: 1000, loop: true, loopMode: 'alternate' },
+    })
+
+    const pathA = selectProcessedPathForActor(project, project.actors[0], {
+      geometryEdit: null,
+      editSession: null,
+      editPreview: null,
+    })
+    const pathB = selectProcessedPathForActor(project, project.actors[1], {
+      geometryEdit: null,
+      editSession: null,
+      editPreview: null,
+    })
+    expect(pathA.length).toBeGreaterThan(1)
+    expect(pathB.length).toBeGreaterThan(1)
+    // Different smoothing must not collapse to an identical path.
+    const mid = Math.floor(pathA.length / 2)
+    expect(
+      Math.abs(pathA[mid].x - pathB[mid].x) +
+        Math.abs(pathA[mid].y - pathB[mid].y),
+    ).toBeGreaterThan(0)
+
+    const css = exportCssFromProject(project)
+    expect(css).toContain('.actor-1')
+    expect(css).toContain('.actor-2')
+    expect(css).toContain('@keyframes motionsketch-actor-1')
+    expect(css).toContain('@keyframes motionsketch-actor-2')
+    expect(css).toMatch(/\.actor-1\s*\{[^}]*z-index:\s*1/s)
+    expect(css).toMatch(/\.actor-2\s*\{[^}]*z-index:\s*2/s)
+    expect(css).toContain('linear infinite alternate')
+    // Example HTML lists actors in list/stacking order.
+    const example = css.slice(css.indexOf('Example HTML:'))
+    expect(example.indexOf('actor-1')).toBeLessThan(example.indexOf('actor-2'))
   })
 })

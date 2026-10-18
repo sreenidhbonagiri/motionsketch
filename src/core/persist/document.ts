@@ -4,43 +4,54 @@ import {
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
 import {
-  cloneTransformTrack,
-  emptyTransformTrack,
-  parseTransformTrack,
-} from '../transform'
+  cloneSceneActor,
+  createSceneActor,
+  MAX_ACTORS,
+  migrateLegacyProjectToActors,
+  parseSceneActor,
+  projectHasAnyRecording,
+} from '../sceneActor'
+import { emptyTransformTrack, parseTransformTrack } from '../transform'
 import {
-  DEFAULT_ACTOR,
   DEFAULT_PLAYBACK,
   DEFAULT_STAGE_ASPECT,
   MAX_PLAYBACK_DURATION_MS,
   MIN_PLAYBACK_DURATION_MS,
+  type ActorImage,
   type GeometryEdit,
   type LoopMode,
-  type MotionSample,
   type PlaybackSettings,
   type Project,
-  type Recording,
+  type SceneActor,
 } from '../types'
 
 /**
  * Envelope version for localStorage / download files.
- * v1 → v2: stageAspect
- * v2 → v3: actor.kind / actor.image
- * v3 → v4: project.transform (rotation/scale keyframes)
+ * v1–v4: single-actor project (migrated to one SceneActor).
+ * v5: multi-actor + shared timeline; image assets may be deduped.
+ * v6: per-actor clip timing (start/end on shared timeline).
  */
-export const PERSIST_FORMAT_VERSION = 4 as const
+export const PERSIST_FORMAT_VERSION = 6 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
+export const PERSIST_FORMAT_VERSION_V4 = 4 as const
+export const PERSIST_FORMAT_VERSION_V5 = 5 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
+
+/** Soft cap for serialized project JSON (localStorage + downloads). */
+export const MAX_PROJECT_JSON_CHARS = 4_500_000
 
 export interface PersistedSnapshot {
   formatVersion: typeof PERSIST_FORMAT_VERSION
   savedAt: string
   project: Project
-  /** Committed path edits only — not undo/redo or live drag preview. */
-  geometryEdit: GeometryEdit | null
+  /**
+   * Deduplicated image payloads referenced by appearance.image via matching
+   * dataUrl. Present in downloads when any actor uses an image.
+   */
+  assets?: Record<string, ActorImage>
 }
 
 export type PersistParseOk = { ok: true; snapshot: PersistedSnapshot }
@@ -49,22 +60,31 @@ export type PersistParseResult = PersistParseOk | PersistParseErr
 
 export function buildSnapshot(
   project: Project,
-  geometryEdit: GeometryEdit | null,
+  _geometryEditIgnored: GeometryEdit | null = null,
   savedAt: string = new Date().toISOString(),
 ): PersistedSnapshot {
+  const cloned = cloneProject(project)
+  const { project: wired, assets } = extractSharedAssets(cloned)
   return {
     formatVersion: PERSIST_FORMAT_VERSION,
     savedAt,
-    project: cloneProject(project),
-    geometryEdit: geometryEdit ? cloneGeometryEdit(geometryEdit) : null,
+    project: wired,
+    ...(Object.keys(assets).length > 0 ? { assets } : {}),
   }
 }
 
 export function serializeSnapshot(snapshot: PersistedSnapshot): string {
-  return JSON.stringify(snapshot, null, 2)
+  // Always rebuild so shared images are deduped into `assets`.
+  return serializeSnapshotForDownload(snapshot)
 }
 
 export function parseSnapshotJson(raw: string): PersistParseResult {
+  if (raw.length > MAX_PROJECT_JSON_CHARS) {
+    return {
+      ok: false,
+      error: `Project file is too large (max ${Math.round(MAX_PROJECT_JSON_CHARS / 1024)} KB).`,
+    }
+  }
   let data: unknown
   try {
     data = JSON.parse(raw) as unknown
@@ -88,12 +108,15 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   }
 
   const formatVersion = data.formatVersion
-  if (
-    formatVersion !== PERSIST_FORMAT_VERSION &&
-    formatVersion !== PERSIST_FORMAT_VERSION_V3 &&
-    formatVersion !== PERSIST_FORMAT_VERSION_V2 &&
-    formatVersion !== PERSIST_FORMAT_VERSION_LEGACY
-  ) {
+  const supported = [
+    PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V5,
+    PERSIST_FORMAT_VERSION_V4,
+    PERSIST_FORMAT_VERSION_V3,
+    PERSIST_FORMAT_VERSION_V2,
+    PERSIST_FORMAT_VERSION_LEGACY,
+  ]
+  if (!supported.includes(formatVersion as typeof PERSIST_FORMAT_VERSION)) {
     return {
       ok: false,
       error: `Unsupported project format version ${formatVersion}. This app supports versions ${PERSIST_FORMAT_VERSION_LEGACY}–${PERSIST_FORMAT_VERSION}.`,
@@ -104,39 +127,105 @@ export function validateSnapshot(data: unknown): PersistParseResult {
     return { ok: false, error: 'Missing or invalid savedAt.' }
   }
 
-  const projectResult = validateProject(data.project, formatVersion)
-  if (!projectResult.ok) return projectResult
+  const assets = parseAssets(data.assets)
+  if (!assets.ok) return assets
 
-  const geometryResult = validateGeometryEdit(data.geometryEdit)
-  if (!geometryResult.ok) return geometryResult
-
-  // Edited path without a recording is inconsistent.
-  if (geometryResult.value && !projectResult.value.recording) {
+  // v5–v6 multi-actor (v5 migrates missing clip → full timeline).
+  if (formatVersion >= PERSIST_FORMAT_VERSION_V5) {
+    const project = validateMultiActorProject(data.project, assets.value)
+    if (!project.ok) return project
+    // Reject leftover top-level geometryEdit that would be ignored silently.
+    if (data.geometryEdit != null) {
+      return {
+        ok: false,
+        error:
+          'Multi-actor projects store path edits on each actor; unexpected top-level geometryEdit.',
+      }
+    }
     return {
-      ok: false,
-      error: 'geometryEdit requires a recording.',
+      ok: true,
+      snapshot: {
+        formatVersion: PERSIST_FORMAT_VERSION,
+        savedAt: data.savedAt,
+        project: project.value,
+        ...(Object.keys(assets.value).length > 0
+          ? { assets: assets.value }
+          : {}),
+      },
     }
   }
+
+  // v1–v4 single-actor migration
+  const legacy = validateLegacyProject(data.project, formatVersion)
+  if (!legacy.ok) return legacy
+
+  let geometryEdit: GeometryEdit | null = null
+  if (data.geometryEdit != null) {
+    const ge = validateLegacyGeometryEdit(data.geometryEdit)
+    if (!ge.ok) return ge
+    if (!legacy.value.recording) {
+      return { ok: false, error: 'geometryEdit requires a recording.' }
+    }
+    geometryEdit = ge.value
+  }
+
+  const actor = migrateLegacyProjectToActors({
+    actor: legacy.value.actor,
+    recording: legacy.value.recording,
+    playback: legacy.value.playback,
+    transform: legacy.value.transform,
+    geometryEdit,
+  })
 
   return {
     ok: true,
     snapshot: {
       formatVersion: PERSIST_FORMAT_VERSION,
       savedAt: data.savedAt,
-      project: projectResult.value,
-      geometryEdit: geometryResult.value,
+      project: {
+        version: 1,
+        actors: [actor],
+        playback: {
+          durationMs: legacy.value.playback.durationMs,
+          loop: legacy.value.playback.loop,
+          loopMode: legacy.value.playback.loopMode,
+        },
+        stageAspect: legacy.value.stageAspect,
+      },
     },
   }
 }
 
-function validateProject(
+function parseAssets(
   value: unknown,
-  formatVersion: number,
+): { ok: true; value: Record<string, ActorImage> } | PersistParseErr {
+  if (value === undefined || value === null) {
+    return { ok: true, value: {} }
+  }
+  if (!isRecord(value)) {
+    return { ok: false, error: 'assets must be an object.' }
+  }
+  const out: Record<string, ActorImage> = {}
+  for (const [id, asset] of Object.entries(value)) {
+    if (typeof id !== 'string' || id.length === 0) {
+      return { ok: false, error: 'assets keys must be non-empty strings.' }
+    }
+    const coerced = coerceActor({ kind: 'image', image: asset, width: 0.12 })
+    if (!coerced.image) {
+      return { ok: false, error: `assets[${id}] is not a valid image.` }
+    }
+    out[id] = { ...coerced.image }
+  }
+  return { ok: true, value: out }
+}
+
+function validateMultiActorProject(
+  value: unknown,
+  assets: Record<string, ActorImage>,
 ): { ok: true; value: Project } | PersistParseErr {
   if (!isRecord(value)) {
     return { ok: false, error: 'Missing or invalid project.' }
   }
-
   if (value.version !== 1) {
     return {
       ok: false,
@@ -147,25 +236,128 @@ function validateProject(
     }
   }
 
-  const recording = validateRecording(value.recording)
+  const playback = validatePlayback(value.playback)
+  if (!playback.ok) return playback
+
+  const stageAspect = coerceStageAspect(value.stageAspect, PERSIST_FORMAT_VERSION)
+  if (!stageAspect.ok) return stageAspect
+
+  if (!Array.isArray(value.actors)) {
+    return { ok: false, error: 'project.actors must be an array.' }
+  }
+  if (value.actors.length === 0) {
+    return { ok: false, error: 'project.actors must contain at least one actor.' }
+  }
+  if (value.actors.length > MAX_ACTORS) {
+    return {
+      ok: false,
+      error: `project.actors has ${value.actors.length} entries; maximum is ${MAX_ACTORS}.`,
+    }
+  }
+
+  const actors: SceneActor[] = []
+  const seenIds = new Set<string>()
+  for (let i = 0; i < value.actors.length; i++) {
+    const rawActor = value.actors[i]
+    // Resolve imageAssetId before parseSceneActor if present.
+    const resolved = resolveActorAppearance(rawActor, assets, i)
+    if (!resolved.ok) return resolved
+    const parsed = parseSceneActor(resolved.value, i)
+    if (!parsed.ok) return parsed
+    if (seenIds.has(parsed.value.id)) {
+      return {
+        ok: false,
+        error: `Duplicate actor id “${parsed.value.id}”.`,
+      }
+    }
+    seenIds.add(parsed.value.id)
+    actors.push(parsed.value)
+  }
+
+  return {
+    ok: true,
+    value: {
+      version: 1,
+      actors,
+      playback: playback.value,
+      stageAspect: stageAspect.value,
+    },
+  }
+}
+
+function resolveActorAppearance(
+  value: unknown,
+  assets: Record<string, ActorImage>,
+  index: number,
+): { ok: true; value: unknown } | PersistParseErr {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { ok: false, error: `actors[${index}] must be an object.` }
+  }
+  const actor = { ...(value as Record<string, unknown>) }
+  const appearanceRaw = actor.appearance
+  if (typeof appearanceRaw !== 'object' || appearanceRaw === null) {
+    return { ok: true, value: actor }
+  }
+  const appearance = { ...(appearanceRaw as Record<string, unknown>) }
+  const image = appearance.image
+  if (typeof image === 'object' && image !== null && !Array.isArray(image)) {
+    const img = image as Record<string, unknown>
+    if (typeof img.assetId === 'string') {
+      const asset = assets[img.assetId]
+      if (!asset) {
+        return {
+          ok: false,
+          error: `actors[${index}] references missing assets[${img.assetId}].`,
+        }
+      }
+      appearance.image = { ...asset }
+      actor.appearance = appearance
+    }
+  }
+  return { ok: true, value: actor }
+}
+
+interface LegacyProject {
+  actor: unknown
+  recording: Project['actors'][0]['recording']
+  playback: PlaybackSettings & { smoothing: number; steadySpeed: number }
+  stageAspect: number
+  transform: Project['actors'][0]['transform']
+}
+
+function validateLegacyProject(
+  value: unknown,
+  formatVersion: number,
+): { ok: true; value: LegacyProject } | PersistParseErr {
+  if (!isRecord(value)) {
+    return { ok: false, error: 'Missing or invalid project.' }
+  }
+  if (value.version !== 1) {
+    return {
+      ok: false,
+      error:
+        typeof value.version === 'number'
+          ? `Unsupported project.version ${value.version}.`
+          : 'Missing or invalid project.version.',
+    }
+  }
+
+  const recording = validateLegacyRecording(value.recording)
   if (!recording.ok) return recording
 
-  const playback = validatePlayback(value.playback)
+  const playback = validateLegacyPlayback(value.playback)
   if (!playback.ok) return playback
 
   const stageAspect = coerceStageAspect(value.stageAspect, formatVersion)
   if (!stageAspect.ok) return stageAspect
 
-  // Missing transform → empty track (v1–v3 migration). Present but invalid → reject.
   const transform = parseTransformTrack(value.transform)
   if (!transform.ok) return transform
 
-  // Actor is coerced with defaults so older / partial files still load.
   return {
     ok: true,
     value: {
-      version: 1,
-      actor: coerceActor(value.actor),
+      actor: value.actor,
       recording: recording.value,
       playback: playback.value,
       stageAspect: stageAspect.value,
@@ -174,94 +366,137 @@ function validateProject(
   }
 }
 
-function coerceStageAspect(
+function validateLegacyRecording(
   value: unknown,
-  formatVersion: number,
-): { ok: true; value: number } | PersistParseErr {
-  // Missing on v1 (and tolerant v2) → historical 16:10 reference geometry.
-  if (value === undefined || value === null) {
-    return { ok: true, value: LEGACY_STAGE_ASPECT }
-  }
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    if (formatVersion === PERSIST_FORMAT_VERSION_LEGACY) {
-      return { ok: true, value: LEGACY_STAGE_ASPECT }
+): { ok: true; value: LegacyProject['recording'] } | PersistParseErr {
+  // Reuse scene actor parser via a shim
+  const shim = parseSceneActor(
+    {
+      id: 'legacy',
+      name: 'Actor 1',
+      appearance: { kind: 'shape', width: 0.12, height: 0.12, borderRadius: 0, color: '#000', image: null },
+      recording: value,
+      transform: { keyframes: [] },
+    },
+    0,
+  )
+  if (!shim.ok) {
+    return {
+      ok: false,
+      error: shim.error.replace(/^actors\[0\]\.recording/, 'recording'),
     }
-    return { ok: false, error: 'stageAspect must be a positive finite number.' }
   }
-  return { ok: true, value: clampStageAspect(value) }
+  return { ok: true, value: shim.value.recording }
 }
 
-function validateRecording(
+function validateLegacyPlayback(
   value: unknown,
-): { ok: true; value: Recording | null } | PersistParseErr {
-  if (value === null) {
-    return { ok: true, value: null }
-  }
+): { ok: true; value: LegacyProject['playback'] } | PersistParseErr {
+  const base = validatePlayback(value)
+  if (!base.ok) return base
   if (!isRecord(value)) {
-    return { ok: false, error: 'Invalid recording.' }
+    return { ok: false, error: 'Invalid playback.' }
   }
-
-  const recordedDurationMs = asFiniteNumber(value.recordedDurationMs)
-  if (recordedDurationMs === null || recordedDurationMs < 0) {
-    return { ok: false, error: 'Invalid recording.recordedDurationMs.' }
-  }
-
-  const samples = validateSamples(value.samples, 'recording.samples')
-  if (!samples.ok) return samples
-  if (samples.value.length < 2) {
-    return { ok: false, error: 'recording.samples must have at least 2 points.' }
-  }
-
+  const smoothing =
+    typeof value.smoothing === 'number' && Number.isFinite(value.smoothing)
+      ? clamp01(value.smoothing)
+      : 0.35
+  const steadySpeed =
+    typeof value.steadySpeed === 'number' && Number.isFinite(value.steadySpeed)
+      ? clamp01(value.steadySpeed)
+      : 0
   return {
     ok: true,
     value: {
-      samples: samples.value,
-      recordedDurationMs,
+      ...base.value,
+      smoothing,
+      steadySpeed,
     },
   }
+}
+
+function validateLegacyGeometryEdit(
+  value: unknown,
+): { ok: true; value: GeometryEdit } | PersistParseErr {
+  const shim = parseSceneActor(
+    {
+      id: 'legacy',
+      name: 'Actor 1',
+      appearance: DEFAULT_SHAPE_APPEARANCE,
+      recording: null,
+      geometryEdit: value,
+      transform: emptyTransformTrack(),
+    },
+    0,
+  )
+  // parseSceneActor allows null recording with geometryEdit — tighten:
+  if (typeof value !== 'object' || value === null) {
+    return { ok: false, error: 'Invalid geometryEdit.' }
+  }
+  const actorLike = parseSceneActor(
+    {
+      id: 'legacy',
+      name: 'A',
+      appearance: DEFAULT_SHAPE_APPEARANCE,
+      recording: {
+        recordedDurationMs: 100,
+        samples: [
+          { t: 0, x: 0.2, y: 0.2 },
+          { t: 100, x: 0.8, y: 0.8 },
+        ],
+      },
+      geometryEdit: value,
+      transform: emptyTransformTrack(),
+    },
+    0,
+  )
+  if (!actorLike.ok || !actorLike.value.geometryEdit) {
+    return {
+      ok: false,
+      error:
+        !actorLike.ok
+          ? actorLike.error.replace(/^actors\[0\]\.geometryEdit/, 'geometryEdit')
+          : 'Invalid geometryEdit.',
+    }
+  }
+  void shim
+  return { ok: true, value: actorLike.value.geometryEdit }
+}
+
+const DEFAULT_SHAPE_APPEARANCE = {
+  kind: 'shape' as const,
+  width: 0.12,
+  height: 0.12,
+  borderRadius: 0.28,
+  color: '#4f46e5',
+  image: null,
 }
 
 function validatePlayback(
   value: unknown,
 ): { ok: true; value: PlaybackSettings } | PersistParseErr {
   if (!isRecord(value)) {
-    return { ok: false, error: 'Missing or invalid playback settings.' }
+    return { ok: false, error: 'Missing or invalid playback.' }
   }
-
   const durationMs = asFiniteNumber(value.durationMs)
-  const smoothing = asFiniteNumber(value.smoothing)
-  const steadySpeed = asFiniteNumber(value.steadySpeed)
-  if (durationMs === null || smoothing === null || steadySpeed === null) {
-    return { ok: false, error: 'Playback numeric fields must be finite numbers.' }
-  }
   if (
+    durationMs === null ||
     durationMs < MIN_PLAYBACK_DURATION_MS ||
     durationMs > MAX_PLAYBACK_DURATION_MS
   ) {
     return {
       ok: false,
-      error: `durationMs must be between ${MIN_PLAYBACK_DURATION_MS} and ${MAX_PLAYBACK_DURATION_MS}.`,
+      error: `playback.durationMs must be in [${MIN_PLAYBACK_DURATION_MS}, ${MAX_PLAYBACK_DURATION_MS}].`,
     }
   }
-  if (smoothing < 0 || smoothing > 1) {
-    return { ok: false, error: 'smoothing must be in [0, 1].' }
-  }
-  if (steadySpeed < 0 || steadySpeed > 1) {
-    return { ok: false, error: 'steadySpeed must be in [0, 1].' }
-  }
   if (typeof value.loop !== 'boolean') {
-    return { ok: false, error: 'loop must be a boolean.' }
+    return { ok: false, error: 'playback.loop must be a boolean.' }
   }
-
-  // Older projects omit loopMode — default to Repeat when looping.
   const loopMode = coerceLoopMode(value.loopMode)
-
   return {
     ok: true,
     value: {
-      durationMs,
-      smoothing,
-      steadySpeed,
+      durationMs: Math.round(durationMs),
       loop: value.loop,
       loopMode,
     },
@@ -269,100 +504,98 @@ function validatePlayback(
 }
 
 function coerceLoopMode(value: unknown): LoopMode {
-  if (value === 'alternate' || value === 'repeat') return value
-  return DEFAULT_PLAYBACK.loopMode
+  return value === 'alternate' ? 'alternate' : 'repeat'
 }
 
-function validateGeometryEdit(
+function coerceStageAspect(
   value: unknown,
-): { ok: true; value: GeometryEdit | null } | PersistParseErr {
-  if (value === null || value === undefined) {
-    return { ok: true, value: null }
-  }
-  if (!isRecord(value)) {
-    return { ok: false, error: 'Invalid geometryEdit.' }
-  }
-
-  const bakedSmoothing = asFiniteNumber(value.bakedSmoothing)
-  if (bakedSmoothing === null || bakedSmoothing < 0 || bakedSmoothing > 1) {
-    return { ok: false, error: 'geometryEdit.bakedSmoothing must be in [0, 1].' }
-  }
-
-  const samples = validateSamples(value.samples, 'geometryEdit.samples')
-  if (!samples.ok) return samples
-  if (samples.value.length < 2) {
-    return {
-      ok: false,
-      error: 'geometryEdit.samples must have at least 2 points.',
+  formatVersion: number,
+): { ok: true; value: number } | PersistParseErr {
+  if (value === undefined || value === null) {
+    if (formatVersion <= PERSIST_FORMAT_VERSION_LEGACY) {
+      return { ok: true, value: LEGACY_STAGE_ASPECT }
     }
+    return { ok: true, value: LEGACY_STAGE_ASPECT }
   }
+  const n = asFiniteNumber(value)
+  if (n === null || n <= 0) {
+    return { ok: false, error: 'project.stageAspect must be a positive number.' }
+  }
+  return { ok: true, value: clampStageAspect(n) }
+}
 
-  return {
-    ok: true,
-    value: {
-      bakedSmoothing,
-      samples: samples.value,
+function extractSharedAssets(project: Project): {
+  project: Project
+  assets: Record<string, ActorImage>
+} {
+  const assets: Record<string, ActorImage> = {}
+  const urlToId = new Map<string, string>()
+  let n = 0
+
+  const actors = project.actors.map((actor) => {
+    const appearance = cloneActor(actor.appearance)
+    if (appearance.kind === 'image' && appearance.image) {
+      const url = appearance.image.dataUrl
+      let id = urlToId.get(url)
+      if (!id) {
+        n += 1
+        id = `img-${n}`
+        urlToId.set(url, id)
+        assets[id] = { ...appearance.image }
+      }
+      // Keep full image in memory snapshot project for runtime; assets map
+      // carries deduped payloads for the file. Wire format uses assetId only
+      // in JSON via replacer below — here we stash assetId on a clone for serialize.
+      ;(appearance as ActorWithAssetRef).image = {
+        ...appearance.image,
+        assetId: id,
+      } as ActorImage & { assetId: string }
+    }
+    return { ...cloneSceneActor(actor), appearance }
+  })
+
+  return { project: { ...project, actors }, assets }
+}
+
+type ActorWithAssetRef = {
+  image: (ActorImage & { assetId?: string }) | null
+}
+
+/**
+ * JSON.stringify replacer: write image as { assetId } when assetId is present.
+ */
+export function serializeSnapshotForDownload(snapshot: PersistedSnapshot): string {
+  const built = buildSnapshot(snapshot.project, null, snapshot.savedAt)
+  const raw = JSON.stringify(
+    built,
+    (key, value) => {
+      if (
+        key === 'image' &&
+        value &&
+        typeof value === 'object' &&
+        'assetId' in value &&
+        typeof (value as { assetId: unknown }).assetId === 'string'
+      ) {
+        return { assetId: (value as { assetId: string }).assetId }
+      }
+      return value
     },
+    2,
+  )
+  if (raw.length > MAX_PROJECT_JSON_CHARS) {
+    throw new Error(
+      `Project is too large to save (${Math.round(raw.length / 1024)} KB). Remove or replace large images.`,
+    )
   }
-}
-
-function validateSamples(
-  value: unknown,
-  label: string,
-): { ok: true; value: MotionSample[] } | PersistParseErr {
-  if (!Array.isArray(value)) {
-    return { ok: false, error: `${label} must be an array.` }
-  }
-
-  const samples: MotionSample[] = []
-  for (let i = 0; i < value.length; i++) {
-    const item = value[i]
-    if (!isRecord(item)) {
-      return { ok: false, error: `${label}[${i}] is invalid.` }
-    }
-    const t = asFiniteNumber(item.t)
-    const x = asFiniteNumber(item.x)
-    const y = asFiniteNumber(item.y)
-    if (t === null || x === null || y === null) {
-      return { ok: false, error: `${label}[${i}] must have finite t, x, y.` }
-    }
-    if (t < 0) {
-      return { ok: false, error: `${label}[${i}].t must be >= 0.` }
-    }
-    if (x < 0 || x > 1 || y < 0 || y > 1) {
-      return { ok: false, error: `${label}[${i}] x/y must be in [0, 1].` }
-    }
-    if (i > 0 && t < samples[i - 1].t) {
-      return { ok: false, error: `${label} timestamps must be non-decreasing.` }
-    }
-    samples.push({ t, x, y })
-  }
-
-  return { ok: true, value: samples }
+  return raw
 }
 
 function cloneProject(project: Project): Project {
   return {
     version: 1,
-    actor: cloneActor(project.actor),
-    recording: project.recording
-      ? {
-          recordedDurationMs: project.recording.recordedDurationMs,
-          samples: project.recording.samples.map((s) => ({ ...s })),
-        }
-      : null,
+    actors: project.actors.map((a) => cloneSceneActor(a)),
     playback: { ...project.playback },
     stageAspect: clampStageAspect(project.stageAspect),
-    transform: cloneTransformTrack(
-      project.transform ?? emptyTransformTrack(),
-    ),
-  }
-}
-
-function cloneGeometryEdit(edit: GeometryEdit): GeometryEdit {
-  return {
-    bakedSmoothing: edit.bakedSmoothing,
-    samples: edit.samples.map((s) => ({ ...s })),
   }
 }
 
@@ -371,12 +604,14 @@ export function createEmptyPersistableProject(
 ): Project {
   return {
     version: 1,
-    actor: cloneActor(DEFAULT_ACTOR),
-    recording: null,
+    actors: [createSceneActor({ name: 'Actor 1' })],
     playback: { ...DEFAULT_PLAYBACK },
     stageAspect: clampStageAspect(stageAspect),
-    transform: { keyframes: [] },
   }
+}
+
+export function snapshotHasAnimation(snapshot: PersistedSnapshot): boolean {
+  return projectHasAnyRecording(snapshot.project)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -385,4 +620,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asFiniteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value))
 }

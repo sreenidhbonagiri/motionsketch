@@ -10,14 +10,21 @@ function formatDurationSeconds(durationMs: number): string {
 
 export function AdjustPanel() {
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
-  const smoothing = useEditorStore((s) => s.project.playback.smoothing)
-  const steadySpeed = useEditorStore((s) => s.project.playback.steadySpeed)
+  const selectedActor = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
+  })
+  const smoothing = selectedActor?.smoothing ?? 0
+  const steadySpeed = selectedActor?.steadySpeed ?? 0
   const loop = useEditorStore((s) => s.project.playback.loop)
   const loopMode = useEditorStore((s) => s.project.playback.loopMode)
   const showPathComparison = useEditorStore((s) => s.showPathComparison)
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const mode = useEditorStore((s) => s.mode)
-  const hasRecording = useEditorStore((s) => !!s.project.recording)
+  const hasAnyRecording = useEditorStore((s) =>
+    s.project.actors.some((a) => !!a.recording),
+  )
+  const selectedHasRecording = !!selectedActor?.recording
   const setDurationMs = useEditorStore((s) => s.setDurationMs)
   const setSmoothing = useEditorStore((s) => s.setSmoothing)
   const setSteadySpeed = useEditorStore((s) => s.setSteadySpeed)
@@ -27,13 +34,17 @@ export function AdjustPanel() {
 
   const steadySpeedLabel =
     steadySpeed <= 0 ? 'Off' : `${Math.round(steadySpeed * 100)}%`
-  const smoothingLocked = !!geometryEdit
+  const smoothingLocked = !!geometryEdit || !!selectedActor?.geometryEdit
   const editing = mode === 'editing'
 
   return (
     <div data-testid="adjust-panel" className="space-y-4 p-3">
       <p className="text-xs text-slate-500">
-        Adjust playback without losing the original take.
+        Duration and loop are shared. Smoothing and Steady Speed apply to{' '}
+        <span className="font-medium text-slate-700">
+          {selectedActor?.name ?? 'the selected actor'}
+        </span>
+        .
       </p>
 
       <div className="space-y-2">
@@ -54,7 +65,7 @@ export function AdjustPanel() {
           max={MAX_PLAYBACK_DURATION_MS}
           step={50}
           value={durationMs}
-          disabled={!hasRecording}
+          disabled={!hasAnyRecording}
           aria-describedby="duration-help"
           onChange={(e) => setDurationMs(Number(e.target.value))}
           className="w-full accent-teal-700 disabled:opacity-40"
@@ -86,7 +97,7 @@ export function AdjustPanel() {
           max={1}
           step={0.01}
           value={smoothing}
-          disabled={!hasRecording || smoothingLocked}
+          disabled={!selectedHasRecording || smoothingLocked}
           aria-describedby="smoothing-help"
           onChange={(e) => setSmoothing(Number(e.target.value))}
           className="w-full accent-teal-700 disabled:opacity-40"
@@ -118,7 +129,7 @@ export function AdjustPanel() {
           max={1}
           step={0.01}
           value={steadySpeed}
-          disabled={!hasRecording}
+          disabled={!hasAnyRecording}
           aria-describedby="steady-speed-help"
           onChange={(e) => setSteadySpeed(Number(e.target.value))}
           className="w-full accent-teal-700 disabled:opacity-40"
@@ -139,7 +150,7 @@ export function AdjustPanel() {
             data-testid="loop-toggle"
             type="checkbox"
             checked={loop}
-            disabled={!hasRecording || editing}
+            disabled={!selectedHasRecording || editing}
             onChange={(e) => setLoop(e.target.checked)}
             className="size-4 accent-teal-700 disabled:opacity-40"
           />
@@ -151,7 +162,7 @@ export function AdjustPanel() {
         {loop && (
           <fieldset
             data-testid="loop-mode-fieldset"
-            disabled={!hasRecording || editing}
+            disabled={!selectedHasRecording || editing}
             className="space-y-2 disabled:opacity-40"
           >
             <legend className="sr-only">Loop mode</legend>
@@ -199,12 +210,12 @@ export function AdjustPanel() {
           data-testid="path-compare-toggle"
           type="checkbox"
           checked={showPathComparison}
-          disabled={!hasRecording || editing}
+          disabled={!selectedHasRecording || editing}
           onChange={(e) => setShowPathComparison(e.target.checked)}
           className="size-4 accent-teal-700 disabled:opacity-40"
         />
       </label>
-      {showPathComparison && hasRecording && (
+      {showPathComparison && selectedHasRecording && (
         <p
           data-testid="path-compare-legend"
           className="text-xs leading-relaxed text-slate-500"

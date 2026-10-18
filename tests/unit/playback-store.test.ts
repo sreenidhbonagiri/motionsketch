@@ -1,43 +1,30 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { MotionSample, Recording } from '../../src/core/types'
+import { makeProject, makeRecording } from './helpers/project'
 import { useEditorStore } from '../../src/state/store'
-
-function makeRecording(): Recording {
-  const samples: MotionSample[] = Array.from({ length: 20 }, (_, i) => ({
-    t: i * 50,
-    x: 0.2 + i * 0.03,
-    y: 0.5,
-  }))
-  return {
-    samples,
-    recordedDurationMs: samples[samples.length - 1].t,
-  }
-}
 
 describe('playback store controls', () => {
   beforeEach(() => {
+    const project = makeProject({
+      actors: undefined,
+    })
+    // rebuild with recording
+    const recording = makeRecording()
+    const actor = {
+      ...project.actors[0],
+      recording,
+      restPosition: { x: 0.2, y: 0.5 },
+    }
     useEditorStore.setState({
       project: {
-        version: 1,
-        actor: {
-          kind: 'shape',
-          width: 0.12,
-          height: 0.12,
-          borderRadius: 0.28,
-          color: '#4f46e5',
-          image: null,
-        },
-        recording: makeRecording(),
+        ...project,
+        actors: [actor],
         playback: {
           durationMs: 1000,
-          smoothing: 0.35,
-          steadySpeed: 0,
           loop: false,
           loopMode: 'repeat',
         },
-      stageAspect: 1.6,
-        transform: { keyframes: [] },
       },
+      selectedActorId: actor.id,
       mode: 'idle',
       pointerId: null,
       playbackHead: 0,
@@ -85,7 +72,11 @@ describe('playback store controls', () => {
   })
 
   it('restart jumps to the beginning and plays', () => {
-    useEditorStore.setState({ playbackHead: 0.7, mode: 'playing', playbackEpoch: 2 })
+    useEditorStore.setState({
+      playbackHead: 0.7,
+      mode: 'playing',
+      playbackEpoch: 2,
+    })
     useEditorStore.getState().restartPlayback()
     expect(useEditorStore.getState().mode).toBe('playing')
     expect(useEditorStore.getState().playbackHead).toBe(0)

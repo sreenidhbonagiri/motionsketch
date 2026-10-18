@@ -11,7 +11,8 @@ import {
   type StorageAdapter,
 } from '../core/persist/storage'
 import { captureViewportStageAspect } from '../core/stageAspect'
-import type { GeometryEdit, Project } from '../core/types'
+import { createEmptyPersistableProject } from '../core/persist/document'
+import type { Project } from '../core/types'
 import { downloadTextFile, stampFilename } from './download'
 import { useEditorStore } from '../state/store'
 
@@ -27,68 +28,77 @@ const SLIDER_DEBOUNCE_MS = 350
 
 export interface PersistableSlice {
   project: Project
-  geometryEdit: GeometryEdit | null
 }
 
 export function pickPersistable(state: {
   project: Project
-  geometryEdit: GeometryEdit | null
 }): PersistableSlice {
   return {
     project: state.project,
-    geometryEdit: state.geometryEdit,
   }
 }
 
 function persistableEqual(a: PersistableSlice, b: PersistableSlice): boolean {
-  return (
-    JSON.stringify({
-      project: a.project,
-      geometryEdit: a.geometryEdit,
-    }) ===
-    JSON.stringify({
-      project: b.project,
-      geometryEdit: b.geometryEdit,
-    })
-  )
+  return JSON.stringify(a.project) === JSON.stringify(b.project)
 }
 
 /**
  * Debounce continuous controls: timing sliders and actor appearance.
- * Discrete changes (recording, loop, path edits) still save immediately.
+ * Discrete changes (recording, loop, path edits, actor list) save immediately.
  */
 export function isSliderOnlyChange(
   prev: PersistableSlice,
   next: PersistableSlice,
 ): boolean {
   const prevAnchor = JSON.stringify({
-    recording: prev.project.recording,
+    actors: prev.project.actors.map((a) => ({
+      id: a.id,
+      recording: a.recording,
+      transform: a.transform,
+      geometryEdit: a.geometryEdit,
+      name: a.name,
+    })),
     loop: prev.project.playback.loop,
     loopMode: prev.project.playback.loopMode,
     version: prev.project.version,
-    geometryEdit: prev.geometryEdit,
-    transform: prev.project.transform,
+    actorCount: prev.project.actors.length,
   })
   const nextAnchor = JSON.stringify({
-    recording: next.project.recording,
+    actors: next.project.actors.map((a) => ({
+      id: a.id,
+      recording: a.recording,
+      transform: a.transform,
+      geometryEdit: a.geometryEdit,
+      name: a.name,
+    })),
     loop: next.project.playback.loop,
     loopMode: next.project.playback.loopMode,
     version: next.project.version,
-    geometryEdit: next.geometryEdit,
-    transform: next.project.transform,
+    actorCount: next.project.actors.length,
   })
   if (prevAnchor !== nextAnchor) return false
 
-  const p = prev.project.playback
-  const n = next.project.playback
-  const timingChanged =
-    p.durationMs !== n.durationMs ||
-    p.smoothing !== n.smoothing ||
-    p.steadySpeed !== n.steadySpeed
-  const actorChanged =
-    JSON.stringify(prev.project.actor) !== JSON.stringify(next.project.actor)
+  const durationChanged =
+    prev.project.playback.durationMs !== next.project.playback.durationMs
+  const appearanceOrPathTuningChanged =
+    JSON.stringify(
+      prev.project.actors.map((a) => ({
+        appearance: a.appearance,
+        smoothing: a.smoothing,
+        steadySpeed: a.steadySpeed,
+        restPosition: a.restPosition,
+      })),
+    ) !==
+    JSON.stringify(
+      next.project.actors.map((a) => ({
+        appearance: a.appearance,
+        smoothing: a.smoothing,
+        steadySpeed: a.steadySpeed,
+        restPosition: a.restPosition,
+      })),
+    )
 
-  return timingChanged || actorChanged
+  return durationChanged || appearanceOrPathTuningChanged
 }
 
 export interface PersistenceController {
@@ -96,59 +106,49 @@ export interface PersistenceController {
   getQuarantineRaw: () => string | null
   isSaveBlocked: () => boolean
   subscribe: (listener: PersistenceListener) => () => void
-  /** Load from storage and hydrate the editor store. Call once on startup. */
   restoreOnStartup: () => void
-  /** Force a save of the current persistable state (respects quarantine block). */
   saveNow: () => void
-  /** Clear quarantine + storage and allow future saves (after New project). */
   discardStoredAndUnblock: () => void
-  /** Mark that a validated snapshot was applied and should be written. */
   afterSuccessfulReplace: () => void
   downloadCurrentProject: () => boolean
-  /** Download quarantined raw bytes when restore failed (portable recovery). */
   downloadQuarantine: () => boolean
   dispose: () => void
 }
 
-export function createPersistenceController(options?: {
-  storage?: StorageAdapter | null
-  debounceMs?: number
-}): PersistenceController {
-  const storage =
-    options?.storage === undefined
-      ? getLocalStorageAdapter()
-      : options.storage
-  const debounceMs = options?.debounceMs ?? SLIDER_DEBOUNCE_MS
+let appController: PersistenceController | null = null
 
+export function setAppPersistenceControllerForTests(
+  controller: PersistenceController | null,
+) {
+  appController = controller
+}
+
+export function getAppPersistenceController(): PersistenceController {
+  if (!appController) {
+    appController = createPersistenceController()
+  }
+  return appController
+}
+
+export function createPersistenceController(
+  storage: StorageAdapter | null = getLocalStorageAdapter(),
+): PersistenceController {
   let status: PersistenceStatus = 'idle'
   let quarantineRaw: string | null = null
   let saveBlocked = false
+  let disposed = false
   let timer: ReturnType<typeof setTimeout> | null = null
   let lastWrittenFingerprint = ''
-  let disposed = false
-  const listeners = new Set<PersistenceListener>()
-
   let unsubscribeStore: (() => void) | null = null
-  let started = false
-  let onFlushPending: (() => void) | null = null
+  const listeners = new Set<PersistenceListener>()
 
   const setStatus = (next: PersistenceStatus) => {
     status = next
     for (const listener of listeners) listener(status)
   }
 
-  const flushPending = () => {
-    if (!timer) return
-    clearTimeout(timer)
-    timer = null
-    writeSlice(pickPersistable(useEditorStore.getState()))
-  }
-
   const fingerprint = (slice: PersistableSlice) =>
-    JSON.stringify({
-      project: slice.project,
-      geometryEdit: slice.geometryEdit,
-    })
+    JSON.stringify({ project: slice.project })
 
   const writeSlice = (slice: PersistableSlice) => {
     if (disposed || saveBlocked) return
@@ -157,18 +157,25 @@ export function createPersistenceController(options?: {
       return
     }
 
-    const snap = buildSnapshot(slice.project, slice.geometryEdit)
-    const result = writeStoredSnapshot(storage, snap)
-    if (result.status === 'ok') {
-      lastWrittenFingerprint = fingerprint(slice)
-      quarantineRaw = null
-      setStatus('saved')
-    } else {
+    try {
+      const snap = buildSnapshot(slice.project, null)
+      const result = writeStoredSnapshot(storage, snap)
+      if (result.status === 'ok') {
+        lastWrittenFingerprint = fingerprint(slice)
+        quarantineRaw = null
+        setStatus('saved')
+      } else {
+        setStatus('save-error')
+      }
+    } catch {
       setStatus('save-error')
     }
   }
 
-  const scheduleWrite = (slice: PersistableSlice, mode: 'immediate' | 'debounce') => {
+  const scheduleWrite = (
+    slice: PersistableSlice,
+    mode: 'immediate' | 'debounce',
+  ) => {
     if (disposed || saveBlocked) return
     if (timer) {
       clearTimeout(timer)
@@ -181,16 +188,21 @@ export function createPersistenceController(options?: {
     timer = setTimeout(() => {
       timer = null
       writeSlice(slice)
-    }, debounceMs)
+    }, SLIDER_DEBOUNCE_MS)
+  }
+
+  const flushPending = () => {
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+      writeSlice(pickPersistable(useEditorStore.getState()))
+    }
   }
 
   const onStoreChange = (
-    state: ReturnType<typeof useEditorStore.getState>,
-    prev: ReturnType<typeof useEditorStore.getState>,
+    state: { project: Project },
+    prev: { project: Project },
   ) => {
-    // Never persist while a take is being captured.
-    if (state.mode === 'recording') return
-
     const next = pickPersistable(state)
     const previous = pickPersistable(prev)
     if (persistableEqual(next, previous)) return
@@ -214,10 +226,9 @@ export function createPersistenceController(options?: {
     },
 
     restoreOnStartup: () => {
-      if (disposed || started) return
-      started = true
+      if (disposed) return
 
-      onFlushPending = () => {
+      const onFlushPending = () => {
         if (document.visibilityState === 'hidden') flushPending()
       }
       document.addEventListener('visibilitychange', onFlushPending)
@@ -231,13 +242,19 @@ export function createPersistenceController(options?: {
 
       const loaded = loadStoredSnapshot(storage)
       if (loaded.status === 'empty') {
-        // Fresh session: lock logical stage to the available viewport once.
         useEditorStore.setState((state) => ({
           project: {
-            ...state.project,
-            stageAspect: captureViewportStageAspect(),
+            ...createEmptyPersistableProject(captureViewportStageAspect()),
           },
+          selectedActorId: state.selectedActorId,
         }))
+        // Ensure selected id matches the fresh project.
+        const fresh = createEmptyPersistableProject(captureViewportStageAspect())
+        useEditorStore.setState({
+          project: fresh,
+          selectedActorId: fresh.actors[0].id,
+          livePosition: { ...fresh.actors[0].restPosition },
+        })
         lastWrittenFingerprint = fingerprint(
           pickPersistable(useEditorStore.getState()),
         )
@@ -247,7 +264,6 @@ export function createPersistenceController(options?: {
 
       if (loaded.status === 'error') {
         setStatus('restore-error')
-        // Don't block forever on a read glitch — allow saving a fresh project.
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
@@ -256,7 +272,6 @@ export function createPersistenceController(options?: {
         quarantineRaw = loaded.raw
         saveBlocked = true
         setStatus('restore-error')
-        // Subscribe but writes stay blocked until discard / successful replace.
         unsubscribeStore = useEditorStore.subscribe(onStoreChange)
         return
       }
@@ -264,10 +279,12 @@ export function createPersistenceController(options?: {
       useEditorStore.getState().applyPersistedSnapshot(loaded.snapshot)
       lastWrittenFingerprint = fingerprint({
         project: loaded.snapshot.project,
-        geometryEdit: loaded.snapshot.geometryEdit,
       })
       setStatus('saved')
       unsubscribeStore = useEditorStore.subscribe(onStoreChange)
+
+      // Keep flush listeners — attach once.
+      void onFlushPending
     },
 
     saveNow: () => {
@@ -286,7 +303,6 @@ export function createPersistenceController(options?: {
       quarantineRaw = null
       saveBlocked = false
       lastWrittenFingerprint = ''
-      // Persist the (typically empty) current project after New project.
       writeSlice(pickPersistable(useEditorStore.getState()))
     },
 
@@ -303,13 +319,18 @@ export function createPersistenceController(options?: {
     downloadCurrentProject: () => {
       try {
         const slice = pickPersistable(useEditorStore.getState())
-        const snap = buildSnapshot(slice.project, slice.geometryEdit)
+        const snap = buildSnapshot(slice.project, null)
         return downloadTextFile(
           serializeSnapshot(snap),
           stampFilename('motionsketch', 'json'),
           'application/json',
         )
-      } catch {
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Could not download the project file.'
+        useEditorStore.getState().announceAction(message)
         return false
       }
     },
@@ -318,7 +339,7 @@ export function createPersistenceController(options?: {
       if (!quarantineRaw) return false
       return downloadTextFile(
         quarantineRaw,
-        'motionsketch-unreadable.json',
+        stampFilename('motionsketch-unreadable', 'json'),
         'application/json',
       )
     },
@@ -329,11 +350,6 @@ export function createPersistenceController(options?: {
         clearTimeout(timer)
         timer = null
       }
-      if (onFlushPending) {
-        document.removeEventListener('visibilitychange', onFlushPending)
-        onFlushPending = null
-      }
-      window.removeEventListener('pagehide', flushPending)
       unsubscribeStore?.()
       unsubscribeStore = null
       listeners.clear()
@@ -341,26 +357,6 @@ export function createPersistenceController(options?: {
   }
 }
 
-export function importSnapshotFromText(raw: string): PersistParseResultLike {
+export function importSnapshotFromText(raw: string) {
   return parseSnapshotJson(raw)
-}
-
-type PersistParseResultLike = ReturnType<typeof parseSnapshotJson>
-
-/** Singleton used by the app shell. Tests can create their own controllers. */
-let appController: PersistenceController | null = null
-
-export function getAppPersistenceController(): PersistenceController {
-  if (!appController) {
-    appController = createPersistenceController()
-  }
-  return appController
-}
-
-/** Test helper — replace or clear the app singleton. */
-export function setAppPersistenceControllerForTests(
-  controller: PersistenceController | null,
-) {
-  appController?.dispose()
-  appController = controller
 }

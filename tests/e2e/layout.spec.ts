@@ -106,6 +106,13 @@ test.describe('workspace layout', () => {
   test('mobile 390x844: labeled menus stay reachable', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
+    // Keep the actor list collapsed so bottom chrome stays reachable.
+    const listExpanded = await page
+      .getByTestId('btn-toggle-actor-list')
+      .getAttribute('aria-expanded')
+    if (listExpanded === 'true') {
+      await page.getByTestId('btn-toggle-actor-list').click()
+    }
     await recordSimplePath(page)
 
     await expect(page.getByTestId('stage')).toBeVisible()
@@ -113,7 +120,6 @@ test.describe('workspace layout', () => {
     await assertFullyInViewport(page, 'toolbar')
 
     await openPanel(page, 'export')
-    await page.getByTestId('btn-view-css').scrollIntoViewIfNeeded()
     await expect(page.getByTestId('btn-view-css')).toBeVisible()
 
     await openPanel(page, 'adjust')

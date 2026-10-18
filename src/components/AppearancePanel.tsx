@@ -22,7 +22,17 @@ function formatCornerLabel(radius: number): string {
 }
 
 export function AppearancePanel() {
-  const actor = useEditorStore((s) => s.project.actor)
+  const actor = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return (
+      s.project.actors.find((a) => a.id === id)?.appearance ??
+      s.project.actors[0]?.appearance
+    )
+  })
+  const selectedName = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return s.project.actors.find((a) => a.id === id)?.name ?? 'Actor'
+  })
   const setActorColor = useEditorStore((s) => s.setActorColor)
   const setActorSize = useEditorStore((s) => s.setActorSize)
   const setActorBorderRadius = useEditorStore((s) => s.setActorBorderRadius)
@@ -35,6 +45,14 @@ export function AppearancePanel() {
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const kindGroupId = useId()
+
+  if (!actor) {
+    return (
+      <div data-testid="appearance-panel" className="p-3 text-sm text-slate-500">
+        No actor selected.
+      </div>
+    )
+  }
 
   const actorSize = actor.width
 
@@ -58,6 +76,9 @@ export function AppearancePanel() {
 
   return (
     <div data-testid="appearance-panel" className="space-y-4 p-3">
+      <p className="text-xs text-slate-500">
+        Editing <span className="font-medium text-slate-700">{selectedName}</span>
+      </p>
       <fieldset data-testid="actor-kind-fieldset" className="space-y-2">
         <legend className="text-sm font-medium text-slate-800">Actor type</legend>
         <div className="flex flex-wrap gap-3">

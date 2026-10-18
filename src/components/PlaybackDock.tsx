@@ -1,3 +1,4 @@
+import { localToProject } from '../core/clip'
 import { traversalElapsedMs } from '../core/playback'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
@@ -15,9 +16,21 @@ const btnQuiet =
 
 export function PlaybackDock() {
   const mode = useEditorStore((s) => s.mode)
-  const recording = useEditorStore((s) => s.project.recording)
-  const transformKeys = useEditorStore((s) => s.project.transform.keyframes)
+  const selectedActor = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
+  })
+  const recording = selectedActor?.recording ?? null
+  const actorClip = selectedActor?.clip ?? { start: 0, end: 1 }
+  const hasAnyRecording = useEditorStore((s) =>
+    s.project.actors.some((a) => !!a.recording),
+  )
+  const transformKeys = selectedActor?.transform.keyframes ?? []
   const selectedTransformId = useEditorStore((s) => s.selectedTransformId)
+  const undoClip = useEditorStore((s) => s.undoClip)
+  const redoClip = useEditorStore((s) => s.redoClip)
+  const clipUndoStack = useEditorStore((s) => s.clipUndoStack)
+  const clipRedoStack = useEditorStore((s) => s.clipRedoStack)
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const undoStack = useEditorStore((s) => s.undoStack)
   const redoStack = useEditorStore((s) => s.redoStack)
@@ -47,7 +60,7 @@ export function PlaybackDock() {
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
   const hasRecording = !!recording
-  const playbackDisabled = !hasRecording || isRecordingLike
+  const playbackDisabled = !hasAnyRecording || isRecordingLike
 
   const elapsedMs = traversalElapsedMs(
     playbackHead,
@@ -66,7 +79,7 @@ export function PlaybackDock() {
       className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {hasRecording && !editing && (
+      {hasAnyRecording && !editing && (
         <div
           data-testid="playback-timeline"
           className="flex flex-col gap-1"
@@ -90,6 +103,7 @@ export function PlaybackDock() {
             >
               {transformKeys.map((kf) => {
                 const selected = kf.id === selectedTransformId
+                const projectT = localToProject(kf.t, actorClip)
                 return (
                   <button
                     key={kf.id}
@@ -98,7 +112,7 @@ export function PlaybackDock() {
                     data-testid={`transform-marker-${kf.id}`}
                     data-transform-marker
                     data-selected={selected ? 'true' : 'false'}
-                    aria-label={`Transform keyframe at ${Math.round(kf.t * 100)} percent, ${Math.round(kf.rotationDeg)} degrees, scale ${kf.scale.toFixed(2)}`}
+                    aria-label={`Transform keyframe at ${Math.round(projectT * 100)} percent of the project, ${Math.round(kf.rotationDeg)} degrees, scale ${kf.scale.toFixed(2)}`}
                     aria-pressed={selected}
                     disabled={isRecordingLike}
                     onClick={() => selectTransformKeyframe(kf.id)}
@@ -107,7 +121,7 @@ export function PlaybackDock() {
                         ? 'border-teal-800 bg-teal-600'
                         : 'border-slate-400 bg-slate-200 hover:bg-teal-200'
                     }`}
-                    style={{ left: `${kf.t * 100}%` }}
+                    style={{ left: `${projectT * 100}%` }}
                   />
                 )
               })}
@@ -199,6 +213,12 @@ export function PlaybackDock() {
                 type="button"
                 data-testid="btn-record"
                 onClick={() => {
+                  if (recording) {
+                    const ok = window.confirm(
+                      `Re-record “${selectedActor?.name ?? 'this actor'}”? This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.`,
+                    )
+                    if (!ok) return
+                  }
                   setPlaybackHead(0)
                   armRecording()
                 }}
@@ -253,18 +273,32 @@ export function PlaybackDock() {
             <button
               type="button"
               data-testid="btn-undo-transform"
-              onClick={undoTransform}
-              disabled={transformUndoStack.length === 0 || isRecordingLike}
+              onClick={() => {
+                if (transformUndoStack.length > 0) undoTransform()
+                else undoClip()
+              }}
+              disabled={
+                isRecordingLike ||
+                (transformUndoStack.length === 0 && clipUndoStack.length === 0)
+              }
               className={btnQuiet}
+              title="Undo transform or clip timing for the selected actor"
             >
               Undo
             </button>
             <button
               type="button"
               data-testid="btn-redo-transform"
-              onClick={redoTransform}
-              disabled={transformRedoStack.length === 0 || isRecordingLike}
+              onClick={() => {
+                if (transformRedoStack.length > 0) redoTransform()
+                else redoClip()
+              }}
+              disabled={
+                isRecordingLike ||
+                (transformRedoStack.length === 0 && clipRedoStack.length === 0)
+              }
               className={btnQuiet}
+              title="Redo transform or clip timing for the selected actor"
             >
               Redo
             </button>
@@ -272,11 +306,22 @@ export function PlaybackDock() {
             <button
               type="button"
               data-testid="btn-reset"
-              onClick={resetRecording}
+              onClick={() => {
+                if (
+                  recording &&
+                  !window.confirm(
+                    `Reset “${selectedActor?.name ?? 'this actor'}”? Clears that actor’s path, path edits, and transform — not other actors.`,
+                  )
+                ) {
+                  return
+                }
+                resetRecording()
+              }}
               disabled={!recording && mode === 'idle'}
               className={btnQuiet}
+              title="Reset selected actor’s take"
             >
-              Reset
+              Reset actor
             </button>
 
             {geometryEdit && (

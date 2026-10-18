@@ -17,7 +17,39 @@ import {
   upsertTransformKeyframe,
 } from '../../src/core/transform'
 import { DEFAULT_ACTOR, type MotionSample } from '../../src/core/types'
+import { findActor } from '../../src/core/sceneActor'
 import { useEditorStore } from '../../src/state/store'
+import { makeActor, makeProject } from './helpers/project'
+
+function selectedTransform() {
+  const state = useEditorStore.getState()
+  return findActor(state.project.actors, state.selectedActorId)!.transform
+}
+
+function seedTransformStore() {
+  const project = makeProject({
+    actors: [
+      makeActor({
+        recording: { samples, recordedDurationMs: 200 },
+      }),
+    ],
+    playback: {
+      durationMs: 1000,
+      loop: false,
+      loopMode: 'repeat',
+    },
+  })
+  const first = project.actors[0]
+  useEditorStore.setState({
+    project,
+    selectedActorId: first.id,
+    mode: 'idle',
+    playbackHead: 0.5,
+    selectedTransformId: null,
+    transformUndoStack: [],
+    transformRedoStack: [],
+  })
+}
 
 const samples: MotionSample[] = [
   { t: 0, x: 0.1, y: 0.2 },
@@ -146,32 +178,12 @@ describe('transform evaluation', () => {
 
 describe('transform store + export', () => {
   it('clears transform on new recording and preserves it when replacing the image', () => {
-    useEditorStore.setState({
-      project: {
-        version: 1,
-        actor: { ...DEFAULT_ACTOR },
-        recording: { samples, recordedDurationMs: 200 },
-        playback: {
-          durationMs: 1000,
-          smoothing: 0,
-          steadySpeed: 0,
-          loop: false,
-          loopMode: 'repeat',
-        },
-        stageAspect: 1.6,
-        transform: { keyframes: [] },
-      },
-      mode: 'idle',
-      playbackHead: 0.5,
-      selectedTransformId: null,
-      transformUndoStack: [],
-      transformRedoStack: [],
-    })
+    seedTransformStore()
     useEditorStore.getState().upsertTransformAtPlayhead(180, 2)
-    expect(useEditorStore.getState().project.transform.keyframes.length).toBeGreaterThan(0)
+    expect(selectedTransform().keyframes.length).toBeGreaterThan(0)
 
     useEditorStore.getState().beginRecording(1, { x: 0.3, y: 0.3 })
-    expect(useEditorStore.getState().project.transform.keyframes).toHaveLength(0)
+    expect(selectedTransform().keyframes).toHaveLength(0)
 
     useEditorStore.getState().finishRecording({
       samples,
@@ -179,7 +191,7 @@ describe('transform store + export', () => {
     })
     useEditorStore.setState({ playbackHead: 0.5 })
     useEditorStore.getState().upsertTransformAtPlayhead(90, 1.5)
-    const before = useEditorStore.getState().project.transform
+    const before = selectedTransform()
     useEditorStore.getState().setActorImage({
       mimeType: 'image/png',
       dataUrl: 'data:image/png;base64,aa',
@@ -187,42 +199,21 @@ describe('transform store + export', () => {
       naturalHeight: 4,
       label: 'Wide',
     })
-    expect(useEditorStore.getState().project.transform).toEqual(before)
+    expect(selectedTransform()).toEqual(before)
   })
 
   it('undo/redo uses one entry per completed keyframe action', () => {
-    useEditorStore.setState({
-      project: {
-        version: 1,
-        actor: { ...DEFAULT_ACTOR },
-        recording: { samples, recordedDurationMs: 200 },
-        playback: {
-          durationMs: 1000,
-          smoothing: 0,
-          steadySpeed: 0,
-          loop: false,
-          loopMode: 'repeat',
-        },
-        stageAspect: 1.6,
-        transform: { keyframes: [] },
-      },
-      mode: 'idle',
-      playbackHead: 0.4,
-      selectedTransformId: null,
-      transformUndoStack: [],
-      transformRedoStack: [],
-    })
+    seedTransformStore()
+    useEditorStore.setState({ playbackHead: 0.4 })
     useEditorStore.getState().upsertTransformAtPlayhead(45, 1.2)
     useEditorStore.setState({ playbackHead: 0.8 })
     useEditorStore.getState().upsertTransformAtPlayhead(90, 2)
     expect(useEditorStore.getState().transformUndoStack).toHaveLength(2)
     useEditorStore.getState().undoTransform()
-    expect(useEditorStore.getState().project.transform.keyframes).toHaveLength(2) // seed + first
+    expect(selectedTransform().keyframes).toHaveLength(2) // seed + first
     useEditorStore.getState().redoTransform()
     expect(
-      useEditorStore.getState().project.transform.keyframes.some(
-        (k) => k.rotationDeg === 90,
-      ),
+      selectedTransform().keyframes.some((k) => k.rotationDeg === 90),
     ).toBe(true)
   })
 
@@ -279,7 +270,7 @@ describe('transform store + export', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
     expect(parsed.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
-    expect(parsed.snapshot.project.transform.keyframes).toEqual([])
+    expect(parsed.snapshot.project.actors[0].transform.keyframes).toEqual([])
 
     const withXf = validateSnapshot({
       formatVersion: 4,
@@ -307,7 +298,7 @@ describe('transform store + export', () => {
     })
     expect(withXf.ok).toBe(true)
     if (!withXf.ok) return
-    expect(withXf.snapshot.project.transform.keyframes).toHaveLength(2)
+    expect(withXf.snapshot.project.actors[0].transform.keyframes).toHaveLength(2)
   })
 
   it('rejects v4 imports with invalid transform keyframes', () => {

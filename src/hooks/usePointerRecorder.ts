@@ -4,6 +4,7 @@ import {
   clientToNormalized,
   grabOffsetFromPointer,
 } from '../core/coords'
+import { findActor } from '../core/sceneActor'
 import {
   endDrag,
   getActivePointerId,
@@ -24,19 +25,23 @@ interface UsePointerRecorderOptions {
 export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
   const mode = useEditorStore((s) => s.mode)
   const pointerId = useEditorStore((s) => s.pointerId)
-  const livePosition = useEditorStore((s) => s.livePosition)
-  const hasRecording = useEditorStore((s) => !!s.project.recording)
-  const setIdle = useEditorStore((s) => s.setIdle)
+  const selectActor = useEditorStore((s) => s.selectActor)
 
   const getRect = useCallback(() => {
     return stageRef.current?.getBoundingClientRect() ?? null
   }, [stageRef])
 
   const onActorPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
+    (actorId: string, event: ReactPointerEvent<HTMLElement>) => {
       if (mode === 'playing' || mode === 'editing') return
-      // After a take exists, only armed recording may move the actor.
-      if (hasRecording && mode !== 'armed') return
+
+      selectActor(actorId)
+      const state = useEditorStore.getState()
+      const actor = findActor(state.project.actors, actorId)
+      if (!actor) return
+
+      // After a take exists on this actor, only armed recording may move it.
+      if (actor.recording && state.mode !== 'armed') return
 
       const rect = getRect()
       if (!rect) return
@@ -45,16 +50,20 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       event.currentTarget.setPointerCapture(event.pointerId)
 
       const pointer = clientToNormalized(event.clientX, event.clientY, rect)
-      setGrabOffset(grabOffsetFromPointer(pointer, livePosition))
+      const position =
+        actorId === state.selectedActorId
+          ? state.livePosition
+          : actor.restPosition
+      setGrabOffset(grabOffsetFromPointer(pointer, position))
       const center = centerFromPointer(pointer, getGrabOffset())
 
-      if (mode === 'armed') {
+      if (state.mode === 'armed') {
         startRecordingDrag(event.pointerId, event.timeStamp, center)
       } else {
         startIdleDrag(event.pointerId, center)
       }
     },
-    [mode, hasRecording, livePosition, getRect],
+    [mode, selectActor, getRect],
   )
 
   const onPointerMove = useCallback(
@@ -95,6 +104,14 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       if (isRecordingActive()) {
         endDrag(true)
       } else {
+        const pos = useEditorStore.getState().livePosition
+        const actor = findActor(
+          useEditorStore.getState().project.actors,
+          useEditorStore.getState().selectedActorId,
+        )
+        if (actor && !actor.recording) {
+          useEditorStore.getState().setRestPosition(pos)
+        }
         endDrag(false)
       }
     },
@@ -109,10 +126,10 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
         endDrag(true)
       } else {
         endDrag(false)
-        if (mode === 'recording') setIdle()
+        if (mode === 'recording') useEditorStore.getState().setIdle()
       }
     },
-    [mode, setIdle],
+    [mode],
   )
 
   return {

@@ -1,23 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { exportCssFromRecording } from '../core/export/css'
-import { buildHtmlDemo } from '../core/export/htmlDemo'
+import { exportCssFromProject } from '../core/export/css'
+import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
 import { downloadTextFile, stampFilename } from '../lib/download'
 import { copyText } from '../lib/clipboard'
-import { selectProcessedPath } from '../state/selectors'
+import { projectHasAnyRecording } from '../core/sceneActor'
 import { useEditorStore } from '../state/store'
 
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
-  const recording = project.recording
-  const actor = project.actor
-  const durationMs = project.playback.durationMs
-  const smoothing = project.playback.smoothing
-  const steadySpeed = project.playback.steadySpeed
-  const loop = project.playback.loop
-  const loopMode = project.playback.loopMode
-  const geometryEdit = useEditorStore((s) => s.geometryEdit)
-  const editSession = useEditorStore((s) => s.editSession)
-  const editPreview = useEditorStore((s) => s.editPreview)
   const announceAction = useEditorStore((s) => s.announceAction)
 
   const [copiedInline, setCopiedInline] = useState(false)
@@ -28,51 +18,12 @@ export function ExportPanel() {
   const codeRef = useRef<HTMLTextAreaElement>(null)
   const titleId = useId()
 
-  const processedPath = useMemo(
-    () =>
-      selectProcessedPath(project, {
-        geometryEdit,
-        editSession,
-        editPreview,
-      }),
-    [project, geometryEdit, editSession, editPreview],
-  )
-
-  const stageAspect = project.stageAspect
-
-  const transform = project.transform
-
-  const exportOptions = useMemo(() => {
-    if (!recording) return null
-    return {
-      samples: recording.samples,
-      smoothing,
-      steadySpeed,
-      durationMs,
-      actor,
-      loop,
-      loopMode,
-      stageAspect,
-      processedPath,
-      transform,
-    }
-  }, [
-    recording,
-    smoothing,
-    steadySpeed,
-    durationMs,
-    actor,
-    loop,
-    loopMode,
-    stageAspect,
-    processedPath,
-    transform,
-  ])
+  const hasExport = projectHasAnyRecording(project)
 
   const css = useMemo(() => {
-    if (!exportOptions) return ''
-    return exportCssFromRecording(exportOptions)
-  }, [exportOptions])
+    if (!hasExport) return ''
+    return exportCssFromProject(project)
+  }, [project, hasExport])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -84,7 +35,7 @@ export function ExportPanel() {
     return () => dialog.removeEventListener('close', onClose)
   }, [])
 
-  if (!recording || !exportOptions) return null
+  if (!hasExport) return null
 
   const announce = (message: string) => {
     setActionStatus(message)
@@ -114,7 +65,7 @@ export function ExportPanel() {
 
   const downloadHtmlDemo = () => {
     try {
-      const html = buildHtmlDemo(exportOptions)
+      const html = buildHtmlDemoFromProject(project)
       const ok = downloadTextFile(
         html,
         stampFilename('motionsketch-demo', 'html'),
@@ -180,8 +131,19 @@ export function ExportPanel() {
         </button>
       </div>
       <p className="text-[11px] leading-relaxed text-slate-500">
-        CSS matches View/Copy. The HTML demo is standalone — open the file
-        locally, no server needed.
+        {project.actors.length <= 1 ? (
+          <>
+            One shared stage and timeline. Drop the CSS next to your image (if
+            any) and use class <code className="text-[10px]">.actor</code> on the
+            element. HTML demo embeds assets offline.
+          </>
+        ) : (
+          <>
+            Shared timeline for every actor. CSS uses unique classes (
+            <code className="text-[10px]">.actor-1</code>, …). HTML demo embeds
+            all images offline.
+          </>
+        )}
       </p>
       {actionStatus && (
         <p data-testid="export-action-status" className="text-[11px] text-slate-600">

@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import {
   clampActorBorderRadius,
   clampActorSize,
-  cloneActor,
   normalizeActorColor,
 } from '../core/actor'
 import type { ActorImageAsset } from '../core/imageAsset'
@@ -10,7 +9,27 @@ import { copyPath } from '../core/edit'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
+import { createEmptyPersistableProject } from '../core/persist/document'
 import { captureViewportStageAspect, clampStageAspect } from '../core/stageAspect'
+import {
+  clampClip,
+  cloneClip,
+  localToProject,
+  projectToLocal,
+} from '../core/clip'
+import {
+  cloneSceneActor,
+  createSceneActor,
+  DEFAULT_REST_POSITION,
+  duplicateSceneActor,
+  findActor,
+  mapActor,
+  MAX_ACTORS,
+  projectHasAnyRecording,
+  restPositionFromRecording,
+  sanitizeActorName,
+  uniqueActorName,
+} from '../core/sceneActor'
 import {
   cloneTransformTrack,
   emptyTransformTrack,
@@ -18,66 +37,58 @@ import {
   upsertTransformKeyframe,
 } from '../core/transform'
 import {
-  DEFAULT_PROJECT,
-  DEFAULT_TRANSFORM_TRACK,
   MAX_PLAYBACK_DURATION_MS,
   MIN_PLAYBACK_DURATION_MS,
+  type ActorClip,
   type EditorMode,
   type GeometryEdit,
   type LoopMode,
   type MotionSample,
   type Project,
   type Recording,
+  type SceneActor,
   type TransformTrack,
   type Vec2,
 } from '../core/types'
-import { bakeEditablePath } from './selectors'
+import {
+  bakeEditablePathForActor,
+  selectActorPositionForActor,
+} from './selectors'
 
 const MAX_UNDO = 40
 
 interface EditorStore {
   project: Project
+  selectedActorId: string
   mode: EditorMode
   pointerId: number | null
   playbackHead: number
-  /**
-   * Path traversal direction for alternate looping (1 forward, -1 backward).
-   * Transient — not persisted.
-   */
   playbackDirection: PlaybackDirection
-  /**
-   * Bumped when playback should re-anchor the RAF clock (Play from end,
-   * Restart while already playing) without relying on a mode flicker.
-   */
   playbackEpoch: number
   livePosition: Vec2
   liveTrail: Vec2[]
   showPathComparison: boolean
 
   /**
-   * Committed geometry edits that persist after leaving Edit mode.
-   * Null means playback uses the live-processed recording.
+   * Working geometry for the selected actor (mirrors actor.geometryEdit when idle).
+   * Path undo/redo apply only to this selection — stacks clear on actor change.
    */
   geometryEdit: GeometryEdit | null
-  /** Working path while mode === 'editing' (may equal geometryEdit or a fresh bake). */
   editSession: GeometryEdit | null
   undoStack: MotionSample[][]
   redoStack: MotionSample[][]
   selectedHandleIndex: number | null
-  /** Live preview while a handle drag is in progress. */
   editPreview: MotionSample[] | null
 
-  /** Selected rotation/scale keyframe id (mutually exclusive with path edit). */
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
   transformRedoStack: TransformTrack[]
 
-  /**
-   * Transient stage tip after New project (not persisted).
-   * Cleared when the user starts recording again.
-   */
+  /** Selection-scoped clip timing history (one gesture → one entry). */
+  clipUndoStack: ActorClip[]
+  clipRedoStack: ActorClip[]
+
   stageHint: 'default' | 'new-project'
-  /** Brief action feedback for a polite live region (not persisted). */
   actionAnnouncement: string | null
 
   armRecording: () => void
@@ -88,20 +99,16 @@ interface EditorStore {
   setIdle: () => void
 
   setLivePosition: (position: Vec2) => void
+  /** Persist rest position for the selected actor (idle drag, no recording). */
+  setRestPosition: (position: Vec2) => void
   clearLiveTrail: () => void
 
   play: () => void
   pause: () => void
-  /** Jump to the start and begin playing. */
   restartPlayback: () => void
-  /**
-   * Seek the playhead (0..1). Pauses if currently playing so the actor
-   * stays on the scrubbed frame instead of being overwritten by the clock.
-   */
   scrubPlayback: (tNorm: number) => void
   setPlaybackHead: (tNorm: number) => void
   setPlaybackDirection: (direction: PlaybackDirection) => void
-  /** Atomic playhead + direction update (avoids pause/resume desync). */
   setPlaybackSample: (tNorm: number, direction: PlaybackDirection) => void
   stopPlayback: () => void
 
@@ -112,22 +119,38 @@ interface EditorStore {
   setLoopMode: (loopMode: LoopMode) => void
   setShowPathComparison: (show: boolean) => void
   setActorColor: (color: string) => void
-  /** Bounding-box longer edge as a fraction of the stage min-side. */
   setActorSize: (size: number) => void
   setActorBorderRadius: (radius: number) => void
   setActorKind: (kind: 'shape' | 'image') => void
   setActorImage: (image: ActorImageAsset) => void
   clearActorImage: () => void
   setActorImageLabel: (label: string) => void
+  /** Clear the selected actor’s recording, path edits, and transform track. */
   resetRecording: () => void
 
-  /** Full wipe to defaults (separate from Reset, which only clears the take). */
   newProject: () => void
-  /** Replace project + committed edits from a validated snapshot; paused at t=0. */
   applyPersistedSnapshot: (snapshot: PersistedSnapshot) => void
-  /** True when opening/importing/new would replace an existing animation. */
   hasReplaceableAnimation: () => boolean
   announceAction: (message: string | null) => void
+
+  selectActor: (id: string) => void
+  addActor: () => string | null
+  duplicateSelectedActor: () => string | null
+  deleteSelectedActor: () => boolean
+  renameSelectedActor: (name: string) => void
+  /** Rename a specific actor by id (ignores selection). */
+  renameActor: (id: string, name: string) => void
+  moveSelectedActor: (direction: -1 | 1) => void
+
+  /** Commit a full clip replace for an actor (one undo step). */
+  commitActorClip: (id: string, clip: ActorClip) => void
+  /** Live preview while dragging (no history). */
+  previewActorClip: (id: string, clip: ActorClip) => void
+  /** Begin a clip drag/resize; pairs with finishClipGesture. */
+  beginClipGesture: (id: string) => void
+  finishClipGesture: (id: string, clip: ActorClip) => void
+  undoClip: () => void
+  redoClip: () => void
 
   enterEditMode: () => void
   exitEditMode: () => void
@@ -141,9 +164,7 @@ interface EditorStore {
   redoEdit: () => void
 
   selectTransformKeyframe: (id: string | null) => void
-  /** Commit rotation/scale at the paused playhead (one history entry). */
   upsertTransformAtPlayhead: (rotationDeg: number, scale: number) => void
-  /** Update selected keyframe values and/or time (one history entry). */
   commitTransformKeyframe: (input: {
     id: string
     t: number
@@ -154,8 +175,6 @@ interface EditorStore {
   undoTransform: () => void
   redoTransform: () => void
 }
-
-const initialPosition: Vec2 = { x: 0.35, y: 0.5 }
 
 function clearEditState() {
   return {
@@ -176,731 +195,1179 @@ function clearTransformEditState() {
   }
 }
 
+function clearClipEditState() {
+  return {
+    clipUndoStack: [] as ActorClip[],
+    clipRedoStack: [] as ActorClip[],
+  }
+}
+
+/** History is selection-scoped: changing actors drops undo/redo stacks. */
+function clearHistoryForActorSwitch() {
+  return {
+    ...clearEditState(),
+    ...clearTransformEditState(),
+    ...clearClipEditState(),
+  }
+}
+
+let clipGestureBaseline: { id: string; clip: ActorClip } | null = null
+
+function getSelected(state: {
+  project: Project
+  selectedActorId: string
+}): SceneActor {
+  return (
+    findActor(state.project.actors, state.selectedActorId) ??
+    state.project.actors[0]
+  )
+}
+
+function withSelectedActor(
+  project: Project,
+  selectedActorId: string,
+  updater: (actor: SceneActor) => SceneActor,
+): Project {
+  return {
+    ...project,
+    actors: mapActor(project.actors, selectedActorId, updater),
+  }
+}
+
 function pushTransformHistory(
   state: EditorStore,
   nextTrack: TransformTrack,
   selectedId: string | null,
 ): Partial<EditorStore> {
-  const prev = cloneTransformTrack(
-    state.project.transform ?? emptyTransformTrack(),
-  )
+  const actor = getSelected(state)
+  const prev = cloneTransformTrack(actor.transform)
   return {
-    project: {
-      ...state.project,
+    project: withSelectedActor(state.project, state.selectedActorId, (a) => ({
+      ...a,
       transform: nextTrack,
-    },
+    })),
     selectedTransformId: selectedId,
     transformUndoStack: [...state.transformUndoStack, prev].slice(-MAX_UNDO),
     transformRedoStack: [],
   }
 }
 
-export const useEditorStore = create<EditorStore>((set, get) => ({
-  project: {
-    ...DEFAULT_PROJECT,
-    actor: cloneActor(DEFAULT_PROJECT.actor),
-    playback: { ...DEFAULT_PROJECT.playback },
-    stageAspect: DEFAULT_PROJECT.stageAspect,
-    transform: cloneTransformTrack(DEFAULT_TRANSFORM_TRACK),
-  },
-  mode: 'idle',
-  pointerId: null,
-  playbackHead: 0,
-  playbackDirection: 1,
-  playbackEpoch: 0,
-  livePosition: initialPosition,
-  liveTrail: [],
-  showPathComparison: false,
-  stageHint: 'default',
-  actionAnnouncement: null,
-  ...clearEditState(),
-  ...clearTransformEditState(),
+function initialProject(): Project {
+  const project = createEmptyPersistableProject()
+  return project
+}
 
-  armRecording: () => {
-    const { mode } = get()
-    if (mode === 'playing' || mode === 'editing') return
-    set({ mode: 'armed', liveTrail: [], stageHint: 'default' })
-  },
+export const useEditorStore = create<EditorStore>((set, get) => {
+  const project = initialProject()
+  const firstId = project.actors[0].id
 
-  cancelArm: () => {
-    if (get().mode === 'armed') {
-      set({ mode: 'idle', pointerId: null })
-    }
-  },
+  return {
+    project,
+    selectedActorId: firstId,
+    mode: 'idle',
+    pointerId: null,
+    playbackHead: 0,
+    playbackDirection: 1,
+    playbackEpoch: 0,
+    livePosition: { ...DEFAULT_REST_POSITION },
+    liveTrail: [],
+    showPathComparison: false,
+    stageHint: 'default',
+    actionAnnouncement: null,
+    ...clearEditState(),
+    ...clearTransformEditState(),
+    ...clearClipEditState(),
 
-  beginRecording: (pointerId, position) => {
-    const state = get()
-    set({
-      mode: 'recording',
-      pointerId,
-      livePosition: position,
-      liveTrail: [position],
-      playbackHead: 0,
-      playbackDirection: 1,
-      stageHint: 'default',
-      ...clearEditState(),
-      ...clearTransformEditState(),
-      // New take replaces the previous animation’s transform track.
-      project: {
-        ...state.project,
-        transform: emptyTransformTrack(),
-      },
-    })
-  },
+    armRecording: () => {
+      const { mode } = get()
+      if (mode === 'playing' || mode === 'editing') return
+      set({ mode: 'armed', liveTrail: [], stageHint: 'default' })
+    },
 
-  pushLiveSample: (position) => {
-    set((state) => ({
-      livePosition: position,
-      liveTrail: [...state.liveTrail, position],
-    }))
-  },
+    cancelArm: () => {
+      if (get().mode === 'armed') {
+        set({ mode: 'idle', pointerId: null })
+      }
+    },
 
-  finishRecording: (recording) => {
-    set((state) => ({
-      mode: 'idle',
-      pointerId: null,
-      liveTrail: [],
-      playbackHead: 0,
-      ...clearEditState(),
-      ...clearTransformEditState(),
-      project: {
-        ...state.project,
-        recording,
-        // New take clears transform track; asset replacement does not.
-        transform: emptyTransformTrack(),
-        playback: {
-          ...state.project.playback,
-          durationMs: recording
-            ? clamp(
-                Math.round(recording.recordedDurationMs),
-                MIN_PLAYBACK_DURATION_MS,
-                MAX_PLAYBACK_DURATION_MS,
-              )
-            : state.project.playback.durationMs,
+    beginRecording: (pointerId, position) => {
+      const state = get()
+      set({
+        mode: 'recording',
+        pointerId,
+        livePosition: position,
+        liveTrail: [position],
+        playbackHead: 0,
+        playbackDirection: 1,
+        stageHint: 'default',
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        // New take on the selected actor clears its transform + path edits.
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            transform: emptyTransformTrack(),
+            geometryEdit: null,
+          }),
+        ),
+      })
+    },
+
+    pushLiveSample: (position) => {
+      set((state) => ({
+        livePosition: position,
+        liveTrail: [...state.liveTrail, position],
+      }))
+    },
+
+    finishRecording: (recording) => {
+      set((state) => {
+        const nextProject = withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            recording,
+            // Shared Duration is unchanged — take is mapped to normalized progress.
+            transform: emptyTransformTrack(),
+            geometryEdit: null,
+            restPosition: recording
+              ? restPositionFromRecording(recording, a.restPosition)
+              : a.restPosition,
+          }),
+        )
+        return {
+          mode: 'idle' as const,
+          pointerId: null,
+          liveTrail: [],
+          playbackHead: 0,
+          ...clearEditState(),
+          ...clearTransformEditState(),
+          project: nextProject,
+          livePosition: recording
+            ? {
+                x: recording.samples[0].x,
+                y: recording.samples[0].y,
+              }
+            : state.livePosition,
+        }
+      })
+    },
+
+    setIdle: () => set({ mode: 'idle', pointerId: null }),
+
+    setLivePosition: (position) => set({ livePosition: position }),
+
+    setRestPosition: (position) =>
+      set((state) => ({
+        livePosition: position,
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            restPosition: {
+              x: clamp(position.x, 0, 1),
+              y: clamp(position.y, 0, 1),
+            },
+          }),
+        ),
+      })),
+
+    clearLiveTrail: () => set({ liveTrail: [] }),
+
+    play: () => {
+      const state = get()
+      if (!projectHasAnyRecording(state.project)) return
+      if (
+        state.mode === 'editing' ||
+        state.mode === 'armed' ||
+        state.mode === 'recording'
+      ) {
+        return
+      }
+      const atEnd =
+        !state.project.playback.loop && state.playbackHead >= 1
+      const head = atEnd ? 0 : state.playbackHead
+      set({
+        mode: 'playing',
+        playbackHead: head,
+        playbackDirection: atEnd ? 1 : state.playbackDirection,
+        playbackEpoch: state.playbackEpoch + 1,
+      })
+    },
+
+    pause: () => {
+      if (get().mode === 'playing') {
+        set({ mode: 'idle' })
+      }
+    },
+
+    restartPlayback: () => {
+      const state = get()
+      if (!projectHasAnyRecording(state.project)) return
+      if (
+        state.mode === 'editing' ||
+        state.mode === 'armed' ||
+        state.mode === 'recording'
+      ) {
+        return
+      }
+      set({
+        mode: 'playing',
+        playbackHead: 0,
+        playbackDirection: 1,
+        playbackEpoch: state.playbackEpoch + 1,
+      })
+    },
+
+    scrubPlayback: (tNorm) => {
+      const state = get()
+      if (!projectHasAnyRecording(state.project)) return
+      if (
+        state.mode === 'editing' ||
+        state.mode === 'armed' ||
+        state.mode === 'recording'
+      ) {
+        return
+      }
+      set({
+        mode: 'idle',
+        playbackHead: clamp(tNorm, 0, 1),
+        playbackDirection: 1,
+      })
+    },
+
+    setPlaybackHead: (tNorm) => set({ playbackHead: clamp(tNorm, 0, 1) }),
+
+    setPlaybackDirection: (direction) => set({ playbackDirection: direction }),
+
+    setPlaybackSample: (tNorm, direction) =>
+      set({
+        playbackHead: clamp(tNorm, 0, 1),
+        playbackDirection: direction,
+      }),
+
+    stopPlayback: () => set({ mode: 'idle' }),
+
+    setDurationMs: (ms) =>
+      set((state) => ({
+        project: {
+          ...state.project,
+          playback: {
+            ...state.project.playback,
+            durationMs: clamp(
+              ms,
+              MIN_PLAYBACK_DURATION_MS,
+              MAX_PLAYBACK_DURATION_MS,
+            ),
+          },
         },
-      },
-      livePosition: recording
-        ? {
-            x: recording.samples[0].x,
-            y: recording.samples[0].y,
-          }
-        : state.livePosition,
-    }))
-  },
+      })),
 
-  setIdle: () => set({ mode: 'idle', pointerId: null }),
+    setSmoothing: (value) => {
+      const state = get()
+      const actor = getSelected(state)
+      if (actor.geometryEdit || state.geometryEdit) return
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, smoothing: clamp(value, 0, 1) }),
+        ),
+      })
+    },
 
-  setLivePosition: (position) => set({ livePosition: position }),
+    setSteadySpeed: (value) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, steadySpeed: clamp(value, 0, 1) }),
+        ),
+      })),
 
-  clearLiveTrail: () => set({ liveTrail: [] }),
+    setLoop: (loop) =>
+      set((state) => ({
+        project: {
+          ...state.project,
+          playback: {
+            ...state.project.playback,
+            loop,
+          },
+        },
+        playbackEpoch:
+          state.mode === 'playing'
+            ? state.playbackEpoch + 1
+            : state.playbackEpoch,
+        playbackDirection: loop ? state.playbackDirection : 1,
+      })),
 
-  play: () => {
-    const state = get()
-    if (!state.project.recording) return
-    if (
-      state.mode === 'editing' ||
-      state.mode === 'armed' ||
-      state.mode === 'recording'
-    ) {
-      return
-    }
-    // End of a non-looping take: Play starts over from the beginning.
-    const atEnd =
-      !state.project.playback.loop && state.playbackHead >= 1
-    const head = atEnd ? 0 : state.playbackHead
-    set({
-      mode: 'playing',
-      playbackHead: head,
-      playbackDirection: atEnd ? 1 : state.playbackDirection,
-      playbackEpoch: state.playbackEpoch + 1,
-    })
-  },
+    setLoopMode: (loopMode) =>
+      set((state) => ({
+        project: {
+          ...state.project,
+          playback: {
+            ...state.project.playback,
+            loopMode,
+          },
+        },
+        playbackEpoch:
+          state.mode === 'playing'
+            ? state.playbackEpoch + 1
+            : state.playbackEpoch,
+        playbackDirection: loopMode === 'repeat' ? 1 : state.playbackDirection,
+      })),
 
-  pause: () => {
-    if (get().mode === 'playing') {
-      set({ mode: 'idle' })
-    }
-  },
+    setShowPathComparison: (show) => set({ showPathComparison: show }),
 
-  restartPlayback: () => {
-    const state = get()
-    if (!state.project.recording) return
-    if (
-      state.mode === 'editing' ||
-      state.mode === 'armed' ||
-      state.mode === 'recording'
-    ) {
-      return
-    }
-    set({
-      mode: 'playing',
-      playbackHead: 0,
-      playbackDirection: 1,
-      playbackEpoch: state.playbackEpoch + 1,
-    })
-  },
+    setActorColor: (color) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            appearance: {
+              ...a.appearance,
+              color: normalizeActorColor(color) ?? a.appearance.color,
+            },
+          }),
+        ),
+      })),
 
-  scrubPlayback: (tNorm) => {
-    const state = get()
-    if (!state.project.recording) return
-    if (
-      state.mode === 'editing' ||
-      state.mode === 'armed' ||
-      state.mode === 'recording'
-    ) {
-      return
-    }
-    // Scrubber is path position (0=start, 1=end). Seeking pauses and
-    // resumes forward from that point — even if we were playing backward.
-    set({
-      mode: 'idle',
-      playbackHead: clamp(tNorm, 0, 1),
-      playbackDirection: 1,
-    })
-  },
+    setActorSize: (size) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            const next = clampActorSize(size)
+            return {
+              ...a,
+              appearance: {
+                ...a.appearance,
+                width: next,
+                height:
+                  a.appearance.kind === 'shape' ? next : a.appearance.height,
+              },
+            }
+          },
+        ),
+      })),
 
-  setPlaybackHead: (tNorm) => set({ playbackHead: clamp(tNorm, 0, 1) }),
+    setActorBorderRadius: (radius) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            appearance: {
+              ...a.appearance,
+              borderRadius: clampActorBorderRadius(radius),
+            },
+          }),
+        ),
+      })),
 
-  setPlaybackDirection: (direction) => set({ playbackDirection: direction }),
+    setActorKind: (kind) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            if (kind === 'image' && !a.appearance.image) return a
+            return {
+              ...a,
+              appearance: {
+                ...a.appearance,
+                kind,
+                height:
+                  kind === 'shape' ? a.appearance.width : a.appearance.height,
+              },
+            }
+          },
+        ),
+      })),
 
-  setPlaybackSample: (tNorm, direction) =>
-    set({
-      playbackHead: clamp(tNorm, 0, 1),
-      playbackDirection: direction,
-    }),
+    setActorImage: (image) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            appearance: {
+              ...a.appearance,
+              kind: 'image',
+              image: { ...image },
+            },
+          }),
+        ),
+      })),
 
-  stopPlayback: () => set({ mode: 'idle' }),
+    clearActorImage: () =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            appearance: {
+              ...a.appearance,
+              kind: 'shape',
+              height: a.appearance.width,
+              image: null,
+            },
+          }),
+        ),
+      })),
 
-  setDurationMs: (ms) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        playback: {
-          ...state.project.playback,
-          durationMs: clamp(
-            ms,
-            MIN_PLAYBACK_DURATION_MS,
-            MAX_PLAYBACK_DURATION_MS,
+    setActorImageLabel: (label) =>
+      set((state) => {
+        const actor = getSelected(state)
+        if (!actor.appearance.image) return state
+        const next = label.trim().slice(0, 64) || 'Image'
+        return {
+          project: withSelectedActor(
+            state.project,
+            state.selectedActorId,
+            (a) => ({
+              ...a,
+              appearance: {
+                ...a.appearance,
+                image: a.appearance.image
+                  ? { ...a.appearance.image, label: next }
+                  : null,
+              },
+            }),
           ),
+        }
+      }),
+
+    resetRecording: () =>
+      set((state) => {
+        const actor = getSelected(state)
+        return {
+          mode: 'idle' as const,
+          pointerId: null,
+          playbackHead: 0,
+          playbackDirection: 1 as const,
+          liveTrail: [],
+          livePosition: { ...actor.restPosition },
+          ...clearEditState(),
+          ...clearTransformEditState(),
+          project: withSelectedActor(
+            state.project,
+            state.selectedActorId,
+            (a) => ({
+              ...a,
+              recording: null,
+              transform: emptyTransformTrack(),
+              geometryEdit: null,
+            }),
+          ),
+        }
+      }),
+
+    newProject: () => {
+      const project = createEmptyPersistableProject(captureViewportStageAspect())
+      set({
+        mode: 'idle',
+        pointerId: null,
+        playbackHead: 0,
+        playbackDirection: 1,
+        liveTrail: [],
+        livePosition: { ...DEFAULT_REST_POSITION },
+        showPathComparison: false,
+        stageHint: 'new-project',
+        actionAnnouncement: 'New project created.',
+        selectedActorId: project.actors[0].id,
+        ...clearHistoryForActorSwitch(),
+        project,
+      })
+    },
+
+    applyPersistedSnapshot: (snapshot) => {
+      const project: Project = {
+        version: 1,
+        actors: snapshot.project.actors.map((a) => cloneSceneActor(a)),
+        playback: { ...snapshot.project.playback },
+        stageAspect: clampStageAspect(snapshot.project.stageAspect),
+      }
+      const first = project.actors[0] ?? createSceneActor({ name: 'Actor 1' })
+      if (project.actors.length === 0) {
+        project.actors = [first]
+      }
+      const selectedActorId = first.id
+      set({
+        mode: 'idle',
+        pointerId: null,
+        playbackHead: 0,
+        playbackDirection: 1,
+        liveTrail: [],
+        livePosition: { ...first.restPosition },
+        showPathComparison: false,
+        stageHint: 'default',
+        selectedActorId,
+        geometryEdit: first?.geometryEdit
+          ? {
+              bakedSmoothing: first.geometryEdit.bakedSmoothing,
+              samples: copyPath(first.geometryEdit.samples),
+            }
+          : null,
+        editSession: null,
+        undoStack: [],
+        redoStack: [],
+        selectedHandleIndex: null,
+        editPreview: null,
+        ...clearTransformEditState(),
+        project,
+      })
+    },
+
+    hasReplaceableAnimation: () => projectHasAnyRecording(get().project),
+
+    announceAction: (message) => set({ actionAnnouncement: message }),
+
+    selectActor: (id) => {
+      const state = get()
+      if (!findActor(state.project.actors, id)) return
+      if (id === state.selectedActorId) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const actor = findActor(state.project.actors, id)!
+      const livePosition = selectActorPositionForActor(
+        state.project,
+        actor,
+        state.playbackHead,
+        actor.restPosition,
+        state.mode,
+        {
+          geometryEdit: actor.geometryEdit,
+          editSession: null,
+          editPreview: null,
         },
-      },
-    })),
+        false,
+      )
+      set({
+        selectedActorId: id,
+        livePosition,
+        mode: state.mode === 'playing' ? 'playing' : 'idle',
+        ...clearHistoryForActorSwitch(),
+        geometryEdit: actor.geometryEdit
+          ? {
+              bakedSmoothing: actor.geometryEdit.bakedSmoothing,
+              samples: copyPath(actor.geometryEdit.samples),
+            }
+          : null,
+      })
+    },
 
-  setSmoothing: (value) => {
-    const state = get()
-    // Committed edits bake spatial smoothing — don't silently reprocess under them.
-    if (state.geometryEdit) return
-    set({
-      project: {
-        ...state.project,
-        playback: {
-          ...state.project.playback,
-          smoothing: clamp(value, 0, 1),
+    addActor: () => {
+      const state = get()
+      if (state.project.actors.length >= MAX_ACTORS) {
+        set({
+          actionAnnouncement: `Actor limit reached (${MAX_ACTORS}).`,
+        })
+        return null
+      }
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return null
+      }
+      const names = state.project.actors.map((a) => a.name)
+      const actor = createSceneActor({
+        name: uniqueActorName('Actor', names),
+        restPosition: {
+          x: clamp(0.35 + state.project.actors.length * 0.06, 0.15, 0.85),
+          y: clamp(0.5 + (state.project.actors.length % 3) * 0.05, 0.2, 0.8),
         },
-      },
-    })
-  },
-
-  setSteadySpeed: (value) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        playback: {
-          ...state.project.playback,
-          steadySpeed: clamp(value, 0, 1),
+      })
+      set({
+        project: {
+          ...state.project,
+          actors: [...state.project.actors, actor],
         },
-      },
-    })),
+        selectedActorId: actor.id,
+        livePosition: { ...actor.restPosition },
+        ...clearHistoryForActorSwitch(),
+        actionAnnouncement: `Added ${actor.name}.`,
+      })
+      return actor.id
+    },
 
-  setLoop: (loop) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        playback: {
-          ...state.project.playback,
-          loop,
-        },
-      },
-      // Re-anchor if currently playing so the clock picks up the new mode.
-      playbackEpoch:
-        state.mode === 'playing'
-          ? state.playbackEpoch + 1
-          : state.playbackEpoch,
-      playbackDirection: loop ? state.playbackDirection : 1,
-    })),
+    duplicateSelectedActor: () => {
+      const state = get()
+      if (state.project.actors.length >= MAX_ACTORS) {
+        set({
+          actionAnnouncement: `Actor limit reached (${MAX_ACTORS}).`,
+        })
+        return null
+      }
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return null
+      }
+      const source = getSelected(state)
+      const names = state.project.actors.map((a) => a.name)
+      const copy = duplicateSceneActor(
+        source,
+        uniqueActorName(`${source.name} copy`, names),
+      )
+      const index = state.project.actors.findIndex((a) => a.id === source.id)
+      const actors = [...state.project.actors]
+      actors.splice(index + 1, 0, copy)
+      set({
+        project: { ...state.project, actors },
+        selectedActorId: copy.id,
+        livePosition: { ...copy.restPosition },
+        ...clearHistoryForActorSwitch(),
+        geometryEdit: copy.geometryEdit
+          ? {
+              bakedSmoothing: copy.geometryEdit.bakedSmoothing,
+              samples: copyPath(copy.geometryEdit.samples),
+            }
+          : null,
+        actionAnnouncement: `Duplicated ${source.name}.`,
+      })
+      return copy.id
+    },
 
-  setLoopMode: (loopMode) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        playback: {
-          ...state.project.playback,
-          loopMode,
-        },
-      },
-      playbackEpoch:
-        state.mode === 'playing'
-          ? state.playbackEpoch + 1
-          : state.playbackEpoch,
-      // Switching to repeat always travels forward from the current head.
-      playbackDirection: loopMode === 'repeat' ? 1 : state.playbackDirection,
-    })),
+    deleteSelectedActor: () => {
+      const state = get()
+      if (state.project.actors.length <= 1) {
+        set({ actionAnnouncement: 'At least one actor is required.' })
+        return false
+      }
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return false
+      }
+      const id = state.selectedActorId
+      const index = state.project.actors.findIndex((a) => a.id === id)
+      const actors = state.project.actors.filter((a) => a.id !== id)
+      const next = actors[Math.max(0, index - 1)] ?? actors[0]
+      set({
+        project: { ...state.project, actors },
+        selectedActorId: next.id,
+        livePosition: { ...next.restPosition },
+        ...clearHistoryForActorSwitch(),
+        geometryEdit: next.geometryEdit
+          ? {
+              bakedSmoothing: next.geometryEdit.bakedSmoothing,
+              samples: copyPath(next.geometryEdit.samples),
+            }
+          : null,
+        actionAnnouncement: 'Actor deleted.',
+      })
+      return true
+    },
 
-  setShowPathComparison: (show) => set({ showPathComparison: show }),
+    renameSelectedActor: (name) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, name: sanitizeActorName(name) }),
+        ),
+      })),
 
-  setActorColor: (color) => {
-    const normalized = normalizeActorColor(color)
-    if (!normalized) return
-    set((state) => ({
-      project: {
-        ...state.project,
-        actor: { ...state.project.actor, color: normalized },
-      },
-    }))
-  },
-
-  setActorSize: (size) => {
-    const next = clampActorSize(size)
-    set((state) => ({
-      project: {
-        ...state.project,
-        actor: {
-          ...state.project.actor,
-          width: next,
-          height: next,
-        },
-      },
-    }))
-  },
-
-  setActorBorderRadius: (radius) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        actor: {
-          ...state.project.actor,
-          borderRadius: clampActorBorderRadius(radius),
-        },
-      },
-    })),
-
-  setActorKind: (kind) =>
-    set((state) => {
-      const actor = state.project.actor
-      if (kind === 'image') {
-        // Require an asset — UI uploads first, then switches kind.
-        if (!actor.image) return state
+    renameActor: (id, name) =>
+      set((state) => {
+        if (!findActor(state.project.actors, id)) return state
         return {
           project: {
             ...state.project,
-            actor: { ...actor, kind: 'image', height: actor.width },
+            actors: mapActor(state.project.actors, id, (a) => ({
+              ...a,
+              name: sanitizeActorName(name),
+            })),
           },
         }
-      }
-      // Back to shape: keep color/radius/size; drop active image display.
-      return {
-        project: {
-          ...state.project,
-          actor: {
-            ...actor,
-            kind: 'shape',
-            height: actor.width,
-            image: actor.image,
-          },
-        },
-      }
-    }),
+      }),
 
-  setActorImage: (image) =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        actor: {
-          ...state.project.actor,
-          kind: 'image',
-          height: state.project.actor.width,
-          image: { ...image },
-        },
-      },
-    })),
-
-  clearActorImage: () =>
-    set((state) => ({
-      project: {
-        ...state.project,
-        actor: {
-          ...state.project.actor,
-          kind: 'shape',
-          height: state.project.actor.width,
-          image: null,
-        },
-      },
-    })),
-
-  setActorImageLabel: (label) =>
-    set((state) => {
-      const image = state.project.actor.image
-      if (!image) return state
-      const next = label.trim().slice(0, 64) || 'Image'
-      return {
-        project: {
-          ...state.project,
-          actor: {
-            ...state.project.actor,
-            image: { ...image, label: next },
-          },
-        },
-      }
-    }),
-
-  resetRecording: () =>
-    set((state) => ({
-      mode: 'idle',
-      pointerId: null,
-      playbackHead: 0,
-      playbackDirection: 1,
-      liveTrail: [],
-      livePosition: initialPosition,
-      ...clearEditState(),
-      ...clearTransformEditState(),
-      project: {
-        ...state.project,
-        recording: null,
-        transform: emptyTransformTrack(),
-      },
-    })),
-
-  newProject: () =>
-    set({
-      mode: 'idle',
-      pointerId: null,
-      playbackHead: 0,
-      playbackDirection: 1,
-      liveTrail: [],
-      livePosition: initialPosition,
-      showPathComparison: false,
-      stageHint: 'new-project',
-      actionAnnouncement: 'New project created.',
-      ...clearEditState(),
-      ...clearTransformEditState(),
-      project: {
-        version: 1,
-        actor: cloneActor(DEFAULT_PROJECT.actor),
-        recording: null,
-        playback: { ...DEFAULT_PROJECT.playback },
-        // Capture available viewport once; never rewrite on later resize.
-        stageAspect: captureViewportStageAspect(),
-        transform: emptyTransformTrack(),
-      },
-    }),
-
-  applyPersistedSnapshot: (snapshot) => {
-    const recording = snapshot.project.recording
-    const start = recording
-      ? { x: recording.samples[0].x, y: recording.samples[0].y }
-      : initialPosition
-
-    set({
-      mode: 'idle',
-      pointerId: null,
-      playbackHead: 0,
-      playbackDirection: 1,
-      liveTrail: [],
-      livePosition: start,
-      showPathComparison: false,
-      stageHint: 'default',
-      geometryEdit: snapshot.geometryEdit
-        ? {
-            bakedSmoothing: snapshot.geometryEdit.bakedSmoothing,
-            samples: copyPath(snapshot.geometryEdit.samples),
-          }
-        : null,
-      editSession: null,
-      undoStack: [],
-      redoStack: [],
-      selectedHandleIndex: null,
-      editPreview: null,
-      ...clearTransformEditState(),
-      project: {
-        version: 1,
-        actor: cloneActor(snapshot.project.actor),
-        recording: recording
-          ? {
-              recordedDurationMs: recording.recordedDurationMs,
-              samples: copyPath(recording.samples),
-            }
-          : null,
-        playback: { ...snapshot.project.playback },
-        stageAspect: clampStageAspect(snapshot.project.stageAspect),
-        transform: cloneTransformTrack(
-          snapshot.project.transform ?? emptyTransformTrack(),
-        ),
-      },
-    })
-  },
-
-  hasReplaceableAnimation: () => !!get().project.recording,
-
-  announceAction: (message) => set({ actionAnnouncement: message }),
-
-  enterEditMode: () => {
-    const state = get()
-    if (!state.project.recording) return
-    if (state.mode === 'recording' || state.mode === 'armed') return
-
-    const samples = state.geometryEdit
-      ? copyPath(state.geometryEdit.samples)
-      : bakeEditablePath(state.project)
-    if (samples.length < 2) return
-
-    const editSession: GeometryEdit = {
-      samples,
-      bakedSmoothing:
-        state.geometryEdit?.bakedSmoothing ?? state.project.playback.smoothing,
-    }
-
-    // Pause playback by leaving 'playing'; path editing owns the stage.
-    // Clear transform selection so path / transform gestures stay mutually exclusive.
-    set({
-      mode: 'editing',
-      editSession,
-      editPreview: null,
-      selectedHandleIndex: state.selectedHandleIndex ?? 0,
-      selectedTransformId: null,
-    })
-  },
-
-  exitEditMode: () => {
-    if (get().mode !== 'editing') return
-    set({
-      mode: 'idle',
-      editSession: null,
-      editPreview: null,
-      pointerId: null,
-    })
-  },
-
-  restoreRecordedPath: () => {
-    const wasEditing = get().mode === 'editing'
-    set({
-      geometryEdit: null,
-      undoStack: [],
-      redoStack: [],
-      editPreview: null,
-      selectedHandleIndex: wasEditing ? 0 : null,
-      editSession: null,
-    })
-
-    if (wasEditing) {
+    commitActorClip: (id, clip) => {
       const state = get()
-      const baked = bakeEditablePath(state.project)
-      if (baked.length >= 2) {
-        set({
-          mode: 'editing',
-          editSession: {
-            samples: baked,
-            bakedSmoothing: state.project.playback.smoothing,
-          },
-          selectedHandleIndex: 0,
-        })
-      } else {
-        set({ mode: 'idle' })
+      const actor = findActor(state.project.actors, id)
+      if (!actor) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
       }
-    }
-  },
+      const next = clampClip(clip)
+      const prev = cloneClip(actor.clip)
+      if (
+        Math.abs(prev.start - next.start) < 1e-9 &&
+        Math.abs(prev.end - next.end) < 1e-9
+      ) {
+        return
+      }
+      set({
+        project: {
+          ...state.project,
+          actors: mapActor(state.project.actors, id, (a) => ({
+            ...a,
+            clip: next,
+          })),
+        },
+        selectedActorId: id,
+        clipUndoStack: [...state.clipUndoStack, prev].slice(-MAX_UNDO),
+        clipRedoStack: [],
+      })
+    },
 
-  setSelectedHandleIndex: (index) =>
-    set({
-      selectedHandleIndex: index,
-      selectedTransformId: index !== null ? null : get().selectedTransformId,
-    }),
+    previewActorClip: (id, clip) => {
+      const state = get()
+      if (!findActor(state.project.actors, id)) return
+      set({
+        project: {
+          ...state.project,
+          actors: mapActor(state.project.actors, id, (a) => ({
+            ...a,
+            clip: clampClip(clip),
+          })),
+        },
+      })
+    },
 
-  beginHandleDrag: () => {
-    const state = get()
-    const base = state.editSession ?? state.geometryEdit
-    if (!base) return
-    set({ editPreview: copyPath(base.samples) })
-  },
+    beginClipGesture: (id) => {
+      const actor = findActor(get().project.actors, id)
+      if (!actor) return
+      clipGestureBaseline = { id, clip: cloneClip(actor.clip) }
+      if (get().selectedActorId !== id) {
+        get().selectActor(id)
+      }
+    },
 
-  updateEditPreview: (samples) => set({ editPreview: samples }),
+    finishClipGesture: (id, clip) => {
+      const state = get()
+      const actor = findActor(state.project.actors, id)
+      if (!actor) {
+        clipGestureBaseline = null
+        return
+      }
+      const next = clampClip(clip)
+      const baseline =
+        clipGestureBaseline?.id === id
+          ? clipGestureBaseline.clip
+          : cloneClip(actor.clip)
+      clipGestureBaseline = null
+      if (
+        Math.abs(baseline.start - next.start) < 1e-9 &&
+        Math.abs(baseline.end - next.end) < 1e-9
+      ) {
+        set({
+          project: {
+            ...state.project,
+            actors: mapActor(state.project.actors, id, (a) => ({
+              ...a,
+              clip: next,
+            })),
+          },
+        })
+        return
+      }
+      set({
+        project: {
+          ...state.project,
+          actors: mapActor(state.project.actors, id, (a) => ({
+            ...a,
+            clip: next,
+          })),
+        },
+        selectedActorId: id,
+        clipUndoStack: [...state.clipUndoStack, baseline].slice(-MAX_UNDO),
+        clipRedoStack: [],
+      })
+    },
 
-  commitHandleEdit: (samples) => {
-    const state = get()
-    const base = state.editSession ?? state.geometryEdit
-    if (!base) return
+    undoClip: () => {
+      const state = get()
+      if (state.clipUndoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const previous = state.clipUndoStack[state.clipUndoStack.length - 1]
+      const actor = getSelected(state)
+      const current = cloneClip(actor.clip)
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, clip: cloneClip(previous) }),
+        ),
+        clipUndoStack: state.clipUndoStack.slice(0, -1),
+        clipRedoStack: [...state.clipRedoStack, current].slice(-MAX_UNDO),
+      })
+    },
 
-    const previous = copyPath(base.samples)
-    const next: GeometryEdit = {
-      bakedSmoothing: base.bakedSmoothing,
-      samples: copyPath(samples),
-    }
+    redoClip: () => {
+      const state = get()
+      if (state.clipRedoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const next = state.clipRedoStack[state.clipRedoStack.length - 1]
+      const actor = getSelected(state)
+      const current = cloneClip(actor.clip)
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, clip: cloneClip(next) }),
+        ),
+        clipRedoStack: state.clipRedoStack.slice(0, -1),
+        clipUndoStack: [...state.clipUndoStack, current].slice(-MAX_UNDO),
+      })
+    },
 
-    set({
-      geometryEdit: next,
-      editSession: state.mode === 'editing' ? next : null,
-      undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
-      redoStack: [],
-      editPreview: null,
-    })
-  },
+    moveSelectedActor: (direction) =>
+      set((state) => {
+        const index = state.project.actors.findIndex(
+          (a) => a.id === state.selectedActorId,
+        )
+        const target = index + direction
+        if (index < 0 || target < 0 || target >= state.project.actors.length) {
+          return state
+        }
+        const actors = [...state.project.actors]
+        const [item] = actors.splice(index, 1)
+        actors.splice(target, 0, item)
+        return { project: { ...state.project, actors } }
+      }),
 
-  cancelHandleDrag: () => set({ editPreview: null }),
+    enterEditMode: () => {
+      const state = get()
+      const actor = getSelected(state)
+      if (!actor.recording) return
+      if (state.mode === 'recording' || state.mode === 'armed') return
 
-  undoEdit: () => {
-    const state = get()
-    const current = state.editSession ?? state.geometryEdit
-    if (!current || state.undoStack.length === 0) return
+      const samples = state.geometryEdit
+        ? copyPath(state.geometryEdit.samples)
+        : actor.geometryEdit
+          ? copyPath(actor.geometryEdit.samples)
+          : bakeEditablePathForActor(state.project, actor)
+      if (samples.length < 2) return
 
-    const previous = state.undoStack[state.undoStack.length - 1]
-    const next: GeometryEdit = {
-      bakedSmoothing: current.bakedSmoothing,
-      samples: copyPath(previous),
-    }
+      const editSession: GeometryEdit = {
+        samples,
+        bakedSmoothing:
+          state.geometryEdit?.bakedSmoothing ??
+          actor.geometryEdit?.bakedSmoothing ??
+          actor.smoothing,
+      }
 
-    set({
-      geometryEdit: next,
-      editSession: state.mode === 'editing' ? next : null,
-      undoStack: state.undoStack.slice(0, -1),
-      redoStack: [...state.redoStack, copyPath(current.samples)].slice(-MAX_UNDO),
-      editPreview: null,
-    })
-  },
+      set({
+        mode: 'editing',
+        editSession,
+        editPreview: null,
+        selectedHandleIndex: state.selectedHandleIndex ?? 0,
+        selectedTransformId: null,
+      })
+    },
 
-  redoEdit: () => {
-    const state = get()
-    const current = state.editSession ?? state.geometryEdit
-    if (!current || state.redoStack.length === 0) return
+    exitEditMode: () => {
+      if (get().mode !== 'editing') return
+      set({
+        mode: 'idle',
+        editSession: null,
+        editPreview: null,
+        pointerId: null,
+      })
+    },
 
-    const restored = state.redoStack[state.redoStack.length - 1]
-    const next: GeometryEdit = {
-      bakedSmoothing: current.bakedSmoothing,
-      samples: copyPath(restored),
-    }
+    restoreRecordedPath: () => {
+      const state = get()
+      const wasEditing = state.mode === 'editing'
+      const nextProject = withSelectedActor(
+        state.project,
+        state.selectedActorId,
+        (a) => ({ ...a, geometryEdit: null }),
+      )
+      set({
+        project: nextProject,
+        geometryEdit: null,
+        undoStack: [],
+        redoStack: [],
+        editPreview: null,
+        selectedHandleIndex: wasEditing ? 0 : null,
+        editSession: null,
+      })
 
-    set({
-      geometryEdit: next,
-      editSession: state.mode === 'editing' ? next : null,
-      redoStack: state.redoStack.slice(0, -1),
-      undoStack: [...state.undoStack, copyPath(current.samples)].slice(-MAX_UNDO),
-      editPreview: null,
-    })
-  },
+      if (wasEditing) {
+        const actor = getSelected(get())
+        const baked = bakeEditablePathForActor(get().project, actor)
+        if (baked.length >= 2) {
+          set({
+            mode: 'editing',
+            editSession: {
+              samples: baked,
+              bakedSmoothing: actor.smoothing,
+            },
+            selectedHandleIndex: 0,
+          })
+        } else {
+          set({ mode: 'idle' })
+        }
+      }
+    },
 
-  selectTransformKeyframe: (id) => {
-    const state = get()
-    if (state.mode === 'editing' || state.mode === 'armed' || state.mode === 'recording') {
-      return
-    }
-    if (id === null) {
-      set({ selectedTransformId: null })
-      return
-    }
-    const kf = state.project.transform?.keyframes.find((k) => k.id === id)
-    if (!kf) return
-    set({
-      mode: 'idle',
-      selectedTransformId: id,
-      selectedHandleIndex: null,
-      playbackHead: clamp(kf.t, 0, 1),
-      playbackDirection: 1,
-    })
-  },
+    setSelectedHandleIndex: (index) =>
+      set({
+        selectedHandleIndex: index,
+        selectedTransformId: index !== null ? null : get().selectedTransformId,
+      }),
 
-  upsertTransformAtPlayhead: (rotationDeg, scale) => {
-    const state = get()
-    if (!state.project.recording) return
-    if (
-      state.mode === 'editing' ||
-      state.mode === 'armed' ||
-      state.mode === 'recording'
-    ) {
-      return
-    }
-    const t = clamp(state.playbackHead, 0, 1)
-    const current = state.project.transform ?? emptyTransformTrack()
-    const { track, keyframeId } = upsertTransformKeyframe(current, {
-      t,
-      rotationDeg,
-      scale,
-      id: state.selectedTransformId ?? undefined,
-    })
-    set({
-      mode: 'idle',
-      ...pushTransformHistory(state, track, keyframeId),
-    })
-  },
+    beginHandleDrag: () => {
+      const state = get()
+      const base = state.editSession ?? state.geometryEdit
+      if (!base) return
+      set({ editPreview: copyPath(base.samples) })
+    },
 
-  commitTransformKeyframe: (input) => {
-    const state = get()
-    if (!state.project.recording) return
-    if (state.mode === 'editing') return
-    const current = state.project.transform ?? emptyTransformTrack()
-    if (!current.keyframes.some((k) => k.id === input.id)) return
-    const { track, keyframeId } = upsertTransformKeyframe(current, input)
-    set({
-      mode: 'idle',
-      playbackHead: clamp(input.t, 0, 1),
-      ...pushTransformHistory(state, track, keyframeId),
-    })
-  },
+    updateEditPreview: (samples) => set({ editPreview: samples }),
 
-  deleteSelectedTransform: () => {
-    const state = get()
-    const id = state.selectedTransformId
-    if (!id) return
-    const current = state.project.transform ?? emptyTransformTrack()
-    if (!current.keyframes.some((k) => k.id === id)) return
-    const next = removeTransformKeyframe(current, id)
-    set({
-      ...pushTransformHistory(state, next, null),
-    })
-  },
+    commitHandleEdit: (samples) => {
+      const state = get()
+      const base = state.editSession ?? state.geometryEdit
+      if (!base) return
 
-  undoTransform: () => {
-    const state = get()
-    if (state.mode === 'editing') return
-    if (state.transformUndoStack.length === 0) return
-    const previous = state.transformUndoStack[state.transformUndoStack.length - 1]
-    const current = cloneTransformTrack(
-      state.project.transform ?? emptyTransformTrack(),
-    )
-    const selectedStill =
-      state.selectedTransformId &&
-      previous.keyframes.some((k) => k.id === state.selectedTransformId)
-        ? state.selectedTransformId
-        : null
-    set({
-      project: {
-        ...state.project,
-        transform: cloneTransformTrack(previous),
-      },
-      transformUndoStack: state.transformUndoStack.slice(0, -1),
-      transformRedoStack: [...state.transformRedoStack, current].slice(-MAX_UNDO),
-      selectedTransformId: selectedStill,
-    })
-  },
+      const previous = copyPath(base.samples)
+      const next: GeometryEdit = {
+        bakedSmoothing: base.bakedSmoothing,
+        samples: copyPath(samples),
+      }
 
-  redoTransform: () => {
-    const state = get()
-    if (state.mode === 'editing') return
-    if (state.transformRedoStack.length === 0) return
-    const restored = state.transformRedoStack[state.transformRedoStack.length - 1]
-    const current = cloneTransformTrack(
-      state.project.transform ?? emptyTransformTrack(),
-    )
-    const selectedStill =
-      state.selectedTransformId &&
-      restored.keyframes.some((k) => k.id === state.selectedTransformId)
-        ? state.selectedTransformId
-        : null
-    set({
-      project: {
-        ...state.project,
-        transform: cloneTransformTrack(restored),
-      },
-      transformRedoStack: state.transformRedoStack.slice(0, -1),
-      transformUndoStack: [...state.transformUndoStack, current].slice(-MAX_UNDO),
-      selectedTransformId: selectedStill,
-    })
-  },
-}))
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: state.mode === 'editing' ? next : null,
+        undoStack: [...state.undoStack, previous].slice(-MAX_UNDO),
+        redoStack: [],
+        editPreview: null,
+      })
+    },
+
+    cancelHandleDrag: () => set({ editPreview: null }),
+
+    undoEdit: () => {
+      const state = get()
+      const current = state.editSession ?? state.geometryEdit
+      if (!current || state.undoStack.length === 0) return
+
+      const previous = state.undoStack[state.undoStack.length - 1]
+      const next: GeometryEdit = {
+        bakedSmoothing: current.bakedSmoothing,
+        samples: copyPath(previous),
+      }
+
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: state.mode === 'editing' ? next : null,
+        undoStack: state.undoStack.slice(0, -1),
+        redoStack: [...state.redoStack, copyPath(current.samples)].slice(
+          -MAX_UNDO,
+        ),
+        editPreview: null,
+      })
+    },
+
+    redoEdit: () => {
+      const state = get()
+      const current = state.editSession ?? state.geometryEdit
+      if (!current || state.redoStack.length === 0) return
+
+      const restored = state.redoStack[state.redoStack.length - 1]
+      const next: GeometryEdit = {
+        bakedSmoothing: current.bakedSmoothing,
+        samples: copyPath(restored),
+      }
+
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, geometryEdit: next }),
+        ),
+        geometryEdit: next,
+        editSession: state.mode === 'editing' ? next : null,
+        redoStack: state.redoStack.slice(0, -1),
+        undoStack: [...state.undoStack, copyPath(current.samples)].slice(
+          -MAX_UNDO,
+        ),
+        editPreview: null,
+      })
+    },
+
+    selectTransformKeyframe: (id) => {
+      const state = get()
+      if (
+        state.mode === 'editing' ||
+        state.mode === 'armed' ||
+        state.mode === 'recording'
+      ) {
+        return
+      }
+      if (id === null) {
+        set({ selectedTransformId: null })
+        return
+      }
+      const actor = getSelected(state)
+      const kf = actor.transform.keyframes.find((k) => k.id === id)
+      if (!kf) return
+      // Keyframe times are actor-local; seek the shared playhead to project time.
+      set({
+        mode: 'idle',
+        selectedTransformId: id,
+        selectedHandleIndex: null,
+        playbackHead: clamp(localToProject(kf.t, actor.clip), 0, 1),
+        playbackDirection: 1,
+      })
+    },
+
+    upsertTransformAtPlayhead: (rotationDeg, scale) => {
+      const state = get()
+      const actor = getSelected(state)
+      if (!actor.recording) return
+      if (
+        state.mode === 'editing' ||
+        state.mode === 'armed' ||
+        state.mode === 'recording'
+      ) {
+        return
+      }
+      const t = projectToLocal(state.playbackHead, actor.clip)
+      const { track, keyframeId } = upsertTransformKeyframe(actor.transform, {
+        t,
+        rotationDeg,
+        scale,
+        id: state.selectedTransformId ?? undefined,
+      })
+      set({
+        mode: 'idle',
+        ...pushTransformHistory(state, track, keyframeId),
+      })
+    },
+
+    commitTransformKeyframe: (input) => {
+      const state = get()
+      const actor = getSelected(state)
+      if (!actor.recording) return
+      if (state.mode === 'editing') return
+      if (!actor.transform.keyframes.some((k) => k.id === input.id)) return
+      const { track, keyframeId } = upsertTransformKeyframe(
+        actor.transform,
+        input,
+      )
+      set({
+        mode: 'idle',
+        playbackHead: clamp(localToProject(input.t, actor.clip), 0, 1),
+        ...pushTransformHistory(state, track, keyframeId),
+      })
+    },
+
+    deleteSelectedTransform: () => {
+      const state = get()
+      const id = state.selectedTransformId
+      if (!id) return
+      const actor = getSelected(state)
+      if (!actor.transform.keyframes.some((k) => k.id === id)) return
+      const next = removeTransformKeyframe(actor.transform, id)
+      set({
+        ...pushTransformHistory(state, next, null),
+      })
+    },
+
+    undoTransform: () => {
+      const state = get()
+      if (state.mode === 'editing') return
+      if (state.transformUndoStack.length === 0) return
+      const previous =
+        state.transformUndoStack[state.transformUndoStack.length - 1]
+      const actor = getSelected(state)
+      const current = cloneTransformTrack(actor.transform)
+      const selectedStill =
+        state.selectedTransformId &&
+        previous.keyframes.some((k) => k.id === state.selectedTransformId)
+          ? state.selectedTransformId
+          : null
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, transform: cloneTransformTrack(previous) }),
+        ),
+        transformUndoStack: state.transformUndoStack.slice(0, -1),
+        transformRedoStack: [...state.transformRedoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        selectedTransformId: selectedStill,
+      })
+    },
+
+    redoTransform: () => {
+      const state = get()
+      if (state.mode === 'editing') return
+      if (state.transformRedoStack.length === 0) return
+      const restored =
+        state.transformRedoStack[state.transformRedoStack.length - 1]
+      const actor = getSelected(state)
+      const current = cloneTransformTrack(actor.transform)
+      const selectedStill =
+        state.selectedTransformId &&
+        restored.keyframes.some((k) => k.id === state.selectedTransformId)
+          ? state.selectedTransformId
+          : null
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, transform: cloneTransformTrack(restored) }),
+        ),
+        transformRedoStack: state.transformRedoStack.slice(0, -1),
+        transformUndoStack: [...state.transformUndoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        selectedTransformId: selectedStill,
+      })
+    },
+  }
+})

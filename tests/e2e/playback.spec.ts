@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { openPanel, readExportedCss, recordSimplePath } from './helpers'
+import {
+  clickRecord,
+  openPanel,
+  readExportedCss,
+  recordSimplePath,
+} from './helpers'
 
 test.describe('playback inspection', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -212,7 +217,7 @@ test.describe('playback inspection', () => {
     await page.goto('/')
     await recordSimplePath(page)
 
-    await page.getByTestId('btn-record').click()
+    await clickRecord(page, { replaceExisting: true })
     await expect(page.getByTestId('btn-play')).toBeDisabled()
     await expect(page.getByTestId('btn-restart')).toBeDisabled()
     await expect(page.getByTestId('playback-scrubber')).toBeDisabled()

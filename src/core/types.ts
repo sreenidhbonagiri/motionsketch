@@ -23,6 +23,7 @@ export interface ActorImage {
   label: string
 }
 
+/** Visual appearance of one actor (shape or image). */
 export interface Actor {
   kind: ActorKind
   /**
@@ -52,18 +53,17 @@ export interface Recording {
 /** How looping repeats when `loop` is true. */
 export type LoopMode = 'repeat' | 'alternate'
 
+/**
+ * Shared timeline settings. Duration, loop, and loopMode apply to every actor.
+ * Per-actor path cleanup lives on SceneActor (smoothing / steadySpeed).
+ */
 export interface PlaybackSettings {
   durationMs: number
-  /** 0..1 path cleanup (spatial) */
-  smoothing: number
-  /** 0..1 soften accidental speed spikes; preserves pauses */
-  steadySpeed: number
   loop: boolean
   /**
    * Used when `loop` is true.
    * - repeat: jump back to the start each cycle
    * - alternate: reverse at endpoints (ping-pong)
-   * Older projects without this field default to `repeat`.
    */
   loopMode: LoopMode
 }
@@ -86,22 +86,50 @@ export interface TransformTrack {
   keyframes: TransformKeyframe[]
 }
 
+/**
+ * Active interval on the shared project timeline (normalized 0..1 progress).
+ * Timing controls when the actor moves, not whether it is visible.
+ * Default is the full timeline `{ start: 0, end: 1 }`.
+ */
+export interface ActorClip {
+  start: number
+  end: number
+}
+
+/**
+ * One stage actor: appearance, optional motion take, path edits, and transform.
+ * Array order in Project.actors is paint/stacking order (later = on top).
+ */
+export interface SceneActor {
+  id: string
+  name: string
+  appearance: Actor
+  recording: Recording | null
+  /** Center when there is no recording (and idle rest). */
+  restPosition: Vec2
+  /** 0..1 path cleanup (spatial) — per actor */
+  smoothing: number
+  /** 0..1 soften accidental speed spikes — per actor */
+  steadySpeed: number
+  transform: TransformTrack
+  /** Committed path edits; null → process live from recording */
+  geometryEdit: GeometryEdit | null
+  /**
+   * Active motion/transform interval on the shared timeline.
+   * Path and transform tracks use actor-local progress within this clip.
+   */
+  clip: ActorClip
+}
+
 export interface Project {
   version: 1
-  actor: Actor
-  recording: Recording | null
+  actors: SceneActor[]
   playback: PlaybackSettings
   /**
    * Logical stage width/height. Captured when the project is created and never
    * rewritten on window resize. Normalized sample coords refer to this space.
-   * Older projects without the field migrate to 16/10 (LEGACY_STAGE_ASPECT).
    */
   stageAspect: number
-  /**
-   * Rotation/scale animation. Empty → identity (0°, scale 1).
-   * Older projects migrate to an empty track.
-   */
-  transform: TransformTrack
 }
 
 export type EditorMode =
@@ -145,26 +173,19 @@ export const MAX_ACTOR_SIZE = 0.4
 
 export const DEFAULT_PLAYBACK: PlaybackSettings = {
   durationMs: 1200,
-  smoothing: 0.35,
-  steadySpeed: 0,
   loop: false,
   loopMode: 'repeat',
 }
+
+/** Default path-processing values for new actors (not shared timeline). */
+export const DEFAULT_ACTOR_SMOOTHING = 0.35
+export const DEFAULT_ACTOR_STEADY_SPEED = 0
 
 /** Default logical stage for new in-memory projects before viewport capture. */
 export const DEFAULT_STAGE_ASPECT = 16 / 10
 
 export const DEFAULT_TRANSFORM_TRACK: TransformTrack = {
   keyframes: [],
-}
-
-export const DEFAULT_PROJECT: Project = {
-  version: 1,
-  actor: DEFAULT_ACTOR,
-  recording: null,
-  playback: DEFAULT_PLAYBACK,
-  stageAspect: DEFAULT_STAGE_ASPECT,
-  transform: DEFAULT_TRANSFORM_TRACK,
 }
 
 export const MIN_RECORDING_SAMPLES = 2

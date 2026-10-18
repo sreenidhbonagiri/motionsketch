@@ -20,6 +20,48 @@ export async function dragActor(
   await page.mouse.up()
 }
 
+/** Accept or dismiss the next native confirm/alert. */
+export function acceptNextDialog(page: Page, accept = true) {
+  page.once('dialog', (dialog) => {
+    void (accept ? dialog.accept() : dialog.dismiss())
+  })
+}
+
+/**
+ * Arm recording. When the selected actor already has a take, a confirm
+ * dialog appears — pass `replaceExisting: true` to accept it.
+ */
+export async function clickRecord(
+  page: Page,
+  options: { replaceExisting?: boolean } = {},
+) {
+  if (options.replaceExisting) acceptNextDialog(page, true)
+  await page.getByTestId('btn-record').click()
+}
+
+export async function actorIdsFromList(page: Page): Promise<string[]> {
+  await expect(page.getByTestId('actor-list')).toBeVisible()
+  const items = page.locator('[data-testid^="actor-list-item-"]')
+  const count = await items.count()
+  const ids: string[] = []
+  for (let i = 0; i < count; i++) {
+    const testId = await items.nth(i).getAttribute('data-testid')
+    expect(testId).toBeTruthy()
+    ids.push(testId!.replace('actor-list-item-', ''))
+  }
+  return ids
+}
+
+export async function selectActorByIndex(page: Page, index: number) {
+  const ids = await actorIdsFromList(page)
+  expect(ids.length).toBeGreaterThan(index)
+  await page.getByTestId(`actor-list-item-${ids[index]}`).click()
+  await expect(
+    page.getByTestId(`actor-list-item-${ids[index]}`),
+  ).toHaveAttribute('data-selected', 'true')
+  return ids[index]
+}
+
 export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
 
 /** Open a labeled top chrome panel (Adjust / Appearance / Export / Project). */
@@ -27,13 +69,18 @@ export async function openPanel(page: Page, id: ChromePanel) {
   const root = page.getByTestId(`${id}-panel-root`)
   if (await root.isVisible().catch(() => false)) return
   // Close any other floating panel first — on narrow viewports an open
-  // panel can cover sibling chrome buttons.
-  for (let i = 0; i < 3; i++) {
-    const other = page.locator(
-      '[data-testid$="-panel-root"]:not([data-testid="' + id + '-panel-root"])',
-    )
-    if ((await other.count()) === 0) break
-    await page.keyboard.press('Escape')
+  // panel can cover sibling chrome buttons. Prefer the Close control over
+  // Escape so a nested <dialog> (e.g. View CSS) cannot swallow the key.
+  const other = page.locator(
+    '[data-testid$="-panel-root"]:not([data-testid="' + id + '-panel-root"])',
+  )
+  if ((await other.count()) > 0) {
+    const closeBtn = other.locator('[data-testid^="btn-close-"]').first()
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click()
+    } else {
+      await page.keyboard.press('Escape')
+    }
     await expect(other).toHaveCount(0)
   }
   await page.getByTestId(`btn-${id}`).click()
@@ -55,7 +102,7 @@ export async function readExportedCss(page: Page): Promise<string> {
 }
 
 export async function recordSimplePath(page: Page) {
-  await page.getByTestId('btn-record').click()
+  await clickRecord(page)
   await dragActor(page, { x: 30, y: -20 }, { x: 160, y: 50 })
   await expect(page.getByTestId('btn-play')).toBeEnabled()
   await openPanel(page, 'export')

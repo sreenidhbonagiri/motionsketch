@@ -121,9 +121,15 @@ test.describe('image actors', () => {
     const projPath = await proj.path()
     const projJson = fs.readFileSync(projPath!, 'utf8')
     const snap = JSON.parse(projJson)
-    expect(snap.formatVersion).toBe(4)
-    expect(snap.project.actor.kind).toBe('image')
-    expect(snap.project.actor.image.dataUrl).toContain('data:image/png')
+    expect(snap.formatVersion).toBe(6)
+    const appearance = snap.project.actors[0].appearance
+    expect(appearance.kind).toBe('image')
+    const assetId = appearance.image.assetId as string | undefined
+    if (assetId && snap.assets?.[assetId]) {
+      expect(snap.assets[assetId].dataUrl).toContain('data:image/png')
+    } else {
+      expect(appearance.image.dataUrl).toContain('data:image/png')
+    }
   })
 
   test('tall image and safe SVG upload; unsafe SVG rejected', async ({

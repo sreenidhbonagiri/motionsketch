@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { openPanel, readExportedCss, recordSimplePath } from './helpers'
+import {
+  clickRecord,
+  openPanel,
+  readExportedCss,
+  recordSimplePath,
+} from './helpers'
 
 test.describe('transform keyframes', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -89,7 +94,7 @@ test.describe('transform keyframes', () => {
       .evaluate((el) => (el as HTMLElement).style.left)
     expect(left).toBe('50%')
 
-    await page.getByTestId('btn-record').click()
+    await clickRecord(page, { replaceExisting: true })
     await page.getByTestId('actor').click()
     // Cancel-ish: stop without a full drag still finishes via stop if recording
     // Prefer cancel from armed state if still armed
@@ -98,7 +103,7 @@ test.describe('transform keyframes', () => {
       await stop.click()
     }
     // Fresh record
-    await page.getByTestId('btn-record').click()
+    await clickRecord(page, { replaceExisting: true })
     const actor = page.getByTestId('actor')
     const box = await actor.boundingBox()
     expect(box).toBeTruthy()

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { projectToLocal } from '../core/clip'
 import {
   DEFAULT_TRANSFORM,
   MAX_TRANSFORM_SCALE,
@@ -26,8 +27,12 @@ function formatTimePct(t: number): string {
  * Slider drags stay local until Add/Update (one history entry per commit).
  */
 export function TransformSection() {
-  const recording = useEditorStore((s) => s.project.recording)
-  const transform = useEditorStore((s) => s.project.transform)
+  const selectedActor = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
+  })
+  const recording = selectedActor?.recording ?? null
+  const transform = selectedActor?.transform ?? { keyframes: [] }
   const playbackHead = useEditorStore((s) => s.playbackHead)
   const mode = useEditorStore((s) => s.mode)
   const selectedId = useEditorStore((s) => s.selectedTransformId)
@@ -36,12 +41,14 @@ export function TransformSection() {
   const deleteSelected = useEditorStore((s) => s.deleteSelectedTransform)
   const selectTransform = useEditorStore((s) => s.selectTransformKeyframe)
 
+  const clip = selectedActor?.clip ?? { start: 0, end: 1 }
+  const localHead = projectToLocal(playbackHead, clip)
   const selected = transform.keyframes.find((k) => k.id === selectedId) ?? null
-  const evaluated = evaluateTransform(transform, playbackHead)
+  const evaluated = evaluateTransform(transform, localHead)
 
   const [rotation, setRotation] = useState(evaluated.rotationDeg)
   const [scale, setScale] = useState(evaluated.scale)
-  const [time, setTime] = useState(selected?.t ?? playbackHead)
+  const [time, setTime] = useState(selected?.t ?? localHead)
 
   // Sync drafts from selection or playhead evaluation when selection/head changes
   // (not while the user is mid-drag — we key off ids/head, not draft).
@@ -52,11 +59,11 @@ export function TransformSection() {
       setTime(selected.t)
       return
     }
-    const at = evaluateTransform(transform, playbackHead)
+    const at = evaluateTransform(transform, localHead)
     setRotation(at.rotationDeg)
     setScale(at.scale)
-    setTime(playbackHead)
-  }, [selectedId, selected, playbackHead, transform])
+    setTime(localHead)
+  }, [selectedId, selected, localHead, transform])
 
   const rotId = useId()
   const scaleId = useId()
@@ -67,7 +74,7 @@ export function TransformSection() {
   const disabled = !recording || editingPath || recordingLike
 
   const nearSelected =
-    selected && Math.abs(selected.t - playbackHead) < 1e-3
+    selected && Math.abs(selected.t - localHead) < 1e-3
 
   const onAddOrUpdate = () => {
     if (disabled) return

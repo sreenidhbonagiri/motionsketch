@@ -7,6 +7,7 @@ import {
 } from '../../src/core/actor'
 import { exportCssFromRecording } from '../../src/core/export/css'
 import { actorSizePx } from '../../src/core/coords'
+import { findActor } from '../../src/core/sceneActor'
 import {
   DEFAULT_ACTOR,
   MAX_ACTOR_SIZE,
@@ -15,12 +16,22 @@ import {
 } from '../../src/core/types'
 import { parseSnapshotJson } from '../../src/core/persist/document'
 import { useEditorStore } from '../../src/state/store'
+import { makeActor, makeProject } from './helpers/project'
 
 const samples: MotionSample[] = [
   { t: 0, x: 0.35, y: 0.5 },
   { t: 100, x: 0.6, y: 0.4 },
   { t: 200, x: 0.8, y: 0.55 },
 ]
+
+function selectedActor() {
+  const state = useEditorStore.getState()
+  return findActor(state.project.actors, state.selectedActorId)!
+}
+
+function selectedAppearance() {
+  return selectedActor().appearance
+}
 
 describe('actor appearance helpers', () => {
   it('normalizes hex colors and rejects unsupported values', () => {
@@ -66,35 +77,29 @@ describe('actor store + export consistency', () => {
     expect(smallCenterX).toBeCloseTo(largeCenterX, 5)
     expect(smallCenterX).toBeCloseTo(center.x * stage.w, 5)
 
-    // Path samples untouched by appearance setters.
+    const project = makeProject({
+      actors: [
+        makeActor({
+          recording: { samples, recordedDurationMs: 200 },
+        }),
+      ],
+    })
+    const first = project.actors[0]
     useEditorStore.setState({
-      project: {
-        version: 1,
-        actor: { ...DEFAULT_ACTOR },
-        recording: { samples, recordedDurationMs: 200 },
-        playback: {
-          durationMs: 1200,
-          smoothing: 0.35,
-          steadySpeed: 0,
-          loop: false,
-          loopMode: 'repeat',
-        },
-      stageAspect: 1.6,
-      transform: { keyframes: [] },
-      },
+      project,
+      selectedActorId: first.id,
       playbackHead: 0.4,
     })
-    const beforeSamples = useEditorStore.getState().project.recording!.samples
+    const beforeSamples = first.recording!.samples
     const beforeHead = useEditorStore.getState().playbackHead
     useEditorStore.getState().setActorSize(0.28)
     useEditorStore.getState().setActorBorderRadius(1)
     useEditorStore.getState().setActorColor('#112233')
-    expect(useEditorStore.getState().project.recording!.samples).toEqual(
-      beforeSamples,
-    )
+    expect(selectedActor().recording!.samples).toEqual(beforeSamples)
     expect(useEditorStore.getState().playbackHead).toBe(beforeHead)
-    expect(useEditorStore.getState().project.actor.width).toBeCloseTo(0.28)
-    expect(useEditorStore.getState().project.actor.height).toBeCloseTo(0.28)
+    const appearance = selectedAppearance()
+    expect(appearance.width).toBeCloseTo(0.28)
+    expect(appearance.height).toBeCloseTo(0.28)
   })
 
   it('exports selected appearance with cqmin sizing semantics', () => {
@@ -141,15 +146,15 @@ describe('actor persistence compatibility', () => {
           loop: false,
           loopMode: 'repeat',
         },
-      stageAspect: 1.6,
-      transform: { keyframes: [] },
+        stageAspect: 1.6,
+        transform: { keyframes: [] },
       },
       geometryEdit: null,
     })
     const parsed = parseSnapshotJson(raw)
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
-    expect(parsed.snapshot.project.actor).toEqual({
+    expect(parsed.snapshot.project.actors[0].appearance).toEqual({
       kind: 'shape',
       width: 0.2,
       height: 0.2,
@@ -176,14 +181,14 @@ describe('actor persistence compatibility', () => {
           loop: false,
           loopMode: 'repeat',
         },
-      stageAspect: 1.6,
-      transform: { keyframes: [] },
+        stageAspect: 1.6,
+        transform: { keyframes: [] },
       },
       geometryEdit: null,
     })
     const parsed = parseSnapshotJson(raw)
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
-    expect(parsed.snapshot.project.actor).toEqual(DEFAULT_ACTOR)
+    expect(parsed.snapshot.project.actors[0].appearance).toEqual(DEFAULT_ACTOR)
   })
 })
