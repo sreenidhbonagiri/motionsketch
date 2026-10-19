@@ -3,6 +3,7 @@ import {
   MIN_PLAYBACK_DURATION_MS,
 } from '../core/types'
 import { useEditorStore } from '../state/store'
+import { SvgPathImport } from './SvgPathImport'
 
 function formatDurationSeconds(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(2)} s`
@@ -46,6 +47,8 @@ export function AdjustPanel() {
         </span>
         .
       </p>
+
+      <SvgPathImport />
 
       <div className="space-y-2">
         <label

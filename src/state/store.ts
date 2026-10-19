@@ -224,6 +224,12 @@ interface EditorStore {
   beginRecording: (pointerId: number, position: Vec2) => void
   pushLiveSample: (position: Vec2) => void
   finishRecording: (recording: Recording | null) => void
+  /**
+   * Replace the selected actor’s take with an imported path recording.
+   * Keeps project Duration and appearance; clears path/transform edits;
+   * sets Steady Speed on for even pacing (import already bakes even timing).
+   */
+  applyImportedPathTake: (recording: Recording) => void
   setIdle: () => void
 
   setLivePosition: (position: Vec2) => void
@@ -699,6 +705,48 @@ export const useEditorStore = create<EditorStore>((set, get) => {
                 y: recording.samples[0].y,
               }
             : state.livePosition,
+        }
+      })
+    },
+
+    applyImportedPathTake: (recording) => {
+      if (!recording || recording.samples.length < 2) return
+      set((state) => {
+        if (
+          state.mode === 'recording' ||
+          state.mode === 'armed' ||
+          state.mode === 'editing'
+        ) {
+          return state
+        }
+        const nextProject = withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            recording,
+            // Keep appearance + shared Duration; bake even pacing preference.
+            smoothing: 0,
+            steadySpeed: 1,
+            transform: emptyTransformTrack(),
+            geometryEdit: null,
+            restPosition: restPositionFromRecording(recording, a.restPosition),
+          }),
+        )
+        return {
+          mode: 'idle' as const,
+          pointerId: null,
+          liveTrail: [],
+          playbackHead: 0,
+          ...clearEditState(),
+          ...clearTransformEditState(),
+          ...clearPlacementHistory(state),
+          project: nextProject,
+          livePosition: {
+            x: recording.samples[0]!.x,
+            y: recording.samples[0]!.y,
+          },
+          actionAnnouncement: 'SVG path imported for the selected actor.',
         }
       })
     },
