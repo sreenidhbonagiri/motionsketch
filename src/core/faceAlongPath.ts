@@ -154,14 +154,18 @@ export function buildHeadingTrack(
     }
   }
 
-  // Moving samples use travel direction (outgoing). Pause samples hold the
-  // incoming heading so the next leg is not anticipated during a dwell.
+  // Moving samples use travel direction (outgoing). Pause samples — and the
+  // still-stationary sample that begins the next leg — hold the incoming
+  // heading so the upcoming turn is not applied while parked. Turning resumes
+  // on samples after motion has actually occurred (prevLen > 0).
   const raw: Array<number | null> = new Array(n).fill(null)
   for (let i = 0; i < n; i++) {
     const prevLen = i > 0 ? segLen(i - 1, i) : 0
     const nextLen = i < n - 1 ? segLen(i, i + 1) : 0
     const paused = prevLen < HEADING_PAUSE_EPS && nextLen < HEADING_PAUSE_EPS
-    if (paused) {
+    const stillOnDwell =
+      prevLen < HEADING_PAUSE_EPS && nextLen >= HEADING_PAUSE_EPS
+    if (paused || stillOnDwell) {
       raw[i] = incoming[i] ?? outgoing[i]
     } else if (nextLen >= HEADING_PAUSE_EPS) {
       raw[i] = outgoing[i] ?? incoming[i]
@@ -198,6 +202,14 @@ export function buildHeadingTrack(
 
   // Short arc-length box smooth — mostly causal (look back) with a tiny
   // forward peek so corners are not rounded far in advance.
+  //
+  // Pause / dwell segments (near-zero length) are hard barriers: the window
+  // must not walk through them. Zero-length steps would otherwise leave the
+  // peek budget unused and blend the *upcoming* turn into a stationary hold.
+  // Tradeoff: after a pause, the first moving samples may still blend briefly
+  // with the held inbound heading (softening departure) — we do not anticipate
+  // the next leg while parked, so a sharp corner after a dwell can change
+  // heading quickly once motion resumes.
   const totalLen = pathLength(samples, aspect)
   const windowLen = Math.max(
     HEADING_PAUSE_EPS,
@@ -206,11 +218,19 @@ export function buildHeadingTrack(
   const forwardPeek = windowLen * 0.35
   const smoothed = unwrapped.map((h, i) => {
     if (totalLen < HEADING_PAUSE_EPS * 2) return h
+    const prevLen = i > 0 ? segLen(i - 1, i) : 0
+    const nextLen = i < samples.length - 1 ? segLen(i, i + 1) : 0
+    if (prevLen < HEADING_PAUSE_EPS && nextLen < HEADING_PAUSE_EPS) {
+      // Fully stationary sample — hold raw inbound heading (no neighbor mix).
+      return h
+    }
     let sum = h
     let weight = 1
     let acc = 0
     for (let j = i - 1; j >= 0 && i - j <= HEADING_SMOOTH_MAX_RADIUS; j--) {
-      acc += segLen(j, j + 1)
+      const step = segLen(j, j + 1)
+      if (step < HEADING_PAUSE_EPS) break
+      acc += step
       if (acc > windowLen) break
       sum += unwrapped[j]!
       weight += 1
@@ -221,7 +241,9 @@ export function buildHeadingTrack(
       j < samples.length && j - i <= Math.max(1, HEADING_SMOOTH_MAX_RADIUS - 2);
       j++
     ) {
-      acc += segLen(j - 1, j)
+      const step = segLen(j - 1, j)
+      if (step < HEADING_PAUSE_EPS) break
+      acc += step
       if (acc > forwardPeek) break
       sum += unwrapped[j]!
       weight += 1
@@ -553,8 +575,10 @@ function exceedsAngularTolerance(
  * error-bounded adaptive sampling so important turns and pause boundaries
  * stay within the *sampled* {@link HEADING_EXPORT_ANGULAR_TOLERANCE_DEG}.
  *
- * When discrete candidates are insufficient, inserts keyframes at the peak
- * probe-error time until the sampled check passes or the hard cap is hit.
+ * All `base` offsets (position + transform export times) are mandatory and
+ * are never dropped for heading optimization. Heading densify uses only the
+ * remaining budget: `maxOffsets - baseCount` (and may omit heading samples
+ * when base already fills the cap — sampled error is still measured/warned).
  *
  * When `rotationAt` is omitted (tests only), returns the full unique set
  * capped by uniform thinning — production export always supplies rotation.
@@ -574,18 +598,29 @@ export function mergeExportLocalOffsets(
   }
 
   if (!rotationAt) {
-    const offsets = mergeExportLocalOffsetsUniform(base, extra, maxOffsets)
+    // Still never drop base when thinning without a rotation evaluator.
+    const baseSorted = uniqueSortedOffsets(base, [])
+    if (sorted.length <= maxOffsets) {
+      return { offsets: sorted, maxErrDeg: 0, fidelityWarning: null }
+    }
+    const extraOnly = sorted.filter(
+      (t) => !baseSorted.some((b) => Math.abs(b - t) < 1e-9),
+    )
+    const headingBudget = Math.max(0, maxOffsets - baseSorted.length)
+    const keptExtra =
+      extraOnly.length <= headingBudget
+        ? extraOnly
+        : mergeExportLocalOffsetsUniform([], extraOnly, headingBudget)
+    const offsets = uniqueSortedOffsets(baseSorted, keptExtra)
     return { offsets, maxErrDeg: 0, fidelityWarning: null }
   }
 
   // Mutable candidate list — probe peaks may add times not in the initial set.
   let candidates = sorted.slice()
   let rots = candidates.map((t) => rotationAt(t))
-  const mustKeep = new Set<number>([0, candidates.length - 1])
+  const baseSet = new Set(base.map((t) => clamp01(t)))
 
-  // Geometry pause boundaries (may sit inside a flat heading run).
-  for (const t of mustKeepOffsets) {
-    const target = clamp01(t)
+  const indexOfTime = (target: number, maxDist = 1e-6): number => {
     let best = -1
     let bestDist = Infinity
     for (let i = 0; i < candidates.length; i++) {
@@ -595,7 +630,24 @@ export function mergeExportLocalOffsets(
         best = i
       }
     }
-    if (best >= 0 && bestDist < 1e-6) mustKeep.add(best)
+    return best >= 0 && bestDist <= maxDist ? best : -1
+  }
+
+  const mustKeep = new Set<number>()
+  // Mandatory: every position / transform export offset.
+  for (const t of baseSet) {
+    const idx = indexOfTime(t)
+    if (idx >= 0) mustKeep.add(idx)
+  }
+  if (candidates.length > 0) {
+    mustKeep.add(0)
+    mustKeep.add(candidates.length - 1)
+  }
+
+  // Geometry pause boundaries (may sit inside a flat heading run).
+  for (const t of mustKeepOffsets) {
+    const idx = indexOfTime(clamp01(t))
+    if (idx >= 0) mustKeep.add(idx)
   }
 
   // Also preserve endpoints of multi-sample constant-heading runs.
@@ -618,10 +670,8 @@ export function mergeExportLocalOffsets(
 
   const syncCandidateIndex = (t: number): number => {
     const target = clamp01(t)
-    for (let i = 0; i < candidates.length; i++) {
-      if (Math.abs(candidates[i]! - target) < 1e-9) return i
-    }
-    // Insert into sorted candidates + rotation cache.
+    const existing = indexOfTime(target, 1e-9)
+    if (existing >= 0) return existing
     let insertAt = candidates.length
     for (let i = 0; i < candidates.length; i++) {
       if (candidates[i]! > target) {
@@ -639,7 +689,6 @@ export function mergeExportLocalOffsets(
       rotationAt(target),
       ...rots.slice(insertAt),
     ]
-    // Remap kept indices after insertion.
     const nextKept = new Set<number>()
     for (const idx of kept) {
       nextKept.add(idx >= insertAt ? idx + 1 : idx)
@@ -649,26 +698,26 @@ export function mergeExportLocalOffsets(
     return insertAt
   }
 
-  if (kept.size > maxOffsets) {
-    const must = [...mustKeep].sort((a, b) => a - b)
-    const reduced = new Set<number>([must[0]!, must[must.length - 1]!])
-    const budget = maxOffsets - 2
-    for (let i = 1; i <= budget; i++) {
-      const idx = Math.round((i * (must.length - 1)) / (budget + 1))
-      reduced.add(must[Math.min(must.length - 1, Math.max(0, idx))]!)
-    }
-    const offsets = [...reduced]
+  const offsetsFromKept = () =>
+    [...kept]
       .sort((a, b) => a - b)
       .map((i) => candidates[i]!)
+
+  // Never drop mandatory base (or pause) offsets — even if they exceed maxOffsets.
+  // Heading densify only uses the remaining budget.
+  if (kept.size >= maxOffsets) {
+    const offsets = offsetsFromKept()
     const maxErrDeg = measureExportHeadingError(offsets, rotationAt)
     return {
       offsets,
       maxErrDeg,
-      fidelityWarning: formatFacingFidelityWarningCss(
-        maxErrDeg,
-        angularToleranceDeg,
-        maxOffsets,
-      ),
+      fidelityWarning: exceedsAngularTolerance(maxErrDeg, angularToleranceDeg)
+        ? formatFacingFidelityWarningCss(
+            maxErrDeg,
+            angularToleranceDeg,
+            maxOffsets,
+          )
+        : null,
     }
   }
 
@@ -690,14 +739,8 @@ export function mergeExportLocalOffsets(
     return { bestIndex, bestErr }
   }
 
-  const offsetsFromKept = () =>
-    [...kept]
-      .sort((a, b) => a - b)
-      .map((i) => candidates[i]!)
-
-  // Insert until the sampled error check passes or the hard cap is exhausted.
-  // Prefer the peak probe time (matches the fidelity metric); fall back to
-  // discrete candidates when the peak is already keyed.
+  // Insert heading samples until the sampled error check passes or the
+  // remaining budget (maxOffsets − mandatory) is exhausted.
   while (kept.size < maxOffsets) {
     const sample = measureExportHeadingErrorDetailed(
       offsetsFromKept(),

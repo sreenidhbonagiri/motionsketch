@@ -143,6 +143,54 @@ export function buildFaceAlongFidelityWarningFixtureJson(
   return buildFaceAlongSpiralFixtureJson(savedAt, { points: 800, turns: 30 })
 }
 
+/**
+ * Straight horizontal path with mid-time position + scale peak — reproduces
+ * facing export dropping the middle position/transform offset.
+ */
+export function buildFaceAlongStraightScaleFixtureJson(
+  savedAt = '2026-06-01T00:00:00.000Z',
+): string {
+  const samples: MotionSample[] = [
+    { t: 0, x: 0.1, y: 0.5 },
+    { t: 500, x: 0.2, y: 0.5 },
+    { t: 1000, x: 0.9, y: 0.5 },
+  ]
+  const actor = createSceneActor({
+    id: 'face-straight-scale',
+    name: 'Straight scale',
+    recording: {
+      samples: samples.map((s) => ({ ...s })),
+      recordedDurationMs: 1000,
+    },
+    geometryEdit: makeGeometryEdit(samples, 0),
+    smoothing: 0,
+    steadySpeed: 0,
+    faceAlongPath: true,
+    directionOffsetDeg: 0,
+    transform: {
+      keyframes: [
+        { id: 's0', t: 0, rotationDeg: 0, scale: 1 },
+        { id: 's1', t: 0.5, rotationDeg: 0, scale: 3 },
+        { id: 's2', t: 1, rotationDeg: 0, scale: 1 },
+      ],
+    },
+    clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
+  })
+  const project: Project = {
+    version: 1,
+    name: 'Face straight scale',
+    actors: [actor],
+    playback: {
+      durationMs: 1000,
+      loop: false,
+      loopMode: 'repeat',
+      trigger: 'page-load',
+    },
+    stageAspect: 1.6,
+  }
+  return serializeSnapshot(buildSnapshot(project, null, savedAt))
+}
+
 export function buildFaceAlongArcFixtureJson(
   savedAt = '2026-06-01T00:00:00.000Z',
 ): string {

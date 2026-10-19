@@ -5,6 +5,7 @@ import {
   buildFaceAlongFidelityWarningFixtureJson,
   buildFaceAlongLFixtureJson,
   buildFaceAlongSpiralFixtureJson,
+  buildFaceAlongStraightScaleFixtureJson,
 } from '../fixtures/faceAlongPathProject'
 import {
   ensureEditor,
@@ -13,33 +14,47 @@ import {
   openPanel,
 } from './helpers'
 
-/** Decompose CSS matrix into rotation degrees (circle, not unwrapped). */
-function decomposeRotation(transform: string): number {
-  if (!transform || transform === 'none') return 0
-  const m2 = transform.match(/^matrix\((.+)\)$/)
-  if (m2) {
-    const [a, b] = m2[1].split(',').map((v) => Number(v.trim()))
-    return (Math.atan2(b, a) * 180) / Math.PI
-  }
-  const m3 = transform.match(/^matrix3d\((.+)\)$/)
-  if (m3) {
-    const parts = m3[1].split(',').map((v) => Number(v.trim()))
-    return (Math.atan2(parts[1], parts[0]) * 180) / Math.PI
-  }
-  return 0
-}
-
 function angleDeltaDeg(a: number, b: number): number {
   return Math.abs(((((a - b) % 360) + 540) % 360) - 180)
 }
 
-async function editorRotationAt(page: Page, tNorm: number): Promise<number> {
+async function editorPoseAt(
+  page: Page,
+  tNorm: number,
+): Promise<{ rotationDeg: number; scale: number; xFrac: number; yFrac: number }> {
   await page.getByTestId('playback-scrubber').fill(String(tNorm))
-  const transform = await page.evaluate(() => {
+  return page.evaluate(() => {
     const el = document.querySelector('[data-testid="actor"]') as HTMLElement
-    return getComputedStyle(el).transform
+    const stage = el.closest('[data-testid="stage"]') as HTMLElement | null
+    const m = getComputedStyle(el).transform
+    let rotationDeg = 0
+    let scale = 1
+    if (m && m !== 'none') {
+      const m2 = m.match(/^matrix\((.+)\)$/)
+      if (m2) {
+        const [a, b] = m2[1].split(',').map((v) => Number(v.trim()))
+        rotationDeg = (Math.atan2(b!, a!) * 180) / Math.PI
+        scale = Math.hypot(a!, b!)
+      }
+    }
+    // Use layout center — matrix tx/ty include translate(-50%,-50%), not stage x.
+    const stageBox = stage?.getBoundingClientRect()
+    const actorBox = el.getBoundingClientRect()
+    const sw = stageBox?.width || 1
+    const sh = stageBox?.height || 1
+    const cx = actorBox.left + actorBox.width / 2 - (stageBox?.left ?? 0)
+    const cy = actorBox.top + actorBox.height / 2 - (stageBox?.top ?? 0)
+    return {
+      rotationDeg,
+      scale,
+      xFrac: cx / sw,
+      yFrac: cy / sh,
+    }
   })
-  return decomposeRotation(transform)
+}
+
+async function editorRotationAt(page: Page, tNorm: number): Promise<number> {
+  return (await editorPoseAt(page, tNorm)).rotationDeg
 }
 
 test.describe('face along path', () => {
@@ -78,10 +93,10 @@ test.describe('face along path', () => {
     const onLate = await editorRotationAt(page, 0.85)
     expect(angleDeltaDeg(onLate, 90)).toBeLessThan(15)
 
-    // Within the turn — between horizontal and vertical
-    const onMid = await editorRotationAt(page, 0.5)
-    expect(onMid).toBeGreaterThan(10)
-    expect(onMid).toBeLessThan(80)
+    // After the corner pause — heading faces the vertical leg (~90°).
+    // (t≈0.5 is still in the pause hold at ~0°, covered by the pause e2e.)
+    const onAfterPause = await editorRotationAt(page, 0.65)
+    expect(angleDeltaDeg(onAfterPause, 90)).toBeLessThan(20)
 
     await page.getByTestId('direction-offset-input').fill('-90')
     await page.getByTestId('direction-offset-input').blur()
@@ -92,6 +107,8 @@ test.describe('face along path', () => {
       late: await editorRotationAt(page, 0.85),
     }
     expect(angleDeltaDeg(editor.early, -90)).toBeLessThan(12)
+    // Mid is inside the pause: path heading held at ~0°, plus −90° offset.
+    expect(angleDeltaDeg(editor.mid, -90)).toBeLessThan(12)
 
     await openPanel(page, 'export')
     const downloadPromise = page.waitForEvent('download')
@@ -274,6 +291,127 @@ test.describe('face along path', () => {
     expect(Math.abs(demoSpan)).toBeGreaterThan(360 * 2)
     expect(Math.abs(Math.abs(demoSpan) - Math.abs(editorSpan))).toBeLessThan(90)
   })
+  test('export keeps mid position+scale with facing on', async ({ page }) => {
+    await loadProjectSnapshot(page, buildFaceAlongStraightScaleFixtureJson())
+    await ensureEditor(page)
+
+    const editorMid = await editorPoseAt(page, 0.5)
+    expect(editorMid.scale).toBeGreaterThan(2.5)
+    expect(editorMid.xFrac).toBeGreaterThan(0.12)
+    expect(editorMid.xFrac).toBeLessThan(0.35)
+
+    await openPanel(page, 'export')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-html-demo').click()
+    const download = await downloadPromise
+    const html = readFileSync((await download.path())!, 'utf8')
+    expect(html).toMatch(/50%/)
+    expect(html).toMatch(/scale\(\s*3/)
+
+    await loadHtmlDocument(page, html)
+    const demoMid = await page.evaluate(() => {
+      const el = document.querySelector(
+        '[data-testid="demo-actor"]',
+      ) as HTMLElement
+      const stage = el.parentElement as HTMLElement
+      const anim = el.getAnimations().find((a) => {
+        const name = (a as CSSAnimation).animationName
+        return typeof name === 'string' && name !== '' && name !== 'none'
+      })
+      if (!anim) throw new Error('missing animation')
+      anim.pause()
+      const dur =
+        Number(anim.effect?.getTiming().duration) ||
+        parseFloat(getComputedStyle(el).animationDuration) * 1000
+      anim.currentTime = 0.5 * dur
+      void el.offsetWidth
+      const m = getComputedStyle(el).transform
+      const m2 = m.match(/^matrix\((.+)\)$/)
+      if (!m2) throw new Error('no matrix')
+      const [a, b] = m2[1].split(',').map((v) => Number(v.trim()))
+      const stageBox = stage.getBoundingClientRect()
+      const actorBox = el.getBoundingClientRect()
+      const cx = actorBox.left + actorBox.width / 2 - stageBox.left
+      const cy = actorBox.top + actorBox.height / 2 - stageBox.top
+      return {
+        scale: Math.hypot(a!, b!),
+        xFrac: cx / (stageBox.width || 1),
+        yFrac: cy / (stageBox.height || 1),
+        rotationDeg: (Math.atan2(b!, a!) * 180) / Math.PI,
+      }
+    })
+
+    expect(demoMid.scale).toBeGreaterThan(2.5)
+    expect(Math.abs(demoMid.scale - editorMid.scale)).toBeLessThan(0.35)
+    expect(Math.abs(demoMid.xFrac - editorMid.xFrac)).toBeLessThan(0.08)
+    // Facing on a straight path: rotation near 0 (not a large authored spin).
+    expect(Math.abs(demoMid.rotationDeg)).toBeLessThan(15)
+    expect(angleDeltaDeg(demoMid.rotationDeg, editorMid.rotationDeg)).toBeLessThan(
+      12,
+    )
+  })
+
+  test('L-path pause holds inbound heading in editor and export', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(page, buildFaceAlongLFixtureJson())
+    await ensureEditor(page)
+
+    // Pause spans t=760–920 on a path ending at t=1720 → ~0.44–0.53 local.
+    const pauseLocals = [0.44, 0.48, 0.5, 0.53]
+    const editorPause: number[] = []
+    for (const t of pauseLocals) {
+      editorPause.push(await editorRotationAt(page, t))
+    }
+    for (const r of editorPause) {
+      expect(Math.abs(r)).toBeLessThan(12)
+    }
+    const after = await editorRotationAt(page, 0.7)
+    expect(after).toBeGreaterThan(40)
+
+    await openPanel(page, 'export')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-html-demo').click()
+    const html = readFileSync((await (await downloadPromise).path())!, 'utf8')
+    await loadHtmlDocument(page, html)
+
+    const demo = await page.evaluate((times: number[]) => {
+      const el = document.querySelector(
+        '[data-testid="demo-actor"]',
+      ) as HTMLElement
+      const anim = el.getAnimations().find((a) => {
+        const name = (a as CSSAnimation).animationName
+        return typeof name === 'string' && name !== '' && name !== 'none'
+      })
+      if (!anim) throw new Error('missing animation')
+      anim.pause()
+      const dur =
+        Number(anim.effect?.getTiming().duration) ||
+        parseFloat(getComputedStyle(el).animationDuration) * 1000
+      const read = (t: number) => {
+        anim.currentTime = t * dur
+        void el.offsetWidth
+        const m = getComputedStyle(el).transform
+        const m2 = m.match(/^matrix\((.+)\)$/)
+        if (!m2) return 0
+        const [a, b] = m2[1].split(',').map((v) => Number(v.trim()))
+        return (Math.atan2(b!, a!) * 180) / Math.PI
+      }
+      return {
+        pause: times.map(read),
+        after: read(0.7),
+      }
+    }, pauseLocals)
+
+    for (const r of demo.pause) {
+      expect(Math.abs(r)).toBeLessThan(12)
+    }
+    expect(demo.after).toBeGreaterThan(40)
+    for (let i = 0; i < pauseLocals.length; i++) {
+      expect(angleDeltaDeg(demo.pause[i]!, editorPause[i]!)).toBeLessThan(10)
+    }
+  })
+
   test('export panel shows facing fidelity warning; CSS comment kept', async ({
     page,
   }) => {

@@ -90,8 +90,9 @@ describe('face-along export fidelity', () => {
   it('demonstrates uniform thinning exceeds angular tolerance on a tight spiral', () => {
     const processed = buildDenseSpiral()
     const headingOff = headingExportOffsets(processed, ASPECT)
-    const posKf = buildKeyframesFromProcessed(processed)
-    const base = unionExportOffsets(posKf, { keyframes: [] })
+    // Sparse position/transform base so the stress cap is spent on heading
+    // (mandatory base offsets are never thinned for facing).
+    const base = [0, 1]
     const uniqueBefore = new Set([...base, ...headingOff]).size
     const stressCap = 60
     const uniform = mergeExportLocalOffsetsUniform(base, headingOff, stressCap)
@@ -112,6 +113,9 @@ describe('face-along export fidelity', () => {
     expect(Math.abs(headingSpan)).toBeGreaterThan(360 * 3)
     expect(maxErrDeg).toBeGreaterThan(HEADING_EXPORT_ANGULAR_TOLERANCE_DEG)
     expect(adaptive.maxErrDeg).toBeLessThan(maxErrDeg)
+    // Base endpoints always survive.
+    expect(adaptive.offsets[0]).toBe(0)
+    expect(adaptive.offsets[adaptive.offsets.length - 1]).toBe(1)
 
     // eslint-disable-next-line no-console
     console.log(
@@ -142,7 +146,13 @@ describe('face-along export fidelity', () => {
       rotationAt,
     )
 
-    expect(merged.offsets.length).toBeLessThanOrEqual(HEADING_EXPORT_MAX_OFFSETS)
+    // Mandatory position offsets always retained.
+    for (const t of base) {
+      expect(merged.offsets.some((o) => Math.abs(o - t) < 1e-9)).toBe(true)
+    }
+    expect(merged.offsets.length).toBeLessThanOrEqual(
+      Math.max(HEADING_EXPORT_MAX_OFFSETS, base.length),
+    )
     expect(merged.offsets[0]).toBe(0)
     expect(merged.offsets[merged.offsets.length - 1]).toBe(1)
 
@@ -167,21 +177,30 @@ describe('face-along export fidelity', () => {
   })
 
   it('regression: former ~3.04° uniform-thin case meets 3° via probe densify or warns', () => {
-    // Uniform thinning at the production cap previously measured ~3.04° and the
-    // 0.05° acceptance slack hid the miss. Adaptive must not silently accept that.
+    // Uniform thinning of the full candidate set at the production cap previously
+    // measured ~3.04° and the 0.05° acceptance slack hid the miss.
     const processed = buildDenseSpiral()
     const headingOff = headingExportOffsets(processed, ASPECT)
     const posKf = buildKeyframesFromProcessed(processed)
-    const base = unionExportOffsets(posKf, { keyframes: [] })
+    const fullBase = unionExportOffsets(posKf, { keyframes: [] })
     const rotationAt = rotationEvaluator(processed)
     const uniformErr = measureExportHeadingError(
-      mergeExportLocalOffsetsUniform(base, headingOff, 120),
+      mergeExportLocalOffsetsUniform(fullBase, headingOff, 120),
       rotationAt,
     )
     expect(uniformErr).toBeGreaterThan(HEADING_EXPORT_ANGULAR_TOLERANCE_DEG)
     expect(uniformErr).toBeLessThan(HEADING_EXPORT_ANGULAR_TOLERANCE_DEG + 0.1)
 
-    const merged = mergeExportLocalOffsets(base, headingOff, 120, rotationAt)
+    // Adaptive with mandatory position base preserved + heading densify.
+    const merged = mergeExportLocalOffsets(
+      fullBase,
+      headingOff,
+      120,
+      rotationAt,
+    )
+    for (const t of fullBase) {
+      expect(merged.offsets.some((o) => Math.abs(o - t) < 1e-9)).toBe(true)
+    }
     if (merged.maxErrDeg <= HEADING_EXPORT_ANGULAR_TOLERANCE_DEG) {
       expect(merged.fidelityWarning).toBeNull()
       expect(merged.maxErrDeg).toBeLessThan(uniformErr)
@@ -203,12 +222,13 @@ describe('face-along export fidelity', () => {
   it('surfaces a fidelity warning when the hard cap cannot meet tolerance', () => {
     const processed = buildDenseSpiral(500, 14)
     const headingOff = headingExportOffsets(processed, ASPECT)
-    const posKf = buildKeyframesFromProcessed(processed)
-    const base = unionExportOffsets(posKf, { keyframes: [] })
+    // Tiny heading budget with minimal mandatory base.
+    const base = [0, 1]
     const rotationAt = rotationEvaluator(processed)
     const merged = mergeExportLocalOffsets(base, headingOff, 24, rotationAt)
 
     expect(merged.offsets.length).toBeLessThanOrEqual(24)
+    expect(merged.offsets).toEqual(expect.arrayContaining([0, 1]))
     expect(merged.maxErrDeg).toBeGreaterThan(HEADING_EXPORT_ANGULAR_TOLERANCE_DEG)
     expect(merged.fidelityWarning).toMatch(/sampled angular error/i)
     expect(merged.fidelityWarning).toMatch(/24 keyframes/)

@@ -63,6 +63,54 @@ describe('face along path heading', () => {
     expect(evaluatePathHeading(track, 0.9)).toBeCloseTo(90, 0)
   })
 
+  it('holds incoming heading across the full L-path pause (no forward-blend)', () => {
+    // Regression: smoothing peeked through zero-length pause segments into the
+    // vertical leg, so heading rose to ~18° while still stationary (t=760–920).
+    const samples = buildLPathSamples()
+    const duration = samples[samples.length - 1]!.t
+    const track = buildHeadingTrack(samples, ASPECT)
+
+    const pauseTimes = [760, 800, 840, 880, 920]
+    for (const t of pauseTimes) {
+      const h = evaluatePathHeading(track, t / duration)
+      expect(Math.abs(h), `heading at t=${t} leaked the upcoming turn`).toBeLessThan(
+        2,
+      )
+    }
+
+    // Entry (last moving sample onto the corner) stays on the inbound heading.
+    expect(Math.abs(evaluatePathHeading(track, 760 / duration))).toBeLessThan(2)
+
+    // After departure, heading resumes toward the vertical leg (~90°).
+    // First moving sample may still blend briefly with the held inbound
+    // heading (documented soft departure); by mid-vertical it faces down.
+    const firstMoving = evaluatePathHeading(track, (24 * 40) / duration)
+    expect(firstMoving).toBeGreaterThan(5)
+    expect(evaluatePathHeading(track, 0.85)).toBeCloseTo(90, 0)
+
+    // Explicit transform rotation stays additive during the pause.
+    const actor = createSceneActor({
+      recording: {
+        samples,
+        recordedDurationMs: duration,
+      },
+      faceAlongPath: true,
+      directionOffsetDeg: 0,
+      transform: {
+        keyframes: [
+          { id: 'r0', t: 0, rotationDeg: 0, scale: 1 },
+          { id: 'r1', t: 0.5, rotationDeg: 15, scale: 1 },
+          { id: 'r2', t: 1, rotationDeg: 15, scale: 1 },
+        ],
+      },
+    })
+    const pauseLocal = 880 / duration
+    const total = evaluateActorRotationDeg(actor, samples, pauseLocal, ASPECT)
+    const pathOnly = evaluatePathHeading(track, pauseLocal)
+    expect(Math.abs(pathOnly)).toBeLessThan(2)
+    expect(total).toBeCloseTo(pathOnly + 15, 5)
+  })
+
   it('returns 0 for stationary and repeated-point paths', () => {
     const stationary: MotionSample[] = [
       { t: 0, x: 0.4, y: 0.4 },
