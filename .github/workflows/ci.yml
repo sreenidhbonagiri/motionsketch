@@ -41,14 +41,30 @@ jobs:
         run: npm run build
 
   e2e:
-    name: E2E (${{ matrix.project }})
+    # Wall-clock is dominated by Linux WebKit (~12–18m for the full suite on
+    # one worker). Chromium/Firefox finish in ~4–6m. Shard WebKit only so two
+    # runners share the suite without raising workers (WebKit still needs
+    # workers=1 to stay inside the 30s test budget).
+    name: E2E (${{ matrix.label }})
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        project: [chromium, firefox, webkit]
+        include:
+          - project: chromium
+            label: chromium
+            shard_args: ''
+          - project: firefox
+            label: firefox
+            shard_args: ''
+          - project: webkit
+            label: webkit 1/2
+            shard_args: '--shard=1/2'
+          - project: webkit
+            label: webkit 2/2
+            shard_args: '--shard=2/2'
 
     steps:
       - name: Checkout
@@ -66,16 +82,17 @@ jobs:
       - name: Install Playwright ${{ matrix.project }}
         run: npx playwright install ${{ matrix.project }} --with-deps
 
-      - name: End-to-end tests (${{ matrix.project }})
+      - name: End-to-end tests (${{ matrix.label }})
         # GitHub Actions sets CI=true, so Playwright starts its own webServer
         # (reuseExistingServer is false) and does not attach to an unrelated process.
-        run: npm run test:e2e -- --project=${{ matrix.project }} --retries=0
+        # WebKit jobs pass --shard so two runners cover the suite in parallel.
+        run: npm run test:e2e -- --project=${{ matrix.project }} --retries=0 ${{ matrix.shard_args }}
 
-      - name: Upload Playwright failure artifacts (${{ matrix.project }})
+      - name: Upload Playwright failure artifacts (${{ matrix.label }})
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-${{ matrix.project }}
+          name: playwright-${{ matrix.project }}-${{ strategy.job-index }}
           path: |
             playwright-report/
             test-results/

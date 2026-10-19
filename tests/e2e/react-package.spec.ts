@@ -152,6 +152,22 @@ async function actorHasRunningAnimation(page: Page) {
   })
 }
 
+async function waitUntilPortFree(port: number, timeoutMs = 10000) {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    try {
+      await fetch(`http://127.0.0.1:${port}/`, {
+        signal: AbortSignal.timeout(250),
+      })
+      // Still accepting connections — wait for exit.
+    } catch {
+      return
+    }
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  throw new Error(`Port ${port} still occupied after stopping consumer Vite`)
+}
+
 async function startConsumerServer(host: ConsumerHost) {
   if (host.proc) return
   host.proc = spawn(
@@ -191,10 +207,37 @@ async function startConsumerServer(host: ConsumerHost) {
   )
 }
 
-function stopConsumerServer(host: ConsumerHost) {
+async function stopConsumerServer(host: ConsumerHost) {
   if (!host.proc) return
-  host.proc.kill('SIGTERM')
+  const proc = host.proc
   host.proc = null
+  proc.kill('SIGTERM')
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      try {
+        proc.kill('SIGKILL')
+      } catch {
+        // already gone
+      }
+      resolve()
+    }, 3000)
+    proc.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
+  await waitUntilPortFree(host.port)
+}
+
+/**
+ * Rewrite the generated scene and restart Vite so the aliased MotionSketchScene
+ * module is not served from a stale transform cache (query-busting the HTML URL
+ * alone does not invalidate ms-scene/*).
+ */
+async function prepareConsumerScene(host: ConsumerHost, project: Project) {
+  writeReactPackageScene(host, project)
+  await stopConsumerServer(host)
+  await startConsumerServer(host)
 }
 
 test.describe('react package export', () => {
@@ -225,7 +268,7 @@ test.describe('react package consumer fixture', () => {
   test.afterAll(async ({ browser }, testInfo) => {
     void browser
     const host = hostFor(testInfo.project.name)
-    stopConsumerServer(host)
+    await stopConsumerServer(host)
     try {
       rmSync(host.sceneDir, { recursive: true, force: true })
     } catch {
@@ -237,8 +280,7 @@ test.describe('react package consumer fixture', () => {
     page,
   }, testInfo) => {
     const host = hostFor(testInfo.project.name)
-    writeReactPackageScene(host, makeTriggerProject('page-load'))
-    await startConsumerServer(host)
+    await prepareConsumerScene(host, makeTriggerProject('page-load'))
     await loadConsumer(page, host.url, 'page-load')
 
     const stageBox = await page.getByTestId('ms-react-stage').boundingBox()
@@ -284,8 +326,7 @@ test.describe('react package consumer fixture', () => {
 
   test('click trigger waits until activate', async ({ page }, testInfo) => {
     const host = hostFor(testInfo.project.name)
-    writeReactPackageScene(host, makeTriggerProject('click'))
-    await startConsumerServer(host)
+    await prepareConsumerScene(host, makeTriggerProject('click'))
     await loadConsumer(page, host.url, 'click')
     await expect(page.getByTestId('ms-react-scene')).toHaveClass(/ms-waiting/)
     expect(await actorHasRunningAnimation(page)).toBe(false)
@@ -300,8 +341,7 @@ test.describe('react package consumer fixture', () => {
 
   test('hover trigger plays on pointer enter', async ({ page }, testInfo) => {
     const host = hostFor(testInfo.project.name)
-    writeReactPackageScene(host, makeTriggerProject('hover'))
-    await startConsumerServer(host)
+    await prepareConsumerScene(host, makeTriggerProject('hover'))
     await loadConsumer(page, host.url, 'hover')
     await expect(page.getByTestId('ms-react-scene')).toHaveClass(/ms-waiting/)
     await page.getByTestId('ms-react-scene').hover()
@@ -312,8 +352,7 @@ test.describe('react package consumer fixture', () => {
 
   test('viewport trigger plays when visible', async ({ page }, testInfo) => {
     const host = hostFor(testInfo.project.name)
-    writeReactPackageScene(host, makeTriggerProject('viewport'))
-    await startConsumerServer(host)
+    await prepareConsumerScene(host, makeTriggerProject('viewport'))
     await loadConsumer(page, host.url, 'viewport')
     await expect
       .poll(async () => actorHasRunningAnimation(page), { timeout: 4000 })
@@ -324,8 +363,7 @@ test.describe('react package consumer fixture', () => {
     page,
   }, testInfo) => {
     const host = hostFor(testInfo.project.name)
-    writeReactPackageScene(host, makeTriggerProject('page-load'))
-    await startConsumerServer(host)
+    await prepareConsumerScene(host, makeTriggerProject('page-load'))
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await loadConsumer(page, host.url, 'page-load')
     expect(await actorHasRunningAnimation(page)).toBe(false)
