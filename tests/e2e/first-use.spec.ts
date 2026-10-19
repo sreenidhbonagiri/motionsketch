@@ -10,12 +10,61 @@ import {
 test.describe('first-use guidance and export wording', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('empty export points to website package and Other ways', async ({
+  test('Record arms with drag-to-draw guidance for sighted and assistive UI', async ({
     page,
   }) => {
     await page.goto('/')
     await ensureEditor(page)
 
+    const record = page.getByTestId('btn-record')
+    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
+      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    )
+    await expect(record).toHaveAttribute('aria-describedby', 'stage-empty-hint')
+    await expect(page.getByTestId('examples-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('btn-try-example')).toBeVisible()
+
+    await record.click()
+    await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
+    await expect(page.getByTestId('dock-status')).toHaveAttribute(
+      'data-mode-status',
+      'armed',
+    )
+    await expect(page.getByTestId('mode-status-label')).toHaveText('Ready')
+    await expect(page.getByTestId('mode-status-instruction')).toHaveText(
+      'Drag the actor to draw its path.',
+    )
+    await expect(page.getByTestId('action-live-region')).toHaveText(
+      'Ready — Drag the actor to draw its path.',
+    )
+    await expect(page.getByTestId('btn-stop')).toHaveAccessibleName(
+      'Cancel record',
+    )
+    await expect(page.getByTestId('btn-stop')).toHaveAttribute(
+      'aria-describedby',
+      'dock-status',
+    )
+    await expect(page.getByTestId('actor')).toHaveAccessibleName(
+      /Drag to draw its path/i,
+    )
+
+    await page.getByTestId('btn-stop').click()
+    await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('btn-record')).toBeVisible()
+  })
+
+  test('empty stage tip states CSS outcome; Adjust still has SVG import', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+
+    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
+      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    )
+    await expect(page.getByTestId('examples-empty-hint')).toContainText(
+      /Try an example/i,
+    )
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-empty')).toContainText(
       /Create a path \(Record, Import SVG, or a Motion preset\)/i,
@@ -26,6 +75,11 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-empty')).toContainText(
       /Other ways/i,
     )
+    await openPanel(page, 'adjust')
+    await expect(page.getByTestId('svg-path-import-help')).toContainText(
+      /Set the path for/i,
+    )
+    await expect(page.getByTestId('motion-presets')).toBeVisible()
   })
 
   test('empty hint clears after recording; Export primary is website package', async ({
@@ -33,8 +87,22 @@ test.describe('first-use guidance and export wording', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
+    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
+      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    )
+
+    await page.getByTestId('btn-record').click()
+    await expect(page.getByTestId('dock-status')).toBeVisible()
+    await expect(page.getByTestId('dock-status')).toContainText(
+      /Drag the actor to draw its path/i,
+    )
+    await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
+
+    await page.getByTestId('btn-stop').click()
     await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
-    await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
+      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    )
 
     await recordSimplePath(page)
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
@@ -272,4 +340,45 @@ test.describe('first-use guidance and export wording', () => {
     }
   })
 
+  test('storage failure shows download recovery; failed download is not success', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    await page.evaluate(() => {
+      const proto = Object.getPrototypeOf(localStorage)
+      // @ts-expect-error test stub
+      proto.setItem = () => {
+        throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+      }
+    })
+    await openPanel(page, 'adjust')
+    await page.getByTestId('duration-slider').fill('1800')
+    await page.waitForTimeout(400)
+
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-error-banner')).toBeVisible()
+    await expect(page.getByTestId('save-status')).toContainText(/Couldn't save/i)
+    await expect(
+      page.getByTestId('btn-download-project-save-error'),
+    ).toBeVisible()
+
+    await page.evaluate(() => {
+      URL.createObjectURL = () => {
+        throw new Error('blob unavailable')
+      }
+    })
+    await page.getByTestId('btn-download-project-save-error').click()
+    await expect(page.getByTestId('project-action-status')).toContainText(
+      /Could not download/i,
+    )
+    await expect(page.getByTestId('project-action-status')).not.toHaveText(
+      'Project download started.',
+    )
+    await expect(page.getByTestId('action-live-region')).not.toHaveText(
+      'Project download started.',
+    )
+  })
 })

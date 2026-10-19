@@ -6,6 +6,10 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { useTransformShortcuts } from '../hooks/useTransformShortcuts'
+import {
+  EMPTY_BOARD_RECORD_HINT_COARSE,
+  EMPTY_BOARD_RECORD_HINT_FINE,
+} from '../lib/modeStatus'
 import { endDrag, isRecordingActive } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 import { AdjustPanel } from './AdjustPanel'
@@ -14,6 +18,7 @@ import { CanvasStage } from './CanvasStage'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
 import { GlidePanel } from './GlidePanel'
+import { PresetPanel } from './PresetPanel'
 import { ProjectNameInput } from './ProjectNameInput'
 import {
   FloatingPanel,
@@ -45,6 +50,7 @@ export function EditorShell() {
   const editing = mode === 'editing'
   const polishSession = useEditorStore((s) => s.polishSession)
   const glideSession = useEditorStore((s) => s.glideSession)
+  const presetSession = useEditorStore((s) => s.presetSession)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const actor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -108,8 +114,8 @@ export function EditorShell() {
   const tip =
     !hasRecording && mode === 'idle'
       ? coarsePointer
-        ? 'Tap Record, then drag the actor to capture its movement.'
-        : 'Click Record, then drag the actor to capture its movement.'
+        ? EMPTY_BOARD_RECORD_HINT_COARSE
+        : EMPTY_BOARD_RECORD_HINT_FINE
       : null
 
   return (
@@ -356,9 +362,13 @@ export function EditorShell() {
         className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex max-h-[100dvh] flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
       >
         <div className="flex min-h-0 w-full max-w-2xl flex-col items-center gap-2">
-          {!editing && !polishSession && !glideSession && <ClipTimeline />}
+          {!editing &&
+            !polishSession &&
+            !glideSession &&
+            !presetSession && <ClipTimeline />}
           {polishSession && <PolishPanel />}
           {glideSession && <GlidePanel />}
+          {presetSession && <PresetPanel />}
           <PlaybackDock />
           {tip && (
             <p
