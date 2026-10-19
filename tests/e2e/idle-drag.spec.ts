@@ -3,6 +3,7 @@ import {
   actorHasPointerCapture,
   dispatchActivePointerCancel,
   ensureEditor,
+  ensureRefineMotionOpen,
   selectActorByIndex,
   touchPointerGesture,
 } from './helpers'
@@ -178,6 +179,7 @@ test.describe('touch-emulated idle placement', () => {
     await page.goto('/')
     await ensureEditor(page)
 
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('snap-to-grid-toggle').click()
     await expect(page.getByTestId('snap-to-grid-toggle')).toHaveAttribute(
       'aria-pressed',

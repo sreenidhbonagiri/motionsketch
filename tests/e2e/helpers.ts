@@ -305,6 +305,23 @@ async function scrollExportScrollerToCenter(locator: Locator) {
   })
 }
 
+/** Expand the dock’s Refine motion disclosure (Polish, Glide, Snap, Restore, Reset). */
+export async function ensureRefineMotionOpen(page: Page) {
+  const details = page.getByTestId('refine-motion')
+  await expect(details).toBeVisible()
+  const open = await details.evaluate(
+    (el) => (el as HTMLDetailsElement).open,
+  )
+  if (!open) {
+    await page.getByTestId('refine-motion-summary').click()
+  }
+  await expect
+    .poll(() =>
+      details.evaluate((el) => (el as HTMLDetailsElement).open),
+    )
+    .toBe(true)
+}
+
 /** Expand Export → Other ways (React, CSS, own-element, project file). */
 export async function expandExportOtherWays(page: Page) {
   const details = page.getByTestId('export-other-ways')

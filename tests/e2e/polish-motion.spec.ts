@@ -5,7 +5,9 @@ import {
   POLISH_RAW_ACTOR_ID,
 } from '../fixtures/polishMotionProject'
 import {
+  closeOpenChromePanels,
   ensureEditor,
+  ensureRefineMotionOpen,
   loadProjectSnapshot,
   openPanel,
   readExportedCss,
@@ -21,6 +23,7 @@ test.describe('polish motion', () => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
 
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-polish-motion').click()
     await expect(page.getByTestId('polish-panel')).toBeVisible()
     await expect(page.getByTestId('polish-compare-legend')).toContainText(
@@ -64,7 +67,9 @@ test.describe('polish motion', () => {
     }
 
     // Actor isolation: other actor still selectable; polish is per selection.
+    await closeOpenChromePanels(page)
     await selectActorByIndex(page, 1)
+    await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('btn-polish-motion')).toBeEnabled()
     await page.getByTestId('btn-polish-motion').click()
     await expect(page.getByTestId('polish-panel')).toBeVisible()
@@ -75,6 +80,7 @@ test.describe('polish motion', () => {
   test('save and open keeps polished geometry', async ({ page }) => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-polish-motion').click()
     const apply = page.getByTestId('btn-polish-apply')
     if (!(await apply.isEnabled())) {
@@ -108,6 +114,7 @@ test.describe('polish motion', () => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
 
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-polish-motion').click()
     await expect(page.getByTestId('polish-strength-value')).toHaveText('55%')
     await page.getByTestId('polish-strength').evaluate((el) => {
@@ -179,6 +186,7 @@ test.describe('polish motion', () => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
     await selectActorByIndex(page, 1)
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-polish-motion').click()
     await expect(page.getByTestId('polish-panel')).toBeVisible()
     const apply = page.getByTestId('btn-polish-apply')

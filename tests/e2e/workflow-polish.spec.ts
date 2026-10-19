@@ -3,6 +3,7 @@ import {
   applyClipSeconds,
   dragActor,
   ensureEditor,
+  ensureRefineMotionOpen,
   openPanel,
   recordSimplePath,
   selectActorByIndex,
@@ -44,6 +45,7 @@ test.describe('editor workflow polish', () => {
 
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('dock-status')).toContainText(/Ready|drag/i)
+    await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('btn-reset')).toBeDisabled()
     await expect(page.getByTestId('btn-reset')).toHaveAttribute(
       'aria-describedby',

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
   ensureEditor,
+  ensureRefineMotionOpen,
   actorIdsFromList,
   clickRecord,
   dragActor,
@@ -221,6 +222,7 @@ test.describe('multiple actors', () => {
 
     const ids = await actorIdsFromList(page)
     await selectActorByIndex(page, 0)
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-reset').click()
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   ensureEditor,
+  ensureRefineMotionOpen,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -130,6 +131,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('export-panel')).toBeVisible()
     const cssAfter = await readExportedCss(page)
     expect(cssAfter).toBe(cssBefore)
+    await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('btn-restore-path')).toBeVisible()
   })
 
@@ -198,6 +200,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await page.getByTestId('loop-toggle').check()
 
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-reset').click()
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',
@@ -220,6 +223,7 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('3000')
     await page.getByTestId('loop-toggle').check()
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-reset').click()
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',

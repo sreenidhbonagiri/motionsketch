@@ -47,6 +47,9 @@ const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
 
 const chromeBtn =
   'inline-flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md transition hover:bg-white'
+/** Primary chrome CTA — used for Export once a path exists. */
+const chromeBtnPrimary =
+  'inline-flex items-center gap-1.5 rounded-xl border border-slate-900 bg-slate-900 px-2.5 py-1.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(15,23,42,0.16)] transition hover:bg-slate-800'
 
 export function EditorShell() {
   usePlaybackClock()
@@ -403,9 +406,12 @@ export function EditorShell() {
               aria-expanded={openPanel === 'export'}
               aria-controls="export-panel-root"
               onClick={() => togglePanel('export')}
-              className={chromeBtn}
+              className={hasRecording ? chromeBtnPrimary : chromeBtn}
             >
-              <span aria-hidden className="text-slate-500">
+              <span
+                aria-hidden
+                className={hasRecording ? 'text-slate-300' : 'text-slate-500'}
+              >
                 ↗
               </span>
               Export

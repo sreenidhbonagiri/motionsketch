@@ -517,7 +517,9 @@ export function PlaybackDock() {
                     armRecording()
                   })()
                 }}
-                className={btnPrimary}
+                // Empty board: Record is the primary action. After a path exists,
+                // Play takes the primary style so preview/export stays front-of-mind.
+                className={hasAnyRecording ? btnSecondary : btnPrimary}
               >
                 Record
               </button>
@@ -528,7 +530,7 @@ export function PlaybackDock() {
                 type="button"
                 data-testid="btn-pause"
                 onClick={pause}
-                className={btnSecondary}
+                className={btnPrimary}
               >
                 Pause
               </button>
@@ -539,7 +541,7 @@ export function PlaybackDock() {
                 onClick={() => play()}
                 disabled={playbackDisabled}
                 aria-describedby={playbackDescribedBy}
-                className={btnSecondary}
+                className={hasAnyRecording ? btnPrimary : btnSecondary}
               >
                 Play
               </button>
@@ -569,28 +571,6 @@ export function PlaybackDock() {
 
             <button
               type="button"
-              data-testid="btn-polish-motion"
-              onClick={() => beginPolishSession()}
-              disabled={polishDisabled}
-              title="Preview a gentler path while keeping pauses and corners"
-              className={btnSecondary}
-            >
-              Polish motion
-            </button>
-
-            <button
-              type="button"
-              data-testid="btn-glide"
-              onClick={() => beginGlideSession()}
-              disabled={glideDisabled}
-              title="Softens starts and stops while keeping your path and pauses"
-              className={btnSecondary}
-            >
-              Glide
-            </button>
-
-            <button
-              type="button"
               data-testid="btn-undo-transform"
               onClick={() => undoActorEdit()}
               disabled={isRecordingLike || actorEditOrder.length === 0}
@@ -610,49 +590,111 @@ export function PlaybackDock() {
               Redo
             </button>
 
-            <button
-              type="button"
-              data-testid="btn-reset"
-              onClick={() => {
-                void (async () => {
-                  if (recording) {
-                    const label = selectedActor?.name ?? 'this actor'
-                    const ok = await confirm({
-                      title: `Reset “${label}”?`,
-                      body: 'Clears that actor’s path, path edits, and transform — not other actors.',
-                      confirmLabel: 'Reset actor',
-                      danger: true,
-                      testId: 'reset-actor-confirm',
-                      confirmTestId: 'btn-reset-actor-confirm',
-                      cancelTestId: 'btn-reset-actor-cancel',
-                      bodyTestId: 'reset-actor-confirm-copy',
-                    })
-                    if (!ok) return
-                  }
-                  resetRecording()
-                })()
-              }}
-              disabled={resetDisabled}
-              aria-describedby={resetDescribedBy}
-              className={btnQuiet}
+            <details
+              data-testid="refine-motion"
+              className="w-full min-w-0 sm:w-auto"
             >
-              Reset actor
-            </button>
-
-            {geometryEdit && (
-              <button
-                type="button"
-                data-testid="btn-restore-path"
-                onClick={restoreRecordedPath}
-                className={btnQuiet}
+              <summary
+                data-testid="refine-motion-summary"
+                className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden"
               >
-                Restore recorded path
-              </button>
-            )}
+                <span
+                  aria-hidden
+                  className="text-slate-400 [[open]_&]:rotate-90"
+                >
+                  ▸
+                </span>
+                Refine motion
+              </summary>
+              <div
+                data-testid="refine-motion-tools"
+                className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:justify-start"
+              >
+                <button
+                  type="button"
+                  data-testid="btn-polish-motion"
+                  onClick={() => beginPolishSession()}
+                  disabled={polishDisabled}
+                  title="Preview a gentler path while keeping pauses and corners"
+                  className={btnSecondary}
+                >
+                  Polish motion
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="btn-glide"
+                  onClick={() => beginGlideSession()}
+                  disabled={glideDisabled}
+                  title="Softens starts and stops while keeping your path and pauses"
+                  className={btnSecondary}
+                >
+                  Glide
+                </button>
+
+                {!isRecordingLike && (
+                  <button
+                    type="button"
+                    data-testid="snap-to-grid-toggle"
+                    aria-pressed={snapToGrid}
+                    aria-describedby="snap-to-grid-help"
+                    title="Align placement and path edits to the dots. Recording stays freehand."
+                    onClick={() => setSnapToGrid(!snapToGrid)}
+                    className={
+                      snapToGrid
+                        ? 'shrink-0 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800'
+                        : `${btnSecondary} shrink-0`
+                    }
+                  >
+                    {snapToGrid ? 'Snap on' : 'Snap to grid'}
+                  </button>
+                )}
+
+                {geometryEdit && (
+                  <button
+                    type="button"
+                    data-testid="btn-restore-path"
+                    onClick={restoreRecordedPath}
+                    className={btnQuiet}
+                  >
+                    Restore recorded path
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  data-testid="btn-reset"
+                  onClick={() => {
+                    void (async () => {
+                      if (recording) {
+                        const label = selectedActor?.name ?? 'this actor'
+                        const ok = await confirm({
+                          title: `Reset “${label}”?`,
+                          body: 'Clears that actor’s path, path edits, and transform — not other actors.',
+                          confirmLabel: 'Reset actor',
+                          danger: true,
+                          testId: 'reset-actor-confirm',
+                          confirmTestId: 'btn-reset-actor-confirm',
+                          cancelTestId: 'btn-reset-actor-cancel',
+                          bodyTestId: 'reset-actor-confirm-copy',
+                        })
+                        if (!ok) return
+                      }
+                      resetRecording()
+                    })()
+                  }}
+                  disabled={resetDisabled}
+                  aria-describedby={resetDescribedBy}
+                  className={btnQuiet}
+                >
+                  Reset actor
+                </button>
+              </div>
+            </details>
           </>
         )}
 
-        {!isRecordingLike && (
+        {editing && !isRecordingLike && (
           <button
             type="button"
             data-testid="snap-to-grid-toggle"
@@ -675,7 +717,11 @@ export function PlaybackDock() {
         <p
           id="snap-to-grid-help"
           data-testid="snap-to-grid-help"
-          className="max-w-xl text-center text-[11px] leading-snug text-slate-500"
+          className={
+            editing
+              ? 'max-w-xl text-center text-[11px] leading-snug text-slate-500'
+              : 'sr-only'
+          }
         >
           Align placement and path edits to the dots. Recording stays freehand.
         </p>

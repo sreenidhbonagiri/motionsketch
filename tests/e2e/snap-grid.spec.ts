@@ -5,7 +5,12 @@ import {
   buildPathMoveFixtureSamples,
   PATH_MOVE_HANDLE_INDICES,
 } from '../fixtures/pathMoveProject'
-import { dragActor, ensureEditor, loadProjectSnapshot } from './helpers'
+import {
+  dragActor,
+  ensureEditor,
+  ensureRefineMotionOpen,
+  loadProjectSnapshot,
+} from './helpers'
 
 test.describe('snap to grid', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -15,6 +20,7 @@ test.describe('snap to grid', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
+    await ensureRefineMotionOpen(page)
     const toggle = page.getByTestId('snap-to-grid-toggle')
     await expect(toggle).toBeVisible()
     await expect(toggle).toHaveAttribute('aria-pressed', 'false')
@@ -38,6 +44,7 @@ test.describe('snap to grid', () => {
     const before = await actor.boundingBox()
     expect(before).toBeTruthy()
 
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('snap-to-grid-toggle').click()
     const afterToggle = await actor.boundingBox()
     expect(Math.abs(afterToggle!.x - before!.x)).toBeLessThan(2)
@@ -65,6 +72,7 @@ test.describe('snap to grid', () => {
   test('recording stays freehand while snap is on', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('snap-to-grid-toggle').click()
     await expect(page.getByTestId('snap-to-grid-toggle')).toHaveAttribute(
       'aria-pressed',
@@ -75,6 +83,7 @@ test.describe('snap to grid', () => {
     await expect(page.getByTestId('snap-to-grid-toggle')).toHaveCount(0)
     await dragActor(page, { x: 20, y: 10 }, { x: 140, y: -40 })
     await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
+    await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('snap-to-grid-toggle')).toBeVisible()
     await expect(page.getByTestId('snap-to-grid-toggle')).toHaveAttribute(
       'aria-pressed',
@@ -87,6 +96,7 @@ test.describe('snap to grid', () => {
   }) => {
     await loadProjectSnapshot(page, buildPathHandlesFixtureJson())
     await ensureEditor(page)
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('snap-to-grid-toggle').click()
     await page.getByTestId('btn-edit-path').click()
     await expect(page.getByTestId('path-handles')).toBeVisible()
@@ -131,6 +141,7 @@ test.describe('snap to grid', () => {
     const baseline = buildPathMoveFixtureSamples()
     await loadProjectSnapshot(page, buildPathMoveFixtureJson())
     await ensureEditor(page)
+    await ensureRefineMotionOpen(page)
     await page.getByTestId('snap-to-grid-toggle').click()
     await page.getByTestId('btn-edit-path').click()
     await page.getByTestId('btn-path-tool-move').click()
