@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /** Load a standalone HTML document without keeping the Vite app URL as the document base. */
 export async function loadHtmlDocument(page: Page, html: string) {
@@ -291,6 +291,20 @@ export async function openPanel(page: Page, id: ChromePanel) {
   await root.focus()
 }
 
+/** Scroll `el` to the vertical center of its nearest `.overflow-y-auto` ancestor. */
+async function scrollExportScrollerToCenter(locator: Locator) {
+  await locator.evaluate((el) => {
+    const scroller = el.closest('.overflow-y-auto') as HTMLElement | null
+    if (!scroller) return
+    // Assign scrollTop directly — scrollIntoView can animate / thrash on WebKit.
+    const elRect = el.getBoundingClientRect()
+    const scRect = scroller.getBoundingClientRect()
+    const delta =
+      elRect.top + elRect.height / 2 - (scRect.top + scRect.height / 2)
+    scroller.scrollTop += delta
+  })
+}
+
 /** Expand Export → Other ways (React, CSS, own-element, project file). */
 export async function expandExportOtherWays(page: Page) {
   const details = page.getByTestId('export-other-ways')
@@ -300,11 +314,7 @@ export async function expandExportOtherWays(page: Page) {
   )
   if (!open) {
     const summary = page.getByTestId('export-other-ways-summary')
-    // Instant scroll — avoid scrollIntoViewIfNeeded on nested Export overflow
-    // (Linux WebKit never marks that summary stable during the animated path).
-    await summary.evaluate((el) => {
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    })
+    await scrollExportScrollerToCenter(summary)
     await summary.click()
   }
   await expect
@@ -312,34 +322,28 @@ export async function expandExportOtherWays(page: Page) {
       details.evaluate((el) => (el as HTMLDetailsElement).open),
     )
     .toBe(true)
-  // Expanded Other ways is taller than the panel. Instant-scroll HTML demo
-  // (below CSS) into the scroller so later clicks do not rely on Playwright’s
-  // nested scrollIntoViewIfNeeded, which thrashes on Linux WebKit.
+  // Expanded Other ways is taller than the panel. Center HTML demo (below CSS)
+  // via scrollTop so callers can click without Playwright’s nested
+  // scrollIntoViewIfNeeded path (never-stable on Linux WebKit).
   const htmlDemo = page.getByTestId('btn-download-html-demo')
-  await htmlDemo.evaluate((el) => {
-    el.scrollIntoView({ block: 'center', inline: 'nearest' })
-  })
+  await scrollExportScrollerToCenter(htmlDemo)
   await expect(page.getByTestId('btn-download-css')).toBeVisible()
   await expect(htmlDemo).toBeVisible()
-  // Require two matching layout samples a frame apart before callers click.
   await expect
     .poll(() =>
-      htmlDemo.evaluate(
-        (el) =>
-          new Promise<string | null>((resolve) => {
-            const a = el.getBoundingClientRect()
-            requestAnimationFrame(() => {
-              const b = el.getBoundingClientRect()
-              const same =
-                Math.round(a.y) === Math.round(b.y) &&
-                Math.round(a.height) === Math.round(b.height) &&
-                b.height > 0
-              resolve(same ? `${Math.round(b.y)}:${Math.round(b.height)}` : null)
-            })
-          }),
-      ),
+      htmlDemo.evaluate((el) => {
+        const scroller = el.closest('.overflow-y-auto') as HTMLElement | null
+        if (!scroller) return false
+        const er = el.getBoundingClientRect()
+        const sr = scroller.getBoundingClientRect()
+        return (
+          er.height > 0 &&
+          er.top >= sr.top - 1 &&
+          er.bottom <= sr.bottom + 1
+        )
+      }),
     )
-    .not.toBeNull()
+    .toBe(true)
 }
 
 export async function openCssDialog(page: Page): Promise<{
@@ -363,10 +367,7 @@ export async function openCssDialog(page: Page): Promise<{
   await expect(viewBtn).toBeVisible()
   // Export panel body scrolls on short viewports; nested overflow can leave
   // View CSS outside the clickable area until scrolled into the panel.
-  await viewBtn.evaluate((el) => {
-    el.scrollIntoView({ block: 'center', inline: 'nearest' })
-  })
-  await viewBtn.scrollIntoViewIfNeeded()
+  await scrollExportScrollerToCenter(viewBtn)
   await expect(viewBtn).toBeVisible()
   await viewBtn.click()
   await expect(page.getByTestId('css-dialog')).toBeVisible()
