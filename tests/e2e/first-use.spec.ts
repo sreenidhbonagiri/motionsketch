@@ -226,9 +226,6 @@ test.describe('first-use guidance and export wording', () => {
     )
 
     await openPanel(page, 'export')
-    await expect(page.getByTestId('export-trigger-select')).toBeVisible()
-    await expect(page.getByTestId('btn-preview-trigger')).toBeVisible()
-
     await expect(page.getByTestId('export-primary')).toContainText(
       'Download for your website',
     )
@@ -255,6 +252,17 @@ test.describe('first-use guidance and export wording', () => {
       expect(text.length, `empty describedby target ${id}`).toBeGreaterThan(0)
     }
 
+    await expect(page.getByTestId('export-trigger-select')).toBeVisible()
+    await expect(page.getByTestId('btn-preview-trigger')).toBeVisible()
+    await expect(page.getByTestId('export-trigger-help')).toContainText(
+      'Download CSS works alone for page-load',
+    )
+    await page.getByTestId('export-trigger-select').selectOption('click')
+    await expect(page.getByTestId('export-trigger-help')).toContainText(
+      /Download CSS is CSS-only[\s\S]*ms-trigger\.js/,
+    )
+    await page.getByTestId('export-trigger-select').selectOption('page-load')
+
     const otherWays = page.getByTestId('export-other-ways')
     await expect(otherWays).toBeVisible()
     await expect(page.getByTestId('export-other-ways-summary')).toHaveText(
@@ -269,11 +277,15 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-own-element')).toBeHidden()
     await expect(page.getByTestId('btn-export-download-project')).toBeHidden()
 
+    // Visual order: website download → playback trigger → Other ways.
     const primaryBox = await page.getByTestId('export-primary').boundingBox()
+    const triggerBox = await page.getByTestId('export-trigger-select').boundingBox()
     const otherBox = await otherWays.boundingBox()
     expect(primaryBox).toBeTruthy()
+    expect(triggerBox).toBeTruthy()
     expect(otherBox).toBeTruthy()
-    expect(primaryBox!.y).toBeLessThan(otherBox!.y)
+    expect(primaryBox!.y).toBeLessThan(triggerBox!.y)
+    expect(triggerBox!.y).toBeLessThan(otherBox!.y)
   })
 
   test('Other ways expands to React, CSS, own-element, and project file', async ({
@@ -329,7 +341,7 @@ test.describe('first-use guidance and export wording', () => {
     expect(ownBox!.y).toBeLessThan(projectBox!.y)
   })
 
-  test('export: keyboard reaches primary then Other ways before Close; help is associated', async ({
+  test('export: keyboard reaches primary then trigger then Other ways before Close; help is associated', async ({
     page,
   }) => {
     await page.goto('/')
@@ -339,9 +351,9 @@ test.describe('first-use guidance and export wording', () => {
 
     await expect(page.getByTestId('export-panel-root')).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(page.getByTestId('export-trigger-select')).toBeFocused()
+    await expect(page.getByTestId('btn-download-web-package')).toBeFocused()
 
-    const tabOrder: string[] = ['export-trigger-select']
+    const tabOrder: string[] = ['btn-download-web-package']
     for (let i = 0; i < 40; i++) {
       await page.keyboard.press('Tab')
       const testId = await page.evaluate(() => {
@@ -353,10 +365,14 @@ test.describe('first-use guidance and export wording', () => {
     }
     expect(tabOrder.at(-1)).toBe('btn-close-export')
     const webIdx = tabOrder.indexOf('btn-download-web-package')
+    const triggerIdx = tabOrder.indexOf('export-trigger-select')
+    const previewIdx = tabOrder.indexOf('btn-preview-trigger')
     const otherIdx = tabOrder.indexOf('export-other-ways-summary')
     const closeIdx = tabOrder.indexOf('btn-close-export')
-    expect(webIdx).toBeGreaterThanOrEqual(0)
-    expect(otherIdx).toBeGreaterThan(webIdx)
+    expect(webIdx).toBe(0)
+    expect(triggerIdx).toBeGreaterThan(webIdx)
+    expect(previewIdx).toBeGreaterThan(triggerIdx)
+    expect(otherIdx).toBeGreaterThan(previewIdx)
     expect(closeIdx).toBeGreaterThan(otherIdx)
     // Collapsed: secondary actions are not in the tab order yet.
     expect(tabOrder.indexOf('btn-download-react-package')).toBe(-1)
@@ -431,9 +447,18 @@ test.describe('first-use guidance and export wording', () => {
     await recordSimplePath(page)
     await openPanel(page, 'export')
 
+    // Primary download should be above the fold on narrow viewports.
+    await expect(page.getByTestId('btn-download-web-package')).toBeInViewport()
+    const primaryBox = await page.getByTestId('export-primary').boundingBox()
+    const triggerBox = await page.getByTestId('export-trigger-select').boundingBox()
+    const otherBox = await page.getByTestId('export-other-ways').boundingBox()
+    expect(primaryBox!.y).toBeLessThan(triggerBox!.y)
+    expect(triggerBox!.y).toBeLessThan(otherBox!.y)
+
     for (const testId of [
       'export-primary',
       'btn-download-web-package',
+      'export-trigger-select',
       'export-other-ways',
     ]) {
       const el = page.getByTestId(testId)

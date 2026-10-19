@@ -303,6 +303,51 @@ export function ExportPanel() {
         </div>
       )}
 
+      {busy ? (
+        <p id={packagingHelpId} className="sr-only" data-testid="export-packaging-help">
+          A package is building. Other export actions are unavailable until it
+          finishes.
+        </p>
+      ) : null}
+
+      <section
+        className="space-y-2"
+        data-testid="export-primary"
+        aria-labelledby={embedHeadingId}
+        aria-describedby={packageStatusId}
+      >
+        <h3
+          id={embedHeadingId}
+          className="text-xs font-semibold text-slate-900"
+        >
+          Download for your website
+        </h3>
+        <button
+          type="button"
+          data-testid="btn-download-web-package"
+          onClick={downloadWebPackage}
+          disabled={busy}
+          aria-busy={packaging === 'web'}
+          aria-describedby={describedBy(
+            packageStatusId,
+            busy && packagingHelpId,
+          )}
+          className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {packaging === 'web'
+            ? 'Building website package…'
+            : 'Download for your website'}
+        </button>
+        <p
+          id={packageStatusId}
+          data-testid="export-web-package-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          ZIP with a working <code>index.html</code> preview and files to add the
+          animation to your site. Downloading does not publish anything.
+        </p>
+      </section>
+
       <div className="space-y-2">
         <label className="block space-y-1">
           <span className="text-xs font-medium text-slate-800">
@@ -360,51 +405,6 @@ export function ExportPanel() {
           recording, or undo history.
         </p>
       </div>
-
-      {busy ? (
-        <p id={packagingHelpId} className="sr-only" data-testid="export-packaging-help">
-          A package is building. Other export actions are unavailable until it
-          finishes.
-        </p>
-      ) : null}
-
-      <section
-        className="space-y-2"
-        data-testid="export-primary"
-        aria-labelledby={embedHeadingId}
-        aria-describedby={packageStatusId}
-      >
-        <h3
-          id={embedHeadingId}
-          className="text-xs font-semibold text-slate-900"
-        >
-          Download for your website
-        </h3>
-        <button
-          type="button"
-          data-testid="btn-download-web-package"
-          onClick={downloadWebPackage}
-          disabled={busy}
-          aria-busy={packaging === 'web'}
-          aria-describedby={describedBy(
-            packageStatusId,
-            busy && packagingHelpId,
-          )}
-          className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {packaging === 'web'
-            ? 'Building website package…'
-            : 'Download for your website'}
-        </button>
-        <p
-          id={packageStatusId}
-          data-testid="export-web-package-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          ZIP with a working <code>index.html</code> preview and files to add the
-          animation to your site. Downloading does not publish anything.
-        </p>
-      </section>
 
       <details
         data-testid="export-other-ways"
