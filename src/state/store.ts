@@ -28,6 +28,17 @@ import {
   smoothBendAvailability,
 } from '../core/edit'
 import { applyGlide, DEFAULT_GLIDE_STRENGTH } from '../core/glide'
+import {
+  applyMotionStateToActor,
+  buildMotionPresetState,
+  captureMotionState,
+  clampPresetTiming,
+  defaultPresetTiming,
+  getMotionPreset,
+  type MotionPresetId,
+  type MotionPresetMotionState,
+  type MotionPresetTiming,
+} from '../core/motionPresets'
 import { selectProcessedPathForActor } from './selectors'
 import {
   polishMotion,
@@ -127,8 +138,28 @@ export type GlideSession = {
   segmentsAdjusted: number
 }
 
+/** Ephemeral Motion preset preview — never persisted until Apply. */
+export type PresetSession = {
+  presetId: MotionPresetId
+  proposed: MotionPresetMotionState
+  /** Delay before motion on the shared timeline (ms) → sequence Start. */
+  delayMs: number
+  /** How long the motion runs after delay (ms) → Move for. */
+  durationMs: number
+  /**
+   * Which motion drives the stage during preview.
+   * `original` = committed actor (project unchanged); `preset` = proposed.
+   */
+  compareMode: 'original' | 'preset'
+}
+
 /** Chronological actor-edit kinds for unified placement/clip/transform undo. */
-export type ActorEditKind = 'transform' | 'clip' | 'placement' | 'glide'
+export type ActorEditKind =
+  | 'transform'
+  | 'clip'
+  | 'placement'
+  | 'glide'
+  | 'preset'
 
 const PLACEMENT_NOOP_EPS = 1e-9
 
@@ -196,6 +227,12 @@ interface EditorStore {
   /** Previous glide amounts for undo (selected actor). */
   glideUndoStack: number[]
   glideRedoStack: number[]
+
+  /** Non-destructive Motion preset preview (null when inactive). */
+  presetSession: PresetSession | null
+  /** Previous full motion snapshots for preset undo (selected actor). */
+  presetUndoStack: MotionPresetMotionState[]
+  presetRedoStack: MotionPresetMotionState[]
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -354,6 +391,14 @@ interface EditorStore {
   undoGlide: () => void
   redoGlide: () => void
 
+  beginPresetPreview: (presetId: MotionPresetId) => boolean
+  setPresetTiming: (timing: Partial<MotionPresetTiming>) => void
+  setPresetCompareMode: (mode: 'original' | 'preset') => void
+  applyPreset: () => boolean
+  cancelPreset: () => void
+  undoPreset: () => void
+  redoPreset: () => void
+
   selectTransformKeyframe: (id: string | null) => void
   upsertTransformAtPlayhead: (rotationDeg: number, scale: number) => void
   commitTransformKeyframe: (input: {
@@ -381,6 +426,7 @@ function clearEditState() {
     pathGestureActive: false,
     polishSession: null as PolishSession | null,
     glideSession: null as GlideSession | null,
+    presetSession: null as PresetSession | null,
   }
 }
 
@@ -524,6 +570,8 @@ function clearHistoryForActorSwitch() {
     ...clearActorEditOrder(),
     glideUndoStack: [] as number[],
     glideRedoStack: [] as number[],
+    presetUndoStack: [] as MotionPresetMotionState[],
+    presetRedoStack: [] as MotionPresetMotionState[],
   }
 }
 
@@ -617,6 +665,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     polishStrengthByActorId: {},
     glideUndoStack: [] as number[],
     glideRedoStack: [] as number[],
+    presetUndoStack: [] as MotionPresetMotionState[],
+    presetRedoStack: [] as MotionPresetMotionState[],
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
@@ -889,7 +939,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     play: () => {
       const state = get()
-      if (!projectHasAnyRecording(state.project)) return
+      const presetHasMotion = !!state.presetSession?.proposed.recording
+      if (!projectHasAnyRecording(state.project) && !presetHasMotion) return
       // Polish owns a static compare preview; Glide intentionally plays motion.
       if (state.polishSession) return
       if (
@@ -918,7 +969,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     restartPlayback: () => {
       const state = get()
-      if (!projectHasAnyRecording(state.project)) return
+      const presetHasMotion = !!state.presetSession?.proposed.recording
+      if (!projectHasAnyRecording(state.project) && !presetHasMotion) return
       if (
         state.mode === 'editing' ||
         state.mode === 'armed' ||
@@ -963,20 +1015,48 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     stopPlayback: () => set({ mode: 'idle' }),
 
-    setDurationMs: (ms) =>
+    setDurationMs: (ms) => {
+      const nextMs = clamp(
+        ms,
+        MIN_PLAYBACK_DURATION_MS,
+        MAX_PLAYBACK_DURATION_MS,
+      )
       set((state) => ({
         project: {
           ...state.project,
           playback: {
             ...state.project.playback,
-            durationMs: clamp(
-              ms,
-              MIN_PLAYBACK_DURATION_MS,
-              MAX_PLAYBACK_DURATION_MS,
-            ),
+            durationMs: nextMs,
           },
         },
-      })),
+      }))
+      // Keep an open preset preview aligned with the new shared timeline.
+      const state = get()
+      const session = state.presetSession
+      if (!session) return
+      const timing = clampPresetTiming(
+        { delayMs: session.delayMs, durationMs: session.durationMs },
+        nextMs,
+      )
+      const actor = getSelected(state)
+      const proposed = buildMotionPresetState(
+        session.presetId,
+        actor,
+        nextMs,
+        timing,
+      )
+      set({
+        presetSession: {
+          ...session,
+          delayMs: timing.delayMs,
+          durationMs: timing.durationMs,
+          proposed,
+          // Match setPresetTiming: reclamped timing must be visible on stage.
+          compareMode: 'preset',
+        },
+      })
+      get().restartPlayback()
+    },
 
     setSmoothing: (value) => {
       const state = get()
@@ -1760,6 +1840,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'glide') {
         get().undoGlide()
+        return
+      }
+      if (kind === 'preset') {
+        get().undoPreset()
       }
     },
 
@@ -1787,6 +1871,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'glide') {
         get().redoGlide()
+        return
+      }
+      if (kind === 'preset') {
+        get().redoPreset()
       }
     },
 
@@ -1835,6 +1923,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathTool: 'edit-points',
         polishSession: null,
         glideSession: null,
+        presetSession: null,
         // Mode transition once; selected-point copy lives in handle-selection-status.
         actionAnnouncement: 'Edit points',
       })
@@ -2335,6 +2424,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (state.pathGestureActive || state.editPreview) return false
       if (state.glideSession) get().cancelGlide()
+      if (state.presetSession) get().cancelPreset()
       const actor = getSelected(state)
       if (!actor.recording) return false
 
@@ -2521,6 +2611,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (state.pathGestureActive || state.editPreview) return false
       if (state.polishSession) get().cancelPolish()
+      if (state.presetSession) get().cancelPreset()
       const actor = getSelected(state)
       if (!actor.recording) return false
 
@@ -2690,6 +2781,241 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         actorEditOrder: pushEditOrder(state.actorEditOrder, 'glide'),
         actorEditRedoOrder: popKindFromOrder(state.actorEditRedoOrder, 'glide'),
         actionAnnouncement: 'Redo Glide',
+      })
+    },
+
+    beginPresetPreview: (presetId) => {
+      const state = get()
+      if (
+        state.mode === 'armed' ||
+        state.mode === 'recording' ||
+        state.mode === 'editing'
+      ) {
+        return false
+      }
+      if (state.pathGestureActive || state.editPreview) return false
+      if (!getMotionPreset(presetId)) return false
+      if (state.polishSession) get().cancelPolish()
+      if (state.glideSession) get().cancelGlide()
+
+      const actor = getSelected(get())
+      const projectDurationMs = state.project.playback.durationMs
+      // Keep timing + compare mode when switching presets; otherwise seed from clip.
+      const prior = state.presetSession
+      const timing = clampPresetTiming(
+        prior
+          ? { delayMs: prior.delayMs, durationMs: prior.durationMs }
+          : defaultPresetTiming(actor, projectDurationMs),
+        projectDurationMs,
+      )
+      const proposed = buildMotionPresetState(
+        presetId,
+        actor,
+        projectDurationMs,
+        timing,
+      )
+      const def = getMotionPreset(presetId)!
+      // Switching presets shows the new recipe; re-picking the same keeps compare.
+      const compareMode =
+        prior && prior.presetId === presetId
+          ? prior.compareMode
+          : 'preset'
+      set({
+        presetSession: {
+          presetId,
+          proposed,
+          delayMs: timing.delayMs,
+          durationMs: timing.durationMs,
+          compareMode,
+        },
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
+        editPreview: null,
+        playbackHead: 0,
+        playbackDirection: 1,
+        actionAnnouncement: `Preview: ${def.label}`,
+      })
+      get().restartPlayback()
+      return true
+    },
+
+    setPresetTiming: (partial) => {
+      const state = get()
+      const session = state.presetSession
+      if (!session) return
+      if (
+        state.mode === 'armed' ||
+        state.mode === 'recording' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const projectDurationMs = state.project.playback.durationMs
+      const timing = clampPresetTiming(
+        {
+          delayMs: partial.delayMs ?? session.delayMs,
+          durationMs: partial.durationMs ?? session.durationMs,
+        },
+        projectDurationMs,
+      )
+      if (
+        timing.delayMs === session.delayMs &&
+        timing.durationMs === session.durationMs &&
+        session.compareMode === 'preset'
+      ) {
+        return
+      }
+      const actor = getSelected(state)
+      const proposed = buildMotionPresetState(
+        session.presetId,
+        actor,
+        projectDurationMs,
+        timing,
+      )
+      set({
+        presetSession: {
+          ...session,
+          delayMs: timing.delayMs,
+          durationMs: timing.durationMs,
+          proposed,
+          // Timing changes must be visible — leave Original compare.
+          compareMode: 'preset',
+        },
+      })
+      get().restartPlayback()
+    },
+
+    setPresetCompareMode: (mode) => {
+      const state = get()
+      if (!state.presetSession) return
+      if (state.presetSession.compareMode === mode) return
+      set({
+        presetSession: { ...state.presetSession, compareMode: mode },
+      })
+      get().restartPlayback()
+    },
+
+    applyPreset: () => {
+      const state = get()
+      const session = state.presetSession
+      if (!session) return false
+      const actor = getSelected(state)
+      const previous = captureMotionState(actor)
+      const appearanceBefore = JSON.stringify(actor.appearance)
+      const nextActor = applyMotionStateToActor(actor, session.proposed)
+      if (JSON.stringify(nextActor.appearance) !== appearanceBefore) {
+        return false
+      }
+      const def = getMotionPreset(session.presetId)
+      const first = session.proposed.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => nextActor,
+        ),
+        presetSession: null,
+        mode: 'idle',
+        pointerId: null,
+        liveTrail: [],
+        playbackHead: 0,
+        geometryEdit: null,
+        editSession: null,
+        undoStack: [],
+        redoStack: [],
+        selectedHandleIndex: null,
+        editPreview: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
+        pathGestureActive: false,
+        polishSession: null,
+        glideSession: null,
+        // Preset replaces path/transform/clip/glide — drop orphaned edit kinds
+        // so Undo cannot target empty transform/clip/glide stacks.
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        ...clearPlacementEditState(),
+        glideUndoStack: [],
+        glideRedoStack: [],
+        presetUndoStack: [...state.presetUndoStack, previous].slice(-MAX_UNDO),
+        presetRedoStack: [],
+        actorEditOrder: ['preset'],
+        actorEditRedoOrder: [],
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...session.proposed.restPosition },
+        actionAnnouncement: def
+          ? `Applied “${def.label}”.`
+          : 'Motion preset applied.',
+      })
+      get().pause()
+      return true
+    },
+
+    cancelPreset: () => {
+      const state = get()
+      if (!state.presetSession) return
+      set({
+        presetSession: null,
+        mode: 'idle',
+        actionAnnouncement: 'Preset preview cancelled.',
+      })
+      get().pause()
+    },
+
+    undoPreset: () => {
+      const state = get()
+      if (state.presetUndoStack.length === 0) return
+      const previous = state.presetUndoStack[state.presetUndoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = captureMotionState(actor)
+      const restored = applyMotionStateToActor(actor, previous)
+      const first = previous.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => restored,
+        ),
+        geometryEdit: geometryMirror(previous.geometryEdit),
+        selectedTransformId: null,
+        presetUndoStack: state.presetUndoStack.slice(0, -1),
+        presetRedoStack: [...state.presetRedoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'preset'),
+        actorEditRedoOrder: pushEditOrder(state.actorEditRedoOrder, 'preset'),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...previous.restPosition },
+        actionAnnouncement: 'Undo motion preset',
+      })
+    },
+
+    redoPreset: () => {
+      const state = get()
+      if (state.presetRedoStack.length === 0) return
+      const next = state.presetRedoStack[state.presetRedoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = captureMotionState(actor)
+      const restored = applyMotionStateToActor(actor, next)
+      const first = next.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => restored,
+        ),
+        geometryEdit: geometryMirror(next.geometryEdit),
+        selectedTransformId: null,
+        presetRedoStack: state.presetRedoStack.slice(0, -1),
+        presetUndoStack: [...state.presetUndoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'preset'),
+        actorEditRedoOrder: popKindFromOrder(state.actorEditRedoOrder, 'preset'),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...next.restPosition },
+        actionAnnouncement: 'Redo motion preset',
       })
     },
 

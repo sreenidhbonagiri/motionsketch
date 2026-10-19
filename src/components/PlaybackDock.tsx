@@ -59,6 +59,7 @@ export function PlaybackDock() {
   const beginGlideSession = useEditorStore((s) => s.beginGlideSession)
   const polishSession = useEditorStore((s) => s.polishSession)
   const glideSession = useEditorStore((s) => s.glideSession)
+  const presetSession = useEditorStore((s) => s.presetSession)
   const snapToGrid = useEditorStore((s) => s.snapToGrid)
   const setSnapToGrid = useEditorStore((s) => s.setSnapToGrid)
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
@@ -113,19 +114,22 @@ export function PlaybackDock() {
         )
       : { enabled: false, reason: null, message: 'Select an interior handle first.' }
   const hasRecording = !!recording
-  const playbackDisabled = !hasAnyRecording || isRecordingLike
+  const playbackDisabled =
+    (!hasAnyRecording && !presetSession) || isRecordingLike
   const editPathDisabled =
     !hasRecording ||
     isRecordingLike ||
     mode === 'playing' ||
     !!polishSession ||
-    !!glideSession
+    !!glideSession ||
+    !!presetSession
   const polishDisabled =
     !hasRecording ||
     isRecordingLike ||
     mode === 'playing' ||
     !!polishSession ||
     !!glideSession ||
+    !!presetSession ||
     pathGestureActive
   const glideDisabled = polishDisabled
   const resetDisabled = !recording || isRecordingLike
@@ -585,7 +589,7 @@ export function PlaybackDock() {
               onClick={() => undoActorEdit()}
               disabled={isRecordingLike || actorEditOrder.length === 0}
               className={btnQuiet}
-              title="Undo placement, transform, sequence timing, or Glide for the selected actor"
+              title="Undo placement, transform, sequence timing, Glide, or a motion preset for the selected actor"
             >
               Undo
             </button>
@@ -595,7 +599,7 @@ export function PlaybackDock() {
               onClick={() => redoActorEdit()}
               disabled={isRecordingLike || actorEditRedoOrder.length === 0}
               className={btnQuiet}
-              title="Redo placement, transform, sequence timing, or Glide for the selected actor"
+              title="Redo placement, transform, sequence timing, Glide, or a motion preset for the selected actor"
             >
               Redo
             </button>

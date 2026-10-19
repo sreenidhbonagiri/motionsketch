@@ -4,6 +4,7 @@ import { gridLineCoords } from '../core/grid'
 import { evaluateActorRotationDeg } from '../core/faceAlongPath'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
+import { applyMotionStateToActor } from '../core/motionPresets'
 import { findActor } from '../core/sceneActor'
 import type { MotionSample, Vec2 } from '../core/types'
 import { usePathEditor } from '../hooks/usePathEditor'
@@ -175,6 +176,7 @@ export function CanvasStage() {
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const polishSession = useEditorStore((s) => s.polishSession)
   const glideSession = useEditorStore((s) => s.glideSession)
+  const presetSession = useEditorStore((s) => s.presetSession)
   const snapIndicator = useEditorStore((s) => s.snapIndicator)
 
   const {
@@ -206,11 +208,19 @@ export function CanvasStage() {
   })
 
   const editing = mode === 'editing'
-  const selected = findActor(project.actors, selectedActorId)
+  const selectedRaw = findActor(project.actors, selectedActorId)
+  const presetPreviewActive =
+    !!presetSession && presetSession.compareMode === 'preset'
+  const selected =
+    selectedRaw && presetPreviewActive
+      ? applyMotionStateToActor(selectedRaw, presetSession.proposed)
+      : selectedRaw
   const pathView = {
-    geometryEdit,
-    editSession,
-    editPreview,
+    geometryEdit: presetPreviewActive
+      ? null
+      : geometryEdit,
+    editSession: presetPreviewActive ? null : editSession,
+    editPreview: presetPreviewActive ? null : editPreview,
     // Glide preview: proposed strength. Original: committed actor.glide
     // (omit override — never force 0, which would hide an already-applied Glide).
     glideOverride:
@@ -364,25 +374,33 @@ export function CanvasStage() {
         !editing &&
         project.actors.map((actor, index) => {
           const isSelected = actor.id === selectedActorId
+          const viewActor =
+            isSelected && presetPreviewActive && presetSession
+              ? applyMotionStateToActor(actor, presetSession.proposed)
+              : actor
           // Recording/armed need the active actor visible for dragging.
           // Normal playback/idle never silently reveals a selected hidden actor.
           const forceVisible =
             isSelected && (mode === 'armed' || mode === 'recording')
           const hidden =
-            !forceVisible && !isActorVisibleAt(playbackHead, actor.clip)
+            !forceVisible && !isActorVisibleAt(playbackHead, viewActor.clip)
           const actorView = isSelected
             ? pathView
             : {
-                geometryEdit: actor.geometryEdit,
+                geometryEdit: viewActor.geometryEdit,
                 editSession: null,
                 editPreview: null,
               }
           // One path lookup per actor: position + facing share the same array
           // (warm Glide/steady caches return identical references).
-          const path = selectProcessedPathForActor(project, actor, actorView)
-          const localT = projectToLocal(playbackHead, actor.clip)
-          const xf = evaluateTransform(actor.transform, localT)
-          let position = actor.restPosition
+          const path = selectProcessedPathForActor(
+            project,
+            viewActor,
+            actorView,
+          )
+          const localT = projectToLocal(playbackHead, viewActor.clip)
+          const xf = evaluateTransform(viewActor.transform, localT)
+          let position = viewActor.restPosition
           if (isSelected && (mode === 'recording' || mode === 'armed')) {
             position = livePosition
           } else if (path.length === 0) {
@@ -391,7 +409,7 @@ export function CanvasStage() {
             position = evaluate(path, localT)
           }
           const rotationDeg = evaluateActorRotationDeg(
-            actor,
+            viewActor,
             path,
             localT,
             project.stageAspect,
@@ -399,9 +417,9 @@ export function CanvasStage() {
           return (
             <Actor
               key={actor.id}
-              actor={actor.appearance}
+              actor={viewActor.appearance}
               actorId={actor.id}
-              name={actor.name}
+              name={viewActor.name}
               position={position}
               stageWidth={size.width}
               stageHeight={size.height}

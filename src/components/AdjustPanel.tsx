@@ -3,6 +3,7 @@ import {
   MIN_PLAYBACK_DURATION_MS,
 } from '../core/types'
 import { useEditorStore } from '../state/store'
+import { MotionPresets } from './MotionPresets'
 import { SvgPathImport } from './SvgPathImport'
 
 function formatDurationSeconds(durationMs: number): string {
@@ -49,6 +50,8 @@ export function AdjustPanel() {
       </p>
 
       <SvgPathImport />
+
+      <MotionPresets />
 
       <div className="space-y-2">
         <label
