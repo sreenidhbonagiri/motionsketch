@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { PERSIST_FORMAT_VERSION } from '../../src/core/persist/document'
 import {
   buildFaceAlongArcFixtureJson,
   buildFaceAlongDensePauseLFixtureJson,
@@ -516,8 +517,9 @@ test.describe('face along path', () => {
     const download = await downloadPromise
     const json = readFileSync((await download.path())!, 'utf8')
     const snap = JSON.parse(json)
-    expect(snap.formatVersion).toBe(11)
+    expect(snap.formatVersion).toBe(PERSIST_FORMAT_VERSION)
     expect(snap.project.actors[0].faceAlongPath).toBe(true)
+    expect(snap.project.actors[0].glide ?? 0).toBe(0)
     expect(snap.project.actors[0].directionOffsetDeg).toBe(45)
 
     await loadProjectSnapshot(page, json)

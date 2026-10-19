@@ -62,6 +62,8 @@ export function createSceneActor(
       typeof partial?.steadySpeed === 'number'
         ? clamp01Local(partial.steadySpeed)
         : DEFAULT_ACTOR_STEADY_SPEED,
+    glide:
+      typeof partial?.glide === 'number' ? clamp01Local(partial.glide) : 0,
     transform: cloneTransformTrack(
       partial?.transform ?? emptyTransformTrack(),
     ),
@@ -92,6 +94,7 @@ export function cloneSceneActor(actor: SceneActor): SceneActor {
     restPosition: actor.restPosition,
     smoothing: actor.smoothing,
     steadySpeed: actor.steadySpeed,
+    glide: actor.glide,
     transform: actor.transform,
     geometryEdit: actor.geometryEdit,
     clip: actor.clip,
@@ -112,6 +115,7 @@ export function duplicateSceneActor(
     restPosition: actor.restPosition,
     smoothing: actor.smoothing,
     steadySpeed: actor.steadySpeed,
+    glide: actor.glide,
     transform: actor.transform,
     geometryEdit: actor.geometryEdit,
     clip: actor.clip,
@@ -282,6 +286,10 @@ export function parseSceneActor(
     typeof raw.steadySpeed === 'number' && Number.isFinite(raw.steadySpeed)
       ? clamp01Local(raw.steadySpeed)
       : DEFAULT_ACTOR_STEADY_SPEED
+  const glide =
+    typeof raw.glide === 'number' && Number.isFinite(raw.glide)
+      ? clamp01Local(raw.glide)
+      : 0
 
   // Appearance may use imageAssetId (resolved by caller) or inline image.
   const appearance = coerceActor(raw.appearance ?? raw)
@@ -301,6 +309,7 @@ export function parseSceneActor(
       restPosition: rest.value,
       smoothing,
       steadySpeed,
+      glide,
       transform: transform.value,
       geometryEdit: geometryEdit.value,
       clip: clip.value,

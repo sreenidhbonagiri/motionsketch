@@ -751,6 +751,7 @@ export function generateCssSnippet(options: {
       : { x: 0.5, y: 0.5 },
     smoothing: 0,
     steadySpeed: 0,
+    glide: 0,
     transform: options.transform ?? { keyframes: [] },
     geometryEdit: null,
     clip: fullClip(),
@@ -820,6 +821,7 @@ export function exportCssFromRecording(options: {
           : { x: 0.5, y: 0.5 },
         smoothing: options.smoothing,
         steadySpeed: options.steadySpeed ?? 0,
+        glide: 0,
         transform: options.transform ?? { keyframes: [] },
         geometryEdit: options.processedPath?.length
           ? makeGeometryEdit(options.processedPath, options.smoothing)

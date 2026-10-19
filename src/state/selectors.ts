@@ -1,4 +1,5 @@
 import { projectToLocal } from '../core/clip'
+import { applyGlide } from '../core/glide'
 import {
   cachedApplySteadySpeed,
   cachedProcessMotion,
@@ -18,6 +19,11 @@ export interface PathViewState {
   geometryEdit: GeometryEdit | null
   editSession: GeometryEdit | null
   editPreview: MotionSample[] | null
+  /**
+   * When set, overrides {@link SceneActor.glide} for preview (Glide session).
+   * `undefined` → use the actor field.
+   */
+  glideOverride?: number
 }
 
 /**
@@ -40,10 +46,21 @@ export function selectProcessedPathForActor(
   if (!recording) return []
 
   const aspect = project.stageAspect
+  const glideAmount =
+    typeof view.glideOverride === 'number'
+      ? view.glideOverride
+      : (actor.glide ?? 0)
+
+  const withGlide = (samples: MotionSample[]) => {
+    if (glideAmount <= 0) return samples
+    return applyGlide(samples, glideAmount, aspect).samples
+  }
 
   // Live drag preview changes every pointer move — do not fill the LRU.
   if (view.editPreview) {
-    return applySteadySpeed(view.editPreview, actor.steadySpeed, aspect)
+    return withGlide(
+      applySteadySpeed(view.editPreview, actor.steadySpeed, aspect),
+    )
   }
 
   const spatial =
@@ -53,14 +70,18 @@ export function selectProcessedPathForActor(
     null
 
   if (spatial) {
-    return cachedApplySteadySpeed(spatial, actor.steadySpeed, aspect)
+    return withGlide(
+      cachedApplySteadySpeed(spatial, actor.steadySpeed, aspect),
+    )
   }
 
-  return cachedProcessMotion(
-    recording.samples,
-    actor.smoothing,
-    actor.steadySpeed,
-    aspect,
+  return withGlide(
+    cachedProcessMotion(
+      recording.samples,
+      actor.smoothing,
+      actor.steadySpeed,
+      aspect,
+    ),
   )
 }
 

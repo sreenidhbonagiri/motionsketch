@@ -103,6 +103,7 @@ function actorDigest(actor: SceneActor): string {
     img,
     String(actor.smoothing ?? 0),
     String(actor.steadySpeed ?? 0),
+    String(actor.glide ?? 0),
     actor.faceAlongPath ? '1' : '0',
     String(actor.directionOffsetDeg ?? 0),
     String(clip.start),

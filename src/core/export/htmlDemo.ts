@@ -327,6 +327,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
           : { x: 0.5, y: 0.5 },
         smoothing: options.smoothing,
         steadySpeed: options.steadySpeed ?? 0,
+        glide: 0,
         transform: options.transform ?? { keyframes: [] },
         geometryEdit: options.processedPath?.length
           ? makeGeometryEdit(options.processedPath, options.smoothing)

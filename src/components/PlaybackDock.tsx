@@ -56,7 +56,9 @@ export function PlaybackDock() {
   const enterEditMode = useEditorStore((s) => s.enterEditMode)
   const exitEditMode = useEditorStore((s) => s.exitEditMode)
   const beginPolishSession = useEditorStore((s) => s.beginPolishSession)
+  const beginGlideSession = useEditorStore((s) => s.beginGlideSession)
   const polishSession = useEditorStore((s) => s.polishSession)
+  const glideSession = useEditorStore((s) => s.glideSession)
   const snapToGrid = useEditorStore((s) => s.snapToGrid)
   const setSnapToGrid = useEditorStore((s) => s.setSnapToGrid)
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
@@ -113,13 +115,19 @@ export function PlaybackDock() {
   const hasRecording = !!recording
   const playbackDisabled = !hasAnyRecording || isRecordingLike
   const editPathDisabled =
-    !hasRecording || isRecordingLike || mode === 'playing' || !!polishSession
+    !hasRecording ||
+    isRecordingLike ||
+    mode === 'playing' ||
+    !!polishSession ||
+    !!glideSession
   const polishDisabled =
     !hasRecording ||
     isRecordingLike ||
     mode === 'playing' ||
     !!polishSession ||
+    !!glideSession ||
     pathGestureActive
+  const glideDisabled = polishDisabled
   const resetDisabled = !recording || isRecordingLike
   const dockStatusId = 'dock-status'
 
@@ -445,6 +453,16 @@ export function PlaybackDock() {
             </button>
             <button
               type="button"
+              data-testid="btn-glide"
+              onClick={() => beginGlideSession()}
+              disabled={glideDisabled || pathTool === 'move-path'}
+              title="Softens starts and stops while keeping your path and pauses"
+              className={btnSecondary}
+            >
+              Glide
+            </button>
+            <button
+              type="button"
               data-testid="btn-restore-path"
               onClick={restoreRecordedPath}
               className={btnQuiet}
@@ -552,11 +570,22 @@ export function PlaybackDock() {
 
             <button
               type="button"
+              data-testid="btn-glide"
+              onClick={() => beginGlideSession()}
+              disabled={glideDisabled}
+              title="Softens starts and stops while keeping your path and pauses"
+              className={btnSecondary}
+            >
+              Glide
+            </button>
+
+            <button
+              type="button"
               data-testid="btn-undo-transform"
               onClick={() => undoActorEdit()}
               disabled={isRecordingLike || actorEditOrder.length === 0}
               className={btnQuiet}
-              title="Undo placement, transform, or sequence timing for the selected actor"
+              title="Undo placement, transform, sequence timing, or Glide for the selected actor"
             >
               Undo
             </button>
@@ -566,7 +595,7 @@ export function PlaybackDock() {
               onClick={() => redoActorEdit()}
               disabled={isRecordingLike || actorEditRedoOrder.length === 0}
               className={btnQuiet}
-              title="Redo placement, transform, or sequence timing for the selected actor"
+              title="Redo placement, transform, sequence timing, or Glide for the selected actor"
             >
               Redo
             </button>

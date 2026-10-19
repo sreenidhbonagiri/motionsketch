@@ -20,6 +20,8 @@ import {
   smoothBendAtHandle,
   smoothBendAvailability,
 } from '../core/edit'
+import { applyGlide, DEFAULT_GLIDE_STRENGTH } from '../core/glide'
+import { selectProcessedPathForActor } from './selectors'
 import {
   polishMotion,
   polishRoundingAvailability,
@@ -107,8 +109,19 @@ export const DEFAULT_POLISH_STRENGTH = 0.55
 
 const MAX_UNDO = 40
 
+/** Ephemeral Glide timing preview — never persisted until Apply. */
+export type GlideSession = {
+  /** Preview strength (0..1). */
+  strength: number
+  /** Which timing drives the actor during the session. */
+  compareMode: 'original' | 'glide'
+  changed: boolean
+  reason: string | null
+  segmentsAdjusted: number
+}
+
 /** Chronological actor-edit kinds for unified placement/clip/transform undo. */
-export type ActorEditKind = 'transform' | 'clip' | 'placement'
+export type ActorEditKind = 'transform' | 'clip' | 'placement' | 'glide'
 
 const PLACEMENT_NOOP_EPS = 1e-9
 
@@ -171,6 +184,11 @@ interface EditorStore {
    * project data, not exported, not autosaved. Survives Cancel/reopen in-session.
    */
   polishStrengthByActorId: Record<string, number>
+  /** Non-destructive Glide timing preview (null when inactive). */
+  glideSession: GlideSession | null
+  /** Previous glide amounts for undo (selected actor). */
+  glideUndoStack: number[]
+  glideRedoStack: number[]
 
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
@@ -310,6 +328,14 @@ interface EditorStore {
   applyPolish: () => boolean
   cancelPolish: () => void
 
+  beginGlideSession: () => boolean
+  setGlideCompareMode: (mode: 'original' | 'glide') => void
+  setGlideStrength: (strength: number) => void
+  applyGlide: () => boolean
+  cancelGlide: () => void
+  undoGlide: () => void
+  redoGlide: () => void
+
   selectTransformKeyframe: (id: string | null) => void
   upsertTransformAtPlayhead: (rotationDeg: number, scale: number) => void
   commitTransformKeyframe: (input: {
@@ -336,6 +362,7 @@ function clearEditState() {
     pathTool: 'edit-points' as PathEditTool,
     pathGestureActive: false,
     polishSession: null as PolishSession | null,
+    glideSession: null as GlideSession | null,
   }
 }
 
@@ -477,6 +504,8 @@ function clearHistoryForActorSwitch() {
     ...clearClipEditState(),
     ...clearPlacementEditState(),
     ...clearActorEditOrder(),
+    glideUndoStack: [] as number[],
+    glideRedoStack: [] as number[],
   }
 }
 
@@ -568,6 +597,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     stageHint: 'default',
     actionAnnouncement: null,
     polishStrengthByActorId: {},
+    glideUndoStack: [] as number[],
+    glideRedoStack: [] as number[],
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
@@ -799,6 +830,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     play: () => {
       const state = get()
       if (!projectHasAnyRecording(state.project)) return
+      // Polish owns a static compare preview; Glide intentionally plays motion.
       if (state.polishSession) return
       if (
         state.mode === 'editing' ||
@@ -1554,6 +1586,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'placement') {
         get().undoPlacement()
+        return
+      }
+      if (kind === 'glide') {
+        get().undoGlide()
       }
     },
 
@@ -1577,6 +1613,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'placement') {
         get().redoPlacement()
+        return
+      }
+      if (kind === 'glide') {
+        get().redoGlide()
       }
     },
 
@@ -1624,6 +1664,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddCandidateIndex: null,
         pathTool: 'edit-points',
         polishSession: null,
+        glideSession: null,
         // Mode transition once; selected-point copy lives in handle-selection-status.
         actionAnnouncement: 'Edit points',
       })
@@ -2123,6 +2164,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         return false
       }
       if (state.pathGestureActive || state.editPreview) return false
+      if (state.glideSession) get().cancelGlide()
       const actor = getSelected(state)
       if (!actor.recording) return false
 
@@ -2295,6 +2337,189 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           session.strength,
         ),
         actionAnnouncement: 'Polish cancelled.',
+      })
+    },
+
+    beginGlideSession: () => {
+      const state = get()
+      if (
+        state.mode === 'armed' ||
+        state.mode === 'recording' ||
+        state.mode === 'playing'
+      ) {
+        return false
+      }
+      if (state.pathGestureActive || state.editPreview) return false
+      if (state.polishSession) get().cancelPolish()
+      const actor = getSelected(state)
+      if (!actor.recording) return false
+
+      const strength =
+        actor.glide > 0 ? actor.glide : DEFAULT_GLIDE_STRENGTH
+      const baselinePath = selectProcessedPathForActor(
+        state.project,
+        { ...actor, glide: 0 },
+        {
+          geometryEdit: state.geometryEdit ?? actor.geometryEdit,
+          editSession: state.editSession,
+          editPreview: null,
+          glideOverride: 0,
+        },
+      )
+      const probe = applyGlide(
+        baselinePath,
+        strength,
+        state.project.stageAspect,
+      )
+
+      set({
+        mode: state.mode === 'editing' ? 'idle' : state.mode,
+        editSession: null,
+        polishSession: null,
+        glideSession: {
+          strength,
+          compareMode: 'glide',
+          changed: probe.changed,
+          reason: probe.reason,
+          segmentsAdjusted: probe.segmentsAdjusted,
+        },
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
+        editPreview: null,
+        pointerId: null,
+        actionAnnouncement: 'Glide timing preview',
+      })
+      // Start playback so the actor motion difference is visible.
+      get().play()
+      return true
+    },
+
+    setGlideCompareMode: (mode) => {
+      const state = get()
+      if (!state.glideSession) return
+      set({
+        glideSession: { ...state.glideSession, compareMode: mode },
+      })
+      get().restartPlayback()
+    },
+
+    setGlideStrength: (strength) => {
+      const state = get()
+      if (!state.glideSession) return
+      const next = clamp(strength, 0, 1)
+      const actor = getSelected(state)
+      const baselinePath = selectProcessedPathForActor(
+        state.project,
+        { ...actor, glide: 0 },
+        {
+          geometryEdit: state.geometryEdit ?? actor.geometryEdit,
+          editSession: null,
+          editPreview: null,
+          glideOverride: 0,
+        },
+      )
+      const probe = applyGlide(baselinePath, next, state.project.stageAspect)
+      set({
+        glideSession: {
+          ...state.glideSession,
+          strength: next,
+          changed: probe.changed,
+          reason: probe.reason,
+          segmentsAdjusted: probe.segmentsAdjusted,
+        },
+      })
+    },
+
+    applyGlide: () => {
+      const state = get()
+      const session = state.glideSession
+      if (!session) return false
+      const actor = getSelected(state)
+      const previous = actor.glide
+      const nextStrength = session.strength
+      // Strength 0 clears a prior Glide; probe "unchanged" is expected then.
+      if (Math.abs(previous - nextStrength) < 1e-9) {
+        set({
+          glideSession: null,
+          mode: 'idle',
+          actionAnnouncement:
+            nextStrength <= 0 && !session.changed
+              ? (session.reason ?? 'Nothing to glide.')
+              : 'Glide unchanged.',
+        })
+        get().pause()
+        return false
+      }
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, glide: nextStrength }),
+        ),
+        glideSession: null,
+        mode: 'idle',
+        glideUndoStack: [...state.glideUndoStack, previous].slice(-MAX_UNDO),
+        glideRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'glide'),
+        actorEditRedoOrder: [],
+        actionAnnouncement:
+          nextStrength <= 0
+            ? 'Glide cleared.'
+            : 'Glide applied. Softens starts and stops in moving sections; pauses and path shape stay put. Transform keys keep their times — speed along the path may shift where they appear.',
+      })
+      get().pause()
+      return true
+    },
+
+    cancelGlide: () => {
+      const state = get()
+      if (!state.glideSession) return
+      set({
+        glideSession: null,
+        mode: 'idle',
+        actionAnnouncement: 'Glide cancelled.',
+      })
+      get().pause()
+    },
+
+    undoGlide: () => {
+      const state = get()
+      if (state.glideUndoStack.length === 0) return
+      const previous = state.glideUndoStack[state.glideUndoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = actor.glide
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, glide: previous }),
+        ),
+        glideUndoStack: state.glideUndoStack.slice(0, -1),
+        glideRedoStack: [...state.glideRedoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'glide'),
+        actorEditRedoOrder: pushEditOrder(state.actorEditRedoOrder, 'glide'),
+        actionAnnouncement: 'Undo Glide',
+      })
+    },
+
+    redoGlide: () => {
+      const state = get()
+      if (state.glideRedoStack.length === 0) return
+      const next = state.glideRedoStack[state.glideRedoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = actor.glide
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, glide: next }),
+        ),
+        glideRedoStack: state.glideRedoStack.slice(0, -1),
+        glideUndoStack: [...state.glideUndoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'glide'),
+        actorEditRedoOrder: popKindFromOrder(state.actorEditRedoOrder, 'glide'),
+        actionAnnouncement: 'Redo Glide',
       })
     },
 

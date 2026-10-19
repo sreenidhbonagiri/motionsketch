@@ -169,6 +169,27 @@ describe('persist document validation', () => {
     expect(migrated.snapshot.project.actors[0].directionOffsetDeg).toBe(0)
   })
 
+  it('round-trips actor.glide and defaults missing glide to 0', () => {
+    const project = makePersistProject({
+      actors: [makeActor({ glide: 0.62, recording: makeRecording() })],
+    })
+    const parsed = parseSnapshotJson(
+      serializeSnapshot(buildSnapshot(project, null)),
+    )
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.snapshot.formatVersion).toBe(PERSIST_FORMAT_VERSION)
+    expect(parsed.snapshot.project.actors[0].glide).toBeCloseTo(0.62, 5)
+
+    const legacy = JSON.parse(serializeSnapshot(buildSnapshot(project, null)))
+    delete legacy.project.actors[0].glide
+    legacy.formatVersion = 11
+    const migrated = parseSnapshotJson(JSON.stringify(legacy))
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    expect(migrated.snapshot.project.actors[0].glide).toBe(0)
+  })
+
   it('round-trips committed geometry edits including handleIndices', () => {
     const samples = makeSamples(16).map((s) => ({ ...s, y: s.y + 0.1 }))
     const geometryEdit = makeGeometryEdit(samples, 0.35, [0, 4, 8, 15])

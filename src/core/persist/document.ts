@@ -40,8 +40,9 @@ import {
  * v9: geometryEdit.handleIndices (older → evenly spaced defaults).
  * v10: playback.trigger (older → page-load; export activation only).
  * v11: actor.faceAlongPath / directionOffsetDeg (older → off / 0°).
+ * v12: actor.glide (older → 0).
  */
-export const PERSIST_FORMAT_VERSION = 11 as const
+export const PERSIST_FORMAT_VERSION = 12 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
@@ -52,6 +53,7 @@ export const PERSIST_FORMAT_VERSION_V7 = 7 as const
 export const PERSIST_FORMAT_VERSION_V8 = 8 as const
 export const PERSIST_FORMAT_VERSION_V9 = 9 as const
 export const PERSIST_FORMAT_VERSION_V10 = 10 as const
+export const PERSIST_FORMAT_VERSION_V11 = 11 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -125,6 +127,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   const supported = [
     PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V11,
     PERSIST_FORMAT_VERSION_V10,
     PERSIST_FORMAT_VERSION_V9,
     PERSIST_FORMAT_VERSION_V8,

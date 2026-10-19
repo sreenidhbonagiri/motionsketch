@@ -219,12 +219,19 @@ export function buildHeadingTrack(
   const smoothed = unwrapped.map((h, i) => {
     if (totalLen < HEADING_PAUSE_EPS * 2) return h
     const prevLen = i > 0 ? segLen(i - 1, i) : 0
-    // Complete dwell protection: any sample that has not yet moved from its
-    // predecessor — including the departure-boundary sample whose *next*
-    // segment is moving — must not run forwardPeek into the upcoming turn.
-    // Otherwise heading lerps across the final stationary interval while the
-    // actor center stays put.
-    if (prevLen < HEADING_PAUSE_EPS) {
+    const nextLen = i < samples.length - 1 ? segLen(i, i + 1) : 0
+    // Dwell protection for the smooth window:
+    // - Fully stationary samples: no neighbor mix.
+    // - Departure-boundary samples (still parked, next segment moves): no
+    //   forwardPeek into the upcoming turn while the actor center is held.
+    // Path start (i === 0) also has prevLen === 0, but it is not a pause —
+    // skipping smooth there was over-broad and spiked export heading error
+    // on continuous paths (~3° → ~10° under uniform thinning).
+    const fullyStationary =
+      prevLen < HEADING_PAUSE_EPS && nextLen < HEADING_PAUSE_EPS
+    const pauseDeparture =
+      i > 0 && prevLen < HEADING_PAUSE_EPS && nextLen >= HEADING_PAUSE_EPS
+    if (fullyStationary || pauseDeparture) {
       return h
     }
     let sum = h

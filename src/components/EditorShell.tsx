@@ -13,6 +13,7 @@ import { AppearancePanel } from './AppearancePanel'
 import { CanvasStage } from './CanvasStage'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
+import { GlidePanel } from './GlidePanel'
 import { ProjectNameInput } from './ProjectNameInput'
 import {
   FloatingPanel,
@@ -43,6 +44,7 @@ export function EditorShell() {
   const mode = useEditorStore((s) => s.mode)
   const editing = mode === 'editing'
   const polishSession = useEditorStore((s) => s.polishSession)
+  const glideSession = useEditorStore((s) => s.glideSession)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const actor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -344,8 +346,9 @@ export function EditorShell() {
         className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex max-h-[100dvh] flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
       >
         <div className="flex min-h-0 w-full max-w-2xl flex-col items-center gap-2">
-          {!editing && !polishSession && <ClipTimeline />}
+          {!editing && !polishSession && !glideSession && <ClipTimeline />}
           {polishSession && <PolishPanel />}
+          {glideSession && <GlidePanel />}
           <PlaybackDock />
           {tip && (
             <p

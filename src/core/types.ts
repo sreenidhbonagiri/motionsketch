@@ -131,6 +131,11 @@ export interface SceneActor {
   smoothing: number
   /** 0..1 soften accidental speed spikes — per actor */
   steadySpeed: number
+  /**
+   * 0..1 ease-in/out within moving segments (Glide). Applied after Steady Speed
+   * in the shared playback/export path. Does not alter path geometry.
+   */
+  glide: number
   transform: TransformTrack
   /** Committed path edits; null → process live from recording */
   geometryEdit: GeometryEdit | null

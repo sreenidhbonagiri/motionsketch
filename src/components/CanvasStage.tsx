@@ -177,6 +177,7 @@ export function CanvasStage() {
   const selectedHandleIndex = useEditorStore((s) => s.selectedHandleIndex)
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const polishSession = useEditorStore((s) => s.polishSession)
+  const glideSession = useEditorStore((s) => s.glideSession)
   const snapIndicator = useEditorStore((s) => s.snapIndicator)
 
   const {
@@ -213,6 +214,12 @@ export function CanvasStage() {
     geometryEdit,
     editSession,
     editPreview,
+    // Glide preview: proposed strength. Original: committed actor.glide
+    // (omit override — never force 0, which would hide an already-applied Glide).
+    glideOverride:
+      glideSession?.compareMode === 'glide'
+        ? glideSession.strength
+        : undefined,
   }
 
   useEffect(() => {

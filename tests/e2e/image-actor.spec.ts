@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { PERSIST_FORMAT_VERSION } from '../../src/core/persist/document'
 import {
   ensureEditor,
   openPanel,
@@ -127,7 +128,7 @@ test.describe('image actors', () => {
     const projPath = await proj.path()
     const projJson = fs.readFileSync(projPath!, 'utf8')
     const snap = JSON.parse(projJson)
-    expect(snap.formatVersion).toBe(11)
+    expect(snap.formatVersion).toBe(PERSIST_FORMAT_VERSION)
     const appearance = snap.project.actors[0].appearance
     expect(appearance.kind).toBe('image')
     const assetId = appearance.image.assetId as string | undefined
