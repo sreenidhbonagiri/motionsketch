@@ -400,6 +400,18 @@ export interface FacingExportFidelityNotice {
   actorName: string
 }
 
+function motionWrapperBoxRules(): { sizeDecl: string; shapeDecls: string } {
+  // Shrink-wrap the developer’s child; do not emit editor size / fill / type styles.
+  return {
+    sizeDecl: `  width: max-content;\n  height: max-content;\n  max-width: 100%;`,
+    shapeDecls: `  /* Motion wrapper: no shape, image, text, color, or size from the editor. */
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;`,
+  }
+}
+
 function generateActorCssBlock(options: {
   actor: SceneActor
   index: number
@@ -410,13 +422,17 @@ function generateActorCssBlock(options: {
   processedPath: MotionSample[]
   stageAspect: number
   scope: ExportScope
+  /** Path/timing only — omit editor appearance (own-element wrapper). */
+  motionWrapper?: boolean
 }): { css: string; facingFidelity: FacingExportFidelityNotice | null } {
   const className = scopedActorClass(options.index, options.actorCount)
   const selector = scopedActorSelector(options.scope, options.index)
   const animName = scopedAnimationName(options.scope, options.index)
   const visName = scopedVisibilityAnimationName(options.scope, options.index)
   const appearance = coerceActor(options.actor.appearance)
-  const box = actorBoxRules(appearance, className)
+  const box = options.motionWrapper
+    ? motionWrapperBoxRules()
+    : actorBoxRules(appearance, className)
   const track = options.actor.transform
   const faceAlong = options.actor.faceAlongPath === true
   const includeXf = track.keyframes.length > 0 || faceAlong
@@ -879,6 +895,147 @@ export function exportCssFromProject(
   options: ExportCssOptions = {},
 ): string {
   return generateProjectCss(project, options)
+}
+
+/**
+ * CSS for one actor as a motion wrapper: path / timing / clip / visibility /
+ * rotation / scale — no editor shape, image, text, color, or size.
+ * `project.actors` must already be the single target actor.
+ */
+export function buildMotionWrapperCssExport(
+  project: Project,
+  options: ExportCssOptions = {},
+): ProjectCssExport {
+  if (project.actors.length !== 1) {
+    return {
+      css: '/* Motion wrapper export expects exactly one actor. */\n',
+      facingFidelityWarnings: [],
+    }
+  }
+  const actor = project.actors[0]!
+  const durationMs = project.playback.durationMs
+  const loop = project.playback.loop
+  const loopMode = project.playback.loopMode
+  const trigger = coercePlaybackTrigger(project.playback.trigger)
+  const stageAspect = project.stageAspect
+  const aspectCss = formatCssAspectRatio(stageAspect)
+  const scope = resolveExportScope(project, options)
+
+  const processed = selectProcessedPathForActor(project, actor, {
+    geometryEdit: actor.geometryEdit,
+    editSession: null,
+    editPreview: null,
+  })
+  if (processed.length < 2) {
+    return {
+      css: '/* No motion path to wrap — record this actor first. */\n',
+      facingFidelityWarnings: [],
+    }
+  }
+
+  const loopNote = !loop
+    ? ' * Loop: off (plays once, forwards).'
+    : loopMode === 'alternate'
+      ? ' * Loop: back and forth (animation-direction: alternate). Duration is one way; a full cycle is 2×.'
+      : ' * Loop: repeat (infinite). End and start may jump if they differ — no bridging segment is added.'
+
+  const triggerNote = (() => {
+    switch (trigger) {
+      case 'page-load':
+        return ' * Playback trigger: page-load (CSS starts immediately; no controller required).'
+      case 'click':
+        return ` * Playback trigger: click/tap — REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+      case 'hover':
+        return ` * Playback trigger: hover/focus — REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+      case 'viewport':
+        return ` * Playback trigger: enter-viewport (~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% visible, once) — REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+      default:
+        return ''
+    }
+  })()
+
+  const jsNote = triggerNeedsJavaScript(trigger)
+    ? ` * JavaScript required: include ms-trigger.js and call MotionSketchTrigger.init(root, options).\n * Download CSS / this wrapper sheet alone will NOT arm click, hover, or viewport triggers.\n *`
+    : ' *'
+
+  const block = generateActorCssBlock({
+    actor,
+    index: 0,
+    actorCount: 1,
+    durationMs,
+    loop,
+    loopMode,
+    processedPath: processed,
+    stageAspect,
+    scope,
+    motionWrapper: true,
+  })
+  const facingFidelityWarnings = block.facingFidelity
+    ? [block.facingFidelity]
+    : []
+
+  const stageSelector = scopedStageSelector(scope)
+  const wrapperClass = scopedActorClass(0, 1)
+  const waitingBlock = triggerNeedsJavaScript(trigger)
+    ? `
+/* Hold at project progress 0 until MotionSketchTrigger removes .${MS_WAITING_CLASS}. */
+.${scope.rootClass}.${MS_WAITING_CLASS} [class^="ms-actor"] {
+  animation-play-state: paused !important;
+}
+`
+    : ''
+  const reducedMotionBlock = `
+@media (prefers-reduced-motion: reduce) {
+  .${scope.rootClass}:not(.${MS_MOTION_OK_CLASS}) [class^="ms-actor"] {
+    animation: none !important;
+    visibility: visible !important;
+  }
+}
+`
+
+  const css = `/* MotionSketch — animate your own element
+ *
+ * Motion wrapper for one actor’s path and timing. Put your HTML / React node
+ * inside .${wrapperClass}; do not put the motion class on your styled element
+ * (keeps your size, color, image, text, and transforms intact on the child).
+ *
+ * Scene isolation:
+ * - Wrap markup in <div class="${scope.rootClass}">.
+ * - Keyframe names include fingerprint ${scope.sceneId}.
+ *
+ * Reduced motion:
+ * - Under prefers-reduced-motion: reduce, animations stay off until the root
+ *   also has class "${MS_MOTION_OK_CLASS}" (explicit Play / activate).
+ *
+ * Playback trigger:
+${triggerNote}
+${jsNote}
+ * Positioning: .${scope.stageClass} is position:relative; container-type:size.
+ * Path uses translate3d(cqw, cqh) + translate(-50%, -50%) on the wrapper.
+ * Clips, hide-before/after, Glide, face-along, rotate/scale tracks match the
+ * full scene export for this actor.
+${loopNote}
+ *
+ * Example:
+ * <div class="${scope.rootClass}${triggerNeedsJavaScript(trigger) ? ` ${MS_WAITING_CLASS}` : ''}" data-ms-scene="${scope.sceneId}">
+ *   <div class="${scope.stageClass}">
+ *     <div class="${wrapperClass}">
+ *       <!-- your element -->
+ *     </div>
+ *   </div>
+ * </div>
+ */
+${stageSelector} {
+  position: relative;
+  container-type: size;
+  width: 100%;
+  aspect-ratio: ${aspectCss};
+  overflow: hidden;
+}
+
+${block.css}
+${waitingBlock}${reducedMotionBlock}`
+  return { css, facingFidelityWarnings }
 }
 
 /** Build scene-root + stage markup matching {@link exportCssFromProject}. */

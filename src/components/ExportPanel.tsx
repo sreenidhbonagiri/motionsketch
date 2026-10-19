@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildProjectCssExport } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
+import { buildOwnElementExport } from '../core/export/ownElement'
 import { buildReactPackage } from '../core/export/reactPackage'
 import { buildWebPackage } from '../core/export/webPackage'
 import {
@@ -16,18 +17,22 @@ import {
   stampProjectFilename,
 } from '../lib/download'
 import { copyText } from '../lib/clipboard'
-import { projectHasAnyRecording } from '../core/sceneActor'
+import { findActor, projectHasAnyRecording } from '../core/sceneActor'
 import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
 
+type OwnCopyKind = 'css' | 'html' | 'react' | 'trigger'
+
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
+  const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const announceAction = useEditorStore((s) => s.announceAction)
   const setPlaybackTrigger = useEditorStore((s) => s.setPlaybackTrigger)
   const { downloadCurrentProject } = useProjectPersistence()
 
   const [copiedInline, setCopiedInline] = useState(false)
   const [copiedDialog, setCopiedDialog] = useState(false)
+  const [ownCopied, setOwnCopied] = useState<OwnCopyKind | null>(null)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
   const [packaging, setPackaging] = useState<null | 'web' | 'react'>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
@@ -40,14 +45,22 @@ export function ExportPanel() {
   const reactPackageStatusId = useId()
   const triggerHelpId = useId()
   const previewTitleId = useId()
+  const ownElementHeadingId = useId()
+  const ownElementHelpId = useId()
 
   const hasExport = projectHasAnyRecording(project)
   const trigger = coercePlaybackTrigger(project.playback.trigger)
+  const selectedActor = findActor(project.actors, selectedActorId)
 
   const { css, facingFidelityWarnings } = useMemo(() => {
     if (!hasExport) return { css: '', facingFidelityWarnings: [] }
     return buildProjectCssExport(project)
   }, [project, hasExport])
+
+  const ownElement = useMemo(() => {
+    if (!hasExport) return null
+    return buildOwnElementExport(project, selectedActorId)
+  }, [project, selectedActorId, hasExport])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -76,6 +89,32 @@ export function ExportPanel() {
       setCopiedDialog(true)
       window.setTimeout(() => setCopiedDialog(false), 1500)
     }
+  }
+
+  const copyOwnElement = async (kind: OwnCopyKind) => {
+    if (!ownElement || !ownElement.ok) return
+    const text =
+      kind === 'css'
+        ? ownElement.css
+        : kind === 'html'
+          ? ownElement.htmlExample
+          : kind === 'react'
+            ? ownElement.reactExample
+            : (ownElement.triggerJs ?? '')
+    if (!text) return
+    const ok = await copyText(text)
+    if (!ok) return
+    setOwnCopied(kind)
+    window.setTimeout(() => setOwnCopied(null), 1500)
+    announce(
+      kind === 'css'
+        ? 'Motion wrapper CSS copied.'
+        : kind === 'html'
+          ? 'HTML example copied.'
+          : kind === 'react'
+            ? 'React example copied.'
+            : 'Trigger script copied.',
+    )
   }
 
   const downloadCss = () => {
@@ -240,8 +279,8 @@ export function ExportPanel() {
           ))}
           <p className="text-[11px] leading-relaxed text-amber-800/90">
             Applies to Copy CSS, View CSS, Download CSS, HTML demo, web package,
-            and React package. Export still proceeds; the CSS also includes a
-            matching comment.
+            React package, and Animate your own element. Export still proceeds;
+            the CSS also includes a matching comment.
           </p>
         </div>
       )}
@@ -404,6 +443,99 @@ export function ExportPanel() {
             ? ' (unique classes per actor inside the scene root).'
             : ' (wrap in the documented scene root).'}
         </p>
+      </div>
+
+      <div
+        className="space-y-2 border-t border-slate-100 pt-3"
+        data-testid="export-own-element"
+        aria-labelledby={ownElementHeadingId}
+      >
+        <h3
+          id={ownElementHeadingId}
+          className="text-xs font-medium text-slate-800"
+        >
+          Animate your own element
+        </h3>
+        <p
+          id={ownElementHelpId}
+          data-testid="export-own-element-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          {ownElement?.ok
+            ? `Motion wrapper for “${ownElement.actorName}” — path and timing only. Nest your HTML or React node inside .${ownElement.wrapperClass}; your child’s size, color, image, text, and transforms stay yours.`
+            : selectedActor
+              ? `Select an actor with a recording (currently “${selectedActor.name}” has no exportable path).`
+              : 'Select an actor with a recording to export a motion wrapper.'}
+        </p>
+        {ownElement?.ok ? (
+          <>
+            <p
+              data-testid="export-own-element-trigger"
+              className={
+                ownElement.requiresTriggerJs
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-950'
+                  : 'text-[11px] leading-relaxed text-slate-500'
+              }
+              role={ownElement.requiresTriggerJs ? 'status' : undefined}
+            >
+              {ownElement.triggerRequirement}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid="btn-copy-own-element-css"
+                onClick={() => void copyOwnElement('css')}
+                className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+              >
+                {ownCopied === 'css' ? 'Copied' : 'Copy wrapper CSS'}
+              </button>
+              <button
+                type="button"
+                data-testid="btn-copy-own-element-html"
+                onClick={() => void copyOwnElement('html')}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+              >
+                {ownCopied === 'html' ? 'Copied' : 'Copy HTML example'}
+              </button>
+              <button
+                type="button"
+                data-testid="btn-copy-own-element-react"
+                onClick={() => void copyOwnElement('react')}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+              >
+                {ownCopied === 'react' ? 'Copied' : 'Copy React example'}
+              </button>
+              {ownElement.requiresTriggerJs ? (
+                <button
+                  type="button"
+                  data-testid="btn-copy-own-element-trigger"
+                  onClick={() => void copyOwnElement('trigger')}
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950 transition hover:bg-amber-100"
+                >
+                  {ownCopied === 'trigger' ? 'Copied' : 'Copy trigger script'}
+                </button>
+              ) : null}
+            </div>
+            {ownElement.requiresTriggerJs ? (
+              <p
+                data-testid="export-own-element-trigger-save"
+                className="text-[11px] leading-relaxed text-amber-950/90"
+              >
+                Save the copied script as <code>ms-trigger.js</code> in the same
+                folder as your HTML or React example (beside{' '}
+                <code>motion-wrapper.css</code>).
+              </p>
+            ) : null}
+            <ul
+              data-testid="export-own-element-limits"
+              className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-500"
+            >
+              {ownElement.limitations.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </div>
 
       <div className="border-t border-slate-100 pt-3">
