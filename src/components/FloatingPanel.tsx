@@ -99,7 +99,7 @@ export function FloatingPanel({
       aria-modal="false"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`pointer-events-auto absolute top-full z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-[max(5.5rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:w-auto ${
+      className={`pointer-events-auto absolute top-full z-50 mt-2 flex max-h-[min(28rem,calc(100dvh-15rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-[max(5.5rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-[calc(100dvh-7rem)] max-sm:w-auto ${
         align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}
@@ -109,8 +109,10 @@ export function FloatingPanel({
       {/*
         Close stays visually top-right but comes after the body in DOM/tab
         order so keyboard and screen-reader users reach panel actions first.
+        max-h leaves the bottom dock clear so path tools / Record stay
+        clickable under a tall Adjust panel (Motion presets).
       */}
-      <div className="border-b border-slate-100 py-2.5 pl-3 pr-14">
+      <div className="shrink-0 border-b border-slate-100 py-2.5 pl-3 pr-14">
         <div className="min-w-0">
           <h2
             id={titleId}
@@ -123,7 +125,7 @@ export function FloatingPanel({
           )}
         </div>
       </div>
-      <div className="max-h-[min(75dvh,32rem)] overflow-y-auto overscroll-contain">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {children}
       </div>
       <button

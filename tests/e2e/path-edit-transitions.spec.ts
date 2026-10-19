@@ -79,6 +79,42 @@ test.describe('path edit mode transitions', () => {
     await expect(page.getByTestId('path-move-overlay')).toHaveCount(0)
   })
 
+  /**
+   * Regression: tall Adjust (Motion presets) used to paint over the path-edit
+   * dock and intercept Move path. Keep Adjust open — dock must stay reachable.
+   */
+  test('path tools stay clickable while Adjust is open', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await loadProjectSnapshot(page, buildPathMoveFixtureJson())
+    await page.getByTestId('btn-edit-path').click()
+    await openPanel(page, 'adjust')
+    await expect(page.getByTestId('adjust-panel')).toBeVisible()
+    await expect(page.getByTestId('motion-presets')).toBeVisible()
+
+    const move = page.getByTestId('btn-path-tool-move')
+    await expect(move).toBeVisible()
+    const hitTestId = await move.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const top = document.elementFromPoint(
+        r.left + r.width / 2,
+        r.top + r.height / 2,
+      )
+      let node: Element | null = top
+      while (node) {
+        if (node instanceof HTMLElement && node.dataset.testid) {
+          return node.dataset.testid
+        }
+        node = node.parentElement
+      }
+      return null
+    })
+    expect(hitTestId).toBe('btn-path-tool-move')
+
+    await move.click()
+    await expect(page.getByTestId('path-move-overlay')).toBeVisible()
+    await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
+  })
+
   test('Escape cancels Move nudge before closing an open floating panel', async ({
     page,
   }) => {

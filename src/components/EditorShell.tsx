@@ -448,10 +448,15 @@ export function EditorShell() {
         </div>
       )}
 
-      {/* Bottom dock — min-h-0 so Sequence can shrink and scroll inside the slot */}
+      {/* Bottom dock — min-h-0 so Sequence can shrink and scroll inside the slot.
+          While path-editing, stack above chrome panels (z-50) so Move path /
+          Edit points stay reachable under a tall Adjust sheet. Otherwise keep
+          z-40 so an open Export panel can cover Sequence (mobile layout). */}
       <div
         data-testid="toolbar-slot"
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex max-h-[100dvh] flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4"
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex max-h-[100dvh] flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4 ${
+          editing ? 'z-[60]' : 'z-40'
+        }`}
       >
         <div className="flex min-h-0 w-full max-w-2xl flex-col items-center gap-2">
           {!editing &&
