@@ -156,6 +156,7 @@ describe('actor persistence compatibility', () => {
     if (!parsed.ok) return
     expect(parsed.snapshot.project.actors[0].appearance).toEqual({
       kind: 'shape',
+      text: null,
       width: 0.2,
       height: 0.2,
       borderRadius: 0.5,

@@ -3,6 +3,10 @@ import { isActorVisibleAt, projectToLocal } from '../core/clip'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
 import { actorBorderRadiusCssPercent, actorDisplaySizePx } from '../core/actor'
+import {
+  actorTextFontCss,
+  clampActorTextFontSize,
+} from '../core/actorText'
 import { selectProcessedPathForActor } from '../state/selectors'
 import type { Project } from '../core/types'
 
@@ -132,6 +136,36 @@ export function ExamplePreviewStage({
                 className="pointer-events-none absolute object-contain"
                 style={style}
               />
+            )
+          }
+          if (appearance.kind === 'text' && appearance.text) {
+            const minSide = Math.min(size.width, size.height)
+            const fontPx =
+              clampActorTextFontSize(appearance.text.fontSize) * minSide
+            return (
+              <div
+                key={actor.id}
+                data-testid={`example-preview-actor-${actor.id}`}
+                className="pointer-events-none absolute"
+                style={{
+                  ...style,
+                  height: 'auto',
+                  background: 'transparent',
+                  color: appearance.color,
+                  fontSize: fontPx,
+                  fontWeight: appearance.text.fontWeight,
+                  fontFamily: actorTextFontCss(appearance.text.fontFamily),
+                  textAlign: appearance.text.align,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.25,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span style={{ display: 'block', width: '100%' }}>
+                  {appearance.text.content}
+                </span>
+              </div>
             )
           }
           const radius = actorBorderRadiusCssPercent(appearance.borderRadius)

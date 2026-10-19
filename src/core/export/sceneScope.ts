@@ -84,6 +84,16 @@ function actorDigest(actor: SceneActor): string {
           hashString(app.image.dataUrl),
         ].join(':')
       : ''
+  const text =
+    app.kind === 'text' && app.text
+      ? [
+          hashString(app.text.content),
+          String(app.text.fontSize),
+          String(app.text.fontWeight),
+          app.text.align,
+          app.text.fontFamily,
+        ].join(':')
+      : ''
   const xf = (actor.transform?.keyframes ?? [])
     .map((k) => [String(k.t), String(k.rotationDeg), String(k.scale)].join(':'))
     .join('|')
@@ -101,6 +111,7 @@ function actorDigest(actor: SceneActor): string {
     String(app.height),
     String(app.borderRadius),
     img,
+    text,
     String(actor.smoothing ?? 0),
     String(actor.steadySpeed ?? 0),
     String(actor.glide ?? 0),

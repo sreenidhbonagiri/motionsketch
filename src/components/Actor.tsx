@@ -1,5 +1,9 @@
 import type { CSSProperties, PointerEventHandler } from 'react'
 import { actorDisplaySizePx } from '../core/actor'
+import {
+  actorTextFontCss,
+  clampActorTextFontSize,
+} from '../core/actorText'
 import type { Actor as ActorModel, Vec2 } from '../core/types'
 
 interface ActorProps {
@@ -44,6 +48,9 @@ export function Actor({
     stageHeight,
     actor,
   )
+  // Text matches CSS export: fixed wrap width, height from browser layout.
+  const boxHeight: CSSProperties['height'] =
+    actor.kind === 'text' ? 'auto' : height
 
   const shadow = recording
     ? '0 0 0 3px rgba(239, 68, 68, 0.45), 0 12px 32px rgba(15, 23, 42, 0.2)'
@@ -57,7 +64,7 @@ export function Actor({
     left: `${position.x * 100}%`,
     top: `${position.y * 100}%`,
     width,
-    height,
+    height: boxHeight,
     zIndex,
     transform: `translate(-50%, -50%) rotate(${rotationDeg}deg) scale(${scale})`,
     boxShadow: editingPreview
@@ -70,7 +77,9 @@ export function Actor({
   const label =
     actor.kind === 'image' && actor.image
       ? `Actor ${name}: ${actor.image.label}`
-      : `Actor ${name}`
+      : actor.kind === 'text' && actor.text
+        ? `Actor ${name}: text`
+        : `Actor ${name}`
   const ariaLabel = editingPreview ? `${label} (editing preview)` : label
 
   if (actor.kind === 'image' && actor.image) {
@@ -99,6 +108,49 @@ export function Actor({
         }}
         onPointerDown={hidden ? undefined : onPointerDown}
       />
+    )
+  }
+
+  if (actor.kind === 'text' && actor.text) {
+    const minSide = Math.min(stageWidth, stageHeight)
+    const fontPx = clampActorTextFontSize(actor.text.fontSize) * minSide
+    return (
+      <div
+        role="button"
+        tabIndex={hidden ? -1 : 0}
+        aria-label={ariaLabel}
+        aria-pressed={selected}
+        aria-hidden={hidden ? true : undefined}
+        data-testid={selected ? 'actor' : `actor-${actorId}`}
+        data-actor-id={actorId}
+        data-actor-kind="text"
+        data-selected={selected ? 'true' : 'false'}
+        data-hidden={hidden ? 'true' : 'false'}
+        data-editing-preview={editingPreview ? 'true' : 'false'}
+        className="absolute cursor-grab touch-none active:cursor-grabbing"
+        style={{
+          ...boxStyle,
+          background: 'transparent',
+          color: actor.color,
+          fontSize: fontPx,
+          fontWeight: actor.text.fontWeight,
+          fontFamily: actorTextFontCss(actor.text.fontFamily),
+          textAlign: actor.text.align,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          lineHeight: 1.25,
+          boxSizing: 'border-box',
+          userSelect: 'text',
+        }}
+        onPointerDown={hidden ? undefined : onPointerDown}
+      >
+        <span
+          data-testid={selected ? 'actor-text-body' : undefined}
+          style={{ display: 'block', width: '100%', userSelect: 'text' }}
+        >
+          {actor.text.content}
+        </span>
+      </div>
     )
   }
 

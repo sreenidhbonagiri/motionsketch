@@ -4,6 +4,12 @@ import {
   type ActorImageAsset,
 } from './imageAsset'
 import {
+  cloneActorText,
+  coerceActorText,
+  DEFAULT_ACTOR_TEXT,
+  clampActorTextFontSize,
+} from './actorText'
+import {
   DEFAULT_ACTOR,
   MAX_ACTOR_SIZE,
   MIN_ACTOR_SIZE,
@@ -41,7 +47,9 @@ export function clampActorBorderRadius(value: number): number {
  *
  * Rule: `sizeNorm` (actor.width) is a fraction of min(stageW, stageH) for the
  * **longer** edge of the box. Shapes are square. Images preserve aspect ratio
- * inside that box (CSS object-fit: contain semantics).
+ * inside that box (CSS object-fit: contain semantics). Text uses width as the
+ * wrap box; height in the live editor/export is `auto` (browser layout). This
+ * helper returns a one-line nominal height for non-DOM callers only.
  */
 export function actorDisplaySizePx(
   stageWidth: number,
@@ -57,10 +65,14 @@ export function actorDisplaySizePx(
     }
     return { width: box * aspect, height: box }
   }
+  if (actor.kind === 'text' && actor.text) {
+    const fontPx = clampActorTextFontSize(actor.text.fontSize) * minSide
+    return { width: box, height: fontPx * 1.25 }
+  }
   return { width: box, height: box }
 }
 
-/** Intrinsic aspect (w/h) for export; 1 for shapes. */
+/** Intrinsic aspect (w/h) for export; 1 for shapes and text (text uses height: auto). */
 export function actorContentAspect(actor: Actor): number {
   if (actor.kind === 'image' && actor.image) {
     return imageAspectRatio(actor.image)
@@ -108,8 +120,12 @@ export function coerceActor(value: unknown): Actor {
       : DEFAULT_ACTOR.color
 
   const image = coerceActorImage(record.image)
+  const text = coerceActorText(record.text)
+
   let kind: ActorKind =
-    record.kind === 'image' || record.kind === 'shape'
+    record.kind === 'image' ||
+    record.kind === 'shape' ||
+    record.kind === 'text'
       ? record.kind
       : image
         ? 'image'
@@ -119,6 +135,9 @@ export function coerceActor(value: unknown): Actor {
   if (kind === 'image' && !image) {
     kind = 'shape'
   }
+  // Text kind without settings gets defaults (never fail the load).
+  const resolvedText =
+    kind === 'text' ? (text ?? { ...DEFAULT_ACTOR_TEXT }) : text
 
   return {
     kind,
@@ -126,7 +145,10 @@ export function coerceActor(value: unknown): Actor {
     height: size,
     borderRadius: clampActorBorderRadius(radiusRaw),
     color,
-    image: kind === 'image' ? image : null,
+    // Keep a valid image payload even when kind !== 'image' so switching back
+    // after save/load still works (same idea as preserving color/corners).
+    image,
+    text: resolvedText,
   }
 }
 
@@ -143,6 +165,24 @@ export function cloneActor(actor: Actor): Actor {
     borderRadius: actor.borderRadius,
     color: actor.color,
     image: actor.image ? { ...actor.image } : null,
+    text: actor.text ? cloneActorText(actor.text) : null,
+  }
+}
+
+/** Normalize optional text field after spreads / fixtures. */
+export function withNormalizedText(actor: Actor): Actor {
+  return {
+    ...actor,
+    text: actor.text ? cloneActorText(actor.text) : null,
+  }
+}
+
+/** Ensure a text payload exists (for switching to Text). */
+export function ensureActorText(actor: Actor): Actor {
+  if (actor.text) return actor
+  return {
+    ...actor,
+    text: { ...DEFAULT_ACTOR_TEXT },
   }
 }
 

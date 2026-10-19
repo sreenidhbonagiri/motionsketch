@@ -2,9 +2,16 @@ import { create } from 'zustand'
 import {
   clampActorBorderRadius,
   clampActorSize,
+  ensureActorText,
   normalizeActorColor,
 } from '../core/actor'
+import {
+  clampActorTextFontSize,
+  DEFAULT_ACTOR_TEXT,
+  sanitizeActorTextContent,
+} from '../core/actorText'
 import type { ActorImageAsset } from '../core/imageAsset'
+import type { ActorTextAlign, ActorTextFont } from '../core/types'
 import {
   addHandleIndex,
   copyGeometryEdit,
@@ -255,10 +262,15 @@ interface EditorStore {
   setActorColor: (color: string) => void
   setActorSize: (size: number) => void
   setActorBorderRadius: (radius: number) => void
-  setActorKind: (kind: 'shape' | 'image') => void
+  setActorKind: (kind: 'shape' | 'image' | 'text') => void
   setActorImage: (image: ActorImageAsset) => void
   clearActorImage: () => void
   setActorImageLabel: (label: string) => void
+  setActorTextContent: (content: string) => void
+  setActorTextFontSize: (fontSize: number) => void
+  setActorTextWeight: (weight: 400 | 700) => void
+  setActorTextAlign: (align: 'left' | 'center' | 'right') => void
+  setActorTextFontFamily: (fontFamily: 'system' | 'serif' | 'mono') => void
   setFaceAlongPath: (on: boolean) => void
   setDirectionOffsetDeg: (degrees: number) => void
   /** Clear the selected actor’s recording, path edits, and transform track. */
@@ -1022,7 +1034,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
                 ...a.appearance,
                 width: next,
                 height:
-                  a.appearance.kind === 'shape' ? next : a.appearance.height,
+                  a.appearance.kind === 'shape' || a.appearance.kind === 'text'
+                    ? next
+                    : a.appearance.height,
               },
             }
           },
@@ -1051,15 +1065,22 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           state.selectedActorId,
           (a) => {
             if (kind === 'image' && !a.appearance.image) return a
-            return {
-              ...a,
-              appearance: {
-                ...a.appearance,
-                kind,
-                height:
-                  kind === 'shape' ? a.appearance.width : a.appearance.height,
-              },
+            let appearance = { ...a.appearance, kind }
+            if (kind === 'text') {
+              appearance = ensureActorText(appearance)
+              appearance = {
+                ...appearance,
+                kind: 'text',
+                height: appearance.width,
+                text: appearance.text ?? { ...DEFAULT_ACTOR_TEXT },
+              }
+            } else if (kind === 'shape') {
+              appearance = {
+                ...appearance,
+                height: appearance.width,
+              }
             }
+            return { ...a, appearance }
           },
         ),
       })),
@@ -1118,6 +1139,107 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ),
         }
       }),
+
+    setActorTextContent: (content) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            const base = ensureActorText(a.appearance)
+            const text = base.text ?? { ...DEFAULT_ACTOR_TEXT }
+            return {
+              ...a,
+              appearance: {
+                ...base,
+                text: {
+                  ...text,
+                  content: sanitizeActorTextContent(content),
+                },
+              },
+            }
+          },
+        ),
+      })),
+
+    setActorTextFontSize: (fontSize) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            const base = ensureActorText(a.appearance)
+            const text = base.text ?? { ...DEFAULT_ACTOR_TEXT }
+            return {
+              ...a,
+              appearance: {
+                ...base,
+                text: {
+                  ...text,
+                  fontSize: clampActorTextFontSize(fontSize),
+                },
+              },
+            }
+          },
+        ),
+      })),
+
+    setActorTextWeight: (weight) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            const base = ensureActorText(a.appearance)
+            const text = base.text ?? { ...DEFAULT_ACTOR_TEXT }
+            return {
+              ...a,
+              appearance: {
+                ...base,
+                text: { ...text, fontWeight: weight === 700 ? 700 : 400 },
+              },
+            }
+          },
+        ),
+      })),
+
+    setActorTextAlign: (align: ActorTextAlign) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            const base = ensureActorText(a.appearance)
+            const text = base.text ?? { ...DEFAULT_ACTOR_TEXT }
+            return {
+              ...a,
+              appearance: {
+                ...base,
+                text: { ...text, align },
+              },
+            }
+          },
+        ),
+      })),
+
+    setActorTextFontFamily: (fontFamily: ActorTextFont) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => {
+            const base = ensureActorText(a.appearance)
+            const text = base.text ?? { ...DEFAULT_ACTOR_TEXT }
+            return {
+              ...a,
+              appearance: {
+                ...base,
+                text: { ...text, fontFamily },
+              },
+            }
+          },
+        ),
+      })),
 
     setFaceAlongPath: (on) =>
       set((state) => ({

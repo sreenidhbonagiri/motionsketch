@@ -1,5 +1,6 @@
 import { zipSync, strToU8 } from 'fflate'
 import { coerceActor } from '../actor'
+import { actorTextHtmlInner } from '../actorText'
 import {
   buildSnapshot,
   serializeSnapshot,
@@ -67,6 +68,9 @@ function embedMarkupExample(
           hrefByDataUrl.get(appearance.image.dataUrl) ?? 'assets/asset-01.png'
         const alt = escapeHtmlText(appearance.image.label || 'Actor image')
         return `    <img class="${cls}" src="${href}" alt="${alt}" />`
+      }
+      if (appearance.kind === 'text' && appearance.text) {
+        return `    <div class="${cls}">${actorTextHtmlInner(appearance.text.content)}</div>`
       }
       return `    <div class="${cls}"></div>`
     })

@@ -12,7 +12,7 @@ export interface MotionSample {
   y: number
 }
 
-export type ActorKind = 'shape' | 'image'
+export type ActorKind = 'shape' | 'image' | 'text'
 
 /** Portable embedded image (see core/imageAsset.ts for limits & SVG rules). */
 export interface ActorImage {
@@ -23,26 +23,49 @@ export interface ActorImage {
   label: string
 }
 
-/** Visual appearance of one actor (shape or image). */
+export type ActorTextAlign = 'left' | 'center' | 'right'
+/** Self-contained stacks; glyphs can differ across devices. */
+export type ActorTextFont = 'system' | 'serif' | 'mono'
+
+/** Authored text payload (see core/actorText.ts for limits). */
+export interface ActorText {
+  content: string
+  /** Font size as a fraction of the stage’s shorter side (cqmin). */
+  fontSize: number
+  fontWeight: 400 | 700
+  align: ActorTextAlign
+  fontFamily: ActorTextFont
+}
+
+/** Visual appearance of one actor (shape, image, or text). */
 export interface Actor {
   kind: ActorKind
   /**
    * Size control: fraction of the stage’s shorter side (cqmin) for the
    * actor bounding-box’s **longer** edge. Shape tiles are square.
    * Images are letterboxed inside that box (contain), preserving aspect ratio.
+   * Text actors use this as the wrap-box width (height follows content).
    */
   width: number
   /** For shapes, equals width (square). Kept in sync by setters. */
   height: number
   /**
    * Corner roundness for shape actors: 0 = square, 1 = circle.
-   * Preserved while kind === 'image' so Shape settings survive a switch back.
+   * Preserved while kind is image/text so Shape settings survive a switch back.
    */
   borderRadius: number
-  /** Fill color for shape actors; preserved while kind === 'image'. */
+  /**
+   * Fill color for shapes; text color when kind === 'text'.
+   * Preserved across kind switches.
+   */
   color: string
-  /** Present when kind === 'image'; null for shapes. */
+  /** Present when an image has been loaded; may persist while kind !== 'image'. */
   image: ActorImage | null
+  /**
+   * Text settings; may persist while kind !== 'text' for easy switching.
+   * Omitted/undefined on older in-memory literals — coerceActor normalizes to null.
+   */
+  text?: ActorText | null
 }
 
 export interface Recording {
@@ -211,6 +234,7 @@ export const DEFAULT_ACTOR: Actor = {
   borderRadius: 0.28,
   color: '#4f46e5',
   image: null,
+  text: null,
 }
 
 /** Fraction of the stage’s shorter side */

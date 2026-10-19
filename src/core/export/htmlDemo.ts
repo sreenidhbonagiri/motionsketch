@@ -1,4 +1,5 @@
 import { coerceActor } from '../actor'
+import { actorTextHtmlInner } from '../actorText'
 import { escapeHtmlText } from '../projectName'
 import {
   clampStageAspect,
@@ -185,6 +186,9 @@ function buildActorMarkup(
         const safeSrc = src.replace(/"/g, '')
         const alt = escapeHtmlText(appearance.image.label || 'Actor image')
         return `<img class="${cls}"${testId} src="${safeSrc}" alt="${alt}" />`
+      }
+      if (appearance.kind === 'text' && appearance.text) {
+        return `<div class="${cls}"${testId}>${actorTextHtmlInner(appearance.text.content)}</div>`
       }
       return `<div class="${cls}"${testId}></div>`
     })

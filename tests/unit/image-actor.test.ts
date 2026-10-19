@@ -1,19 +1,34 @@
 import { describe, expect, it } from 'vitest'
+import { strFromU8 } from 'fflate'
 import { actorDisplaySizePx, coerceActor } from '../../src/core/actor'
-import { exportCssFromRecording } from '../../src/core/export/css'
-import { buildHtmlDemo } from '../../src/core/export/htmlDemo'
+import {
+  buildProjectCssExport,
+  exportCssFromRecording,
+} from '../../src/core/export/css'
+import {
+  buildHtmlDemo,
+  buildHtmlDemoFromProject,
+  isSafeCssForEmbed,
+} from '../../src/core/export/htmlDemo'
+import {
+  buildWebPackage,
+  WEB_PACKAGE_CSS_NAME,
+  WEB_PACKAGE_HTML_NAME,
+} from '../../src/core/export/webPackage'
 import {
   coerceActorImage,
   validateSvgMarkup,
   type ActorImageAsset,
 } from '../../src/core/imageAsset'
+import { escapeHtmlText } from '../../src/core/projectName'
 import {
   PERSIST_FORMAT_VERSION,
   buildSnapshot,
   parseSnapshotJson,
   serializeSnapshot,
 } from '../../src/core/persist/document'
-import { makeActor, makeProject } from './helpers/project'
+import { createSceneActor } from '../../src/core/sceneActor'
+import { makeActor, makeProject, makeRecording } from './helpers/project'
 import { DEFAULT_ACTOR, type MotionSample } from '../../src/core/types'
 
 const samples: MotionSample[] = [
@@ -140,6 +155,57 @@ describe('image actor export', () => {
     expect(html).toContain('<img class="ms-actor"')
     expect(html).toContain(dataUrl)
     expect(html).not.toMatch(/https?:\/\//i)
+  })
+
+  it('keeps image labels out of CSS header; risky labels still demo safely', () => {
+    const riskyLabel = '@import "evil.css"; Logo'
+    const dataUrl = tinyPngDataUrl()
+    const sceneActor = createSceneActor({
+      appearance: {
+        kind: 'image',
+        width: 0.2,
+        height: 0.2,
+        borderRadius: 0.2,
+        color: '#4f46e5',
+        image: asset({
+          naturalWidth: 64,
+          naturalHeight: 64,
+          dataUrl,
+          label: riskyLabel,
+        }),
+        text: null,
+      },
+      recording: makeRecording(8),
+    })
+    const project = makeProject({
+      name: 'Image label safety',
+      actors: [sceneActor],
+    })
+
+    const { css } = buildProjectCssExport(project)
+    expect(isSafeCssForEmbed(css)).toBe(true)
+    expect(css).toContain('alt="Actor image"')
+    expect(css).not.toContain('@import')
+    expect(css).not.toContain(riskyLabel)
+
+    const demo = buildHtmlDemoFromProject(project)
+    expect(demo).toContain(`alt="${escapeHtmlText(riskyLabel)}"`)
+    expect(demo).toContain(dataUrl)
+
+    const packed = buildWebPackage(project)
+    expect(packed.ok).toBe(true)
+    if (!packed.ok) return
+    const indexHtml = strFromU8(
+      packed.files.find((f) => f.path === WEB_PACKAGE_HTML_NAME)!.bytes,
+    )
+    expect(indexHtml).toContain(`alt="${escapeHtmlText(riskyLabel)}"`)
+    const pkgCss = strFromU8(
+      packed.files.find((f) => f.path === WEB_PACKAGE_CSS_NAME)!.bytes,
+    )
+    expect(isSafeCssForEmbed(pkgCss)).toBe(true)
+    expect(pkgCss).toContain('alt="Actor image"')
+    expect(pkgCss).not.toContain('@import')
+    expect(pkgCss).not.toContain(riskyLabel)
   })
 })
 

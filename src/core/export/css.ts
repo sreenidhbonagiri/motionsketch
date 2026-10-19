@@ -3,6 +3,11 @@ import {
   actorContentAspect,
   coerceActor,
 } from '../actor'
+import {
+  actorTextFontCss,
+  actorTextHtmlInner,
+  sanitizeCssCommentText,
+} from '../actorText'
 import { clampClip, fullClip, isFullClip, localToProject } from '../clip'
 import { clamp01 } from '../coords'
 import {
@@ -240,10 +245,36 @@ function actorBoxRules(
   background: transparent;
   border: none;
   padding: 0;`,
-      htmlExample: `<img class="${className}" src="your-image.png" alt="${actor.image.label.replace(/"/g, '')}" />`,
+      // Placeholder alt only — never interpolate the user label into the CSS header.
+      htmlExample: `<img class="${className}" src="your-image.png" alt="Actor image" />`,
       imageNote: ` * Image actor (.${className}): CSS alone does NOT embed the image bytes.
  * Host the file yourself (or use the HTML demo export, which embeds data URLs).
  * Use an <img class="${className}"> with the same intrinsic aspect ratio as in the editor.`,
+    }
+  }
+
+  if (actor.kind === 'text' && actor.text) {
+    const fontSize = (actor.text.fontSize * 100).toFixed(2)
+    const fontStack = actorTextFontCss(actor.text.fontFamily)
+    return {
+      sizeDecl: `  width: ${size}cqmin;\n  height: auto;`,
+      shapeDecls: `  background: transparent;
+  color: ${actor.color};
+  font-size: ${fontSize}cqmin;
+  font-weight: ${actor.text.fontWeight};
+  font-family: ${fontStack};
+  text-align: ${actor.text.align};
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.25;
+  box-sizing: border-box;`,
+      // Placeholder only — never interpolate authored copy into the CSS file header.
+      htmlExample: `<div class="${className}">Your text here</div>`,
+      imageNote: ` * Text actor (.${className}): CSS alone does NOT include the copy.
+ * Put the text inside a matching element, e.g. <div class="${className}">Your text here</div>
+ * Use real text (not an image). Newlines and wrapping follow white-space: pre-wrap.
+ * System font stacks are self-contained; glyph shapes can vary by device.
+ * HTML demo / web package exports embed the escaped copy; this CSS file does not.`,
     }
   }
 
@@ -592,23 +623,24 @@ export function buildProjectCssExport(
     : ' *'
 
   const actorCount = project.actors.length
-  const htmlParts = project.actors.map((actor, index) => {
-    const cls = scopedActorClass(index, actorCount)
-    if (actor.appearance.kind === 'image' && actor.appearance.image) {
-      return `<img class="${cls}" src="actor-${index + 1}.png" alt="${actor.name.replace(/"/g, '')}" />`
-    }
-    return `<div class="${cls}"></div>`
+  // Header example markup uses placeholders for text (no authored copy in comments).
+  const htmlPartsForComment = project.actors.map((actor, index) => {
+    const appearance = coerceActor(actor.appearance)
+    return sanitizeCssCommentText(
+      actorBoxRules(appearance, scopedActorClass(index, actorCount)).htmlExample,
+    )
   })
 
   const imageNotes = project.actors
     .map((actor, i) => {
-      if (actor.appearance.kind !== 'image' || !actor.appearance.image) return ''
+      const appearance = coerceActor(actor.appearance)
       return actorBoxRules(
-        actor.appearance,
+        appearance,
         scopedActorClass(i, actorCount),
       ).imageNote
     })
     .filter(Boolean)
+    .map(sanitizeCssCommentText)
     .join('\n *\n')
 
   const facingFidelityWarnings: FacingExportFidelityNotice[] = []
@@ -703,7 +735,7 @@ ${loopNote}
  * Example HTML:
  * <div class="${scope.rootClass}${triggerNeedsJavaScript(trigger) ? ` ${MS_WAITING_CLASS}` : ''}" data-ms-scene="${scope.sceneId}">
  *   <div class="${scope.stageClass}">
- *     ${htmlParts.join('\n *     ')}
+ *     ${htmlPartsForComment.join('\n *     ')}
  *   </div>
  * </div>
  */
@@ -862,6 +894,9 @@ export function buildExportSceneMarkup(
       const appearance = coerceActor(actor.appearance)
       if (appearance.kind === 'image' && appearance.image) {
         return `<img class="${cls}" src="${appearance.image.dataUrl.replace(/"/g, '')}" alt="${appearance.image.label.replace(/"/g, '&quot;')}" />`
+      }
+      if (appearance.kind === 'text' && appearance.text) {
+        return `<div class="${cls}">${actorTextHtmlInner(appearance.text.content)}</div>`
       }
       return `<div class="${cls}"></div>`
     })
