@@ -1,6 +1,7 @@
 import { projectToLocal } from '../core/clip'
 import { applyGlide } from '../core/glide'
 import {
+  cachedApplyGlide,
   cachedApplySteadySpeed,
   cachedProcessMotion,
 } from '../core/pathCache'
@@ -51,16 +52,16 @@ export function selectProcessedPathForActor(
       ? view.glideOverride
       : (actor.glide ?? 0)
 
-  const withGlide = (samples: MotionSample[]) => {
-    if (glideAmount <= 0) return samples
-    return applyGlide(samples, glideAmount, aspect).samples
-  }
-
-  // Live drag preview changes every pointer move — do not fill the LRU.
+  // Live drag preview changes every pointer move — do not fill the LRU
+  // (steady or glide). Committed paths use identity-keyed caches below.
   if (view.editPreview) {
-    return withGlide(
-      applySteadySpeed(view.editPreview, actor.steadySpeed, aspect),
+    const steady = applySteadySpeed(
+      view.editPreview,
+      actor.steadySpeed,
+      aspect,
     )
+    if (glideAmount <= 0) return steady
+    return applyGlide(steady, glideAmount, aspect).samples
   }
 
   const spatial =
@@ -69,20 +70,16 @@ export function selectProcessedPathForActor(
     actor.geometryEdit?.samples ??
     null
 
-  if (spatial) {
-    return withGlide(
-      cachedApplySteadySpeed(spatial, actor.steadySpeed, aspect),
-    )
-  }
+  const processed = spatial
+    ? cachedApplySteadySpeed(spatial, actor.steadySpeed, aspect)
+    : cachedProcessMotion(
+        recording.samples,
+        actor.smoothing,
+        actor.steadySpeed,
+        aspect,
+      )
 
-  return withGlide(
-    cachedProcessMotion(
-      recording.samples,
-      actor.smoothing,
-      actor.steadySpeed,
-      aspect,
-    ),
-  )
+  return cachedApplyGlide(processed, glideAmount, aspect)
 }
 
 /** @deprecated Use selectProcessedPathForActor — kept for transitional call sites. */

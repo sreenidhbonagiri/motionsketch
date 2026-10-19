@@ -9,10 +9,7 @@ import type { MotionSample, Vec2 } from '../core/types'
 import { usePathEditor } from '../hooks/usePathEditor'
 import { usePointerRecorder } from '../hooks/usePointerRecorder'
 import { useStageSize } from '../hooks/useStageSize'
-import {
-  selectActorPositionForActor,
-  selectProcessedPathForActor,
-} from '../state/selectors'
+import { selectProcessedPathForActor } from '../state/selectors'
 import { useEditorStore } from '../state/store'
 import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
@@ -373,35 +370,29 @@ export function CanvasStage() {
             isSelected && (mode === 'armed' || mode === 'recording')
           const hidden =
             !forceVisible && !isActorVisibleAt(playbackHead, actor.clip)
-          const position = selectActorPositionForActor(
-            project,
-            actor,
-            playbackHead,
-            livePosition,
-            mode,
-            isSelected ? pathView : {
-              geometryEdit: actor.geometryEdit,
-              editSession: null,
-              editPreview: null,
-            },
-            isSelected,
-          )
+          const actorView = isSelected
+            ? pathView
+            : {
+                geometryEdit: actor.geometryEdit,
+                editSession: null,
+                editPreview: null,
+              }
+          // One path lookup per actor: position + facing share the same array
+          // (warm Glide/steady caches return identical references).
+          const path = selectProcessedPathForActor(project, actor, actorView)
           const localT = projectToLocal(playbackHead, actor.clip)
           const xf = evaluateTransform(actor.transform, localT)
-          const pathForFacing = selectProcessedPathForActor(
-            project,
-            actor,
-            isSelected
-              ? pathView
-              : {
-                  geometryEdit: actor.geometryEdit,
-                  editSession: null,
-                  editPreview: null,
-                },
-          )
+          let position = actor.restPosition
+          if (isSelected && (mode === 'recording' || mode === 'armed')) {
+            position = livePosition
+          } else if (path.length === 0) {
+            if (isSelected && mode === 'idle') position = livePosition
+          } else {
+            position = evaluate(path, localT)
+          }
           const rotationDeg = evaluateActorRotationDeg(
             actor,
-            pathForFacing,
+            path,
             localT,
             project.stageAspect,
           )

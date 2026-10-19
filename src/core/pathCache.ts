@@ -1,3 +1,4 @@
+import { applyGlide } from './glide'
 import { applySteadySpeed, processMotion } from './process'
 import type { MotionSample } from './types'
 
@@ -15,7 +16,7 @@ export interface ProcessedPathCacheStats {
   fingerprintTraversals: number
 }
 
-type CacheMode = 'pm' | 'ss'
+type CacheMode = 'pm' | 'ss' | 'gl'
 
 type LruEntry = {
   samples: MotionSample[]
@@ -36,16 +37,28 @@ const byIdentity = new WeakMap<MotionSample[], Map<string, LruEntry>>()
 /** Strong LRU so retention stays bounded while sample arrays remain live. */
 const lru: LruEntry[] = []
 
+/**
+ * Encode a finite processing param exactly (no decimal rounding).
+ * Distinct floats such as 0.50001 vs 0.50002 must not share a cache entry.
+ */
+function exactParam(n: number): string {
+  return Object.is(n, -0) ? '0' : String(n)
+}
+
 function paramKey(
   mode: CacheMode,
   smoothing: number,
   steadySpeed: number,
   stageAspect: number,
+  glide = 0,
 ): string {
   if (mode === 'pm') {
-    return `pm:s${smoothing.toFixed(4)}:v${steadySpeed.toFixed(4)}:a${stageAspect.toFixed(6)}`
+    return `pm:s${exactParam(smoothing)}:v${exactParam(steadySpeed)}:a${exactParam(stageAspect)}`
   }
-  return `ss:v${steadySpeed.toFixed(4)}:a${stageAspect.toFixed(6)}`
+  if (mode === 'gl') {
+    return `gl:g${exactParam(glide)}:a${exactParam(stageAspect)}`
+  }
+  return `ss:v${exactParam(steadySpeed)}:a${exactParam(stageAspect)}`
 }
 
 /**
@@ -82,8 +95,9 @@ function lookup(
   smoothing: number,
   steadySpeed: number,
   stageAspect: number,
+  glide = 0,
 ): MotionSample[] | null {
-  const key = paramKey(mode, smoothing, steadySpeed, stageAspect)
+  const key = paramKey(mode, smoothing, steadySpeed, stageAspect, glide)
   const entry = byIdentity.get(samples)?.get(key)
   if (!entry) return null
   hits += 1
@@ -98,9 +112,10 @@ function store(
   steadySpeed: number,
   stageAspect: number,
   path: MotionSample[],
+  glide = 0,
 ): MotionSample[] {
   sealSampleArray(samples)
-  const key = paramKey(mode, smoothing, steadySpeed, stageAspect)
+  const key = paramKey(mode, smoothing, steadySpeed, stageAspect, glide)
   let map = byIdentity.get(samples)
   if (!map) {
     map = new Map()
@@ -198,5 +213,29 @@ export function cachedApplySteadySpeed(
     steadySpeed,
     stageAspect,
     applySteadySpeed(samples, steadySpeed, stageAspect),
+  )
+}
+
+/**
+ * Cached {@link applyGlide} keyed by *processed-path* array identity + strength
+ * + stage aspect. Call only for committed inputs (not live drag previews).
+ * Strength ≤ 0 returns the input array (same identity) without caching.
+ */
+export function cachedApplyGlide(
+  samples: MotionSample[],
+  amount: number,
+  stageAspect: number,
+): MotionSample[] {
+  if (!(amount > 0) || samples.length < 2) return samples
+  const hit = lookup(samples, 'gl', 0, 0, stageAspect, amount)
+  if (hit) return hit
+  return store(
+    samples,
+    'gl',
+    0,
+    0,
+    stageAspect,
+    applyGlide(samples, amount, stageAspect).samples,
+    amount,
   )
 }
