@@ -1,0 +1,70 @@
+name: E2E full
+
+# Complete Chromium / Firefox / WebKit suite. Not on every push — run manually
+# or wait for the nightly. Locally: npm run test:e2e:full
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:15 UTC daily
+    - cron: '15 6 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    # Wall-clock is dominated by Linux WebKit. Shard WebKit only; keep workers=1
+    # (see playwright.config.ts) so tests stay inside the 30s budget.
+    name: E2E (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            label: chromium
+            shard_args: ''
+          - project: firefox
+            label: firefox
+            shard_args: ''
+          - project: webkit
+            label: webkit 1/2
+            shard_args: '--shard=1/2'
+          - project: webkit
+            label: webkit 2/2
+            shard_args: '--shard=2/2'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright ${{ matrix.project }}
+        run: npx playwright install ${{ matrix.project }} --with-deps
+
+      - name: End-to-end tests (${{ matrix.label }})
+        run: npm run test:e2e:full -- --project=${{ matrix.project }} ${{ matrix.shard_args }}
+
+      - name: Upload Playwright failure artifacts (${{ matrix.label }})
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-full-${{ matrix.project }}-${{ strategy.job-index }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

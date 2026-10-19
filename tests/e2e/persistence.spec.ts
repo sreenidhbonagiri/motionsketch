@@ -35,9 +35,10 @@ async function confirmNewProject(page: Page) {
 test.describe('project persistence', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('restores loop and duration after reload, paused and playable', async ({
-    page,
-  }) => {
+  test(
+    'restores loop and duration after reload, paused and playable',
+    { tag: '@smoke' },
+    async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)

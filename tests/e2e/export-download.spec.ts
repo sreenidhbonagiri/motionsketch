@@ -42,9 +42,10 @@ test.describe('downloadable exports', () => {
     )
   })
 
-  test('HTML demo downloads, opens locally, animates, and replays', async ({
-    page,
-  }) => {
+  test(
+    'HTML demo downloads, opens locally, animates, and replays',
+    { tag: '@smoke' },
+    async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)

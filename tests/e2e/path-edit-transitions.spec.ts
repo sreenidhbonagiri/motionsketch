@@ -83,7 +83,10 @@ test.describe('path edit mode transitions', () => {
    * Regression: tall Adjust (Motion presets) used to paint over the path-edit
    * dock and intercept Move path. Keep Adjust open — dock must stay reachable.
    */
-  test('path tools stay clickable while Adjust is open', async ({ page }) => {
+  test(
+    'path tools stay clickable while Adjust is open',
+    { tag: '@smoke' },
+    async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 })
     await loadProjectSnapshot(page, buildPathMoveFixtureJson())
     await page.getByTestId('btn-edit-path').click()

@@ -125,7 +125,16 @@ export function FloatingPanel({
           )}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      {/*
+        Firefox puts overflow scrollers in the sequential tab order. Keep this
+        region scrollable for pointer/wheel, but tabIndex=-1 so Tab from the
+        dialog root reaches the first control (e.g. Export primary) instead of
+        this wrapper.
+      */}
+      <div
+        tabIndex={-1}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         {children}
       </div>
       <button

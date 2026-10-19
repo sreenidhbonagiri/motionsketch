@@ -10,8 +10,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   // Keep failures visible — do not retry to paper over flakes (CI also passes --retries=0).
   retries: 0,
-  // One worker in CI: Linux WebKit under two parallel browsers routinely
-  // stretches long scenarios past the default 30s test budget.
+  // One worker in CI: Linux WebKit still exceeds the 30s test budget under
+  // parallel workers on a single runner. The full suite (e2e-full.yml) shards
+  // WebKit across jobs so wall-clock drops without raising workers.
   workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: 'http://127.0.0.1:5173',

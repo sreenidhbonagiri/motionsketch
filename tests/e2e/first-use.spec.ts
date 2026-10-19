@@ -11,9 +11,10 @@ import {
 test.describe('first-use guidance and export wording', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('Record arms with drag-to-draw guidance for sighted and assistive UI', async ({
-    page,
-  }) => {
+  test(
+    'Record arms with drag-to-draw guidance for sighted and assistive UI',
+    { tag: '@smoke' },
+    async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
 
@@ -341,10 +342,10 @@ test.describe('first-use guidance and export wording', () => {
     expect(ownBox!.y).toBeLessThan(projectBox!.y)
   })
 
-  test('export: keyboard reaches primary then trigger then Other ways before Close; help is associated', async ({
-    page,
-    browserName,
-  }) => {
+  test(
+    'export: keyboard reaches primary then trigger then Other ways before Close; help is associated',
+    { tag: '@smoke' },
+    async ({ page, browserName }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
