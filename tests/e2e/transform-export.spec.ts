@@ -5,6 +5,7 @@ import {
   loadHtmlDocument,
   openPanel,
   recordSimplePath,
+  expandExportOtherWays,
 } from './helpers'
 
 async function makeWidePng(page: Page): Promise<Buffer> {
@@ -118,6 +119,7 @@ test.describe('transform export browser parity', () => {
     expect(previewMid.centerY).toBeGreaterThan(50)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise

@@ -11,6 +11,7 @@ import {
   readExportedCss,
   recordSimplePath,
   selectActorByIndex,
+  expandExportOtherWays,
 } from './helpers'
 
 async function ensureClipTimelineOpen(
@@ -169,6 +170,7 @@ test.describe('per-actor clip timing', () => {
     expect(css).toMatch(/Clip /)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const dl = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const path = await (await dl).path()

@@ -6,6 +6,7 @@ import {
   readExportedCss,
   recordSimplePath,
   respondToConfirm,
+  expandExportOtherWays,
 } from './helpers'
 
 async function openExamples(page: import('@playwright/test').Page) {
@@ -66,6 +67,7 @@ test.describe('starter examples', () => {
     expect(css).toContain('cqw')
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise

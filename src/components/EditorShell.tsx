@@ -197,6 +197,9 @@ export function EditorShell() {
         <div
           className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3 sm:px-4"
           style={{ top: toastTopPx }}
+          // Keep Export/Adjust keyboard flow inside the open panel — toast
+          // dismiss must not sit in the tab order ahead of panel actions.
+          inert={openPanel !== null ? true : undefined}
         >
           <div
             role="status"

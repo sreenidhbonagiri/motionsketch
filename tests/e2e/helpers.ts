@@ -236,10 +236,31 @@ export async function selectActorByIndex(page: Page, index: number) {
 
 export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
 
+/** Close every floating chrome panel (Project / Adjust / Appearance / Export). */
+export async function closeOpenChromePanels(page: Page) {
+  const open = page.locator('[data-testid$="-panel-root"]')
+  const count = await open.count()
+  for (let i = 0; i < count; i++) {
+    const panel = open.nth(i)
+    if (!(await panel.isVisible().catch(() => false))) continue
+    const closeBtn = panel.locator('[data-testid^="btn-close-"]').first()
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click()
+    } else {
+      await page.keyboard.press('Escape')
+    }
+  }
+  await expect(page.locator('[data-testid$="-panel-root"]')).toHaveCount(0)
+}
+
 /** Open a labeled top chrome panel (Adjust / Appearance / Export / Project). */
 export async function openPanel(page: Page, id: ChromePanel) {
   const root = page.getByTestId(`${id}-panel-root`)
-  if (await root.isVisible().catch(() => false)) return
+  if (await root.isVisible().catch(() => false)) {
+    // Already open — re-focus so keyboard tests start from a known place.
+    await root.focus()
+    return
+  }
   // Close any other floating panel first — on narrow viewports an open
   // panel can cover sibling chrome buttons. Prefer the Close control over
   // Escape so a nested <dialog> (e.g. View CSS) cannot swallow the key.
@@ -257,6 +278,7 @@ export async function openPanel(page: Page, id: ChromePanel) {
   }
   await page.getByTestId(`btn-${id}`).click()
   await expect(root).toBeVisible()
+  await root.focus()
 }
 
 /** Expand Export → Other ways (React, CSS, own-element, project file). */
@@ -267,13 +289,21 @@ export async function expandExportOtherWays(page: Page) {
     (el) => (el as HTMLDetailsElement).open,
   )
   if (!open) {
-    await page.getByTestId('export-other-ways-summary').click()
+    const summary = page.getByTestId('export-other-ways-summary')
+    await summary.scrollIntoViewIfNeeded()
+    await summary.click()
   }
   await expect
     .poll(() =>
       details.evaluate((el) => (el as HTMLDetailsElement).open),
     )
     .toBe(true)
+  // open=true alone is not enough on WebKit when the panel body still scrolls.
+  const cssBtn = page.getByTestId('btn-download-css')
+  await cssBtn.evaluate((el) => {
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+  await expect(cssBtn).toBeVisible()
 }
 
 export async function openCssDialog(page: Page) {
@@ -299,12 +329,19 @@ export async function readExportedCss(page: Page): Promise<string> {
   return css
 }
 
+/**
+ * Record a short path and leave the editor idle with Play enabled.
+ * Closes floating panels before/after so later steps (toast, Export, Adjust)
+ * are not blocked by leftover chrome from earlier helpers.
+ */
 export async function recordSimplePath(page: Page) {
+  await closeOpenChromePanels(page)
   await clickRecord(page)
   await dragActor(page, { x: 30, y: -20 }, { x: 160, y: 50 })
   await expect(page.getByTestId('btn-play')).toBeEnabled()
-  await openPanel(page, 'export')
-  await expect(page.getByTestId('export-panel')).toBeVisible()
+  await expect(page.getByTestId('btn-record')).toBeVisible()
+  await expect(page.getByTestId('btn-stop')).toHaveCount(0)
+  await closeOpenChromePanels(page)
 }
 
 /**

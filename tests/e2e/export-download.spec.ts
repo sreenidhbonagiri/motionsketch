@@ -6,6 +6,7 @@ import {
   openPanel,
   readExportedCss,
   recordSimplePath,
+  expandExportOtherWays,
 } from './helpers'
 
 async function readDownloadText(download: import('@playwright/test').Download) {
@@ -25,6 +26,8 @@ test.describe('downloadable exports', () => {
     await recordSimplePath(page)
     const viewed = await readExportedCss(page)
 
+    await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-css').click()
     const download = await downloadPromise
@@ -52,6 +55,7 @@ test.describe('downloadable exports', () => {
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-color').fill('#0f766e')
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
 
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
@@ -115,6 +119,7 @@ test.describe('downloadable exports', () => {
     await ensureEditor(page)
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
+    await expect(page.getByTestId('export-other-ways')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-css')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-html-demo')).toHaveCount(0)
     await expect(page.getByTestId('btn-download-web-package')).toHaveCount(0)

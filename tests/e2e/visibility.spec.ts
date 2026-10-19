@@ -13,6 +13,7 @@ import {
   openPanel,
   recordSimplePath,
   selectActorByIndex,
+  expandExportOtherWays,
 } from './helpers'
 
 async function openClipTimeline(page: Page) {
@@ -116,6 +117,7 @@ test.describe('per-actor visibility timing', () => {
     await expect(page.getByTestId('actor-hidden-indicator')).toHaveCount(0)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
@@ -245,9 +247,7 @@ test.describe('per-actor visibility timing', () => {
     expect(await htmlVisibilityAt(page, 1.75)).toBe('visible')
   })
 
-  test('undo visibility; stationary second actor exports visibility', async ({
-    page,
-  }) => {
+  test('undo visibility toggles one flag at a time', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
@@ -266,11 +266,22 @@ test.describe('per-actor visibility timing', () => {
     await page.getByTestId('btn-undo-transform').click()
     await expect(page.getByTestId('clip-hide-before')).not.toBeChecked()
     await expect(page.getByTestId('clip-hide-after')).not.toBeChecked()
+  })
 
+  test('stationary second actor exports visibility', async ({ page }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    await page.getByTestId('btn-add-actor').click()
+    await selectActorByIndex(page, 1)
+    await openClipTimeline(page)
+    await applyClipSeconds(page, '0.30', '0.90')
     await page.getByTestId('clip-hide-before').check()
     await page.getByTestId('clip-hide-after').check()
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     await page.getByTestId('btn-view-css').click()
     const cssText = await page.getByTestId('css-output').inputValue()
     expect(cssText).toMatch(/ms-[a-f0-9]{8}-vis-a2/)

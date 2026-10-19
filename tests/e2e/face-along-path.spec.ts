@@ -14,6 +14,7 @@ import {
   loadHtmlDocument,
   loadProjectSnapshot,
   openPanel,
+  expandExportOtherWays,
 } from './helpers'
 
 function angleDeltaDeg(a: number, b: number): number {
@@ -113,6 +114,7 @@ test.describe('face along path', () => {
     expect(angleDeltaDeg(editor.mid, -90)).toBeLessThan(12)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
@@ -176,6 +178,7 @@ test.describe('face along path', () => {
     await page.getByTestId('loop-mode-alternate').check()
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const html = readFileSync((await (await downloadPromise).path())!, 'utf8')
@@ -237,6 +240,7 @@ test.describe('face along path', () => {
     expect(Math.abs(editorMid - editorProgression[0]!)).toBeGreaterThan(180)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
@@ -303,6 +307,7 @@ test.describe('face along path', () => {
     expect(editorMid.xFrac).toBeLessThan(0.35)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
@@ -373,6 +378,7 @@ test.describe('face along path', () => {
     expect(after).toBeGreaterThan(40)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const html = readFileSync((await (await downloadPromise).path())!, 'utf8')
@@ -431,6 +437,7 @@ test.describe('face along path', () => {
     expect(after).toBeGreaterThan(40)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const html = readFileSync((await (await downloadPromise).path())!, 'utf8')
@@ -479,6 +486,7 @@ test.describe('face along path', () => {
     await loadProjectSnapshot(page, buildFaceAlongFidelityWarningFixtureJson())
     await ensureEditor(page)
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
 
     const banner = page.getByTestId('export-facing-fidelity-warning')
     await expect(banner).toBeVisible()
@@ -495,6 +503,7 @@ test.describe('face along path', () => {
     await page.getByTestId('btn-close-css-dialog').click()
 
     // Download HTML demo still works with the warning present.
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise

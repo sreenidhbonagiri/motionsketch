@@ -168,6 +168,7 @@ export function SvgPathImport() {
           type="button"
           data-testid="btn-import-svg-path"
           disabled={busyModes || busy}
+          aria-describedby={helpId}
           onClick={() => fileRef.current?.click()}
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -182,13 +183,32 @@ export function SvgPathImport() {
           onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
         />
       </div>
-      <p id={helpId} className="text-xs leading-relaxed text-slate-500">
-        Replace the path for{' '}
-        <span className="font-medium text-slate-700">
-          {selectedActor?.name ?? 'the selected actor'}
-        </span>{' '}
-        with one local SVG path. Preview fit on the stage, then confirm. Keeps
-        Duration and appearance; movement is even-speed by default.
+      <p
+        id={helpId}
+        data-testid="svg-path-import-help"
+        className="text-xs leading-relaxed text-slate-500"
+      >
+        {hasExistingTake ? (
+          <>
+            Replace the path for{' '}
+            <span className="font-medium text-slate-700">
+              {selectedActor?.name ?? 'the selected actor'}
+            </span>{' '}
+            with one local SVG path. Preview on the stage, nudge if needed, then
+            confirm. Keeps Duration and appearance; movement is even-speed by
+            default.
+          </>
+        ) : (
+          <>
+            Set the path for{' '}
+            <span className="font-medium text-slate-700">
+              {selectedActor?.name ?? 'the selected actor'}
+            </span>{' '}
+            from one local SVG file. Preview on the stage, nudge if needed, then
+            apply. Uses project Duration; appearance stays the same; movement is
+            even-speed by default.
+          </>
+        )}
       </p>
       {error ? (
         <p
@@ -304,7 +324,7 @@ export function SvgPathImport() {
                 onClick={confirmImport}
                 className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
               >
-                Replace path
+                {hasExistingTake ? 'Replace path' : 'Apply path'}
               </button>
             </div>
           </div>

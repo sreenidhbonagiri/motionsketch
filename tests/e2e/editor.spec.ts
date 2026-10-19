@@ -5,6 +5,7 @@ import {
   ensureEditor,
   openPanel,
   readExportedCss,
+  expandExportOtherWays,
 } from './helpers'
 
 test.describe('MotionSketch editor', () => {
@@ -32,6 +33,7 @@ test.describe('MotionSketch editor', () => {
     await dragActor(page, { x: 30, y: -20 }, { x: 180, y: 60 })
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     await expect(page.getByTestId('export-panel')).toBeVisible()
     await expect(page.getByTestId('btn-play')).toBeEnabled()
 

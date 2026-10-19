@@ -4,6 +4,7 @@ import {
   openCssDialog,
   openPanel,
   recordSimplePath,
+  expandExportOtherWays,
 } from './helpers'
 
 async function assertFullyInViewport(
@@ -94,6 +95,7 @@ test.describe('workspace layout', () => {
       expect(noPageScroll).toBeTruthy()
 
       await openPanel(page, 'export')
+      await expandExportOtherWays(page)
       await page.getByTestId('btn-view-css').scrollIntoViewIfNeeded()
       await expect(page.getByTestId('btn-view-css')).toBeVisible()
       await expect(page.getByTestId('btn-copy-css')).toBeVisible()
@@ -138,6 +140,7 @@ test.describe('workspace layout', () => {
     await assertFullyInViewport(page, 'toolbar')
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const viewCss = page.getByTestId('btn-view-css')
     await expect(viewCss).toBeVisible()
     await viewCss.evaluate((el) => {
@@ -171,8 +174,10 @@ test.describe('workspace layout', () => {
     if (listExpanded === 'true') {
       await page.getByTestId('btn-toggle-actor-list').click()
     }
-    // Leaves Export open — keep it open so the panel stacks above the dock.
+    // Keep Export open so the panel stacks above the dock.
     await recordSimplePath(page)
+    await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     await expect(page.getByTestId('export-panel-root')).toBeVisible()
 
     const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')

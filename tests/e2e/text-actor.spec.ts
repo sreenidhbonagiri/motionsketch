@@ -6,6 +6,7 @@ import {
   openPanel,
   readExportedCss,
   recordSimplePath,
+  expandExportOtherWays,
 } from './helpers'
 
 test.describe('text actors', () => {
@@ -97,6 +98,7 @@ test.describe('text actors', () => {
     expect(css).toMatch(/system-ui|Segoe UI/)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
