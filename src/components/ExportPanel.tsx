@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildProjectCssExport } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
+import { buildReactPackage } from '../core/export/reactPackage'
 import { buildWebPackage } from '../core/export/webPackage'
 import {
   PLAYBACK_TRIGGERS,
@@ -28,7 +29,7 @@ export function ExportPanel() {
   const [copiedInline, setCopiedInline] = useState(false)
   const [copiedDialog, setCopiedDialog] = useState(false)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
-  const [packaging, setPackaging] = useState(false)
+  const [packaging, setPackaging] = useState<null | 'web' | 'react'>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const previewRef = useRef<HTMLDialogElement>(null)
@@ -36,6 +37,7 @@ export function ExportPanel() {
   const codeRef = useRef<HTMLTextAreaElement>(null)
   const titleId = useId()
   const packageStatusId = useId()
+  const reactPackageStatusId = useId()
   const triggerHelpId = useId()
   const previewTitleId = useId()
 
@@ -109,7 +111,7 @@ export function ExportPanel() {
 
   const downloadWebPackage = () => {
     if (packaging) return
-    setPackaging(true)
+    setPackaging('web')
     setActionStatus('Building web package…')
     // Yield so the busy state paints before ZIP work.
     window.setTimeout(() => {
@@ -134,7 +136,38 @@ export function ExportPanel() {
       } catch {
         announce('Couldn’t build the web package.')
       } finally {
-        setPackaging(false)
+        setPackaging(null)
+      }
+    }, 0)
+  }
+
+  const downloadReactPackage = () => {
+    if (packaging) return
+    setPackaging('react')
+    setActionStatus('Building React package…')
+    window.setTimeout(() => {
+      try {
+        const result = buildReactPackage(project)
+        if (!result.ok) {
+          announce(result.error)
+          return
+        }
+        const blob = new Blob([result.zip as BlobPart], {
+          type: 'application/zip',
+        })
+        const ok = downloadBlob(
+          blob,
+          stampProjectFilename(`${project.name}-react`, 'zip'),
+        )
+        if (ok) {
+          announce('React package download started.')
+          return
+        }
+        announce('Could not download the React package.')
+      } catch {
+        announce('Couldn’t build the React package.')
+      } finally {
+        setPackaging(null)
       }
     }, 0)
   }
@@ -206,9 +239,9 @@ export function ExportPanel() {
             </p>
           ))}
           <p className="text-[11px] leading-relaxed text-amber-800/90">
-            Applies to Copy CSS, View CSS, Download CSS, HTML demo, and web
-            package. Export still proceeds; the CSS also includes a matching
-            comment.
+            Applies to Copy CSS, View CSS, Download CSS, HTML demo, web package,
+            and React package. Export still proceeds; the CSS also includes a
+            matching comment.
           </p>
         </div>
       )}
@@ -245,7 +278,7 @@ export function ExportPanel() {
         >
           {triggerHelpText(trigger)}
           {triggerNeedsJavaScript(trigger)
-            ? ' Download CSS is CSS-only — this trigger needs the HTML demo or web package (includes ms-trigger.js).'
+            ? ' Download CSS is CSS-only — this trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
             : ' Download CSS works alone for page-load.'}{' '}
           Loop / alternate still apply after the scene starts.
         </p>
@@ -253,7 +286,7 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-preview-trigger"
           onClick={openTriggerPreview}
-          disabled={packaging}
+          disabled={packaging !== null}
           className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Preview trigger
@@ -267,7 +300,7 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-download-html-demo"
           onClick={downloadHtmlDemo}
-          disabled={packaging}
+          disabled={packaging !== null}
           className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Download HTML demo
@@ -283,12 +316,14 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-download-web-package"
           onClick={downloadWebPackage}
-          disabled={packaging}
-          aria-busy={packaging}
+          disabled={packaging !== null}
+          aria-busy={packaging === 'web'}
           aria-describedby={packageStatusId}
           className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {packaging ? 'Building web package…' : 'Download web package'}
+          {packaging === 'web'
+            ? 'Building web package…'
+            : 'Download web package'}
         </button>
         <p
           id={packageStatusId}
@@ -300,9 +335,31 @@ export function ExportPanel() {
 
         <button
           type="button"
+          data-testid="btn-download-react-package"
+          onClick={downloadReactPackage}
+          disabled={packaging !== null}
+          aria-busy={packaging === 'react'}
+          aria-describedby={reactPackageStatusId}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {packaging === 'react'
+            ? 'Building React package…'
+            : 'Download React package'}
+        </button>
+        <p
+          id={reactPackageStatusId}
+          data-testid="export-react-package-help"
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
+          ZIP with MotionSketchScene.tsx, scoped CSS, images, trigger script, and
+          a Vite React README.
+        </p>
+
+        <button
+          type="button"
           data-testid="btn-download-css"
           onClick={downloadCss}
-          disabled={packaging}
+          disabled={packaging !== null}
           className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Download CSS
@@ -354,7 +411,7 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-export-download-project"
           onClick={downloadProjectFile}
-          disabled={packaging}
+          disabled={packaging !== null}
           className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Download project file

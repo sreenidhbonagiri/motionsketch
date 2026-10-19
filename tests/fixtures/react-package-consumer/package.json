@@ -1,0 +1,8 @@
+{
+  "name": "ms-react-package-consumer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck:scene": "tsc -p tsconfig.scene.json --pretty false"
+  }
+}
