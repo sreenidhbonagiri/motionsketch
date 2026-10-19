@@ -1,6 +1,6 @@
 # MotionSketch
 
-MotionSketch is a local browser editor for demonstrating motion. Drag an asset on the stage to record a path, refine timing and appearance, compose a multi-actor scene, then export scoped CSS or a self-contained HTML demo you can open offline.
+MotionSketch is a local browser editor for demonstrating motion. Drag an asset on the stage to record a path, refine timing and appearance, compose a multi-actor scene, then export a website package, scoped CSS, a React package, own-element wrappers, or a self-contained HTML demo you can open offline.
 
 There is no hosted product URL in this repository. Run the app locally with the commands below.
 
@@ -33,15 +33,16 @@ npm run preview
 
 ## What you can do
 
-- **Record** pointer motion for the selected actor (shape tile or image).
-- **Refine** per-actor smoothing and Steady Speed; edit the path with handles (add/remove controls on the baked path, drag/nudge to reshape); set shared Duration, Loop, and loop mode (repeat or alternate).
+- **Record** pointer motion for the selected actor (shape, image, or text).
+- **Refine** per-actor smoothing and Steady Speed; edit the path with handles (add/remove controls on the baked path, drag/nudge to reshape); **Polish** geometry and **Glide** timing from the dock’s Refine motion menu; set shared Duration, Loop, and loop mode (repeat or alternate).
+- **Motion presets** — temporary Slide In / Pop In / Float / Attention Pulse previews under Adjust (Timing), with Start at / Move for; Apply commits to the selected actor (Undo restores).
 - **Sequence** when each actor moves (Start at / Move for on the shared Duration), with optional hide before/after movement.
 - **Transform** with rotation/scale keyframes on the same clip-local progress.
 - **Compose** up to **8** actors (paint order = stacking); rename actors and the project.
-- **Appearances** — colored shapes or PNG / JPEG / WebP / SVG images (see limits below).
+- **Appearances** — colored shapes, text labels, or PNG / JPEG / WebP / SVG images (see limits below).
 - **Examples** — load bundled starters: Logo entrance, Follow the leader, Orbit.
 - **Projects** — New / Open / Download JSON; one active project autosaves in this browser.
-- **Export** — scoped CSS (copy or download) and an offline HTML demo. Exports respect `prefers-reduced-motion` until an explicit Play opt-in.
+- **Export** — website ZIP, scoped CSS, offline HTML demo, React package, and Animate your own element wrappers. Exports respect `prefers-reduced-motion` until an explicit Play opt-in.
 
 Confirmations (reset actor, replace recording, delete actor, new/open project, load example) use in-app dialogs, not the browser’s native `confirm`.
 
@@ -63,7 +64,7 @@ Open **Examples** in the editor to preview and load a starter scene. Loading rep
 | **Where** | `localStorage` key `motionsketch.project.v1` (see `src/core/persist/document.ts`). |
 | **What** | One active project in this browser origin. No accounts, sync, or cloud backup. |
 | **When** | Discrete edits save immediately; continuous slider / appearance tweaks debounce (~350 ms). Untouched blank untitled canvases are not written. |
-| **Download / Open** | JSON envelope `formatVersion` **8** (older files migrate on open). Soft size cap ~4.5M characters. Image payloads may be deduped into an `assets` map. |
+| **Download / Open** | JSON envelope `formatVersion` **13** (older files migrate on open — see `PERSIST_FORMAT_VERSION` in `src/core/persist/document.ts`). Soft size cap ~4.5M characters. Image payloads may be deduped into an `assets` map. |
 | **Recovery** | If stored JSON is invalid, the app can quarantine it and offer a download rather than silently overwriting. |
 
 Clearing site data for this origin removes the autosaved project. Keep downloads if you need a backup.
@@ -72,9 +73,11 @@ Clearing site data for this origin removes the autosaved project. Keep downloads
 
 | Export | Use when |
 | --- | --- |
-| **HTML demo** | Offline preview in any browser; embeds scene CSS + Play control for reduced motion. |
-| **Web package** | ZIP with `index.html`, `animation.css`, deduplicated `assets/`, `README.txt`, and `project.json` for offline preview and embedding. |
-| **CSS** (copy / download / view) | Integrate into your own markup. Image actors are **not** inlined into the CSS — host the assets yourself and match the documented structure. |
+| **Download for your website** (web package) | ZIP with `index.html`, `animation.css`, deduplicated `assets/`, trigger script when needed, `README.txt`, and `project.json` for offline preview and embedding. Primary export in the Export panel. |
+| **HTML demo** | Single-file offline preview; embeds scene CSS + Play control for reduced motion. Under Export → Other ways. |
+| **CSS** (copy / download / view) | Integrate into your own markup. Image actors are **not** inlined into the CSS — host the assets yourself and match the documented structure. Under Other ways. |
+| **React package** | ZIP with `MotionSketchScene.tsx`, scoped CSS, images, trigger script, and a Vite React README. Under Other ways. |
+| **Animate your own element** | Copy wrapper CSS plus HTML / React examples that nest *your* markup inside `.ms-actor` (path and timing only). Under Other ways. |
 
 CSS uses a scene root class (content fingerprint, optional `instancePrefix`), stage class `ms-stage`, and per-actor classes under that root. Keyframe names include the same fingerprint so multiple scenes can share a page. Details and markup example live in the CSS header comments and in [`docs/architecture.md`](docs/architecture.md).
 
