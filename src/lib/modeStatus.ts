@@ -27,6 +27,57 @@ export const ADD_POINT_PLACEMENT_FINE =
 export const ADD_POINT_PLACEMENT_COARSE =
   'The ghost sits on the sample that will become the handle. Tap near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
 
+
+export const EMPTY_BOARD_RECORD_HINT_FINE =
+  'Draw a path to make CSS motion for your site — click Record, then drag the actor.'
+
+export const EMPTY_BOARD_RECORD_HINT_COARSE =
+  'Draw a path to make CSS motion for your site — tap Record, then drag the actor.'
+
+/** After a path exists — next step toward using the motion on a website. */
+export const AFTER_PATH_WEBSITE_HINT =
+  'Play to preview, then open Export → Download for your website.'
+
+/**
+ * sessionStorage key for dismissed after-path toasts.
+ * Value: JSON string[] of {@link afterPathWebsiteHintProjectKey} entries.
+ * Dismissal lasts for the current browser tab session, per project identity
+ * (name + first actor id). A New project gets a new actor id, so the toast
+ * can appear again after that project’s first path.
+ */
+export const AFTER_PATH_WEBSITE_HINT_DISMISSED_KEY =
+  'motionsketch.afterPathWebsiteHintDismissed.v1'
+
+export function afterPathWebsiteHintProjectKey(project: {
+  name: string
+  actors: ReadonlyArray<{ id: string }>
+}): string {
+  return `${project.name}::${project.actors[0]?.id ?? ''}`
+}
+
+export function readAfterPathWebsiteHintDismissedKeys(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(AFTER_PATH_WEBSITE_HINT_DISMISSED_KEY)
+    if (!raw) return new Set()
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((k): k is string => typeof k === 'string'))
+  } catch {
+    return new Set()
+  }
+}
+
+export function writeAfterPathWebsiteHintDismissedKeys(keys: Set<string>) {
+  try {
+    sessionStorage.setItem(
+      AFTER_PATH_WEBSITE_HINT_DISMISSED_KEY,
+      JSON.stringify([...keys]),
+    )
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 export function resolveModeStatus(input: {
   mode: EditorMode
   pathTool: PathEditTool

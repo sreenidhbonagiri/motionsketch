@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { usePlaybackClock } from '../hooks/usePlaybackClock'
 import {
@@ -7,8 +14,12 @@ import {
 } from '../hooks/useProjectPersistence'
 import { useTransformShortcuts } from '../hooks/useTransformShortcuts'
 import {
+  AFTER_PATH_WEBSITE_HINT,
+  afterPathWebsiteHintProjectKey,
   EMPTY_BOARD_RECORD_HINT_COARSE,
   EMPTY_BOARD_RECORD_HINT_FINE,
+  readAfterPathWebsiteHintDismissedKeys,
+  writeAfterPathWebsiteHintDismissedKeys,
 } from '../lib/modeStatus'
 import { endDrag, isRecordingActive } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
@@ -71,6 +82,14 @@ export function EditorShell() {
       return false
     }
   })
+  // Per-project dismissals for this browser tab session (see modeStatus helpers).
+  const [afterPathHintDismissedKeys, setAfterPathHintDismissedKeys] = useState(
+    () => readAfterPathWebsiteHintDismissedKeys(),
+  )
+  const afterPathToastTextId = useId()
+  const headerRef = useRef<HTMLElement>(null)
+  // Toast top tracks measured header height so wrapped mobile chrome never overlaps.
+  const [toastTopPx, setToastTopPx] = useState(96)
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
@@ -96,8 +115,19 @@ export function EditorShell() {
 
   const isEmptyProject = useEditorStore((s) => !projectHasMeaningfulWork(s.project))
   const showExamplesHint = isEmptyProject && !hintDismissed && !examplesOpen
-  const projectName = useEditorStore((s) => s.project.name)
+  const project = useEditorStore((s) => s.project)
+  const projectName = project.name
   const renameProject = useEditorStore((s) => s.renameProject)
+  const afterPathProjectKey = afterPathWebsiteHintProjectKey(project)
+
+  const dismissAfterPathWebsiteHint = () => {
+    setAfterPathHintDismissedKeys((prev) => {
+      const next = new Set(prev)
+      next.add(afterPathProjectKey)
+      writeAfterPathWebsiteHintDismissedKeys(next)
+      return next
+    })
+  }
 
   useEffect(() => {
     const onHidden = () => {
@@ -109,14 +139,37 @@ export function EditorShell() {
     return () => document.removeEventListener('visibilitychange', onHidden)
   }, [])
 
+  useLayoutEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const gapPx = 8
+    const update = () => {
+      setToastTopPx(Math.ceil(el.getBoundingClientRect().height) + gapPx)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   const coarsePointer = useCoarsePointer()
-  // Empty-board recording guidance — hide once any take exists; edit/record status lives in the dock.
-  const tip =
-    !hasRecording && mode === 'idle'
+  // Empty-board Record cue — hide once any take exists; dock covers armed/recording.
+  const tipBusy =
+    mode !== 'idle' ||
+    !!polishSession ||
+    !!glideSession ||
+    !!presetSession
+  const emptyTip =
+    !tipBusy && !hasRecording
       ? coarsePointer
         ? EMPTY_BOARD_RECORD_HINT_COARSE
         : EMPTY_BOARD_RECORD_HINT_FINE
       : null
+  // Top toast: after a path, idle only; dismissible per project for this tab session.
+  const showAfterPathWebsiteToast =
+    !tipBusy &&
+    hasRecording &&
+    !afterPathHintDismissedKeys.has(afterPathProjectKey)
 
   return (
     <div
@@ -135,10 +188,46 @@ export function EditorShell() {
       {/* Full-viewport interactive stage (only drawing surface) */}
       <CanvasStage />
 
+      {/*
+        Post-path website cue — top offset from measured header height (z-30 <
+        header z-40) so Project / Export never overlap. Non-blocking; pointer
+        events only on the toast itself.
+      */}
+      {showAfterPathWebsiteToast && (
+        <div
+          className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3 sm:px-4"
+          style={{ top: toastTopPx }}
+        >
+          <div
+            role="status"
+            data-testid="after-path-website-toast"
+            aria-describedby={afterPathToastTextId}
+            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-white/70 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-md"
+          >
+            <p
+              id={afterPathToastTextId}
+              className="min-w-0 flex-1 pt-0.5 leading-relaxed"
+            >
+              {AFTER_PATH_WEBSITE_HINT}
+            </p>
+            <button
+              type="button"
+              data-testid="btn-dismiss-after-path-toast"
+              onClick={dismissAfterPathWebsiteHint}
+              className="shrink-0 rounded-md px-1.5 py-0.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              aria-label="Dismiss website export tip"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top chrome — pointer-events only on controls.
           When a floating panel is open, raise above the bottom dock (also z-40)
           so mobile panel actions are not covered by Sequence / Playback. */}
       <header
+        ref={headerRef}
         className={`pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4 sm:pt-4 ${
           openPanel ? 'z-50' : 'z-40'
         }`}
@@ -370,13 +459,13 @@ export function EditorShell() {
           {glideSession && <GlidePanel />}
           {presetSession && <PresetPanel />}
           <PlaybackDock />
-          {tip && (
+          {emptyTip && (
             <p
               id="stage-empty-hint"
               data-testid="stage-empty-hint"
               className="pointer-events-auto rounded-full border border-white/60 bg-white/85 px-3 py-1 text-center text-xs text-slate-600 shadow-sm backdrop-blur-md"
             >
-              {tip}
+              {emptyTip}
             </p>
           )}
           {showExamplesHint && (

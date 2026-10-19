@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  clickRecord,
   ensureEditor,
   expandExportOtherWays,
   openPanel,
@@ -82,6 +83,119 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('motion-presets')).toBeVisible()
   })
 
+  test('after a path exists, website toast appears and hides in other modes', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+    await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
+
+    await recordSimplePath(page)
+    await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
+    const toast = page.getByTestId('after-path-website-toast')
+    await expect(toast).toHaveText(
+      /Play to preview, then open Export → Download for your website/,
+    )
+    await expect(
+      page.getByTestId('btn-dismiss-after-path-toast'),
+    ).toHaveAccessibleName('Dismiss website export tip')
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+
+    // Stays below header chrome (does not cover Export).
+    const toastBox = await toast.boundingBox()
+    const exportBtn = page.getByTestId('btn-export')
+    const exportBox = await exportBtn.boundingBox()
+    expect(toastBox).toBeTruthy()
+    expect(exportBox).toBeTruthy()
+    expect(toastBox!.y).toBeGreaterThan(exportBox!.y + exportBox!.height - 4)
+
+    // Hides while armed / recording.
+    await clickRecord(page, { replaceExisting: true })
+    await expect(page.getByTestId('dock-status')).toHaveAttribute(
+      'data-mode-status',
+      'armed',
+    )
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+    await page.getByTestId('btn-stop').click()
+    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
+
+    // Hides while editing; returns after Done.
+    await page.getByTestId('btn-edit-path').click()
+    await expect(page.getByTestId('btn-done-edit')).toBeVisible()
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+    await page.getByTestId('btn-done-edit').click()
+    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
+
+    // Hides while playing.
+    await page.getByTestId('btn-play').click()
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+    await page.getByTestId('btn-pause').click()
+    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
+
+    await openPanel(page, 'export')
+    await expect(page.getByTestId('btn-download-web-package')).toHaveText(
+      'Download for your website',
+    )
+  })
+
+  test('website toast dismissal lasts for this project in the browser session', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
+
+    await page.getByTestId('btn-dismiss-after-path-toast').click()
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+
+    // Same project + same tab session: stays dismissed across reload.
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await page.reload()
+    await ensureEditor(page)
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+
+    // New project (new actor id): toast can appear again after the first path.
+    await openPanel(page, 'project')
+    await page.getByTestId('btn-new-project').click()
+    await expect(page.getByTestId('new-project-confirm')).toBeVisible()
+    await page.getByTestId('btn-new-project-confirm').click()
+    await ensureEditor(page)
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+    await recordSimplePath(page)
+    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
+  })
+
+  test('mobile: website toast stays below header controls', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+    const listExpanded = await page
+      .getByTestId('btn-toggle-actor-list')
+      .getAttribute('aria-expanded')
+    if (listExpanded === 'true') {
+      await page.getByTestId('btn-toggle-actor-list').click()
+    }
+    await recordSimplePath(page)
+    const toast = page.getByTestId('after-path-website-toast')
+    await expect(toast).toBeVisible()
+    const toastBox = await toast.boundingBox()
+    const exportBox = await page.getByTestId('btn-export').boundingBox()
+    expect(toastBox).toBeTruthy()
+    expect(exportBox).toBeTruthy()
+    expect(toastBox!.y).toBeGreaterThan(exportBox!.y + exportBox!.height - 4)
+    // Fully on-screen horizontally.
+    expect(toastBox!.x).toBeGreaterThanOrEqual(-1)
+    expect(toastBox!.x + toastBox!.width).toBeLessThanOrEqual(390 + 1)
+  })
+
   test('empty hint clears after recording; Export primary is website package', async ({
     page,
   }) => {
@@ -107,6 +221,9 @@ test.describe('first-use guidance and export wording', () => {
     await recordSimplePath(page)
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
     await expect(page.getByTestId('edit-mode-hint')).toHaveCount(0)
+    await expect(page.getByTestId('after-path-website-toast')).toContainText(
+      /Download for your website/,
+    )
 
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-trigger-select')).toBeVisible()
