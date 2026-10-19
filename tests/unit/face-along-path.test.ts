@@ -13,8 +13,11 @@ import { createSceneActor } from '../../src/core/sceneActor'
 import type { MotionSample } from '../../src/core/types'
 import {
   buildArcPathSamples,
+  buildDensePauseLPathSamples,
   buildLPathSamples,
 } from '../fixtures/faceAlongPathProject'
+import { selectProcessedPathForActor } from '../../src/state/selectors'
+import { makeGeometryEdit } from '../../src/core/edit'
 import { makeActor, makeProject, makeRecording } from './helpers/project'
 
 const ASPECT = 1.6
@@ -60,6 +63,70 @@ describe('face along path heading', () => {
     const pauseHeading = evaluatePathHeading(track, pauseNorm)
     expect(Math.abs(pauseHeading)).toBeLessThan(25)
     // Late vertical ≈ 90°
+    expect(evaluatePathHeading(track, 0.9)).toBeCloseTo(90, 0)
+  })
+
+  it('holds heading on dense pause L including departure boundary (t=2040)', () => {
+    // Independent repro: last parked sample has an outgoing moving segment, so
+    // smoothing used to forwardPeek the vertical leg (~60° at t=2040) while
+    // position was still (.5,.2); lerp then spun through the final dwell.
+    const raw = buildDensePauseLPathSamples()
+    const actor = createSceneActor({
+      recording: {
+        samples: raw.map((s) => ({ ...s })),
+        recordedDurationMs: raw[raw.length - 1]!.t,
+      },
+      geometryEdit: makeGeometryEdit(raw, 0),
+      smoothing: 0,
+      steadySpeed: 0,
+      faceAlongPath: true,
+      directionOffsetDeg: 0,
+      transform: {
+        keyframes: [
+          { id: 'r0', t: 0, rotationDeg: 0, scale: 1 },
+          { id: 'r1', t: 0.5, rotationDeg: 12, scale: 1 },
+          { id: 'r2', t: 1, rotationDeg: 12, scale: 1 },
+        ],
+      },
+    })
+    const project = makeProject({
+      actors: [actor],
+      stageAspect: ASPECT,
+    })
+    const processed = selectProcessedPathForActor(project, actor, {
+      geometryEdit: actor.geometryEdit,
+      editSession: null,
+      editPreview: null,
+    })
+    const duration = processed[processed.length - 1]!.t
+    expect(duration).toBeGreaterThanOrEqual(2040)
+    const track = buildHeadingTrack(processed, ASPECT)
+
+    // Interior pause + departure boundary — path heading stays inbound (~0°).
+    for (const t of [2010, 2020, 2030, 2040]) {
+      const h = evaluatePathHeading(track, t / duration)
+      expect(Math.abs(h), `path heading at t=${t}`).toBeLessThan(2)
+    }
+    // Nearby normalized times while still parked (same center) must not spin.
+    for (const u of [0.502, 0.503, 0.504]) {
+      const h = evaluatePathHeading(track, u)
+      expect(Math.abs(h), `path heading at u=${u}`).toBeLessThan(2)
+    }
+
+    // Authored rotation remains additive during the dwell.
+    const pauseLocal = 2040 / duration
+    const total = evaluateActorRotationDeg(
+      actor,
+      processed,
+      pauseLocal,
+      ASPECT,
+      track,
+    )
+    expect(total).toBeCloseTo(12, 5)
+
+    // Turning only after position starts moving.
+    const afterDepart = evaluatePathHeading(track, 2100 / duration)
+    expect(afterDepart).toBeGreaterThan(20)
     expect(evaluatePathHeading(track, 0.9)).toBeCloseTo(90, 0)
   })
 

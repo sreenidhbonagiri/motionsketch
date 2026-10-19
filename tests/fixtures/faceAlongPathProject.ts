@@ -79,6 +79,68 @@ export function buildFaceAlongLFixtureJson(
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }
 
+/**
+ * Dense L with a short corner pause — last parked sample has an outgoing
+ * moving segment (regression: forwardPeek used to turn it while still parked).
+ */
+export function buildDensePauseLPathSamples(): MotionSample[] {
+  const samples: MotionSample[] = []
+  for (let i = 0; i <= 200; i++) {
+    samples.push({ t: i * 10, x: 0.1 + i * 0.002, y: 0.2 })
+  }
+  for (let i = 1; i <= 4; i++) {
+    samples.push({ t: 2000 + i * 10, x: 0.5, y: 0.2 })
+  }
+  for (let i = 1; i <= 200; i++) {
+    samples.push({
+      t: 2040 + i * 10,
+      x: 0.5,
+      y: 0.2 + i * 0.002,
+    })
+  }
+  return samples
+}
+
+export function buildFaceAlongDensePauseLFixtureJson(
+  savedAt = '2026-06-01T00:00:00.000Z',
+): string {
+  const samples = buildDensePauseLPathSamples()
+  const actor = createSceneActor({
+    id: 'face-dense-pause-l',
+    name: 'Dense pause L',
+    recording: {
+      samples: samples.map((s) => ({ ...s })),
+      recordedDurationMs: samples[samples.length - 1]!.t,
+    },
+    geometryEdit: makeGeometryEdit(samples, 0),
+    smoothing: 0,
+    steadySpeed: 0,
+    faceAlongPath: true,
+    directionOffsetDeg: 0,
+    transform: {
+      keyframes: [
+        { id: 'r0', t: 0, rotationDeg: 0, scale: 1 },
+        { id: 'r1', t: 0.5, rotationDeg: 12, scale: 1 },
+        { id: 'r2', t: 1, rotationDeg: 12, scale: 1 },
+      ],
+    },
+    clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
+  })
+  const project: Project = {
+    version: 1,
+    name: 'Face dense pause L',
+    actors: [actor],
+    playback: {
+      durationMs: 4000,
+      loop: false,
+      loopMode: 'repeat',
+      trigger: 'page-load',
+    },
+    stageAspect: 1.6,
+  }
+  return serializeSnapshot(buildSnapshot(project, null, savedAt))
+}
+
 /** Multi-revolution spiral for additive facing / export progression checks. */
 export function buildSpiralPathSamples(
   points = 180,

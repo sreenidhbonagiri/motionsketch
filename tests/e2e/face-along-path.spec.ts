@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
   buildFaceAlongArcFixtureJson,
+  buildFaceAlongDensePauseLFixtureJson,
   buildFaceAlongFidelityWarningFixtureJson,
   buildFaceAlongLFixtureJson,
   buildFaceAlongSpiralFixtureJson,
@@ -349,6 +350,65 @@ test.describe('face along path', () => {
     expect(angleDeltaDeg(demoMid.rotationDeg, editorMid.rotationDeg)).toBeLessThan(
       12,
     )
+  })
+
+  test('dense pause L: dwell+departure hold heading in editor and export', async ({
+    page,
+  }) => {
+    await loadProjectSnapshot(page, buildFaceAlongDensePauseLFixtureJson())
+    await ensureEditor(page)
+
+    // Normalized times in the final stationary interval (same actor center).
+    const dwellLocals = [0.502, 0.503, 0.504]
+    const editorDwell: number[] = []
+    for (const t of dwellLocals) {
+      editorDwell.push(await editorRotationAt(page, t))
+    }
+    // Path ~0° + authored +12° during dwell.
+    for (const r of editorDwell) {
+      expect(angleDeltaDeg(r, 12)).toBeLessThan(8)
+    }
+    const after = await editorRotationAt(page, 0.7)
+    expect(after).toBeGreaterThan(40)
+
+    await openPanel(page, 'export')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-html-demo').click()
+    const html = readFileSync((await (await downloadPromise).path())!, 'utf8')
+    await loadHtmlDocument(page, html)
+
+    const demo = await page.evaluate((times: number[]) => {
+      const el = document.querySelector(
+        '[data-testid="demo-actor"]',
+      ) as HTMLElement
+      const anim = el.getAnimations().find((a) => {
+        const name = (a as CSSAnimation).animationName
+        return typeof name === 'string' && name !== '' && name !== 'none'
+      })
+      if (!anim) throw new Error('missing animation')
+      anim.pause()
+      const dur =
+        Number(anim.effect?.getTiming().duration) ||
+        parseFloat(getComputedStyle(el).animationDuration) * 1000
+      const read = (t: number) => {
+        anim.currentTime = t * dur
+        void el.offsetWidth
+        const m = getComputedStyle(el).transform
+        const m2 = m.match(/^matrix\((.+)\)$/)
+        if (!m2) return 0
+        const [a, b] = m2[1].split(',').map((v) => Number(v.trim()))
+        return (Math.atan2(b!, a!) * 180) / Math.PI
+      }
+      return { dwell: times.map(read), after: read(0.7) }
+    }, dwellLocals)
+
+    for (const r of demo.dwell) {
+      expect(angleDeltaDeg(r, 12)).toBeLessThan(8)
+    }
+    expect(demo.after).toBeGreaterThan(40)
+    for (let i = 0; i < dwellLocals.length; i++) {
+      expect(angleDeltaDeg(demo.dwell[i]!, editorDwell[i]!)).toBeLessThan(10)
+    }
   })
 
   test('L-path pause holds inbound heading in editor and export', async ({
