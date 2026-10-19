@@ -300,7 +300,11 @@ export async function expandExportOtherWays(page: Page) {
   )
   if (!open) {
     const summary = page.getByTestId('export-other-ways-summary')
-    await summary.scrollIntoViewIfNeeded()
+    // Instant scroll — avoid scrollIntoViewIfNeeded on nested Export overflow
+    // (Linux WebKit never marks that summary stable during the animated path).
+    await summary.evaluate((el) => {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
     await summary.click()
   }
   await expect
@@ -308,12 +312,34 @@ export async function expandExportOtherWays(page: Page) {
       details.evaluate((el) => (el as HTMLDetailsElement).open),
     )
     .toBe(true)
-  // open=true alone is not enough on WebKit when the panel body still scrolls.
-  const cssBtn = page.getByTestId('btn-download-css')
-  await cssBtn.evaluate((el) => {
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  // Expanded Other ways is taller than the panel. Instant-scroll HTML demo
+  // (below CSS) into the scroller so later clicks do not rely on Playwright’s
+  // nested scrollIntoViewIfNeeded, which thrashes on Linux WebKit.
+  const htmlDemo = page.getByTestId('btn-download-html-demo')
+  await htmlDemo.evaluate((el) => {
+    el.scrollIntoView({ block: 'center', inline: 'nearest' })
   })
-  await expect(cssBtn).toBeVisible()
+  await expect(page.getByTestId('btn-download-css')).toBeVisible()
+  await expect(htmlDemo).toBeVisible()
+  // Require two matching layout samples a frame apart before callers click.
+  await expect
+    .poll(() =>
+      htmlDemo.evaluate(
+        (el) =>
+          new Promise<string | null>((resolve) => {
+            const a = el.getBoundingClientRect()
+            requestAnimationFrame(() => {
+              const b = el.getBoundingClientRect()
+              const same =
+                Math.round(a.y) === Math.round(b.y) &&
+                Math.round(a.height) === Math.round(b.height) &&
+                b.height > 0
+              resolve(same ? `${Math.round(b.y)}:${Math.round(b.height)}` : null)
+            })
+          }),
+      ),
+    )
+    .not.toBeNull()
 }
 
 export async function openCssDialog(page: Page): Promise<{
