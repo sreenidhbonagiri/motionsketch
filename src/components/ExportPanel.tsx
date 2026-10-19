@@ -45,8 +45,26 @@ export function ExportPanel() {
   const reactPackageStatusId = useId()
   const triggerHelpId = useId()
   const previewTitleId = useId()
+  const embedHeadingId = useId()
   const ownElementHeadingId = useId()
   const ownElementHelpId = useId()
+  const projectHeadingId = useId()
+  const projectHelpId = useId()
+  const projectActionHelpId = useId()
+  const advancedHeadingId = useId()
+  const advancedHelpId = useId()
+  const previewTriggerHelpId = useId()
+  const cssFileHelpId = useId()
+  const cssCodeHelpId = useId()
+  const htmlDemoHelpId = useId()
+  const packagingHelpId = useId()
+  const ownElementTriggerHelpId = useId()
+
+  const describedBy = (...ids: Array<string | false | null | undefined>) => {
+    const list = ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    return list.length > 0 ? list.join(' ') : undefined
+  }
+  const busy = packaging !== null
 
   const hasExport = projectHasAnyRecording(project)
   const trigger = coercePlaybackTrigger(project.playback.trigger)
@@ -259,7 +277,7 @@ export function ExportPanel() {
   }
 
   return (
-    <div data-testid="export-panel" className="space-y-3">
+    <div data-testid="export-panel" className="space-y-4">
       {facingFidelityWarnings.length > 0 && (
         <div
           data-testid="export-facing-fidelity-warning"
@@ -325,134 +343,222 @@ export function ExportPanel() {
           type="button"
           data-testid="btn-preview-trigger"
           onClick={openTriggerPreview}
-          disabled={packaging !== null}
+          disabled={busy}
+          aria-describedby={describedBy(
+            previewTriggerHelpId,
+            busy && packagingHelpId,
+          )}
           className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Preview trigger
         </button>
-        <p className="text-[11px] leading-relaxed text-slate-500">
+        <p
+          id={previewTriggerHelpId}
+          className="text-[11px] leading-relaxed text-slate-500"
+        >
           Isolated export preview — does not change the editor playhead,
           recording, or undo history.
         </p>
+      </div>
 
-        <button
-          type="button"
-          data-testid="btn-download-html-demo"
-          onClick={downloadHtmlDemo}
-          disabled={packaging !== null}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Download HTML demo
-        </button>
-        <p
-          data-testid="export-html-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          Play in a browser without MotionSketch.
+      {busy ? (
+        <p id={packagingHelpId} className="sr-only" data-testid="export-packaging-help">
+          A package is building. Other export actions are unavailable until it
+          finishes.
         </p>
+      ) : null}
 
+      <section
+        className="space-y-2"
+        data-testid="export-primary"
+        aria-labelledby={embedHeadingId}
+        aria-describedby={packageStatusId}
+      >
+        <h3
+          id={embedHeadingId}
+          className="text-xs font-semibold text-slate-900"
+        >
+          Download for your website
+        </h3>
         <button
           type="button"
           data-testid="btn-download-web-package"
           onClick={downloadWebPackage}
-          disabled={packaging !== null}
+          disabled={busy}
           aria-busy={packaging === 'web'}
-          aria-describedby={packageStatusId}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-describedby={describedBy(
+            packageStatusId,
+            busy && packagingHelpId,
+          )}
+          className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {packaging === 'web'
-            ? 'Building web package…'
-            : 'Download web package'}
+            ? 'Building website package…'
+            : 'Download for your website'}
         </button>
         <p
           id={packageStatusId}
           data-testid="export-web-package-help"
           className="text-[11px] leading-relaxed text-slate-500"
         >
-          ZIP with preview HTML, scoped CSS, images, README, and project file.
+          ZIP with a working <code>index.html</code> preview and files to add the
+          animation to your site. Downloading does not publish anything.
         </p>
+      </section>
 
-        <button
-          type="button"
-          data-testid="btn-download-react-package"
-          onClick={downloadReactPackage}
-          disabled={packaging !== null}
-          aria-busy={packaging === 'react'}
-          aria-describedby={reactPackageStatusId}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {packaging === 'react'
-            ? 'Building React package…'
-            : 'Download React package'}
-        </button>
-        <p
-          id={reactPackageStatusId}
-          data-testid="export-react-package-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          ZIP with MotionSketchScene.tsx, scoped CSS, images, trigger script, and
-          a Vite React README.
-        </p>
-
-        <button
-          type="button"
-          data-testid="btn-download-css"
-          onClick={downloadCss}
-          disabled={packaging !== null}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Download CSS
-        </button>
-        <p
-          data-testid="export-css-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          Scoped CSS for your site (scene root + keyframes). Image assets are
-          separate. See the header comments for reduced motion, triggers, and
-          instance prefixes.
-          {triggerNeedsJavaScript(trigger)
-            ? ' This project’s trigger requires JavaScript (not included in Download CSS).'
-            : ''}
-        </p>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            data-testid="btn-copy-css"
-            onClick={() => void copyCss('inline')}
-            className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
-          >
-            {copiedInline ? 'Copied' : 'Copy CSS'}
-          </button>
-          <button
-            ref={viewBtnRef}
-            type="button"
-            data-testid="btn-view-css"
-            onClick={openDialog}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
-          >
-            View CSS
-          </button>
-        </div>
-        <p
-          data-testid="export-css-code-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          Copy CSS and View CSS provide the same scoped scene code
-          {project.actors.length > 1
-            ? ' (unique classes per actor inside the scene root).'
-            : ' (wrap in the documented scene root).'}
-        </p>
-      </div>
-
-      <div
-        className="space-y-2 border-t border-slate-100 pt-3"
-        data-testid="export-own-element"
-        aria-labelledby={ownElementHeadingId}
+      <details
+        data-testid="export-other-ways"
+        className="rounded-lg border border-slate-100 bg-slate-50/60"
       >
+        <summary
+          data-testid="export-other-ways-summary"
+          className="cursor-pointer list-outside px-2.5 py-2 text-xs font-semibold text-slate-800 marker:text-slate-400"
+        >
+          Other ways
+        </summary>
+        <div className="space-y-4 border-t border-slate-100 px-2.5 py-3">
+          <section
+            className="space-y-2"
+            data-testid="export-goal-embed"
+            aria-labelledby={advancedHeadingId}
+          >
+            <button
+              type="button"
+              data-testid="btn-download-react-package"
+              onClick={downloadReactPackage}
+              disabled={busy}
+              aria-busy={packaging === 'react'}
+              aria-describedby={describedBy(
+                reactPackageStatusId,
+                busy && packagingHelpId,
+              )}
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {packaging === 'react'
+                ? 'Building React package…'
+                : 'Download React package'}
+            </button>
+            <p
+              id={reactPackageStatusId}
+              data-testid="export-react-package-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              ZIP with MotionSketchScene.tsx, scoped CSS, images, trigger script,
+              and a Vite React README.
+            </p>
+
+            <div
+              data-testid="export-embed-advanced"
+              className="space-y-2 rounded-lg border border-slate-100 bg-white/80 px-2.5 py-2"
+              role="group"
+              aria-labelledby={advancedHeadingId}
+              aria-describedby={advancedHelpId}
+            >
+              <h4
+                id={advancedHeadingId}
+                className="text-xs font-medium text-slate-800"
+              >
+                CSS and offline preview
+              </h4>
+              <p
+                id={advancedHelpId}
+                data-testid="export-embed-advanced-help"
+                className="text-[11px] leading-relaxed text-slate-500"
+              >
+                When you already have markup, or only need a single-file preview.
+              </p>
+
+              <button
+                type="button"
+                data-testid="btn-download-css"
+                onClick={downloadCss}
+                disabled={busy}
+                aria-describedby={describedBy(
+                  cssFileHelpId,
+                  busy && packagingHelpId,
+                )}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Download CSS
+              </button>
+              <p
+                id={cssFileHelpId}
+                data-testid="export-css-help"
+                className="text-[11px] leading-relaxed text-slate-500"
+              >
+                Scoped CSS only (scene root + keyframes). You supply the HTML.
+                Image assets are separate. See the header comments for reduced
+                motion, triggers, and instance prefixes.
+                {triggerNeedsJavaScript(trigger)
+                  ? ' This project’s trigger requires JavaScript (not included in Download CSS).'
+                  : ''}
+              </p>
+
+              <div className="flex min-w-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  data-testid="btn-copy-css"
+                  onClick={() => void copyCss('inline')}
+                  aria-describedby={cssCodeHelpId}
+                  className="min-h-9 min-w-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                >
+                  {copiedInline ? 'Copied' : 'Copy CSS'}
+                </button>
+                <button
+                  ref={viewBtnRef}
+                  type="button"
+                  data-testid="btn-view-css"
+                  onClick={openDialog}
+                  aria-describedby={cssCodeHelpId}
+                  className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                >
+                  View CSS
+                </button>
+              </div>
+              <p
+                id={cssCodeHelpId}
+                data-testid="export-css-code-help"
+                className="text-[11px] leading-relaxed text-slate-500"
+              >
+                Copy CSS and View CSS provide the same scoped scene code
+                {project.actors.length > 1
+                  ? ' (unique classes per actor inside the scene root).'
+                  : ' (wrap in the documented scene root).'}
+              </p>
+
+              <button
+                type="button"
+                data-testid="btn-download-html-demo"
+                onClick={downloadHtmlDemo}
+                disabled={busy}
+                aria-describedby={describedBy(
+                  htmlDemoHelpId,
+                  busy && packagingHelpId,
+                )}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Download HTML demo
+              </button>
+              <p
+                id={htmlDemoHelpId}
+                data-testid="export-html-help"
+                className="text-[11px] leading-relaxed text-slate-500"
+              >
+                Single-file offline preview — open in a browser; not for
+                embedding in your site.
+              </p>
+            </div>
+          </section>
+
+          <section
+            className="space-y-2 border-t border-slate-100 pt-3"
+            data-testid="export-own-element"
+            aria-labelledby={ownElementHeadingId}
+            aria-describedby={ownElementHelpId}
+          >
         <h3
           id={ownElementHeadingId}
-          className="text-xs font-medium text-slate-800"
+          className="text-xs font-semibold text-slate-900"
         >
           Animate your own element
         </h3>
@@ -470,6 +576,7 @@ export function ExportPanel() {
         {ownElement?.ok ? (
           <>
             <p
+              id={ownElementTriggerHelpId}
               data-testid="export-own-element-trigger"
               className={
                 ownElement.requiresTriggerJs
@@ -480,12 +587,16 @@ export function ExportPanel() {
             >
               {ownElement.triggerRequirement}
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               <button
                 type="button"
                 data-testid="btn-copy-own-element-css"
                 onClick={() => void copyOwnElement('css')}
-                className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                aria-describedby={describedBy(
+                  ownElementHelpId,
+                  ownElementTriggerHelpId,
+                )}
+                className="min-h-9 min-w-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
               >
                 {ownCopied === 'css' ? 'Copied' : 'Copy wrapper CSS'}
               </button>
@@ -493,7 +604,11 @@ export function ExportPanel() {
                 type="button"
                 data-testid="btn-copy-own-element-html"
                 onClick={() => void copyOwnElement('html')}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                aria-describedby={describedBy(
+                  ownElementHelpId,
+                  ownElementTriggerHelpId,
+                )}
+                className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
               >
                 {ownCopied === 'html' ? 'Copied' : 'Copy HTML example'}
               </button>
@@ -501,7 +616,11 @@ export function ExportPanel() {
                 type="button"
                 data-testid="btn-copy-own-element-react"
                 onClick={() => void copyOwnElement('react')}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                aria-describedby={describedBy(
+                  ownElementHelpId,
+                  ownElementTriggerHelpId,
+                )}
+                className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
               >
                 {ownCopied === 'react' ? 'Copied' : 'Copy React example'}
               </button>
@@ -510,12 +629,31 @@ export function ExportPanel() {
                   type="button"
                   data-testid="btn-copy-own-element-trigger"
                   onClick={() => void copyOwnElement('trigger')}
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950 transition hover:bg-amber-100"
+                  aria-describedby={describedBy(
+                    ownElementHelpId,
+                    ownElementTriggerHelpId,
+                  )}
+                  className="min-h-9 min-w-0 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950 transition hover:bg-amber-100"
                 >
                   {ownCopied === 'trigger' ? 'Copied' : 'Copy trigger script'}
                 </button>
               ) : null}
             </div>
+            <p
+              data-testid="export-own-element-setup"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              HTML example is a complete host page (links{' '}
+              <code>motion-wrapper.css</code>, sizes <code>.ms-stage</code>).
+              React: save <code>motion-wrapper.css</code> beside the example
+              component before importing it
+              {ownElement.requiresTriggerJs ? (
+                <>
+                  ; also save <code>ms-trigger.js</code> in that same folder
+                </>
+              ) : null}
+              .
+            </p>
             {ownElement.requiresTriggerJs ? (
               <p
                 data-testid="export-own-element-trigger-save"
@@ -535,29 +673,89 @@ export function ExportPanel() {
               ))}
             </ul>
           </>
-        ) : null}
-      </div>
+        ) : (
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="btn-copy-own-element-css"
+              disabled
+              aria-describedby={ownElementHelpId}
+              className="min-h-9 min-w-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-40"
+            >
+              Copy wrapper CSS
+            </button>
+            <button
+              type="button"
+              data-testid="btn-copy-own-element-html"
+              disabled
+              aria-describedby={ownElementHelpId}
+              className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 opacity-40"
+            >
+              Copy HTML example
+            </button>
+            <button
+              type="button"
+              data-testid="btn-copy-own-element-react"
+              disabled
+              aria-describedby={ownElementHelpId}
+              className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 opacity-40"
+            >
+              Copy React example
+            </button>
+          </div>
+        )}
+          </section>
 
-      <div className="border-t border-slate-100 pt-3">
-        <button
-          type="button"
-          data-testid="btn-export-download-project"
-          onClick={downloadProjectFile}
-          disabled={packaging !== null}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Download project file
-        </button>
-        <p
-          data-testid="export-project-help"
-          className="mt-1 text-[11px] leading-relaxed text-slate-500"
-        >
-          Reopen and edit in MotionSketch. Also available under Project.
-        </p>
-      </div>
+          <section
+            className="space-y-2 border-t border-slate-100 pt-3"
+            data-testid="export-goal-project"
+            aria-labelledby={projectHeadingId}
+            aria-describedby={projectHelpId}
+          >
+            <h3
+              id={projectHeadingId}
+              className="text-xs font-semibold text-slate-900"
+            >
+              Continue editing elsewhere
+            </h3>
+            <p
+              id={projectHelpId}
+              data-testid="export-project-goal-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              Save a MotionSketch project file you can reopen later or on another
+              machine.
+            </p>
+            <button
+              type="button"
+              data-testid="btn-export-download-project"
+              onClick={downloadProjectFile}
+              disabled={busy}
+              aria-describedby={describedBy(
+                projectActionHelpId,
+                busy && packagingHelpId,
+              )}
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Download project file
+            </button>
+            <p
+              id={projectActionHelpId}
+              data-testid="export-project-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              Reopen and edit in MotionSketch. Also available under Project.
+            </p>
+          </section>
+        </div>
+      </details>
 
       {actionStatus && (
-        <p data-testid="export-action-status" className="text-[11px] text-slate-600">
+        <p
+          data-testid="export-action-status"
+          role="status"
+          className="text-[11px] text-slate-600"
+        >
           {actionStatus}
         </p>
       )}

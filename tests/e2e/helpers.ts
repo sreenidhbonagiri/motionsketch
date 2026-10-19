@@ -259,8 +259,26 @@ export async function openPanel(page: Page, id: ChromePanel) {
   await expect(root).toBeVisible()
 }
 
+/** Expand Export → Other ways (React, CSS, own-element, project file). */
+export async function expandExportOtherWays(page: Page) {
+  const details = page.getByTestId('export-other-ways')
+  await expect(details).toBeVisible()
+  const open = await details.evaluate(
+    (el) => (el as HTMLDetailsElement).open,
+  )
+  if (!open) {
+    await page.getByTestId('export-other-ways-summary').click()
+  }
+  await expect
+    .poll(() =>
+      details.evaluate((el) => (el as HTMLDetailsElement).open),
+    )
+    .toBe(true)
+}
+
 export async function openCssDialog(page: Page) {
   await openPanel(page, 'export')
+  await expandExportOtherWays(page)
   const viewBtn = page.getByTestId('btn-view-css')
   await expect(viewBtn).toBeVisible()
   // Export panel body scrolls on short viewports; nested overflow can leave

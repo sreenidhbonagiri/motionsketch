@@ -318,7 +318,11 @@ export function EditorShell() {
               open={openPanel === 'export'}
               onClose={closePanel}
               align="right"
-              summary={hasRecording ? 'CSS and HTML demo' : 'Record first'}
+              summary={
+                hasRecording
+                  ? 'Download for your website, or other ways'
+                  : 'Create a path first'
+              }
             >
               <div className="p-3">
                 {hasRecording ? (
@@ -328,7 +332,9 @@ export function EditorShell() {
                     data-testid="export-empty"
                     className="text-sm text-slate-500"
                   >
-                    Record an animation to export CSS or an HTML demo.
+                    Create a path (Record, Import SVG, or a Motion preset) to
+                    download a website package — or open Other ways for React,
+                    your own HTML, CSS-only, and the project file.
                   </p>
                 )}
               </div>
