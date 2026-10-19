@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { exportCssFromProject } from '../core/export/css'
+import { buildProjectCssExport } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
 import { buildWebPackage } from '../core/export/webPackage'
 import {
@@ -42,9 +42,9 @@ export function ExportPanel() {
   const hasExport = projectHasAnyRecording(project)
   const trigger = coercePlaybackTrigger(project.playback.trigger)
 
-  const css = useMemo(() => {
-    if (!hasExport) return ''
-    return exportCssFromProject(project)
+  const { css, facingFidelityWarnings } = useMemo(() => {
+    if (!hasExport) return { css: '', facingFidelityWarnings: [] }
+    return buildProjectCssExport(project)
   }, [project, hasExport])
 
   useEffect(() => {
@@ -188,6 +188,31 @@ export function ExportPanel() {
 
   return (
     <div data-testid="export-panel" className="space-y-3">
+      {facingFidelityWarnings.length > 0 && (
+        <div
+          data-testid="export-facing-fidelity-warning"
+          role="status"
+          className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"
+        >
+          <p className="text-[11px] font-medium text-amber-950">
+            Facing export fidelity
+          </p>
+          {facingFidelityWarnings.map((notice) => (
+            <p
+              key={`${notice.actorName}-${notice.maxErrDeg.toFixed(3)}`}
+              className="text-[11px] leading-relaxed text-amber-900/90"
+            >
+              {notice.plainMessage}
+            </p>
+          ))}
+          <p className="text-[11px] leading-relaxed text-amber-800/90">
+            Applies to Copy CSS, View CSS, Download CSS, HTML demo, and web
+            package. Export still proceeds; the CSS also includes a matching
+            comment.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <label className="block space-y-1">
           <span className="text-xs font-medium text-slate-800">

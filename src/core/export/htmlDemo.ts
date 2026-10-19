@@ -332,6 +332,8 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
           ? makeGeometryEdit(options.processedPath, options.smoothing)
           : null,
         clip: fullClip(),
+        faceAlongPath: false,
+        directionOffsetDeg: 0,
       },
     ],
     playback: {

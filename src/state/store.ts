@@ -76,6 +76,7 @@ import {
   type TransformTrack,
   type Vec2,
 } from '../core/types'
+import { clampDirectionOffsetDeg } from '../core/faceAlongPath'
 import { cancelIdleDrag } from '../lib/recordingController'
 import {
   bakeEditablePathForActor,
@@ -240,6 +241,8 @@ interface EditorStore {
   setActorImage: (image: ActorImageAsset) => void
   clearActorImage: () => void
   setActorImageLabel: (label: string) => void
+  setFaceAlongPath: (on: boolean) => void
+  setDirectionOffsetDeg: (degrees: number) => void
   /** Clear the selected actor’s recording, path edits, and transform track. */
   resetRecording: () => void
 
@@ -1083,6 +1086,27 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ),
         }
       }),
+
+    setFaceAlongPath: (on) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, faceAlongPath: !!on }),
+        ),
+      })),
+
+    setDirectionOffsetDeg: (degrees) =>
+      set((state) => ({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({
+            ...a,
+            directionOffsetDeg: clampDirectionOffsetDeg(degrees),
+          }),
+        ),
+      })),
 
     resetRecording: () =>
       set((state) => {

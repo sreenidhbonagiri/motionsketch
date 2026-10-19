@@ -9,6 +9,7 @@ import {
   MIN_ACTOR_SIZE,
 } from '../core/types'
 import { useEditorStore } from '../state/store'
+import { FaceAlongPathSection } from './FaceAlongPathSection'
 import { TransformSection } from './TransformSection'
 
 function formatSizePercent(size: number): string {
@@ -332,6 +333,7 @@ export function AppearancePanel() {
             )}
         </div>
 
+        <FaceAlongPathSection />
         <TransformSection />
       </div>
     </div>

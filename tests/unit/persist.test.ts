@@ -141,6 +141,34 @@ describe('persist document validation', () => {
     )
   })
 
+  it('round-trips faceAlongPath and defaults missing fields to off', () => {
+    const project = makePersistProject({
+      actors: [
+        makeActor({
+          faceAlongPath: true,
+          directionOffsetDeg: -45,
+        }),
+      ],
+    })
+    const parsed = parseSnapshotJson(
+      serializeSnapshot(buildSnapshot(project, null)),
+    )
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.snapshot.project.actors[0].faceAlongPath).toBe(true)
+    expect(parsed.snapshot.project.actors[0].directionOffsetDeg).toBe(-45)
+
+    const legacy = JSON.parse(serializeSnapshot(buildSnapshot(project, null)))
+    delete legacy.project.actors[0].faceAlongPath
+    delete legacy.project.actors[0].directionOffsetDeg
+    legacy.formatVersion = 10
+    const migrated = parseSnapshotJson(JSON.stringify(legacy))
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    expect(migrated.snapshot.project.actors[0].faceAlongPath).toBe(false)
+    expect(migrated.snapshot.project.actors[0].directionOffsetDeg).toBe(0)
+  })
+
   it('round-trips committed geometry edits including handleIndices', () => {
     const samples = makeSamples(16).map((s) => ({ ...s, y: s.y + 0.1 }))
     const geometryEdit = makeGeometryEdit(samples, 0.35, [0, 4, 8, 15])

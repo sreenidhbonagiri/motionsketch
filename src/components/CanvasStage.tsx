@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { isActorVisibleAt, projectToLocal } from '../core/clip'
 import { gridLineCoords } from '../core/grid'
+import { evaluateActorRotationDeg } from '../core/faceAlongPath'
 import { evaluate } from '../core/playback'
 import { evaluateTransform } from '../core/transform'
 import { findActor } from '../core/sceneActor'
@@ -380,6 +381,23 @@ export function CanvasStage() {
           )
           const localT = projectToLocal(playbackHead, actor.clip)
           const xf = evaluateTransform(actor.transform, localT)
+          const pathForFacing = selectProcessedPathForActor(
+            project,
+            actor,
+            isSelected
+              ? pathView
+              : {
+                  geometryEdit: actor.geometryEdit,
+                  editSession: null,
+                  editPreview: null,
+                },
+          )
+          const rotationDeg = evaluateActorRotationDeg(
+            actor,
+            pathForFacing,
+            localT,
+            project.stageAspect,
+          )
           return (
             <Actor
               key={actor.id}
@@ -394,7 +412,7 @@ export function CanvasStage() {
               armed={mode === 'armed' && isSelected}
               recording={mode === 'recording' && isSelected}
               hidden={hidden}
-              rotationDeg={xf.rotationDeg}
+              rotationDeg={rotationDeg}
               scale={xf.scale}
               onPointerDown={(e) => onActorPointerDown(actor.id, e)}
             />

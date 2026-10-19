@@ -10,6 +10,17 @@ import {
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
 import {
+  buildHeadingTrack,
+  evaluateActorRotationDeg,
+  formatFacingFidelityWarningPlain,
+  HEADING_EXPORT_ANGULAR_TOLERANCE_DEG,
+  HEADING_EXPORT_ERROR_PROBE_COUNT,
+  HEADING_EXPORT_MAX_OFFSETS,
+  headingExportOffsets,
+  mergeExportLocalOffsets,
+  pauseExportOffsets,
+} from '../faceAlongPath'
+import {
   evaluateTransform,
   formatTransformCss,
 } from '../transform'
@@ -348,6 +359,16 @@ export function buildVisibilityKeyframesCss(
   return { initialHidden: hideBefore, frames }
 }
 
+export interface FacingExportFidelityNotice {
+  /** Peak sampled unwrapped error for this actor (°). */
+  maxErrDeg: number
+  /** Technical CSS comment text. */
+  cssComment: string
+  /** Plain-language Export panel message. */
+  plainMessage: string
+  actorName: string
+}
+
 function generateActorCssBlock(options: {
   actor: SceneActor
   index: number
@@ -356,8 +377,9 @@ function generateActorCssBlock(options: {
   loop: boolean
   loopMode: LoopMode
   processedPath: MotionSample[]
+  stageAspect: number
   scope: ExportScope
-}): string {
+}): { css: string; facingFidelity: FacingExportFidelityNotice | null } {
   const className = scopedActorClass(options.index, options.actorCount)
   const selector = scopedActorSelector(options.scope, options.index)
   const animName = scopedAnimationName(options.scope, options.index)
@@ -365,7 +387,12 @@ function generateActorCssBlock(options: {
   const appearance = coerceActor(options.actor.appearance)
   const box = actorBoxRules(appearance, className)
   const track = options.actor.transform
-  const includeXf = track.keyframes.length > 0
+  const faceAlong = options.actor.faceAlongPath === true
+  const includeXf = track.keyframes.length > 0 || faceAlong
+  const stageAspect = options.stageAspect
+  const headingTrack = faceAlong
+    ? buildHeadingTrack(options.processedPath, stageAspect)
+    : undefined
   const timing = animationTiming(
     options.durationMs,
     options.loop,
@@ -386,41 +413,86 @@ ${vis.frames}
 `
     : ''
 
+  const rotationAt = (localT: number) =>
+    evaluateActorRotationDeg(
+      options.actor,
+      options.processedPath,
+      localT,
+      stageAspect,
+      headingTrack,
+    )
+
   if (options.processedPath.length < 2) {
     // Static actor — rest position; optional discrete visibility animation.
     const x = options.actor.restPosition.x
     const y = options.actor.restPosition.y
     const xf = evaluateTransform(track, 0)
+    // No path → facing contributes only the direction offset (if enabled).
+    const rotation = faceAlong
+      ? rotationAt(0)
+      : xf.rotationDeg
     const animLine = vis
       ? `\n  animation: ${visName} ${timing};`
       : ''
-    return `${selector} {
+    return {
+      css: `${selector} {
   position: absolute;
   left: 0;
   top: 0;
 ${box.sizeDecl}
 ${box.shapeDecls}
-  transform: ${cssTransformAt(x, y, xf.rotationDeg, xf.scale, includeXf)};
+  transform: ${cssTransformAt(x, y, rotation, xf.scale, includeXf)};
   display: block;
   box-sizing: border-box;
   z-index: ${options.index + 1};${visInitial}${animLine}
 }
-${visKeyframes}`
+${visKeyframes}`,
+      facingFidelity: null,
+    }
   }
 
   const keyframes = buildKeyframesFromProcessed(options.processedPath)
-  const localOffsets = unionExportOffsets(keyframes, track)
+  const baseOffsets = unionExportOffsets(keyframes, track)
+  let localOffsets = baseOffsets
+  let faceFidelityNote = ''
+  let facingFidelity: FacingExportFidelityNotice | null = null
+  if (faceAlong) {
+    const merged = mergeExportLocalOffsets(
+      baseOffsets,
+      headingExportOffsets(options.processedPath, stageAspect),
+      HEADING_EXPORT_MAX_OFFSETS,
+      rotationAt,
+      HEADING_EXPORT_ANGULAR_TOLERANCE_DEG,
+      pauseExportOffsets(options.processedPath, stageAspect),
+    )
+    localOffsets = merged.offsets
+    if (merged.fidelityWarning) {
+      faceFidelityNote = `\n  /* ${merged.fidelityWarning} */`
+      facingFidelity = {
+        maxErrDeg: merged.maxErrDeg,
+        cssComment: merged.fidelityWarning,
+        plainMessage: formatFacingFidelityWarningPlain(
+          merged.maxErrDeg,
+          HEADING_EXPORT_ANGULAR_TOLERANCE_DEG,
+          options.actor.name,
+        ),
+        actorName: options.actor.name,
+      }
+    }
+  }
   const timeline = projectTimelineSamples(localOffsets, clip)
   const cssOffsets = formatProjectOffsets(timeline.map((s) => s.projectT))
   const startLocal = timeline[0]?.localT ?? 0
   const startPos = evaluateKeyframes(keyframes, startLocal)
   const startXf = evaluateTransform(track, startLocal)
+  const startRotation = rotationAt(startLocal)
 
   const frames = timeline
     .map(({ localT }, index) => {
       const pos = evaluateKeyframes(keyframes, localT)
       const xf = evaluateTransform(track, localT)
-      return `  ${cssOffsets[index]} { transform: ${cssTransformAt(pos.x, pos.y, xf.rotationDeg, xf.scale, includeXf)}; }`
+      const rotation = rotationAt(localT)
+      return `  ${cssOffsets[index]} { transform: ${cssTransformAt(pos.x, pos.y, rotation, xf.scale, includeXf)}; }`
     })
     .join('\n')
 
@@ -430,34 +502,54 @@ ${visKeyframes}`
   const visNote = vis
     ? `\n  /* Visibility is a separate discrete animation (no fades). */`
     : ''
-
-  return `${selector} {
+  const faceNote = faceAlong
+    ? `\n  /* Face along path: heading + direction offset + transform track (additive). Alternate retraces poses without turning to face reverse travel. Sampled angular export check: ≤${HEADING_EXPORT_ANGULAR_TOLERANCE_DEG}° over ${HEADING_EXPORT_ERROR_PROBE_COUNT} probe times (not a continuous bound). */${faceFidelityNote}`
+    : ''
+  const css = `${selector} {
   position: absolute;
   left: 0;
   top: 0;
 ${box.sizeDecl}
 ${box.shapeDecls}
-  transform: ${cssTransformAt(startPos.x, startPos.y, startXf.rotationDeg, startXf.scale, includeXf)};
+  transform: ${cssTransformAt(startPos.x, startPos.y, startRotation, startXf.scale, includeXf)};
   animation: ${animName} ${timing}${visAnimDecl};
   will-change: transform;
   display: block;
   box-sizing: border-box;
-  z-index: ${options.index + 1};${visInitial}${clipNote}${visNote}
+  z-index: ${options.index + 1};${visInitial}${clipNote}${visNote}${faceNote}
 }
 
 @keyframes ${animName} {
 ${frames}
 }
 ${visKeyframes}`
+  return { css, facingFidelity }
+}
+
+export interface ProjectCssExport {
+  css: string
+  /** Plain-language facing fidelity notices (export still proceeds). */
+  facingFidelityWarnings: FacingExportFidelityNotice[]
 }
 
 /**
  * Multi-actor CSS export: one scoped scene root + stage; unique keyframes per scene.
+ * Prefer {@link buildProjectCssExport} when the Export panel needs fidelity notices.
  */
 export function generateProjectCss(
   project: Project,
   options: ExportCssOptions = {},
 ): string {
+  return buildProjectCssExport(project, options).css
+}
+
+/**
+ * Build scoped CSS plus any face-along sampled-fidelity warnings for the UI.
+ */
+export function buildProjectCssExport(
+  project: Project,
+  options: ExportCssOptions = {},
+): ProjectCssExport {
   const durationMs = project.playback.durationMs
   const loop = project.playback.loop
   const loopMode = project.playback.loopMode
@@ -468,7 +560,10 @@ export function generateProjectCss(
 
   const hasAnyMotion = project.actors.some((a) => !!a.recording)
   if (!hasAnyMotion) {
-    return '/* No recording to export */\n'
+    return {
+      css: '/* No recording to export */\n',
+      facingFidelityWarnings: [],
+    }
   }
 
   const loopNote = !loop
@@ -516,6 +611,7 @@ export function generateProjectCss(
     .filter(Boolean)
     .join('\n *\n')
 
+  const facingFidelityWarnings: FacingExportFidelityNotice[] = []
   const actorBlocks = project.actors
     .map((actor, index) => {
       const processed = selectProcessedPathForActor(project, actor, {
@@ -523,7 +619,7 @@ export function generateProjectCss(
         editSession: null,
         editPreview: null,
       })
-      return generateActorCssBlock({
+      const block = generateActorCssBlock({
         actor,
         index,
         actorCount,
@@ -531,8 +627,13 @@ export function generateProjectCss(
         loop,
         loopMode,
         processedPath: processed,
+        stageAspect: project.stageAspect,
         scope,
       })
+      if (block.facingFidelity) {
+        facingFidelityWarnings.push(block.facingFidelity)
+      }
+      return block.css
     })
     .join('\n')
 
@@ -555,7 +656,7 @@ export function generateProjectCss(
 }
 `
 
-  return `/* MotionSketch scoped scene export
+  const css = `/* MotionSketch scoped scene export
  *
  * Scene isolation:
  * - Wrap markup in <div class="${scope.rootClass}"> so rules never touch host .stage/.actor.
@@ -616,6 +717,7 @@ ${stageSelector} {
 
 ${actorBlocks}
 ${waitingBlock}${reducedMotionBlock}`
+  return { css, facingFidelityWarnings }
 }
 
 /** @deprecated single-actor helper — prefer generateProjectCss */
@@ -652,6 +754,8 @@ export function generateCssSnippet(options: {
     transform: options.transform ?? { keyframes: [] },
     geometryEdit: null,
     clip: fullClip(),
+    faceAlongPath: false,
+    directionOffsetDeg: 0,
   }
   const project: Project = {
     version: 1,
@@ -721,6 +825,8 @@ export function exportCssFromRecording(options: {
           ? makeGeometryEdit(options.processedPath, options.smoothing)
           : null,
         clip: fullClip(),
+        faceAlongPath: false,
+        directionOffsetDeg: 0,
       },
     ],
     playback: {

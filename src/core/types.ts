@@ -139,6 +139,16 @@ export interface SceneActor {
    * Path and transform tracks use actor-local progress within this clip.
    */
   clip: ActorClip
+  /**
+   * When true, rotate the actor to follow its processed path heading.
+   * Additive with {@link directionOffsetDeg} and the transform track.
+   */
+  faceAlongPath: boolean
+  /**
+   * Extra degrees added on top of path heading (image/shape facing alignment).
+   * Ignored when {@link faceAlongPath} is off.
+   */
+  directionOffsetDeg: number
 }
 
 export interface Project {

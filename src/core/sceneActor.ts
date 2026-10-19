@@ -6,6 +6,7 @@ import {
   emptyTransformTrack,
   parseTransformTrack,
 } from './transform'
+import { clampDirectionOffsetDeg } from './faceAlongPath'
 import {
   DEFAULT_ACTOR,
   DEFAULT_ACTOR_SMOOTHING,
@@ -72,6 +73,12 @@ export function createSceneActor(
         )
       : null,
     clip: cloneClip(partial?.clip ?? fullClip()),
+    faceAlongPath: partial?.faceAlongPath === true,
+    directionOffsetDeg: clampDirectionOffsetDeg(
+      typeof partial?.directionOffsetDeg === 'number'
+        ? partial.directionOffsetDeg
+        : 0,
+    ),
   }
 }
 
@@ -88,6 +95,8 @@ export function cloneSceneActor(actor: SceneActor): SceneActor {
     transform: actor.transform,
     geometryEdit: actor.geometryEdit,
     clip: actor.clip,
+    faceAlongPath: actor.faceAlongPath,
+    directionOffsetDeg: actor.directionOffsetDeg,
   })
 }
 
@@ -106,6 +115,8 @@ export function duplicateSceneActor(
     transform: actor.transform,
     geometryEdit: actor.geometryEdit,
     clip: actor.clip,
+    faceAlongPath: actor.faceAlongPath,
+    directionOffsetDeg: actor.directionOffsetDeg,
   })
 }
 
@@ -275,6 +286,11 @@ export function parseSceneActor(
   // Appearance may use imageAssetId (resolved by caller) or inline image.
   const appearance = coerceActor(raw.appearance ?? raw)
 
+  const faceAlongPath = raw.faceAlongPath === true
+  const directionOffsetDeg = clampDirectionOffsetDeg(
+    typeof raw.directionOffsetDeg === 'number' ? raw.directionOffsetDeg : 0,
+  )
+
   return {
     ok: true,
     value: createSceneActor({
@@ -288,6 +304,8 @@ export function parseSceneActor(
       transform: transform.value,
       geometryEdit: geometryEdit.value,
       clip: clip.value,
+      faceAlongPath,
+      directionOffsetDeg,
     }),
   }
 }
