@@ -129,9 +129,13 @@ export function EditorShell() {
       {/* Full-viewport interactive stage (only drawing surface) */}
       <CanvasStage />
 
-      {/* Top chrome — pointer-events only on controls */}
+      {/* Top chrome — pointer-events only on controls.
+          When a floating panel is open, raise above the bottom dock (also z-40)
+          so mobile panel actions are not covered by Sequence / Playback. */}
       <header
-        className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4 sm:pt-4"
+        className={`pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4 sm:pt-4 ${
+          openPanel ? 'z-50' : 'z-40'
+        }`}
       >
         <div className="pointer-events-auto relative flex min-w-0 flex-wrap items-center gap-2">
           <div className="rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md">

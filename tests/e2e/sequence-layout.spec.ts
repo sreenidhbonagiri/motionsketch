@@ -7,6 +7,7 @@ import {
   applyClipSeconds,
   ensureEditor,
   loadProjectSnapshot,
+  selectActorByIndex,
 } from './helpers'
 
 async function openSequence(page: Page) {

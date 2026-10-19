@@ -123,12 +123,27 @@ test.describe('workspace layout', () => {
     }
     await recordSimplePath(page)
 
+    // Sequence mounts only after a recording; collapse it so it cannot cover
+    // the Export panel’s scrollable actions (View CSS sits near the bottom).
+    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
+    if (await sequenceToggle.isVisible().catch(() => false)) {
+      if ((await sequenceToggle.getAttribute('aria-expanded')) === 'true') {
+        await sequenceToggle.click()
+        await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'false')
+      }
+    }
+
     await expect(page.getByTestId('stage')).toBeVisible()
     await expect(page.getByTestId('toolbar')).toBeVisible()
     await assertFullyInViewport(page, 'toolbar')
 
     await openPanel(page, 'export')
-    await expect(page.getByTestId('btn-view-css')).toBeVisible()
+    const viewCss = page.getByTestId('btn-view-css')
+    await expect(viewCss).toBeVisible()
+    await viewCss.evaluate((el) => {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
+    await expect(viewCss).toBeInViewport()
 
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-help')).toBeVisible()
@@ -137,5 +152,49 @@ test.describe('workspace layout', () => {
     await expect(page.getByTestId('css-dialog')).toBeVisible()
     await page.getByTestId('btn-close-css-dialog').click()
     await expect(page.getByTestId('css-dialog')).toBeHidden()
+  })
+
+  /**
+   * Regression: with Sequence expanded, the bottom dock used to paint over the
+   * Export panel (header stacking at z-40). View CSS must remain clickable —
+   * header rises to z-50 while a chrome panel is open.
+   */
+  test('mobile 390x844: View CSS opens over expanded Sequence', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+    const listExpanded = await page
+      .getByTestId('btn-toggle-actor-list')
+      .getAttribute('aria-expanded')
+    if (listExpanded === 'true') {
+      await page.getByTestId('btn-toggle-actor-list').click()
+    }
+    // Leaves Export open — keep it open so the panel stacks above the dock.
+    await recordSimplePath(page)
+    await expect(page.getByTestId('export-panel-root')).toBeVisible()
+
+    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
+    await expect(sequenceToggle).toBeVisible()
+    // Toggle sits under the open Export panel; use the element click path so
+    // Sequence can expand while Export stays open (the overlap under test).
+    if ((await sequenceToggle.getAttribute('aria-expanded')) !== 'true') {
+      await sequenceToggle.evaluate((el) => {
+        ;(el as HTMLButtonElement).click()
+      })
+    }
+    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+    await expect(page.getByTestId('export-panel-root')).toBeVisible()
+
+    const viewCss = page.getByTestId('btn-view-css')
+    await expect(viewCss).toBeVisible()
+    await viewCss.evaluate((el) => {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
+    await viewCss.scrollIntoViewIfNeeded()
+    await viewCss.click()
+    await expect(page.getByTestId('css-dialog')).toBeVisible()
   })
 })

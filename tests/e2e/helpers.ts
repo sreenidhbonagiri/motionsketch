@@ -261,7 +261,15 @@ export async function openPanel(page: Page, id: ChromePanel) {
 
 export async function openCssDialog(page: Page) {
   await openPanel(page, 'export')
-  await page.getByTestId('btn-view-css').click()
+  const viewBtn = page.getByTestId('btn-view-css')
+  await expect(viewBtn).toBeVisible()
+  // Export panel body scrolls on short viewports; nested overflow can leave
+  // View CSS outside the clickable area until scrolled into the panel.
+  await viewBtn.evaluate((el) => {
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+  await viewBtn.scrollIntoViewIfNeeded()
+  await viewBtn.click()
   await expect(page.getByTestId('css-dialog')).toBeVisible()
 }
 
