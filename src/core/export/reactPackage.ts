@@ -330,9 +330,13 @@ ${assetLines}
 
 ## Install in a Vite React app
 
-1. Copy this entire folder into your project (e.g. \`src/motionsketch/\`).
+1. Create a directory in your app (e.g. \`src/motionsketch/\`) and unzip **all
+   files from this ZIP into that directory**. The archive is flat (no wrapper
+   folder) — do not leave \`MotionSketchScene.tsx\` at your project root.
 2. Ensure \`react\` and \`react-dom\` are installed (Vite React template is enough).
-3. Import and render:
+   You can ignore or delete the template \`App.tsx\` / \`App.css\` if you mount
+   the scene from \`main.tsx\` instead.
+3. Import and render (example replaces \`src/main.tsx\`):
 
 \`\`\`tsx
 import { StrictMode } from 'react'
@@ -346,7 +350,8 @@ createRoot(document.getElementById('root')!).render(
 )
 \`\`\`
 
-Or mount more than once (each instance gets a unique \`data-ms-scene\`):
+Or mount from \`App.tsx\`, or more than once (each instance gets a unique
+\`data-ms-scene\`):
 
 \`\`\`tsx
 <>
@@ -360,7 +365,8 @@ Or mount more than once (each instance gets a unique \`data-ms-scene\`):
 - \`animation.css\` — identical scoped stylesheet to Download CSS / web package.
 - \`${REACT_PACKAGE_COMPONENT_NAME}\` — React tree with actor classes; **text is a
   React text child** (not \`dangerouslySetInnerHTML\`).
-- Images use Vite \`import\` URLs under \`assets/\` (offline, no CDN).
+- Images use Vite \`import\` URLs under \`assets/\` (offline, no CDN). At build
+  time Vite may inline small images as \`data:\` URLs; that is still offline.
 - \`${REACT_PACKAGE_TRIGGER_JS_NAME}\` — same controller as the web package
   (\`${TRIGGER_CONTROLLER_GLOBAL}\`). The component calls \`init\` on mount and
   \`destroy\` on unmount (Strict Mode safe).
@@ -370,6 +376,9 @@ ${
     : `- Page-load scenes start without \`.${MS_WAITING_CLASS}\`; Play still opts into motion under \`prefers-reduced-motion\`.`
 }
 
+Controls: the **Play animation** button relabels to **Replay** after the scene
+has run (same controller as the web package). Pause appears when offered.
+
 Reduced motion: under \`prefers-reduced-motion: reduce\`, CSS keeps animations off
 until the scene root also has \`.${MS_MOTION_OK_CLASS}\` (Play / explicit activate).
 
@@ -377,14 +386,16 @@ until the scene root also has \`.${MS_MOTION_OK_CLASS}\` (Play / explicit activa
 
 | Prop | Default | Description |
 |------|---------|-------------|
-| \`showControls\` | \`true\` | Play / Replay (+ Pause / Tap when applicable) |
+| \`showControls\` | \`true\` | Play animation / Replay (+ Pause / Tap when applicable) |
 | \`className\` | — | Extra class on the scene root |
 | \`style\` | — | Style on the outer shell |
 
-## Differences from the web package
+## Differences from the editor / web package
 
+- No editor chrome (grid, actors list, record dock). The stage fills the host
+  width with \`aspect-ratio\` from the project; resize the window to scale it.
 - No standalone \`index.html\` preview or \`project.json\`.
-- Host app supplies React; this folder is a component, not a double-click demo.
+- Host app supplies React; this package is a component, not a double-click demo.
 - Text appears as a JS string expression in TSX (React escapes at runtime), not
   pre-escaped HTML entities in a static file.
 

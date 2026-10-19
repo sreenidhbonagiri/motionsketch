@@ -128,6 +128,8 @@ describe('react package export', () => {
     )
     expect(readme).toMatch(/Vite \+ React/i)
     expect(readme).toContain('MotionSketchScene')
+    expect(readme).toMatch(/archive is flat/i)
+    expect(readme).toMatch(/unzip/i)
 
     const unzipped = unzipSync(result.zip)
     expect(Object.keys(unzipped)).toContain(REACT_PACKAGE_COMPONENT_NAME)
