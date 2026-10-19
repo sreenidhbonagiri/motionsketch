@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { buildHtmlDemoExportFixtureJson } from '../fixtures/htmlDemoExportProject'
 import {
   ensureEditor,
   loadHtmlDocument,
+  loadProjectSnapshot,
   openPanel,
   readExportedCss,
   recordSimplePath,
@@ -46,15 +48,9 @@ test.describe('downloadable exports', () => {
     'HTML demo downloads, opens locally, animates, and replays',
     { tag: '@smoke' },
     async ({ page }) => {
-    await page.goto('/')
-    await ensureEditor(page)
-    await recordSimplePath(page)
-    await openPanel(page, 'adjust')
-    await page.getByTestId('duration-slider').fill('800')
-    await page.getByTestId('loop-toggle').check()
-    await page.getByTestId('loop-mode-alternate').check()
-    await openPanel(page, 'appearance')
-    await page.getByTestId('actor-color').fill('#0f766e')
+    // Seed duration / loop-alternate / color via snapshot so Linux WebKit
+    // does not burn the 30s budget on Adjust + Appearance panel clicks.
+    await loadProjectSnapshot(page, buildHtmlDemoExportFixtureJson())
     await openPanel(page, 'export')
     await expandExportOtherWays(page)
 
