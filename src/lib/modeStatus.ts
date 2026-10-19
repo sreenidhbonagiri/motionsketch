@@ -27,6 +27,10 @@ export const ADD_POINT_PLACEMENT_FINE =
 export const ADD_POINT_PLACEMENT_COARSE =
   'The ghost sits on the sample that will become the handle. Tap near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
 
+/** Armed-record guidance — same drag verb for mouse, touch, and SR/keyboard focus. */
+export const ARMED_INSTRUCTION = 'Drag the actor to draw its path.'
+
+export const ARMED_ANNOUNCEMENT = `Ready — ${ARMED_INSTRUCTION}`
 
 export const EMPTY_BOARD_RECORD_HINT_FINE =
   'Draw a path to make CSS motion for your site — click Record, then drag the actor.'
@@ -137,7 +141,7 @@ export function resolveModeStatus(input: {
     return {
       kind: 'armed',
       label: 'Ready',
-      instruction: 'drag the actor.',
+      instruction: ARMED_INSTRUCTION,
     }
   }
 

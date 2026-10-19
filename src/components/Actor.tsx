@@ -80,7 +80,13 @@ export function Actor({
       : actor.kind === 'text' && actor.text
         ? `Actor ${name}: text`
         : `Actor ${name}`
-  const ariaLabel = editingPreview ? `${label} (editing preview)` : label
+  const ariaLabel = editingPreview
+    ? `${label} (editing preview)`
+    : armed
+      ? `${label}. Drag to draw its path.`
+      : recording
+        ? `${label}. Recording — release to finish.`
+        : label
 
   if (actor.kind === 'image' && actor.image) {
     return (

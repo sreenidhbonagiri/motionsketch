@@ -1,10 +1,21 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import {
   ensureEditor,
   openPanel,
   readExportedCss,
   recordSimplePath,
 } from './helpers'
+
+/** Adjust panel scrolls on short Linux WebKit viewports — stabilize before click. */
+async function pickMotionPreset(page: Page, id: string) {
+  const btn = page.getByTestId(`motion-preset-${id}`)
+  await expect(btn).toBeVisible()
+  await btn.evaluate((el) => {
+    el.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await btn.scrollIntoViewIfNeeded()
+  await btn.click()
+}
 
 test.describe('motion presets', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -15,6 +26,12 @@ test.describe('motion presets', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
+    // Toast above the stage can keep Adjust content unstable on Linux WebKit.
+    const toastDismiss = page.getByTestId('btn-dismiss-after-path-toast')
+    if (await toastDismiss.isVisible().catch(() => false)) {
+      await toastDismiss.click()
+      await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
+    }
 
     // Timing = Adjust chrome (Duration / Loop / Motion presets).
     await openPanel(page, 'adjust')
@@ -26,7 +43,7 @@ test.describe('motion presets', () => {
     expect(cssBefore).not.toContain('scale(0.78)')
 
     await openPanel(page, 'adjust')
-    await page.getByTestId('motion-preset-slide-in').click()
+    await pickMotionPreset(page, 'slide-in')
     await expect(page.getByTestId('preset-panel')).toBeVisible()
     await expect(page.getByTestId('preset-panel')).toContainText(
       'Preview: Slide In',
@@ -76,7 +93,19 @@ test.describe('motion presets', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('2.00 s')
     await page.getByTestId('btn-close-adjust').click()
 
-    await page.getByTestId('btn-preset-apply').click()
+    // Preview playback updates the dock every frame; pause so Apply’s box is stable.
+    const pauseBtn = page.getByTestId('btn-pause')
+    if (await pauseBtn.isVisible().catch(() => false)) {
+      await pauseBtn.click()
+      await expect(page.getByTestId('btn-play')).toBeVisible()
+    }
+    const applyBtn = page.getByTestId('btn-preset-apply')
+    await applyBtn.evaluate((el) => {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' })
+    })
+    await applyBtn.scrollIntoViewIfNeeded()
+    await expect(applyBtn).toBeVisible()
+    await applyBtn.click()
     await expect(page.getByTestId('preset-panel')).toHaveCount(0)
     await expect(page.getByTestId('action-live-region')).toHaveText(
       /Applied .+Slide In/i,
@@ -92,13 +121,24 @@ test.describe('motion presets', () => {
     expect(cssRestored).not.toContain('scale(0.78)')
 
     await openPanel(page, 'adjust')
-    await page.getByTestId('motion-preset-slide-in').click()
+    await pickMotionPreset(page, 'slide-in')
     await expect(page.getByTestId('preset-panel')).toBeVisible()
     await page.getByTestId('btn-close-adjust').click()
     await expect(page.getByTestId('adjust-panel-root')).toHaveCount(0)
     await page.getByTestId('preset-delay').fill('400')
     await page.getByTestId('preset-duration').fill('1000')
-    await page.getByTestId('btn-preset-apply').click()
+    const pauseAgain = page.getByTestId('btn-pause')
+    if (await pauseAgain.isVisible().catch(() => false)) {
+      await pauseAgain.click()
+      await expect(page.getByTestId('btn-play')).toBeVisible()
+    }
+    const applyAgain = page.getByTestId('btn-preset-apply')
+    await applyAgain.evaluate((el) => {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' })
+    })
+    await applyAgain.scrollIntoViewIfNeeded()
+    await expect(applyAgain).toBeVisible()
+    await applyAgain.click()
     await expect(page.getByTestId('preset-panel')).toHaveCount(0)
 
     const cssApplied = await readExportedCss(page)

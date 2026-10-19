@@ -83,10 +83,14 @@ test.describe('mode and path-tool status', () => {
       'armed',
     )
     await expect(page.getByTestId('dock-status')).toContainText(
-      'Ready — drag the actor.',
+      'Ready — Drag the actor to draw its path.',
     )
     await expect(page.getByTestId('btn-stop')).toHaveAccessibleName(
-      'Cancel ready to record',
+      'Cancel record',
+    )
+    await expect(page.getByTestId('btn-stop')).toHaveAttribute(
+      'aria-describedby',
+      'dock-status',
     )
 
     const actor = page.getByTestId('actor')

@@ -211,7 +211,17 @@ export async function clickRecord(
   await expect(dialog).toBeHidden()
 }
 
+/** Expand the Actors list when it is collapsed (items are unmounted while closed). */
+export async function ensureActorListExpanded(page: Page) {
+  const listToggle = page.getByTestId('btn-toggle-actor-list')
+  if (!(await listToggle.isVisible().catch(() => false))) return
+  if ((await listToggle.getAttribute('aria-expanded')) === 'true') return
+  await listToggle.click()
+  await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+}
+
 export async function actorIdsFromList(page: Page): Promise<string[]> {
+  await ensureActorListExpanded(page)
   await expect(page.getByTestId('actor-list')).toBeVisible()
   const items = page.locator('[data-testid^="actor-list-item-"]')
   const count = await items.count()
@@ -306,26 +316,45 @@ export async function expandExportOtherWays(page: Page) {
   await expect(cssBtn).toBeVisible()
 }
 
-export async function openCssDialog(page: Page) {
+export async function openCssDialog(page: Page): Promise<{
+  collapsedActorList: boolean
+}> {
   await openPanel(page, 'export')
+  // Collapse the actor list so it cannot cover Export’s scrollable Other ways.
+  // readExportedCss restores afterward; other callers should ensureActorListExpanded.
+  const listToggle = page.getByTestId('btn-toggle-actor-list')
+  let collapsedActorList = false
+  if (
+    (await listToggle.isVisible().catch(() => false)) &&
+    (await listToggle.getAttribute('aria-expanded')) === 'true'
+  ) {
+    await listToggle.click()
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'false')
+    collapsedActorList = true
+  }
   await expandExportOtherWays(page)
   const viewBtn = page.getByTestId('btn-view-css')
   await expect(viewBtn).toBeVisible()
   // Export panel body scrolls on short viewports; nested overflow can leave
   // View CSS outside the clickable area until scrolled into the panel.
   await viewBtn.evaluate((el) => {
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    el.scrollIntoView({ block: 'center', inline: 'nearest' })
   })
   await viewBtn.scrollIntoViewIfNeeded()
+  await expect(viewBtn).toBeVisible()
   await viewBtn.click()
   await expect(page.getByTestId('css-dialog')).toBeVisible()
+  return { collapsedActorList }
 }
 
 export async function readExportedCss(page: Page): Promise<string> {
-  await openCssDialog(page)
+  const { collapsedActorList } = await openCssDialog(page)
   const css = await page.getByTestId('css-output').inputValue()
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('css-dialog')).toBeHidden()
+  if (collapsedActorList) {
+    await ensureActorListExpanded(page)
+  }
   return css
 }
 

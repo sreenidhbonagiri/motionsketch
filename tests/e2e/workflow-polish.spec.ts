@@ -69,7 +69,7 @@ test.describe('editor workflow polish', () => {
       'download-project-help',
     )
     await expect(page.getByTestId('download-project-help')).toContainText(
-      'Record a path',
+      'Create a path',
     )
   })
 
@@ -86,7 +86,7 @@ test.describe('editor workflow polish', () => {
 
     await expect(page.getByTestId('steady-speed-slider')).toBeDisabled()
     await expect(page.getByTestId('steady-speed-help')).toContainText(
-      'Record a path for this actor',
+      'Create a path for this actor',
     )
     await expect(page.getByTestId('duration-slider')).toBeEnabled()
     await expect(page.getByTestId('loop-toggle')).toBeEnabled()

@@ -39,6 +39,7 @@ import {
   type MotionPresetMotionState,
   type MotionPresetTiming,
 } from '../core/motionPresets'
+import { ARMED_ANNOUNCEMENT } from '../lib/modeStatus'
 import { selectProcessedPathForActor } from './selectors'
 import {
   polishMotion,
@@ -680,7 +681,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         mode: 'armed',
         liveTrail: [],
         stageHint: 'default',
-        actionAnnouncement: 'Ready — drag the actor.',
+        actionAnnouncement: ARMED_ANNOUNCEMENT,
       })
     },
 
@@ -1435,7 +1436,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         stageHint: 'new-project',
         actionAnnouncement:
           project.name === DEFAULT_PROJECT_NAME
-            ? 'New project ready. Click Record to create an animation.'
+            ? 'New project ready. Create a path to start an animation.'
             : `Created “${project.name}”. You can start drawing.`,
         selectedActorId: project.actors[0].id,
         ...clearHistoryForActorSwitch(),

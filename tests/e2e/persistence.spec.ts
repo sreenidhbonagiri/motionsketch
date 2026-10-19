@@ -35,7 +35,7 @@ async function confirmNewProject(page: Page) {
 test.describe('project persistence', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('restores recording after reload, paused and playable', async ({
+  test('restores loop and duration after reload, paused and playable', async ({
     page,
   }) => {
     await page.goto('/')
@@ -47,11 +47,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('2.40 s')
     await waitForSaved(page)
 
-    const cssBefore = await readExportedCss(page)
-
     await page.reload()
-    await openPanel(page, 'export')
-    await expect(page.getByTestId('export-panel')).toBeVisible()
     await openPanel(page, 'project')
     await expect(page.getByTestId('save-status')).toHaveText(
       'Saved in this browser',
@@ -60,7 +56,22 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
     await expect(page.getByTestId('duration-value')).toHaveText('2.40 s')
+  })
 
+  test('exported CSS matches after reload', async ({ page }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'adjust')
+    await page.getByTestId('loop-toggle').check()
+    await page.getByTestId('duration-slider').fill('2400')
+    await expect(page.getByTestId('duration-value')).toHaveText('2.40 s')
+    await waitForSaved(page)
+
+    const cssBefore = await readExportedCss(page)
+    await page.reload()
+    await openPanel(page, 'export')
+    await expect(page.getByTestId('export-panel')).toBeVisible()
     const cssAfter = await readExportedCss(page)
     expect(cssAfter).toBe(cssBefore)
   })
@@ -134,7 +145,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Click Record, then drag the actor to capture its movement.',
+      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
     )
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
@@ -175,7 +186,9 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('export-panel')).toBeVisible()
   })
 
-  test('Reset remains separate from New project', async ({ page }) => {
+  test('Reset clears the take but keeps playback settings', async ({
+    page,
+  }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
@@ -195,6 +208,23 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
+  })
+
+  test('New project resets playback settings after Reset left them dirty', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'adjust')
+    await page.getByTestId('duration-slider').fill('3000')
+    await page.getByTestId('loop-toggle').check()
+    await page.getByTestId('btn-reset').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'reset-actor-confirm',
+      confirmTestId: 'btn-reset-actor-confirm',
+      cancelTestId: 'btn-reset-actor-cancel',
+    })
 
     // Playback settings still count as work — New project confirms, then names.
     await confirmNewProject(page)
@@ -202,7 +232,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('1.20 s')
     await expect(page.getByTestId('loop-toggle')).not.toBeChecked()
     await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Click Record, then drag the actor to capture its movement.',
+      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
     )
   })
 
@@ -220,7 +250,7 @@ test.describe('project persistence', () => {
       'Download project file',
     )
     await expect(page.getByTestId('download-project-help')).toContainText(
-      'Record a path',
+      'Create a path',
     )
     await page.getByTestId('btn-close-project').click()
 
@@ -241,7 +271,40 @@ test.describe('project persistence', () => {
     )
   })
 
-  test('Open project validates and can replace after confirm', async ({
+  test('Open project replaces after confirm and updates duration', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await waitForSaved(page)
+
+    const snapshotJson = await page.evaluate(() =>
+      localStorage.getItem('motionsketch.project.v1'),
+    )
+    expect(snapshotJson).toBeTruthy()
+
+    const mutated = JSON.parse(snapshotJson!)
+    mutated.project.playback.durationMs = 4000
+    mutated.savedAt = new Date().toISOString()
+
+    await openPanel(page, 'project')
+    await page.getByTestId('project-file-input').setInputFiles({
+      name: 'import.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(mutated), 'utf-8'),
+    })
+    await respondToConfirm(page, {
+      dialogTestId: 'open-project-confirm',
+      confirmTestId: 'btn-open-project-confirm',
+      cancelTestId: 'btn-open-project-cancel',
+    })
+
+    await openPanel(page, 'adjust')
+    await expect(page.getByTestId('duration-value')).toHaveText('4.00 s')
+  })
+
+  test('Open project changes exported CSS to the imported duration', async ({
     page,
   }) => {
     await page.goto('/')
@@ -271,8 +334,6 @@ test.describe('project persistence', () => {
       cancelTestId: 'btn-open-project-cancel',
     })
 
-    await openPanel(page, 'adjust')
-    await expect(page.getByTestId('duration-value')).toHaveText('4.00 s')
     const cssImported = await readExportedCss(page)
     expect(cssImported).not.toBe(cssOriginal)
     expect(cssImported).toContain('4000ms')

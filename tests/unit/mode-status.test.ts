@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   ADD_POINT_PLACEMENT_COARSE,
   ADD_POINT_PLACEMENT_FINE,
+  ARMED_ANNOUNCEMENT,
+  ARMED_INSTRUCTION,
   resolveModeStatus,
 } from '../../src/lib/modeStatus'
 
@@ -86,16 +88,14 @@ describe('resolveModeStatus', () => {
     }
   })
 
-  it('retains Ready — drag the actor for armed mode', () => {
+  it('retains Ready — drag to draw path for armed mode', () => {
     const status = resolveModeStatus({ ...base, mode: 'armed' })
     expect(status).toEqual({
       kind: 'armed',
       label: 'Ready',
-      instruction: 'drag the actor.',
+      instruction: ARMED_INSTRUCTION,
     })
-    expect(`${status!.label} — ${status!.instruction}`).toBe(
-      'Ready — drag the actor.',
-    )
+    expect(`${status!.label} — ${status!.instruction}`).toBe(ARMED_ANNOUNCEMENT)
   })
 
   it('shows Recording label and stop guidance', () => {

@@ -482,7 +482,10 @@ export function PlaybackDock() {
                 data-testid="btn-stop"
                 onClick={stopFromUi}
                 aria-label={
-                  mode === 'armed' ? 'Cancel ready to record' : 'Stop recording'
+                  mode === 'armed' ? 'Cancel record' : 'Stop recording'
+                }
+                aria-describedby={
+                  mode === 'armed' && modeStatus ? dockStatusId : undefined
                 }
                 className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-600"
               >
@@ -492,6 +495,9 @@ export function PlaybackDock() {
               <button
                 type="button"
                 data-testid="btn-record"
+                aria-describedby={
+                  !hasAnyRecording ? emptyBoardHintId : undefined
+                }
                 onClick={() => {
                   void (async () => {
                     if (recording) {

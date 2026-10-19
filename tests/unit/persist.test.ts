@@ -697,7 +697,7 @@ describe('store applyPersistedSnapshot / newProject', () => {
     expect(state.mode).toBe('idle')
     expect(state.stageHint).toBe('new-project')
     expect(state.actionAnnouncement).toBe(
-      'New project ready. Click Record to create an animation.',
+      'New project ready. Create a path to start an animation.',
     )
   })
 

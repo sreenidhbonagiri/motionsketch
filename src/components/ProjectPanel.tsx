@@ -255,7 +255,7 @@ export function ProjectPanel() {
       >
         {canDownloadProject
           ? 'Download a JSON file you can reopen and edit in MotionSketch.'
-          : 'Record a path (or recover from a save error) before downloading a project file.'}
+          : 'Create a path (or recover from a save error) before downloading a project file.'}
       </p>
     </div>
   )

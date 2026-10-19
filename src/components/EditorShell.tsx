@@ -166,9 +166,12 @@ export function EditorShell() {
         : EMPTY_BOARD_RECORD_HINT_FINE
       : null
   // Top toast: after a path, idle only; dismissible per project for this tab session.
+  // Hide while a chrome panel is open — toast still competes for layout/hit-testing
+  // with Export/Adjust scroll bodies even when inert for keyboard.
   const showAfterPathWebsiteToast =
     !tipBusy &&
     hasRecording &&
+    openPanel === null &&
     !afterPathHintDismissedKeys.has(afterPathProjectKey)
 
   return (
@@ -197,9 +200,6 @@ export function EditorShell() {
         <div
           className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3 sm:px-4"
           style={{ top: toastTopPx }}
-          // Keep Export/Adjust keyboard flow inside the open panel — toast
-          // dismiss must not sit in the tab order ahead of panel actions.
-          inert={openPanel !== null ? true : undefined}
         >
           <div
             role="status"

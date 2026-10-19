@@ -106,7 +106,11 @@ export function FloatingPanel({
       onPointerUp={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-3 py-2.5">
+      {/*
+        Close stays visually top-right but comes after the body in DOM/tab
+        order so keyboard and screen-reader users reach panel actions first.
+      */}
+      <div className="border-b border-slate-100 py-2.5 pl-3 pr-14">
         <div className="min-w-0">
           <h2
             id={titleId}
@@ -118,19 +122,19 @@ export function FloatingPanel({
             <div className="mt-0.5 text-xs text-slate-500">{summary}</div>
           )}
         </div>
-        <button
-          ref={closeRef}
-          type="button"
-          data-testid={`btn-close-${id}`}
-          onClick={onClose}
-          className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-        >
-          Close
-        </button>
       </div>
-      <div className="max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain">
+      <div className="max-h-[min(75dvh,32rem)] overflow-y-auto overscroll-contain">
         {children}
       </div>
+      <button
+        ref={closeRef}
+        type="button"
+        data-testid={`btn-close-${id}`}
+        onClick={onClose}
+        className="absolute top-2.5 right-3 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        Close
+      </button>
     </div>
   )
 }

@@ -149,7 +149,7 @@ export function AdjustPanel() {
         >
           {selectedHasRecording
             ? 'Evens out movement speed while keeping pauses. Glide (dock) adds ease-in/out after this — they compose, they are not the same control.'
-            : 'Record a path for this actor to adjust Steady Speed.'}
+            : 'Create a path for this actor to adjust Steady Speed.'}
         </p>
       </div>
 
