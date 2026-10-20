@@ -26,9 +26,14 @@ async function editorPoseAt(
   tNorm: number,
 ): Promise<{ rotationDeg: number; scale: number; xFrac: number; yFrac: number }> {
   await page.getByTestId('playback-scrubber').fill(String(tNorm))
+  await expect(page.getByTestId('actor')).toBeAttached()
   return page.evaluate(() => {
-    const el = document.querySelector('[data-testid="actor"]') as HTMLElement
-    const stage = el.closest('[data-testid="stage"]') as HTMLElement | null
+    const el = document.querySelector('[data-testid="actor"]') as HTMLElement | null
+    if (!el) throw new Error('missing actor')
+    const stage = document.querySelector(
+      '[data-testid="stage-frame"]',
+    ) as HTMLElement | null
+    if (!stage) throw new Error('missing stage-frame')
     const m = getComputedStyle(el).transform
     let rotationDeg = 0
     let scale = 1

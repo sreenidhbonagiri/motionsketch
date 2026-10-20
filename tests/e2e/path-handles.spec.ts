@@ -48,7 +48,7 @@ test.describe('user path handles', () => {
     await expect(page.getByTestId('export-panel-root')).toHaveCount(0)
 
     await page.getByTestId('btn-path-add-mode').click()
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-add-mode',
       'true',
     )
@@ -63,7 +63,7 @@ test.describe('user path handles', () => {
     await expect(page.locator('[data-testid^="path-handle-"]')).toHaveCount(
       handleCountBefore,
     )
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-add-mode',
       'true',
     )

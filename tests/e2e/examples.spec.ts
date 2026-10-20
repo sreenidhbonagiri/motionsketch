@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
+  ensureActorListExpanded,
   ensureEditor,
   openPanel,
   readExportedCss,
@@ -119,6 +120,7 @@ test.describe('starter examples', () => {
     await expect(page.getByTestId('examples-gallery')).toHaveCount(0)
     await expect(page.getByTestId('action-live-region')).toContainText(/Orbit/i)
     await expect(page.getByTestId('btn-rename-project')).toContainText('Orbit')
+    await ensureActorListExpanded(page)
     await expect(page.locator('[data-testid^="actor-list-item-"]')).toHaveCount(
       2,
     )
@@ -131,6 +133,7 @@ test.describe('starter examples', () => {
     await ensureEditor(page)
     await openExamples(page)
     await page.getByTestId('btn-use-follow-the-leader').click()
+    await ensureActorListExpanded(page)
     await expect(page.locator('[data-testid^="actor-list-item-"]')).toHaveCount(
       3,
     )

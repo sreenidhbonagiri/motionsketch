@@ -16,6 +16,7 @@ import {
   loadProjectSnapshot,
   openPanel,
   readExportedCss,
+  ensureActorListExpanded,
 } from './helpers'
 
 function roundedTurnSamples(n = 41): MotionSample[] {
@@ -232,6 +233,7 @@ test.describe('local bend actions', () => {
       ),
     )
 
+    await ensureActorListExpanded(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-list-item-actor-a').click()
     await page.getByTestId('btn-close-appearance').click()
@@ -245,6 +247,7 @@ test.describe('local bend actions', () => {
     )
     await page.getByTestId('btn-done-edit').click()
 
+    await ensureActorListExpanded(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-list-item-actor-b').click()
     await page.getByTestId('btn-close-appearance').click()

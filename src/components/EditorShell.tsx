@@ -269,13 +269,13 @@ export function EditorShell() {
       <CanvasStage />
 
       {/*
-        Post-path website cue — top offset from measured header height (z-30 <
-        header z-40) so Project / Export never overlap. Non-blocking; pointer
-        events only on the toast itself.
+        Post-path website cue — top offset from measured header height (z-34 >
+        camera z-32, < header z-40) so Fit/zoom never steal dismiss hits.
+        Non-blocking; pointer events only on the toast itself.
       */}
       {showAfterPathWebsiteToast && (
         <div
-          className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-3 sm:px-4"
+          className="pointer-events-none absolute inset-x-0 z-[34] flex justify-center px-3 sm:px-4"
           style={{ top: toastTopPx }}
         >
           <div
@@ -295,7 +295,7 @@ export function EditorShell() {
               type="button"
               data-testid="btn-dismiss-after-path-toast"
               onClick={dismissAfterPathWebsiteHint}
-              className="shrink-0 rounded-md px-1.5 py-0.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
               aria-label="Dismiss website export tip"
             >
               ✕

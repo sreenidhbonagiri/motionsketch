@@ -55,7 +55,7 @@ test.describe('path edit mode transitions', () => {
   }) => {
     await loadProjectSnapshot(page, buildPathMoveFixtureJson())
     await page.getByTestId('btn-edit-path').click()
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-tool',
       'edit-points',
     )
@@ -66,7 +66,7 @@ test.describe('path edit mode transitions', () => {
     )
 
     await page.getByTestId('btn-path-tool-move').click()
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-tool',
       'move-path',
     )
@@ -132,7 +132,7 @@ test.describe('path edit mode transitions', () => {
     await overlay.focus()
     await expect(overlay).toBeFocused()
     await page.keyboard.down('ArrowRight')
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-gesture',
       'true',
     )
@@ -142,7 +142,7 @@ test.describe('path edit mode transitions', () => {
 
     // Gesture cancelled; Adjust stays open because Escape was consumed.
     await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-gesture',
       'false',
     )

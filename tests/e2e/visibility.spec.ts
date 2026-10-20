@@ -9,6 +9,7 @@ import {
 import {
   applyClipSeconds,
   clickAddActor,
+  ensureActorListExpanded,
   ensureEditor,
   expandExportOtherWays,
   loadHtmlDocument,
@@ -109,6 +110,7 @@ test.describe('per-actor visibility timing', () => {
     expect(await editorHiddenAt(page, clipEnd)).toBe(true)
 
     await page.getByTestId('playback-scrubber').fill('0.1')
+    await ensureActorListExpanded(page)
     await expect(page.getByTestId('actor-hidden-indicator')).toBeVisible()
     await page.getByTestId('btn-seek-clip-start').click()
     await expect(page.getByTestId('actor')).toHaveAttribute(
@@ -305,6 +307,7 @@ test.describe('per-actor visibility timing', () => {
     await expect(page.getByTestId('clip-hide-after')).not.toBeChecked()
 
     await page.getByTestId('playback-scrubber').fill('0.1')
+    await ensureActorListExpanded(page)
     const item = page.locator('[data-testid^="actor-list-item-"]').first()
     await expect(item).toHaveAttribute('data-hidden-now', 'true')
     await item.click()

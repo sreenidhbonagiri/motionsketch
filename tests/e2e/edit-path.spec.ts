@@ -3,6 +3,7 @@ import {
   ensureEditor,
   readExportedCss,
   recordSimplePath,
+  respondToConfirm,
 } from './helpers'
 
 test.describe('path editing', () => {
@@ -71,6 +72,11 @@ test.describe('path editing', () => {
     )
     await page.mouse.up()
     await page.getByTestId('btn-restore-path').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'restore-path-confirm',
+      confirmTestId: 'btn-restore-path-confirm',
+      cancelTestId: 'btn-app-confirm-cancel',
+    })
     await expect(page.getByTestId('path-handles')).toBeVisible()
 
     await page.getByTestId('btn-done-edit').click()

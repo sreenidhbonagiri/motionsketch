@@ -464,12 +464,21 @@ export async function clientPointForSample(
   page: Page,
   sample: { x: number; y: number },
 ) {
-  const box = await page.getByTestId('stage').boundingBox()
+  // Geometry tools map through the transformed stage-frame, not the camera viewport.
+  const box = await page.getByTestId('stage-frame').boundingBox()
   expect(box).toBeTruthy()
   return {
     x: box!.x + sample.x * box!.width,
     y: box!.y + sample.y * box!.height,
   }
+}
+
+/** Close the dock Refine popover when it is open (leaves Snap / Polish state intact). */
+export async function ensureRefineMotionClosed(page: Page) {
+  const tools = page.getByTestId('refine-motion-tools')
+  if (!(await tools.isVisible().catch(() => false))) return
+  await page.getByTestId('btn-refine-motion').click()
+  await expect(tools).toHaveCount(0)
 }
 
 /**

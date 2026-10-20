@@ -29,7 +29,7 @@ test.describe('move entire path', () => {
     await page.getByTestId('btn-path-tool-move').click()
     await expect(page.getByTestId('path-move-overlay')).toBeVisible()
     await expect(page.getByTestId('path-handles')).toHaveCount(0)
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-tool',
       'move-path',
     )
@@ -69,6 +69,11 @@ test.describe('move entire path', () => {
     )
 
     await page.getByTestId('btn-restore-path').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'restore-path-confirm',
+      confirmTestId: 'btn-restore-path-confirm',
+      cancelTestId: 'btn-app-confirm-cancel',
+    })
     await expect(page.getByTestId('path-handles')).toBeVisible()
     await page.getByTestId('btn-done-edit').click()
 
@@ -249,6 +254,11 @@ test.describe('move entire path', () => {
 
     // Return to the fixture pose via Restore (clears nudge history).
     await page.getByTestId('btn-restore-path').click()
+    await respondToConfirm(page, {
+      dialogTestId: 'restore-path-confirm',
+      confirmTestId: 'btn-restore-path-confirm',
+      cancelTestId: 'btn-app-confirm-cancel',
+    })
     await expect(startHandle).toHaveAttribute(
       'data-sample-x',
       String(baseline[PATH_MOVE_HANDLE_INDICES[0]]!.x),

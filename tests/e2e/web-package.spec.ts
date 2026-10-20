@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { unzipSync } from 'fflate'
 import {
+  clickAddActor,
   clickRecord,
   dragActor,
   ensureEditor,
@@ -82,9 +83,9 @@ test.describe('web package export', () => {
     await recordSimplePath(page)
 
     // Actor 0 stays a shape; actor 1 and 2 share one PNG; actor 3 is SVG.
-    await page.getByTestId('btn-add-actor').click()
-    await page.getByTestId('btn-add-actor').click()
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
+    await clickAddActor(page)
+    await clickAddActor(page)
 
     const png = await makePngBytes(page, 48, 32, '#0f766e')
     const svg = Buffer.from(
@@ -177,7 +178,7 @@ test.describe('web package export', () => {
     await page.goto('/')
     await ensureEditor(page, 'Offline pack')
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     const png = await makePngBytes(page, 32, 24, '#0f766e')
     await selectActorByIndex(page, 1)
     await openPanel(page, 'appearance')
@@ -245,7 +246,7 @@ test.describe('web package export', () => {
     await page.goto('/')
     await ensureEditor(page, 'Web pack')
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     const png = await makePngBytes(page, 32, 24, '#0f766e')
     await selectActorByIndex(page, 1)
     await openPanel(page, 'appearance')

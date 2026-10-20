@@ -329,18 +329,26 @@ test.describe('workspace layout', () => {
             r.left + r.width / 2,
             r.top + r.height / 2,
           )
-          return top instanceof Element && (top === el || el.contains(top))
+          const ok = top instanceof Element && (top === el || el.contains(top))
+          const blocker =
+            top instanceof Element
+              ? top.getAttribute('data-testid') || top.tagName
+              : 'null'
+          return { ok, blocker }
         }
+        const fitHit = hit(fitEl)
+        const zoomHit = hit(zoomEl)
+        const dismissHit = hit(dismissEl)
         return {
-          ok: !overlap && hit(fitEl) && hit(zoomEl) && hit(dismissEl),
+          ok: !overlap && fitHit.ok && zoomHit.ok && dismissHit.ok,
           reason: overlap
             ? 'overlap'
-            : !hit(fitEl)
-              ? 'fit-blocked'
-              : !hit(zoomEl)
-                ? 'zoom-blocked'
-                : !hit(dismissEl)
-                  ? 'dismiss-blocked'
+            : !fitHit.ok
+              ? `fit-blocked:${fitHit.blocker}`
+              : !zoomHit.ok
+                ? `zoom-blocked:${zoomHit.blocker}`
+                : !dismissHit.ok
+                  ? `dismiss-blocked:${dismissHit.blocker}`
                   : 'ok',
           barBelowToast: br.top >= tr.bottom - 1,
         }

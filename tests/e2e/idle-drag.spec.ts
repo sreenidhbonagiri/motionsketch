@@ -4,6 +4,7 @@ import {
   clickAddActor,
   dispatchActivePointerCancel,
   ensureEditor,
+  ensureRefineMotionClosed,
   ensureRefineMotionOpen,
   selectActorByIndex,
   touchPointerGesture,
@@ -186,6 +187,8 @@ test.describe('touch-emulated idle placement', () => {
       'aria-pressed',
       'true',
     )
+    // Popover can cover the actor; Snap stays on after close.
+    await ensureRefineMotionClosed(page)
 
     const actor = page.getByTestId('actor')
     const before = await actor.boundingBox()

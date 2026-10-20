@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   clickAddActor,
+  ensureActorListExpanded,
   ensureEditor,
   openPanel,
   recordSimplePath,
@@ -63,7 +64,9 @@ test.describe('unified actor edit undo', () => {
     await page.getByTestId('btn-redo-transform').click()
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
-    await page.locator('body').click({ position: { x: 8, y: 8 } })
+    // Leave the sequence fields so the editor shortcut (not native input undo) runs.
+    await page.getByTestId('stage').focus()
+    await expect(page.getByTestId('stage')).toBeFocused()
     await page.keyboard.press(`${mod}+z`)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
 
@@ -76,11 +79,13 @@ test.describe('unified actor edit undo', () => {
     await page.getByTestId('clip-move-for-input').fill('0.90')
     await page.getByTestId('clip-start-input').press('Enter')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.30')
-    await page.locator('body').click({ position: { x: 8, y: 8 } })
+    await page.getByTestId('stage').focus()
+    await expect(page.getByTestId('stage')).toBeFocused()
     await page.keyboard.press(`${mod}+z`)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
 
     // Focused text inputs keep native undo; editor shortcut must not fire.
+    await ensureActorListExpanded(page)
     const name = page.getByTestId('actor-name-input')
     await name.click()
     await name.fill('TypedName')

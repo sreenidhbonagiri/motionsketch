@@ -77,9 +77,9 @@ test.describe('text actors', () => {
         '[data-testid="actor"]',
       ) as HTMLElement | null
       const stage = document.querySelector(
-        '[data-testid="stage"]',
+        '[data-testid="stage-frame"]',
       ) as HTMLElement | null
-      if (!el || !stage) throw new Error('missing actor/stage')
+      if (!el || !stage) throw new Error('missing actor/stage-frame')
       const sr = stage.getBoundingClientRect()
       const ar = el.getBoundingClientRect()
       const minSide = Math.min(sr.width, sr.height)
