@@ -103,6 +103,8 @@ export function buildPathMoveFixtureJson(
       trigger: 'page-load',
     },
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }

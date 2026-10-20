@@ -4,7 +4,6 @@ import {
 } from '../../src/core/persist/document'
 import { createSceneActor } from '../../src/core/sceneActor'
 import type { MotionSample, Project } from '../../src/core/types'
-
 export const GLIDE_ACTOR_ID = 'glide-fixture-actor'
 
 /** Deterministic uneven path with a mid pause — good for Glide preview. */
@@ -72,6 +71,8 @@ export function buildGlideFixtureProject(): Project {
     version: 1,
     name: 'Glide fixture',
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
     playback: {
       durationMs: samples[samples.length - 1]!.t,
       loop: true,

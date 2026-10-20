@@ -671,7 +671,7 @@ export function PlaybackDock() {
               disabled={isRecordingLike || actorEditOrder.length === 0}
               className={btnIcon}
               aria-label="Undo"
-              title="Undo placement, transform, sequence timing, Glide, continue path, or a motion preset for the selected actor"
+              title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
             >
               <span aria-hidden>↶</span>
             </button>
@@ -682,7 +682,7 @@ export function PlaybackDock() {
               disabled={isRecordingLike || actorEditRedoOrder.length === 0}
               className={btnIcon}
               aria-label="Redo"
-              title="Redo placement, transform, sequence timing, Glide, continue path, or a motion preset for the selected actor"
+              title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
             >
               <span aria-hidden>↷</span>
             </button>

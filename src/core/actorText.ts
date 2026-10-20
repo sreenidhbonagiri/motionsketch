@@ -1,6 +1,13 @@
 import { clamp } from './coords'
 import { escapeHtmlText } from './projectName'
-import type { ActorText, ActorTextAlign, ActorTextFont } from './types'
+import {
+  MAX_ACTOR_SIZE,
+  MIN_ACTOR_SIZE,
+  type Actor,
+  type ActorText,
+  type ActorTextAlign,
+  type ActorTextFont,
+} from './types'
 
 /** Soft cap for authored / imported text content. */
 export const MAX_ACTOR_TEXT_LENGTH = 240
@@ -9,6 +16,19 @@ export const MAX_ACTOR_TEXT_LENGTH = 240
 export const MIN_ACTOR_TEXT_FONT_SIZE = 0.028
 export const MAX_ACTOR_TEXT_FONT_SIZE = 0.18
 export const DEFAULT_ACTOR_TEXT_FONT_SIZE = 0.055
+
+/** Matches editor / CSS export `line-height: 1.25`. */
+export const TEXT_LAYOUT_LINE_HEIGHT = 1.25
+
+/**
+ * Underestimate average glyph advance (em) so wrap-line counts are never below
+ * real `pre-wrap` + `break-word` layout. Used only for conservative bounds
+ * (stage-resize content-fit), not for painting.
+ */
+const CONSERVATIVE_CHAR_ADVANCE_EM = 0.34
+
+/** Extra height factor for glyph/metric variance across system font stacks. */
+const CONSERVATIVE_HEIGHT_PAD = 1.12
 
 export const DEFAULT_ACTOR_TEXT: ActorText = {
   content: 'Text',
@@ -114,4 +134,57 @@ export function actorTextFontCss(fontFamily: ActorTextFont): string {
 /** Escape text content for HTML element bodies (keeps newlines for pre-wrap). */
 export function actorTextHtmlInner(content: string): string {
   return escapeHtmlText(content)
+}
+
+/**
+ * Count visual lines for `white-space: pre-wrap` + `word-break: break-word`
+ * using a conservative (narrow) glyph advance so height is never underestimated.
+ */
+export function countConservativeTextLines(
+  content: string,
+  wrapWidthPx: number,
+  fontSizePx: number,
+): number {
+  if (!(wrapWidthPx > 0) || !(fontSizePx > 0)) return 1
+  const charW = fontSizePx * CONSERVATIVE_CHAR_ADVANCE_EM
+  const charsPerLine = Math.max(1, Math.floor(wrapWidthPx / charW))
+  const paragraphs = content.split('\n')
+  let lines = 0
+  for (const para of paragraphs) {
+    if (para.length === 0) {
+      lines += 1
+      continue
+    }
+    // break-word: hard-wrap by character capacity (spaces do not reduce wraps
+    // in this underestimate — that only makes the box taller, which is safer).
+    lines += Math.max(1, Math.ceil(para.length / charsPerLine))
+  }
+  return Math.max(1, lines)
+}
+
+/**
+ * Conservative axis-aligned text box in stage pixels for content-fit checks.
+ * Width is the authored wrap box; height follows multiline / wrapped lines
+ * (never the one-line nominal from {@link actorDisplaySizePx}).
+ *
+ * Returns null when the actor is not text (caller should use shape/image sizing).
+ */
+export function estimateTextLayoutSizePx(
+  stageWidth: number,
+  stageHeight: number,
+  actor: Actor,
+): { width: number; height: number } | null {
+  if (actor.kind !== 'text' || !actor.text) return null
+  const minSide = Math.min(stageWidth, stageHeight)
+  if (!(minSide > 0)) return null
+  const wrapWidth = clamp(actor.width, MIN_ACTOR_SIZE, MAX_ACTOR_SIZE) * minSide
+  const fontPx = clampActorTextFontSize(actor.text.fontSize) * minSide
+  const lineCount = countConservativeTextLines(
+    actor.text.content,
+    wrapWidth,
+    fontPx,
+  )
+  const height =
+    lineCount * fontPx * TEXT_LAYOUT_LINE_HEIGHT * CONSERVATIVE_HEIGHT_PAD
+  return { width: wrapWidth, height }
 }

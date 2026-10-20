@@ -51,6 +51,15 @@ import {
   type ContinuePathSnapshot,
   type RecordingIntent,
 } from '../core/continuePath'
+import {
+  applyStageResizeSnapshot,
+  captureStageResizeSnapshot,
+  resizeProjectStage as resizeProjectStageCore,
+  resolveProjectStageSize,
+  withProjectStageSize,
+  type StageResizeAnchor,
+  type StageResizeSnapshot,
+} from '../core/stageResize'
 import { ARMED_ANNOUNCEMENT } from '../lib/modeStatus'
 import { selectProcessedPathForActor } from './selectors'
 import {
@@ -178,6 +187,7 @@ export type ActorEditKind =
   | 'glide'
   | 'preset'
   | 'continuePath'
+  | 'stageResize'
 
 const PLACEMENT_NOOP_EPS = 1e-9
 
@@ -269,6 +279,13 @@ interface EditorStore {
   continuePathRedoStack: ContinuePathSnapshot[]
 
   /**
+   * Stage-resize undo: project-global snapshots (aspect + all actors).
+   * Survives actor selection switches like continue path.
+   */
+  stageResizeUndoStack: StageResizeSnapshot[]
+  stageResizeRedoStack: StageResizeSnapshot[]
+
+  /**
    * Armed / in-progress recording intent. `continue` appends; `replace` is
    * the classic Record flow.
    */
@@ -309,6 +326,17 @@ interface EditorStore {
   cancelContinueRecording: () => void
   undoContinuePath: () => void
   redoContinuePath: () => void
+  /**
+   * Resize the composition frame (expand without stretching content).
+   * One undo entry; Fit stage after success. Rejects shrinks that cut content.
+   */
+  resizeProjectStage: (
+    width: number,
+    height: number,
+    anchor?: StageResizeAnchor,
+  ) => boolean
+  undoStageResize: () => void
+  redoStageResize: () => void
   /**
    * Replace the selected actor’s take with an imported path recording.
    * Keeps project Duration and appearance; clears path/transform edits;
@@ -613,10 +641,10 @@ function clearPlacementHistory(state: {
 
 /**
  * History is selection-scoped: changing actors drops per-actor undo stacks.
- * Continue path is project-global (Duration + absolute remaps for others), so
- * its stacks and edit-order entries survive a selection switch — otherwise
- * undoing a continue after an interleaved edit on another actor would be
- * impossible, or a whole-project snapshot could overwrite that edit.
+ * Continue path and stage resize are project-global, so their stacks and
+ * edit-order entries survive a selection switch — otherwise undoing after an
+ * interleaved edit on another actor would be impossible, or a whole-project
+ * snapshot could overwrite that edit.
  * Pass `resetContinue: true` when replacing the project or actor set.
  */
 function clearHistoryForActorSwitch(
@@ -627,7 +655,8 @@ function clearHistoryForActorSwitch(
   options?: { resetContinue?: boolean },
 ) {
   const resetContinue = options?.resetContinue === true
-  const keepGlobal = (k: ActorEditKind) => k === 'continuePath'
+  const keepGlobal = (k: ActorEditKind) =>
+    k === 'continuePath' || k === 'stageResize'
   return {
     ...clearEditState(),
     ...clearTransformEditState(),
@@ -642,6 +671,8 @@ function clearHistoryForActorSwitch(
           ...clearActorEditOrder(),
           continuePathUndoStack: [] as ContinuePathSnapshot[],
           continuePathRedoStack: [] as ContinuePathSnapshot[],
+          stageResizeUndoStack: [] as StageResizeSnapshot[],
+          stageResizeRedoStack: [] as StageResizeSnapshot[],
         }
       : {
           actorEditOrder: state.actorEditOrder.filter(keepGlobal),
@@ -747,6 +778,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     presetRedoStack: [] as MotionPresetMotionState[],
     continuePathUndoStack: [] as ContinuePathSnapshot[],
     continuePathRedoStack: [] as ContinuePathSnapshot[],
+    stageResizeUndoStack: [] as StageResizeSnapshot[],
+    stageResizeRedoStack: [] as StageResizeSnapshot[],
     recordingIntent: 'replace' as RecordingIntent,
     ...clearEditState(),
     ...clearTransformEditState(),
@@ -1117,6 +1150,160 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           : { ...actor.restPosition },
         playbackHead: 0,
         actionAnnouncement: 'Redo continue path',
+      })
+    },
+
+    resizeProjectStage: (width, height, anchor) => {
+      const state = get()
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing' ||
+        state.mode === 'playing' ||
+        state.polishSession ||
+        state.glideSession ||
+        state.presetSession
+      ) {
+        set({
+          actionAnnouncement:
+            'Finish or cancel the current tool before resizing the stage.',
+        })
+        return false
+      }
+
+      const result = resizeProjectStageCore(
+        state.project,
+        width,
+        height,
+        anchor,
+      )
+      if (!result.ok) {
+        set({ actionAnnouncement: result.error })
+        return false
+      }
+
+      if (result.plan.noop) {
+        set({
+          actionAnnouncement: 'Stage size is already that size.',
+        })
+        return false
+      }
+
+      const snap = captureStageResizeSnapshot({
+        before: state.project,
+        after: result.project,
+        plan: result.plan,
+      })
+      const actor =
+        findActor(result.project.actors, state.selectedActorId) ??
+        result.project.actors[0]!
+      const first =
+        actor.geometryEdit?.samples[0] ?? actor.recording?.samples[0]
+
+      set({
+        project: result.project,
+        stageResizeUndoStack: [...state.stageResizeUndoStack, snap].slice(
+          -MAX_UNDO,
+        ),
+        stageResizeRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'stageResize'),
+        actorEditRedoOrder: [],
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        geometryEdit: geometryMirror(actor.geometryEdit),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...actor.restPosition },
+        playbackHead: 0,
+        camera: { ...DEFAULT_CAMERA },
+        cameraFitNonce: state.cameraFitNonce + 1,
+        actionAnnouncement: `Stage resized to ${result.plan.after.width} × ${result.plan.after.height}.`,
+      })
+      return true
+    },
+
+    undoStageResize: () => {
+      const state = get()
+      if (state.stageResizeUndoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const snap =
+        state.stageResizeUndoStack[state.stageResizeUndoStack.length - 1]!
+      const restored = applyStageResizeSnapshot(state.project, snap, 'undo')
+      const actor =
+        findActor(restored.actors, state.selectedActorId) ?? restored.actors[0]!
+      const first =
+        actor.geometryEdit?.samples[0] ?? actor.recording?.samples[0]
+      set({
+        project: restored,
+        stageResizeUndoStack: state.stageResizeUndoStack.slice(0, -1),
+        stageResizeRedoStack: [...state.stageResizeRedoStack, snap].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'stageResize'),
+        actorEditRedoOrder: pushEditOrder(
+          state.actorEditRedoOrder,
+          'stageResize',
+        ),
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        geometryEdit: geometryMirror(actor.geometryEdit),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...actor.restPosition },
+        playbackHead: 0,
+        camera: { ...DEFAULT_CAMERA },
+        cameraFitNonce: state.cameraFitNonce + 1,
+        actionAnnouncement: 'Undo stage resize',
+      })
+    },
+
+    redoStageResize: () => {
+      const state = get()
+      if (state.stageResizeRedoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const snap =
+        state.stageResizeRedoStack[state.stageResizeRedoStack.length - 1]!
+      const restored = applyStageResizeSnapshot(state.project, snap, 'redo')
+      const actor =
+        findActor(restored.actors, state.selectedActorId) ?? restored.actors[0]!
+      const first =
+        actor.geometryEdit?.samples[0] ?? actor.recording?.samples[0]
+      set({
+        project: restored,
+        stageResizeRedoStack: state.stageResizeRedoStack.slice(0, -1),
+        stageResizeUndoStack: [...state.stageResizeUndoStack, snap].slice(
+          -MAX_UNDO,
+        ),
+        actorEditRedoOrder: popKindFromOrder(
+          state.actorEditRedoOrder,
+          'stageResize',
+        ),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'stageResize'),
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        geometryEdit: geometryMirror(actor.geometryEdit),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...actor.restPosition },
+        playbackHead: 0,
+        camera: { ...DEFAULT_CAMERA },
+        cameraFitNonce: state.cameraFitNonce + 1,
+        actionAnnouncement: 'Redo stage resize',
       })
     },
 
@@ -1832,15 +2019,20 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     applyPersistedSnapshot: (snapshot) => {
       cancelIdleDrag()
-      const project: Project = {
-        version: 1,
-        name:
-          sanitizeProjectName(snapshot.project.name) || DEFAULT_PROJECT_NAME,
-        actors: snapshot.project.actors.map((a) => cloneSceneActor(a)),
-        playback: { ...snapshot.project.playback },
-        // Preserve the snapshot’s authored aspect (examples and imports).
-        stageAspect: clampStageAspect(snapshot.project.stageAspect),
-      }
+      const size = resolveProjectStageSize(snapshot.project)
+      const project: Project = withProjectStageSize(
+        {
+          version: 1,
+          name:
+            sanitizeProjectName(snapshot.project.name) || DEFAULT_PROJECT_NAME,
+          actors: snapshot.project.actors.map((a) => cloneSceneActor(a)),
+          playback: { ...snapshot.project.playback },
+          stageAspect: clampStageAspect(snapshot.project.stageAspect),
+          stageWidth: size.width,
+          stageHeight: size.height,
+        },
+        size,
+      )
       const first = project.actors[0] ?? createSceneActor({ name: 'Actor 1' })
       if (project.actors.length === 0) {
         project.actors = [first]
@@ -2219,6 +2411,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'continuePath') {
         get().undoContinuePath()
+        return
+      }
+      if (kind === 'stageResize') {
+        get().undoStageResize()
       }
     },
 
@@ -2254,6 +2450,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'continuePath') {
         get().redoContinuePath()
+        return
+      }
+      if (kind === 'stageResize') {
+        get().redoStageResize()
       }
     },
 

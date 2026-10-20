@@ -75,6 +75,8 @@ export function buildFaceAlongLFixtureJson(
       trigger: 'page-load',
     },
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }
@@ -137,6 +139,8 @@ export function buildFaceAlongDensePauseLFixtureJson(
       trigger: 'page-load',
     },
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }
@@ -194,6 +198,8 @@ export function buildFaceAlongSpiralFixtureJson(
       trigger: 'page-load',
     },
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }
@@ -249,6 +255,8 @@ export function buildFaceAlongStraightScaleFixtureJson(
       trigger: 'page-load',
     },
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }
@@ -288,6 +296,8 @@ export function buildFaceAlongArcFixtureJson(
       trigger: 'page-load',
     },
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
   }
   return serializeSnapshot(buildSnapshot(project, null, savedAt))
 }

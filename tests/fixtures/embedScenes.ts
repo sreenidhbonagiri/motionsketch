@@ -5,6 +5,7 @@ import type {
   Recording,
   TransformTrack,
 } from '../../src/core/types'
+import { compositionSizeFromAspect } from '../../src/core/stageResize'
 import { createMotionSketchMarkImage } from '../../src/examples/assets'
 import { EXAMPLE_STAGE_ASPECT } from '../../src/examples/buildScenes'
 
@@ -75,6 +76,8 @@ export function buildEmbedMarkProject(): Project {
     version: 1,
     name: 'Mark entrance',
     stageAspect: EXAMPLE_STAGE_ASPECT,
+    stageWidth: compositionSizeFromAspect(EXAMPLE_STAGE_ASPECT).width,
+    stageHeight: compositionSizeFromAspect(EXAMPLE_STAGE_ASPECT).height,
     playback: { durationMs, loop: false, loopMode: 'repeat' },
     actors: [
       createSceneActor({
@@ -174,6 +177,8 @@ export function buildEmbedCompanionProject(): Project {
     version: 1,
     name: 'Companion pulse',
     stageAspect: 1,
+    stageWidth: 1000,
+    stageHeight: 1000,
     playback: { durationMs, loop: true, loopMode: 'alternate' },
     actors: [
       createSceneActor({

@@ -1,4 +1,5 @@
 import { createSceneActor } from '../../../src/core/sceneActor'
+import { compositionSizeFromAspect } from '../../../src/core/stageResize'
 import type {
   Actor,
   MotionSample,
@@ -42,6 +43,8 @@ export function makeActor(
 
 export function makeProject(overrides?: Partial<Project>): Project {
   const actor = makeActor()
+  const stageAspect = overrides?.stageAspect ?? 1.6
+  const defaults = compositionSizeFromAspect(stageAspect)
   return {
     version: 1,
     name: overrides?.name ?? 'Test project',
@@ -52,6 +55,8 @@ export function makeProject(overrides?: Partial<Project>): Project {
       loopMode: 'repeat',
       trigger: 'page-load',
     },
-    stageAspect: overrides?.stageAspect ?? 1.6,
+    stageAspect,
+    stageWidth: overrides?.stageWidth ?? defaults.width,
+    stageHeight: overrides?.stageHeight ?? defaults.height,
   }
 }

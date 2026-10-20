@@ -18,6 +18,8 @@ export function buildHtmlDemoExportFixtureJson(
     version: 1,
     name: 'Untitled project',
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
     actors: [
       createSceneActor({
         id: 'html-demo-actor',

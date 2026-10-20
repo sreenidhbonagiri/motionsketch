@@ -9,6 +9,10 @@ import {
   sanitizeProjectName,
 } from '../core/projectName'
 import { cloneSceneActor } from '../core/sceneActor'
+import {
+  resolveProjectStageSize,
+  withProjectStageSize,
+} from '../core/stageResize'
 import type { Project } from '../core/types'
 import { EXAMPLE_CATALOG, findExample, type ExampleId } from './catalog'
 
@@ -18,13 +22,19 @@ export type ExampleLoadResult = ExampleLoadOk | ExampleLoadErr
 
 /** Deep-clone a project graph (actors, recordings, transforms, clips). */
 export function cloneExampleProject(project: Project): Project {
-  return {
-    version: 1,
-    name: sanitizeProjectName(project.name) || DEFAULT_PROJECT_NAME,
-    stageAspect: project.stageAspect,
-    playback: { ...project.playback },
-    actors: project.actors.map((a) => cloneSceneActor(a)),
-  }
+  const size = resolveProjectStageSize(project)
+  return withProjectStageSize(
+    {
+      version: 1,
+      name: sanitizeProjectName(project.name) || DEFAULT_PROJECT_NAME,
+      stageAspect: project.stageAspect,
+      stageWidth: size.width,
+      stageHeight: size.height,
+      playback: { ...project.playback },
+      actors: project.actors.map((a) => cloneSceneActor(a)),
+    },
+    size,
+  )
 }
 
 /**

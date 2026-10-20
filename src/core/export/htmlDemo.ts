@@ -5,6 +5,7 @@ import {
   clampStageAspect,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
+import { compositionSizeFromAspect } from '../stageResize'
 import type {
   Actor,
   ActorImage,
@@ -309,6 +310,7 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
   const stageAspect = clampStageAspect(
     options.stageAspect ?? LEGACY_STAGE_ASPECT,
   )
+  const stageSize = compositionSizeFromAspect(stageAspect)
 
   // Bridge legacy single-actor options through the project exporter.
   const project: Project = {
@@ -348,6 +350,8 @@ export function buildHtmlDemo(options: HtmlDemoOptions): string {
       trigger: 'page-load',
     },
     stageAspect,
+    stageWidth: stageSize.width,
+    stageHeight: stageSize.height,
   }
 
   return buildHtmlDemoFromProject(project)

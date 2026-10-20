@@ -17,6 +17,8 @@ export function buildMotionPresetsFixtureJson(
     version: 1,
     name: 'Motion presets fixture',
     stageAspect: 1.6,
+    stageWidth: 1600,
+    stageHeight: 1000,
     actors: [
       createSceneActor({
         id: 'preset-actor',

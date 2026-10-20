@@ -186,10 +186,21 @@ export interface Project {
   actors: SceneActor[]
   playback: PlaybackSettings
   /**
-   * Logical stage width/height. Captured when the project is created and never
-   * rewritten on window resize. Normalized sample coords refer to this space.
+   * Logical stage aspect (width ÷ height). Kept in sync with
+   * {@link stageWidth} / {@link stageHeight}. Window resize never rewrites it.
+   * Normalized sample coords refer to this composition space.
    */
   stageAspect: number
+  /**
+   * Composition working width (not export pixels). Persisted so same-aspect
+   * expansion (e.g. 1600×1000 → 3200×2000) survives save/reopen.
+   */
+  stageWidth: number
+  /**
+   * Composition working height (not export pixels). Persisted with
+   * {@link stageWidth}; aspect = width / height.
+   */
+  stageHeight: number
 }
 
 export type EditorMode =

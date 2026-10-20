@@ -7,6 +7,7 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
+import { StageSizeSection } from './StageSizeSection'
 
 export function ProjectPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -257,6 +258,8 @@ export function ProjectPanel() {
           ? 'Download a JSON file you can reopen and edit in MotionSketch.'
           : 'Create a path (or recover from a save error) before downloading a project file.'}
       </p>
+
+      <StageSizeSection />
     </div>
   )
 }

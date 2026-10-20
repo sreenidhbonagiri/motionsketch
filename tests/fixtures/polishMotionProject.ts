@@ -7,6 +7,7 @@ import {
 } from '../../src/core/persist/document'
 import { createSceneActor } from '../../src/core/sceneActor'
 import type { GeometryEdit, MotionSample, Project } from '../../src/core/types'
+import { compositionSizeFromAspect } from '../../src/core/stageResize'
 
 type FixtureActor = {
   id: string
@@ -47,6 +48,8 @@ export function buildPolishMotionFixtureProject(): Project {
     version: 1,
     name: data.name,
     stageAspect: data.stageAspect,
+    stageWidth: compositionSizeFromAspect(data.stageAspect).width,
+    stageHeight: compositionSizeFromAspect(data.stageAspect).height,
     playback: { ...data.playback },
     actors: data.actors.map((a) =>
       createSceneActor({

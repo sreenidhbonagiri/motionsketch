@@ -4,6 +4,13 @@ import {
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
 import {
+  compositionSizeFromAspect,
+  MAX_STAGE_COMPOSITION_EDGE,
+  MIN_STAGE_COMPOSITION_EDGE,
+  resolveProjectStageSize,
+  withProjectStageSize,
+} from '../stageResize'
+import {
   cloneSceneActor,
   createSceneActor,
   MAX_ACTORS,
@@ -42,11 +49,13 @@ import {
  * v11: actor.faceAlongPath / directionOffsetDeg (older → off / 0°).
  * v12: actor.glide (older → 0).
  * v13: appearance.text + kind 'text' (older → text null; kind unchanged).
+ * v14: project.stageWidth / stageHeight composition units (older → derive from
+ *      stageAspect with default height 1000 so appearance is unchanged).
  *
  * Additive (no version bump): geometryEdit.timingBaked / restoreSteadySpeed /
  * restoreGlide — older files omit them (treated as unset / not timing-baked).
  */
-export const PERSIST_FORMAT_VERSION = 13 as const
+export const PERSIST_FORMAT_VERSION = 14 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
@@ -59,6 +68,7 @@ export const PERSIST_FORMAT_VERSION_V9 = 9 as const
 export const PERSIST_FORMAT_VERSION_V10 = 10 as const
 export const PERSIST_FORMAT_VERSION_V11 = 11 as const
 export const PERSIST_FORMAT_VERSION_V12 = 12 as const
+export const PERSIST_FORMAT_VERSION_V13 = 13 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -132,6 +142,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   const supported = [
     PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V13,
     PERSIST_FORMAT_VERSION_V12,
     PERSIST_FORMAT_VERSION_V11,
     PERSIST_FORMAT_VERSION_V10,
@@ -210,6 +221,8 @@ export function validateSnapshot(data: unknown): PersistParseResult {
     geometryEdit,
   })
 
+  const stageAspect = legacy.value.stageAspect
+  const migratedSize = compositionSizeFromAspect(stageAspect)
   return {
     ok: true,
     snapshot: {
@@ -227,7 +240,9 @@ export function validateSnapshot(data: unknown): PersistParseResult {
             (legacy.value.playback as { trigger?: unknown }).trigger,
           ),
         },
-        stageAspect: legacy.value.stageAspect,
+        stageAspect,
+        stageWidth: migratedSize.width,
+        stageHeight: migratedSize.height,
       },
     },
   }
@@ -301,8 +316,16 @@ function validateMultiActorProject(
   const playback = validatePlayback(value.playback)
   if (!playback.ok) return playback
 
-  const stageAspect = coerceStageAspect(value.stageAspect, PERSIST_FORMAT_VERSION)
+  const stageAspect = coerceStageAspect(value.stageAspect, formatVersion)
   if (!stageAspect.ok) return stageAspect
+
+  const stageSize = coerceStageSize(
+    value.stageWidth,
+    value.stageHeight,
+    stageAspect.value,
+    formatVersion,
+  )
+  if (!stageSize.ok) return stageSize
 
   if (!Array.isArray(value.actors)) {
     return { ok: false, error: 'project.actors must be an array.' }
@@ -343,7 +366,9 @@ function validateMultiActorProject(
       name: name.value,
       actors,
       playback: playback.value,
-      stageAspect: stageAspect.value,
+      stageAspect: stageSize.value.aspect,
+      stageWidth: stageSize.value.width,
+      stageHeight: stageSize.value.height,
     },
   }
 }
@@ -582,6 +607,100 @@ function coerceLoopMode(value: unknown): LoopMode {
   return value === 'alternate' ? 'alternate' : 'repeat'
 }
 
+/**
+ * v14+: require finite, positive stageWidth/stageHeight in range; aspect must
+ * match width/height (otherwise reject). Older: migrate missing sizes from
+ * aspect × default height. When older files include both sizes but aspect
+ * disagrees, dimensions win (aspect rewritten to width/height).
+ */
+function coerceStageSize(
+  widthRaw: unknown,
+  heightRaw: unknown,
+  stageAspect: number,
+  formatVersion: number,
+):
+  | { ok: true; value: { width: number; height: number; aspect: number } }
+  | PersistParseErr {
+  const hasWidth = widthRaw !== undefined && widthRaw !== null
+  const hasHeight = heightRaw !== undefined && heightRaw !== null
+
+  if (!hasWidth && !hasHeight) {
+    if (formatVersion >= PERSIST_FORMAT_VERSION) {
+      return {
+        ok: false,
+        error: 'project.stageWidth and project.stageHeight are required.',
+      }
+    }
+    // Pre-v14 files: derive composition size from aspect (appearance unchanged).
+    const size = compositionSizeFromAspect(stageAspect)
+    return {
+      ok: true,
+      value: {
+        width: size.width,
+        height: size.height,
+        aspect: clampStageAspect(stageAspect),
+      },
+    }
+  }
+
+  if (!hasWidth || !hasHeight) {
+    return {
+      ok: false,
+      error:
+        'project.stageWidth and project.stageHeight must both be present when either is set.',
+    }
+  }
+
+  if (typeof widthRaw !== 'number' || typeof heightRaw !== 'number') {
+    return {
+      ok: false,
+      error: 'project.stageWidth and project.stageHeight must be numbers.',
+    }
+  }
+  const width = asFiniteNumber(widthRaw)
+  const height = asFiniteNumber(heightRaw)
+  if (width === null || height === null) {
+    return {
+      ok: false,
+      error: 'project.stageWidth and project.stageHeight must be finite numbers.',
+    }
+  }
+  if (!(width > 0) || !(height > 0)) {
+    return {
+      ok: false,
+      error: 'project.stageWidth and project.stageHeight must be positive.',
+    }
+  }
+  const w = Math.round(width)
+  const h = Math.round(height)
+  if (
+    w < MIN_STAGE_COMPOSITION_EDGE ||
+    h < MIN_STAGE_COMPOSITION_EDGE ||
+    w > MAX_STAGE_COMPOSITION_EDGE ||
+    h > MAX_STAGE_COMPOSITION_EDGE
+  ) {
+    return {
+      ok: false,
+      error: `project.stageWidth/stageHeight must be in [${MIN_STAGE_COMPOSITION_EDGE}, ${MAX_STAGE_COMPOSITION_EDGE}].`,
+    }
+  }
+  const fromSize = clampStageAspect(w / h)
+  const aspectMismatch =
+    Math.abs(fromSize - clampStageAspect(stageAspect)) > 1e-3
+  if (aspectMismatch && formatVersion >= PERSIST_FORMAT_VERSION) {
+    return {
+      ok: false,
+      error:
+        'project.stageAspect does not match project.stageWidth / stageHeight.',
+    }
+  }
+  // Pre-v14 with both sizes: dimensions are authoritative (deterministic).
+  return {
+    ok: true,
+    value: { width: w, height: h, aspect: fromSize },
+  }
+}
+
 function coerceStageAspect(
   value: unknown,
   formatVersion: number,
@@ -666,13 +785,19 @@ export function serializeSnapshotForDownload(snapshot: PersistedSnapshot): strin
 }
 
 function cloneProject(project: Project): Project {
-  return {
-    version: 1,
-    name: sanitizeProjectName(project.name) || DEFAULT_PROJECT_NAME,
-    actors: project.actors.map((a) => cloneSceneActor(a)),
-    playback: { ...project.playback },
-    stageAspect: clampStageAspect(project.stageAspect),
-  }
+  const size = resolveProjectStageSize(project)
+  return withProjectStageSize(
+    {
+      version: 1,
+      name: sanitizeProjectName(project.name) || DEFAULT_PROJECT_NAME,
+      actors: project.actors.map((a) => cloneSceneActor(a)),
+      playback: { ...project.playback },
+      stageAspect: clampStageAspect(project.stageAspect),
+      stageWidth: size.width,
+      stageHeight: size.height,
+    },
+    size,
+  )
 }
 
 export function createEmptyPersistableProject(
@@ -680,12 +805,16 @@ export function createEmptyPersistableProject(
   name: string = DEFAULT_PROJECT_NAME,
 ): Project {
   const safeName = sanitizeProjectName(name) || DEFAULT_PROJECT_NAME
+  const aspect = clampStageAspect(stageAspect)
+  const size = compositionSizeFromAspect(aspect)
   return {
     version: 1,
     name: safeName,
     actors: [createSceneActor({ name: 'Actor 1' })],
     playback: { ...DEFAULT_PLAYBACK },
-    stageAspect: clampStageAspect(stageAspect),
+    stageAspect: aspect,
+    stageWidth: size.width,
+    stageHeight: size.height,
   }
 }
 

@@ -1,4 +1,5 @@
 import { createSceneActor } from '../core/sceneActor'
+import { compositionSizeFromAspect } from '../core/stageResize'
 import type {
   MotionSample,
   Project,
@@ -9,6 +10,8 @@ import { createMotionSketchMarkImage } from './assets'
 
 /** Authored stage aspect for all bundled examples (independent of viewport). */
 export const EXAMPLE_STAGE_ASPECT = 16 / 10
+
+const EXAMPLE_STAGE_SIZE = compositionSizeFromAspect(EXAMPLE_STAGE_ASPECT)
 
 function recordingFromPath(
   points: Array<{ x: number; y: number }>,
@@ -49,6 +52,8 @@ export function buildLogoEntranceProject(): Project {
     version: 1,
     name: 'Logo entrance',
     stageAspect: EXAMPLE_STAGE_ASPECT,
+    stageWidth: EXAMPLE_STAGE_SIZE.width,
+    stageHeight: EXAMPLE_STAGE_SIZE.height,
     playback: { durationMs, loop: false, loopMode: 'repeat', trigger: 'page-load' },
     actors: [
       createSceneActor({
@@ -98,6 +103,8 @@ export function buildFollowTheLeaderProject(): Project {
     version: 1,
     name: 'Follow the leader',
     stageAspect: EXAMPLE_STAGE_ASPECT,
+    stageWidth: EXAMPLE_STAGE_SIZE.width,
+    stageHeight: EXAMPLE_STAGE_SIZE.height,
     playback: { durationMs, loop: false, loopMode: 'repeat', trigger: 'page-load' },
     actors: [
       createSceneActor({
@@ -177,6 +184,8 @@ export function buildOrbitProject(): Project {
     version: 1,
     name: 'Orbit',
     stageAspect: EXAMPLE_STAGE_ASPECT,
+    stageWidth: EXAMPLE_STAGE_SIZE.width,
+    stageHeight: EXAMPLE_STAGE_SIZE.height,
     playback: { durationMs, loop: true, loopMode: 'repeat', trigger: 'page-load' },
     actors: [
       createSceneActor({

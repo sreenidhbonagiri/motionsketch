@@ -14,6 +14,7 @@ import {
   formatCssAspectRatio,
   LEGACY_STAGE_ASPECT,
 } from '../stageAspect'
+import { compositionSizeFromAspect } from '../stageResize'
 import {
   buildHeadingTrack,
   evaluateActorRotationDeg,
@@ -806,6 +807,8 @@ export function generateCssSnippet(options: {
     faceAlongPath: false,
     directionOffsetDeg: 0,
   }
+  const stageAspect = options.stageAspect ?? LEGACY_STAGE_ASPECT
+  const stageSize = compositionSizeFromAspect(stageAspect)
   const project: Project = {
     version: 1,
     name: 'Export',
@@ -816,7 +819,9 @@ export function generateCssSnippet(options: {
       loopMode: options.loopMode ?? 'repeat',
       trigger: 'page-load',
     },
-    stageAspect: options.stageAspect ?? LEGACY_STAGE_ASPECT,
+    stageAspect,
+    stageWidth: stageSize.width,
+    stageHeight: stageSize.height,
   }
   // Inject processed path via geometryEdit samples mapped from keyframes
   if (options.keyframes.length >= 2) {
@@ -849,6 +854,8 @@ export function exportCssFromRecording(options: {
   processedPath?: MotionSample[] | null
   transform?: TransformTrack | null
 }): string {
+  const stageAspect = options.stageAspect ?? LEGACY_STAGE_ASPECT
+  const stageSize = compositionSizeFromAspect(stageAspect)
   const project: Project = {
     version: 1,
     name: 'Export',
@@ -885,7 +892,9 @@ export function exportCssFromRecording(options: {
       loopMode: options.loopMode ?? 'repeat',
       trigger: 'page-load',
     },
-    stageAspect: options.stageAspect ?? LEGACY_STAGE_ASPECT,
+    stageAspect,
+    stageWidth: stageSize.width,
+    stageHeight: stageSize.height,
   }
   return generateProjectCss(project)
 }
