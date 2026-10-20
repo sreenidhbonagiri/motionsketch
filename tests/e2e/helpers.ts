@@ -337,6 +337,13 @@ export async function ensureRefineMotionOpen(page: Page) {
     .toBe(true)
 }
 
+/** Arm Continue path from the main dock (after Record, before Play). */
+export async function clickContinuePath(page: Page) {
+  const btn = page.getByTestId('btn-continue-path')
+  await expect(btn).toBeVisible()
+  await btn.click()
+}
+
 /** Expand Export → Other ways (React, CSS, own-element, project file). */
 export async function expandExportOtherWays(page: Page) {
   const details = page.getByTestId('export-other-ways')

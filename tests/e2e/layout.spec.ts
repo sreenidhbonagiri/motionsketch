@@ -426,6 +426,20 @@ test.describe('workspace layout', () => {
     await expect(page.getByTestId('toolbar')).toBeVisible()
     await assertFullyInViewport(page, 'toolbar')
 
+    // Continue path sits on the main dock after Record; keep touch height and
+    // avoid horizontal overflow when the longer label wraps.
+    const continueBtn = page.getByTestId('btn-continue-path')
+    await expect(continueBtn).toBeVisible()
+    await assertFullyInViewport(page, 'btn-continue-path')
+    const continueBox = await continueBtn.boundingBox()
+    expect(continueBox).toBeTruthy()
+    expect(continueBox!.height).toBeGreaterThanOrEqual(32)
+    const noOverflowX = await page.evaluate(() => {
+      const root = document.documentElement
+      return root.scrollWidth <= root.clientWidth + 1
+    })
+    expect(noOverflowX).toBe(true)
+
     await openPanel(page, 'export')
     await expandExportOtherWays(page)
     const viewCss = page.getByTestId('btn-view-css')

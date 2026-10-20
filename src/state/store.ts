@@ -39,6 +39,18 @@ import {
   type MotionPresetMotionState,
   type MotionPresetTiming,
 } from '../core/motionPresets'
+import {
+  additionHasMotion,
+  applyContinuePathSnapshot,
+  captureContinuePathSnapshot,
+  CONTINUE_PATH_ANNOUNCEMENT,
+  continuePathAvailability,
+  displayedPathSamples,
+  pathEndpoint,
+  planContinuePathCommit,
+  type ContinuePathSnapshot,
+  type RecordingIntent,
+} from '../core/continuePath'
 import { ARMED_ANNOUNCEMENT } from '../lib/modeStatus'
 import { selectProcessedPathForActor } from './selectors'
 import {
@@ -161,6 +173,7 @@ export type ActorEditKind =
   | 'placement'
   | 'glide'
   | 'preset'
+  | 'continuePath'
 
 const PLACEMENT_NOOP_EPS = 1e-9
 
@@ -235,6 +248,20 @@ interface EditorStore {
   presetUndoStack: MotionPresetMotionState[]
   presetRedoStack: MotionPresetMotionState[]
 
+  /**
+   * Continue-path undo: per-commit snapshots. Undo restores the continued
+   * actor + Duration, remapping others by absolute time so interleaved edits
+   * are not overwritten.
+   */
+  continuePathUndoStack: ContinuePathSnapshot[]
+  continuePathRedoStack: ContinuePathSnapshot[]
+
+  /**
+   * Armed / in-progress recording intent. `continue` appends; `replace` is
+   * the classic Record flow.
+   */
+  recordingIntent: RecordingIntent
+
   selectedTransformId: string | null
   transformUndoStack: TransformTrack[]
   transformRedoStack: TransformTrack[]
@@ -258,10 +285,18 @@ interface EditorStore {
   actionAnnouncement: string | null
 
   armRecording: () => void
+  /** Arm append-at-end recording for the selected actor’s existing path. */
+  armContinuePath: () => boolean
   cancelArm: () => void
   beginRecording: (pointerId: number, position: Vec2) => void
   pushLiveSample: (position: Vec2) => void
   finishRecording: (recording: Recording | null) => void
+  /** @internal Commit a continue-path addition (called from finishRecording). */
+  finishContinuePath: (addition: Recording | null) => void
+  /** Abort an in-progress continue stroke (no history). */
+  cancelContinueRecording: () => void
+  undoContinuePath: () => void
+  redoContinuePath: () => void
   /**
    * Replace the selected actor’s take with an imported path recording.
    * Keeps project Duration and appearance; clears path/transform edits;
@@ -561,18 +596,46 @@ function clearPlacementHistory(state: {
   }
 }
 
-/** History is selection-scoped: changing actors drops undo/redo stacks. */
-function clearHistoryForActorSwitch() {
+/**
+ * History is selection-scoped: changing actors drops per-actor undo stacks.
+ * Continue path is project-global (Duration + absolute remaps for others), so
+ * its stacks and edit-order entries survive a selection switch — otherwise
+ * undoing a continue after an interleaved edit on another actor would be
+ * impossible, or a whole-project snapshot could overwrite that edit.
+ * Pass `resetContinue: true` when replacing the project or actor set.
+ */
+function clearHistoryForActorSwitch(
+  state: {
+    actorEditOrder: ActorEditKind[]
+    actorEditRedoOrder: ActorEditKind[]
+  },
+  options?: { resetContinue?: boolean },
+) {
+  const resetContinue = options?.resetContinue === true
   return {
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
     ...clearPlacementEditState(),
-    ...clearActorEditOrder(),
     glideUndoStack: [] as number[],
     glideRedoStack: [] as number[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
+    ...(resetContinue
+      ? {
+          ...clearActorEditOrder(),
+          continuePathUndoStack: [] as ContinuePathSnapshot[],
+          continuePathRedoStack: [] as ContinuePathSnapshot[],
+        }
+      : {
+          actorEditOrder: state.actorEditOrder.filter(
+            (k) => k === 'continuePath',
+          ),
+          actorEditRedoOrder: state.actorEditRedoOrder.filter(
+            (k) => k === 'continuePath',
+          ),
+        }),
+    recordingIntent: 'replace' as RecordingIntent,
   }
 }
 
@@ -668,6 +731,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     glideRedoStack: [] as number[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
+    continuePathUndoStack: [] as ContinuePathSnapshot[],
+    continuePathRedoStack: [] as ContinuePathSnapshot[],
+    recordingIntent: 'replace' as RecordingIntent,
     ...clearEditState(),
     ...clearTransformEditState(),
     ...clearClipEditState(),
@@ -679,20 +745,80 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (mode === 'playing' || mode === 'editing') return
       set({
         mode: 'armed',
+        recordingIntent: 'replace',
         liveTrail: [],
         stageHint: 'default',
         actionAnnouncement: ARMED_ANNOUNCEMENT,
       })
     },
 
+    armContinuePath: () => {
+      const state = get()
+      const actor = getSelected(state)
+      const availability = continuePathAvailability({
+        actor,
+        mode: state.mode,
+        polishSession: state.polishSession,
+        glideSession: state.glideSession,
+        presetSession: state.presetSession,
+        pathGestureActive: state.pathGestureActive,
+      })
+      if (!availability.enabled) {
+        set({
+          actionAnnouncement:
+            availability.reason ?? 'Continue path is unavailable.',
+        })
+        return false
+      }
+      const endpoint = pathEndpoint(
+        displayedPathSamples(actor, state.project.stageAspect),
+      )
+      if (!endpoint) return false
+      if (state.polishSession) get().cancelPolish()
+      if (state.glideSession) get().cancelGlide()
+      if (state.presetSession) get().cancelPreset()
+      set({
+        mode: 'armed',
+        recordingIntent: 'continue',
+        livePosition: { ...endpoint },
+        liveTrail: [],
+        playbackHead: actor.clip.end,
+        playbackDirection: 1,
+        stageHint: 'default',
+        actionAnnouncement: CONTINUE_PATH_ANNOUNCEMENT,
+        geometryEdit: geometryMirror(actor.geometryEdit),
+      })
+      return true
+    },
+
     cancelArm: () => {
       if (get().mode === 'armed') {
-        set({ mode: 'idle', pointerId: null, actionAnnouncement: null })
+        set({
+          mode: 'idle',
+          pointerId: null,
+          recordingIntent: 'replace',
+          actionAnnouncement: null,
+        })
       }
     },
 
     beginRecording: (pointerId, position) => {
       const state = get()
+      const continuing = state.recordingIntent === 'continue'
+      if (continuing) {
+        // Keep transform + path edits until a successful join absorbs them.
+        set({
+          mode: 'recording',
+          pointerId,
+          livePosition: position,
+          liveTrail: [position],
+          playbackDirection: 1,
+          stageHint: 'default',
+          actionAnnouncement: 'Recording continuation',
+          ...clearPlacementHistory(state),
+        })
+        return
+      }
       set({
         mode: 'recording',
         pointerId,
@@ -702,6 +828,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         playbackDirection: 1,
         stageHint: 'default',
         actionAnnouncement: 'Recording',
+        recordingIntent: 'replace',
         ...clearEditState(),
         ...clearTransformEditState(),
         ...clearPlacementHistory(state),
@@ -726,10 +853,15 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     },
 
     finishRecording: (recording) => {
-      set((state) => {
+      const state = get()
+      if (state.recordingIntent === 'continue') {
+        get().finishContinuePath(recording)
+        return
+      }
+      set((s) => {
         const nextProject = withSelectedActor(
-          state.project,
-          state.selectedActorId,
+          s.project,
+          s.selectedActorId,
           (a) => ({
             ...a,
             recording,
@@ -746,17 +878,231 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           pointerId: null,
           liveTrail: [],
           playbackHead: 0,
+          recordingIntent: 'replace' as RecordingIntent,
           ...clearEditState(),
           ...clearTransformEditState(),
-          ...clearPlacementHistory(state),
+          ...clearPlacementHistory(s),
           project: nextProject,
           livePosition: recording
             ? {
                 x: recording.samples[0].x,
                 y: recording.samples[0].y,
               }
-            : state.livePosition,
+            : s.livePosition,
         }
+      })
+    },
+
+    finishContinuePath: (addition) => {
+      const state = get()
+      const actor = getSelected(state)
+      const projectBefore = state.project
+      const endpoint =
+        pathEndpoint(
+          displayedPathSamples(actor, state.project.stageAspect),
+        ) ?? state.livePosition
+
+      const restoreIdle = (announcement: string | null) => {
+        // Rejection / cancel must leave the prior project and history intact.
+        set({
+          mode: 'idle',
+          pointerId: null,
+          liveTrail: [],
+          recordingIntent: 'replace',
+          livePosition: { ...endpoint },
+          playbackHead: actor.clip.end,
+          actionAnnouncement: announcement,
+          geometryEdit: geometryMirror(actor.geometryEdit),
+          project: projectBefore,
+        })
+      }
+
+      if (!addition || !additionHasMotion(addition)) {
+        restoreIdle(null)
+        return
+      }
+
+      const plan = planContinuePathCommit({
+        project: state.project,
+        actorId: state.selectedActorId,
+        addition,
+      })
+      if ('error' in plan) {
+        restoreIdle(plan.error === 'zero-motion' ? null : plan.error)
+        return
+      }
+
+      const nextProject: Project = {
+        ...state.project,
+        playback: {
+          ...state.project.playback,
+          durationMs: plan.durationMs,
+        },
+        actors: state.project.actors.map((a) => {
+          const patch = plan.actors.find((p) => p.id === a.id)
+          if (!patch) return a
+          if (a.id === state.selectedActorId) {
+            return {
+              ...a,
+              // Original take stays for Restore recorded path.
+              recording: a.recording,
+              geometryEdit: patch.geometryEdit ?? plan.geometryEdit,
+              steadySpeed: patch.steadySpeed ?? 0,
+              glide: patch.glide ?? 0,
+              clip: patch.clip,
+              transform: patch.transform,
+              restPosition: a.restPosition,
+            }
+          }
+          return {
+            ...a,
+            clip: patch.clip,
+            transform: patch.transform,
+          }
+        }),
+      }
+
+      const snap = captureContinuePathSnapshot({
+        actorId: state.selectedActorId,
+        before: state.project,
+        after: nextProject,
+      })
+      if (!snap) {
+        restoreIdle('Continue path failed.')
+        return
+      }
+
+      const first = plan.geometryEdit.samples[0]!
+      const bakedNote = plan.bakedLiveTiming
+        ? ' Existing smoothing, Steady Speed, and Glide are now part of the continued path so earlier motion stays the same.'
+        : ' Existing smoothing is now part of the continued path.'
+      set({
+        mode: 'idle',
+        pointerId: null,
+        liveTrail: [],
+        recordingIntent: 'replace',
+        playbackHead: 0,
+        playbackDirection: 1,
+        project: nextProject,
+        livePosition: { x: first.x, y: first.y },
+        ...clearEditState(),
+        geometryEdit: geometryMirror(plan.geometryEdit),
+        continuePathUndoStack: [...state.continuePathUndoStack, snap].slice(
+          -MAX_UNDO,
+        ),
+        continuePathRedoStack: [],
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        ...clearPlacementHistory(state),
+        actorEditOrder: pushEditOrder(
+          state.actorEditOrder.filter(
+            (k) => k !== 'clip' && k !== 'transform' && k !== 'placement',
+          ),
+          'continuePath',
+        ),
+        actorEditRedoOrder: [],
+        actionAnnouncement: `Path continued.${bakedNote}`,
+      })
+    },
+
+    cancelContinueRecording: () => {
+      const state = get()
+      if (state.recordingIntent !== 'continue') return
+      if (state.mode !== 'recording' && state.mode !== 'armed') return
+      const actor = getSelected(state)
+      const endpoint =
+        pathEndpoint(
+          displayedPathSamples(actor, state.project.stageAspect),
+        ) ?? actor.restPosition
+      set({
+        mode: 'idle',
+        pointerId: null,
+        liveTrail: [],
+        recordingIntent: 'replace',
+        livePosition: { ...endpoint },
+        playbackHead: actor.clip.end,
+        actionAnnouncement: 'Continue path cancelled.',
+        geometryEdit: geometryMirror(actor.geometryEdit),
+      })
+    },
+
+    undoContinuePath: () => {
+      const state = get()
+      if (state.continuePathUndoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const snap =
+        state.continuePathUndoStack[state.continuePathUndoStack.length - 1]!
+      const restored = applyContinuePathSnapshot(state.project, snap, 'undo')
+      const actor =
+        findActor(restored.actors, state.selectedActorId) ?? restored.actors[0]!
+      const first =
+        actor.geometryEdit?.samples[0] ?? actor.recording?.samples[0]
+      set({
+        project: restored,
+        continuePathUndoStack: state.continuePathUndoStack.slice(0, -1),
+        continuePathRedoStack: [...state.continuePathRedoStack, snap].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'continuePath'),
+        actorEditRedoOrder: pushEditOrder(
+          state.actorEditRedoOrder,
+          'continuePath',
+        ),
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        geometryEdit: geometryMirror(actor.geometryEdit),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...actor.restPosition },
+        playbackHead: 0,
+        actionAnnouncement: 'Undo continue path',
+      })
+    },
+
+    redoContinuePath: () => {
+      const state = get()
+      if (state.continuePathRedoStack.length === 0) return
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return
+      }
+      const snap =
+        state.continuePathRedoStack[state.continuePathRedoStack.length - 1]!
+      const restored = applyContinuePathSnapshot(state.project, snap, 'redo')
+      const actor =
+        findActor(restored.actors, state.selectedActorId) ?? restored.actors[0]!
+      const first =
+        actor.geometryEdit?.samples[0] ?? actor.recording?.samples[0]
+      set({
+        project: restored,
+        continuePathRedoStack: state.continuePathRedoStack.slice(0, -1),
+        continuePathUndoStack: [...state.continuePathUndoStack, snap].slice(
+          -MAX_UNDO,
+        ),
+        actorEditRedoOrder: popKindFromOrder(
+          state.actorEditRedoOrder,
+          'continuePath',
+        ),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'continuePath'),
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        ...clearClipEditState(),
+        geometryEdit: geometryMirror(actor.geometryEdit),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...actor.restPosition },
+        playbackHead: 0,
+        actionAnnouncement: 'Redo continue path',
       })
     },
 
@@ -1439,7 +1785,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
             ? 'New project ready. Create a path to start an animation.'
             : `Created “${project.name}”. You can start drawing.`,
         selectedActorId: project.actors[0].id,
-        ...clearHistoryForActorSwitch(),
+        ...clearHistoryForActorSwitch(get(), { resetContinue: true }),
         polishStrengthByActorId: {},
         project,
       })
@@ -1489,7 +1835,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         showPathComparison: false,
         stageHint: 'default',
         selectedActorId,
-        ...clearHistoryForActorSwitch(),
+        ...clearHistoryForActorSwitch(get(), { resetContinue: true }),
         polishStrengthByActorId: {},
         geometryEdit: geometryMirror(first?.geometryEdit),
         project,
@@ -1539,7 +1885,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         livePosition,
         mode: state.mode === 'playing' ? 'playing' : 'idle',
         polishStrengthByActorId,
-        ...clearHistoryForActorSwitch(),
+        ...clearHistoryForActorSwitch(state),
         geometryEdit: geometryMirror(actor.geometryEdit),
       })
     },
@@ -1574,7 +1920,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         },
         selectedActorId: actor.id,
         livePosition: { ...actor.restPosition },
-        ...clearHistoryForActorSwitch(),
+        ...clearHistoryForActorSwitch(state, { resetContinue: true }),
         actionAnnouncement: `Added ${actor.name}.`,
       })
       return actor.id
@@ -1608,7 +1954,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         project: { ...state.project, actors },
         selectedActorId: copy.id,
         livePosition: { ...copy.restPosition },
-        ...clearHistoryForActorSwitch(),
+        ...clearHistoryForActorSwitch(state, { resetContinue: true }),
         geometryEdit: geometryMirror(copy.geometryEdit),
         actionAnnouncement: `Duplicated ${source.name}.`,
       })
@@ -1637,7 +1983,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         project: { ...state.project, actors },
         selectedActorId: next.id,
         livePosition: { ...next.restPosition },
-        ...clearHistoryForActorSwitch(),
+        ...clearHistoryForActorSwitch(state, { resetContinue: true }),
         geometryEdit: geometryMirror(next.geometryEdit),
         actionAnnouncement: 'Actor deleted.',
       })
@@ -1845,6 +2191,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'preset') {
         get().undoPreset()
+        return
+      }
+      if (kind === 'continuePath') {
+        get().undoContinuePath()
       }
     },
 
@@ -1876,6 +2226,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'preset') {
         get().redoPreset()
+        return
+      }
+      if (kind === 'continuePath') {
+        get().redoContinuePath()
       }
     },
 
@@ -1948,10 +2302,20 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     restoreRecordedPath: () => {
       const state = get()
       const wasEditing = state.mode === 'editing'
+      const selected = getSelected(state)
+      const restoreSteady = selected.geometryEdit?.restoreSteadySpeed
+      const restoreGlide = selected.geometryEdit?.restoreGlide
       const nextProject = withSelectedActor(
         state.project,
         state.selectedActorId,
-        (a) => ({ ...a, geometryEdit: null }),
+        (a) => ({
+          ...a,
+          geometryEdit: null,
+          ...(typeof restoreSteady === 'number'
+            ? { steadySpeed: restoreSteady }
+            : {}),
+          ...(typeof restoreGlide === 'number' ? { glide: restoreGlide } : {}),
+        }),
       )
       set({
         project: nextProject,

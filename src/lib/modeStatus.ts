@@ -1,5 +1,11 @@
+import {
+  CONTINUE_PATH_ANNOUNCEMENT,
+  CONTINUE_PATH_INSTRUCTION,
+} from '../core/continuePath'
 import type { PathEditTool } from '../core/edit'
 import type { EditorMode } from '../core/types'
+
+export { CONTINUE_PATH_ANNOUNCEMENT, CONTINUE_PATH_INSTRUCTION }
 
 export type ModeStatusKind =
   | 'edit-points'
@@ -91,6 +97,8 @@ export function resolveModeStatus(input: {
   hasAnyRecording: boolean
   hasSelectedRecording: boolean
   actorLabel: string
+  /** When armed/recording, distinguish replace vs continue-path. */
+  recordingIntent?: 'replace' | 'continue'
 }): ModeStatus | null {
   const {
     mode,
@@ -101,6 +109,7 @@ export function resolveModeStatus(input: {
     hasAnyRecording,
     hasSelectedRecording,
     actorLabel,
+    recordingIntent = 'replace',
   } = input
 
   if (mode === 'editing') {
@@ -138,6 +147,13 @@ export function resolveModeStatus(input: {
   }
 
   if (mode === 'armed') {
+    if (recordingIntent === 'continue') {
+      return {
+        kind: 'armed',
+        label: 'Continue',
+        instruction: CONTINUE_PATH_INSTRUCTION,
+      }
+    }
     return {
       kind: 'armed',
       label: 'Ready',
@@ -146,6 +162,13 @@ export function resolveModeStatus(input: {
   }
 
   if (mode === 'recording') {
+    if (recordingIntent === 'continue') {
+      return {
+        kind: 'recording',
+        label: 'Continuing',
+        instruction: 'Release to join, Escape to cancel.',
+      }
+    }
     return {
       kind: 'recording',
       label: 'Recording',

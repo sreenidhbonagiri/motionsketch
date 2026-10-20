@@ -1,5 +1,11 @@
 import { localToProject } from '../core/clip'
 import {
+  CONTINUE_PATH_BAKE_NOTE,
+  CONTINUE_PATH_HELP,
+  continuePathAvailability,
+  RESTORE_RECORDED_PATH_HELP,
+} from '../core/continuePath'
+import {
   isEndpointHandle,
   makeCornerAvailability,
   MAX_PATH_HANDLES,
@@ -54,6 +60,8 @@ export function PlaybackDock() {
   const playbackDirection = useEditorStore((s) => s.playbackDirection)
   const scrubPlayback = useEditorStore((s) => s.scrubPlayback)
   const armRecording = useEditorStore((s) => s.armRecording)
+  const armContinuePath = useEditorStore((s) => s.armContinuePath)
+  const recordingIntent = useEditorStore((s) => s.recordingIntent)
   const play = useEditorStore((s) => s.play)
   const pause = useEditorStore((s) => s.pause)
   const restartPlayback = useEditorStore((s) => s.restartPlayback)
@@ -91,6 +99,18 @@ export function PlaybackDock() {
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const confirm = useConfirm()
   const coarsePointer = useCoarsePointer()
+
+  const onRestoreRecordedPath = async () => {
+    const ok = await confirm({
+      title: 'Restore recorded path?',
+      body: RESTORE_RECORDED_PATH_HELP,
+      confirmLabel: 'Restore recorded path',
+      danger: true,
+      testId: 'restore-path-confirm',
+      confirmTestId: 'btn-restore-path-confirm',
+    })
+    if (ok) restoreRecordedPath()
+  }
 
   const isRecordingLike = mode === 'armed' || mode === 'recording'
   const editing = mode === 'editing'
@@ -157,6 +177,15 @@ export function PlaybackDock() {
   // Compact label + instruction in the dock. Empty-board Record guidance stays on
   // the stage tip (id=stage-empty-hint). Selected-point copy stays in
   // handle-selection-status.
+  const continueAvail = continuePathAvailability({
+    actor: selectedActor,
+    mode,
+    polishSession,
+    glideSession,
+    presetSession,
+    pathGestureActive,
+  })
+
   const modeStatus = resolveModeStatus({
     mode,
     pathTool,
@@ -166,6 +195,7 @@ export function PlaybackDock() {
     hasAnyRecording,
     hasSelectedRecording: hasRecording,
     actorLabel,
+    recordingIntent,
   })
 
   const emptyBoardHintId = 'stage-empty-hint'
@@ -474,11 +504,18 @@ export function PlaybackDock() {
             <button
               type="button"
               data-testid="btn-restore-path"
-              onClick={restoreRecordedPath}
+              onClick={() => {
+                void onRestoreRecordedPath()
+              }}
+              title={RESTORE_RECORDED_PATH_HELP}
+              aria-describedby="restore-path-help-edit"
               className={btnQuiet}
             >
               Restore recorded path
             </button>
+            <span id="restore-path-help-edit" className="sr-only">
+              {RESTORE_RECORDED_PATH_HELP}
+            </span>
           </>
         ) : (
           <>
@@ -528,6 +565,22 @@ export function PlaybackDock() {
                 className={hasAnyRecording ? btnSecondary : btnPrimary}
               >
                 Record
+              </button>
+            )}
+
+            {hasRecording && !isRecordingLike && (
+              <button
+                type="button"
+                data-testid="btn-continue-path"
+                onClick={() => {
+                  armContinuePath()
+                }}
+                disabled={!continueAvail.enabled}
+                title={continueAvail.reason ?? CONTINUE_PATH_HELP}
+                aria-describedby="continue-path-help"
+                className={btnSecondary}
+              >
+                Continue path
               </button>
             )}
 
@@ -618,7 +671,7 @@ export function PlaybackDock() {
               disabled={isRecordingLike || actorEditOrder.length === 0}
               className={btnIcon}
               aria-label="Undo"
-              title="Undo placement, transform, sequence timing, Glide, or a motion preset for the selected actor"
+              title="Undo placement, transform, sequence timing, Glide, continue path, or a motion preset for the selected actor"
             >
               <span aria-hidden>↶</span>
             </button>
@@ -629,7 +682,7 @@ export function PlaybackDock() {
               disabled={isRecordingLike || actorEditRedoOrder.length === 0}
               className={btnIcon}
               aria-label="Redo"
-              title="Redo placement, transform, sequence timing, Glide, or a motion preset for the selected actor"
+              title="Redo placement, transform, sequence timing, Glide, continue path, or a motion preset for the selected actor"
             >
               <span aria-hidden>↷</span>
             </button>
@@ -693,14 +746,27 @@ export function PlaybackDock() {
                 )}
 
                 {geometryEdit && (
-                  <button
-                    type="button"
-                    data-testid="btn-restore-path"
-                    onClick={restoreRecordedPath}
-                    className={btnQuiet}
-                  >
-                    Restore recorded path
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      data-testid="btn-restore-path"
+                      onClick={() => {
+                        void onRestoreRecordedPath()
+                      }}
+                      title={RESTORE_RECORDED_PATH_HELP}
+                      aria-describedby="restore-path-help"
+                      className={btnQuiet}
+                    >
+                      Restore recorded path
+                    </button>
+                    <span
+                      id="restore-path-help"
+                      data-testid="restore-path-help"
+                      className="basis-full text-xs leading-snug text-slate-500"
+                    >
+                      {RESTORE_RECORDED_PATH_HELP}
+                    </span>
+                  </>
                 )}
               </div>
             </details>
@@ -721,6 +787,20 @@ export function PlaybackDock() {
           </button>
         )}
       </div>
+
+      {hasRecording && !editing && !isRecordingLike && (
+        <p
+          id="continue-path-help"
+          data-testid="continue-path-help"
+          className={
+            continueAvail.enabled
+              ? 'max-w-xl text-center text-[11px] leading-snug text-slate-500'
+              : 'sr-only'
+          }
+        >
+          {continueAvail.reason ?? CONTINUE_PATH_BAKE_NOTE}
+        </p>
+      )}
 
       {!isRecordingLike && (
         <p

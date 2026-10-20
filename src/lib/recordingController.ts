@@ -1,3 +1,4 @@
+import { displayedPathSamples, pathEndpoint } from '../core/continuePath'
 import {
   createSession,
   finish,
@@ -66,8 +67,21 @@ export function startRecordingDrag(
   activePointerId = pointerId
   isRecordingDrag = true
   idleRestBaseline = null
-  session = pushSample(createSession(), absoluteTimestamp, center.x, center.y)
-  useEditorStore.getState().beginRecording(pointerId, center)
+  const state = useEditorStore.getState()
+  let start = center
+  // Continue path: pin the first sample to the committed endpoint so the
+  // stroke never jumps on pointerdown.
+  if (state.recordingIntent === 'continue') {
+    const actor = findActor(state.project.actors, state.selectedActorId)
+    const endpoint = actor
+      ? pathEndpoint(
+          displayedPathSamples(actor, state.project.stageAspect),
+        )
+      : null
+    if (endpoint) start = endpoint
+  }
+  session = pushSample(createSession(), absoluteTimestamp, start.x, start.y)
+  useEditorStore.getState().beginRecording(pointerId, start)
 }
 
 export function startIdleDrag(pointerId: number, center: Vec2): void {

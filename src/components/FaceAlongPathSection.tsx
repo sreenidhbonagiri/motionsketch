@@ -49,6 +49,16 @@ export function FaceAlongPathSection() {
         </div>
       </div>
 
+      {enabled && recording && (
+        <p
+          data-testid="face-along-continue-note"
+          className="text-xs leading-relaxed text-amber-800/90"
+        >
+          Continue path is unavailable while Face along path is on. Facing uses
+          the whole stroke, so continuing would change earlier facing.
+        </p>
+      )}
+
       <label
         htmlFor={toggleId}
         className="flex cursor-pointer items-center gap-2 text-sm text-slate-700"

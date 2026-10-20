@@ -72,6 +72,19 @@ export function createSceneActor(
           partial.geometryEdit.samples,
           partial.geometryEdit.bakedSmoothing,
           partial.geometryEdit.handleIndices,
+          {
+            ...(partial.geometryEdit.timingBaked
+              ? { timingBaked: true }
+              : {}),
+            ...(typeof partial.geometryEdit.restoreSteadySpeed === 'number'
+              ? {
+                  restoreSteadySpeed: partial.geometryEdit.restoreSteadySpeed,
+                }
+              : {}),
+            ...(typeof partial.geometryEdit.restoreGlide === 'number'
+              ? { restoreGlide: partial.geometryEdit.restoreGlide }
+              : {}),
+          },
         )
       : null,
     clip: cloneClip(partial?.clip ?? fullClip()),
@@ -445,9 +458,23 @@ function parseGeometryEdit(
     }
     handleIndices = parsed
   }
+  const timingBaked = raw.timingBaked === true
+  const restoreSteadySpeed =
+    typeof raw.restoreSteadySpeed === 'number' &&
+    Number.isFinite(raw.restoreSteadySpeed)
+      ? raw.restoreSteadySpeed
+      : undefined
+  const restoreGlide =
+    typeof raw.restoreGlide === 'number' && Number.isFinite(raw.restoreGlide)
+      ? raw.restoreGlide
+      : undefined
   return {
     ok: true,
-    value: makeGeometryEdit(samples, baked, handleIndices),
+    value: makeGeometryEdit(samples, baked, handleIndices, {
+      ...(timingBaked ? { timingBaked: true } : {}),
+      ...(restoreSteadySpeed !== undefined ? { restoreSteadySpeed } : {}),
+      ...(restoreGlide !== undefined ? { restoreGlide } : {}),
+    }),
   }
 }
 

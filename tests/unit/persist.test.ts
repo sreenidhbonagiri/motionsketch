@@ -210,6 +210,62 @@ describe('persist document validation', () => {
     ])
   })
 
+  it('round-trips Continue path timingBaked + restore Steady/Glide hints', () => {
+    const recording = makeRecording(12)
+    const geometryEdit = makeGeometryEdit(
+      recording.samples.map((s, i) => ({
+        ...s,
+        x: Math.min(0.99, s.x + i * 0.01),
+      })),
+      0.2,
+      null,
+      {
+        timingBaked: true,
+        restoreSteadySpeed: 0.7,
+        restoreGlide: 0.55,
+      },
+    )
+    const project = makePersistProject({
+      actors: [
+        makeActor({
+          recording,
+          geometryEdit,
+          steadySpeed: 0,
+          glide: 0,
+        }),
+      ],
+    })
+    const parsed = parseSnapshotJson(
+      serializeSnapshot(buildSnapshot(project, null)),
+    )
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    const ge = parsed.snapshot.project.actors[0]!.geometryEdit!
+    expect(ge.timingBaked).toBe(true)
+    expect(ge.restoreSteadySpeed).toBe(0.7)
+    expect(ge.restoreGlide).toBe(0.55)
+    expect(ge.samples.length).toBe(geometryEdit.samples.length)
+
+    // Older files without the additive fields still load.
+    const legacy = JSON.parse(
+      serializeSnapshot(buildSnapshot(project, null)),
+    ) as {
+      project: {
+        actors: Array<{ geometryEdit: Record<string, unknown> }>
+      }
+    }
+    delete legacy.project.actors[0]!.geometryEdit.timingBaked
+    delete legacy.project.actors[0]!.geometryEdit.restoreSteadySpeed
+    delete legacy.project.actors[0]!.geometryEdit.restoreGlide
+    const migrated = parseSnapshotJson(JSON.stringify(legacy))
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    const legacyGe = migrated.snapshot.project.actors[0]!.geometryEdit!
+    expect(legacyGe.timingBaked).toBeUndefined()
+    expect(legacyGe.restoreSteadySpeed).toBeUndefined()
+    expect(legacyGe.restoreGlide).toBeUndefined()
+  })
+
   it('migrates geometryEdit without handleIndices to defaults', () => {
     const samples = makeSamples(20)
     const raw = JSON.stringify({

@@ -64,14 +64,16 @@ export function selectProcessedPathForActor(
     return applyGlide(steady, glideAmount, aspect).samples
   }
 
-  const spatial =
-    view.editSession?.samples ??
-    view.geometryEdit?.samples ??
-    actor.geometryEdit?.samples ??
-    null
+  const spatialEdit =
+    view.editSession ?? view.geometryEdit ?? actor.geometryEdit ?? null
+  const spatial = spatialEdit?.samples ?? null
+  // Continue path bakes Steady/Glide into samples; do not retime the prefix.
+  const timingBaked = spatialEdit?.timingBaked === true
+  const steadyAmount = timingBaked ? 0 : actor.steadySpeed
+  const glideForPath = timingBaked ? 0 : glideAmount
 
   const processed = spatial
-    ? cachedApplySteadySpeed(spatial, actor.steadySpeed, aspect)
+    ? cachedApplySteadySpeed(spatial, steadyAmount, aspect)
     : cachedProcessMotion(
         recording.samples,
         actor.smoothing,
@@ -79,7 +81,7 @@ export function selectProcessedPathForActor(
         aspect,
       )
 
-  return cachedApplyGlide(processed, glideAmount, aspect)
+  return cachedApplyGlide(processed, glideForPath, aspect)
 }
 
 /** @deprecated Use selectProcessedPathForActor — kept for transitional call sites. */

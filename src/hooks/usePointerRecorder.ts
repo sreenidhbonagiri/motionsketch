@@ -32,6 +32,28 @@ interface UsePointerRecorderOptions {
   stageRef: React.RefObject<HTMLElement | null>
 }
 
+/** Escape / unmount: discard an armed or in-progress continue without committing. */
+function cancelContinueStroke() {
+  const state = useEditorStore.getState()
+  if (state.recordingIntent !== 'continue') return false
+  if (isRecordingActive()) {
+    endDrag(false)
+  }
+  state.cancelContinueRecording()
+  return true
+}
+
+/**
+ * Commit the active recording (replace or continue).
+ * Used by pointerup, pointercancel, and blur — clears session/capture so a
+ * later pointerup cannot double-commit.
+ */
+function commitActiveRecording(timeStamp: number) {
+  const pos = useEditorStore.getState().livePosition
+  pushRecordingSample(timeStamp, pos)
+  endDrag(true)
+}
+
 export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
   const mode = useEditorStore((s) => s.mode)
   const pointerId = useEditorStore((s) => s.pointerId)
@@ -153,9 +175,7 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       if (isRecordingActive()) {
         // Stamp the release time so a post-move hold still counts toward
         // minimum duration (WebKit often compresses move timeStamps).
-        const pos = useEditorStore.getState().livePosition
-        pushRecordingSample(event.timeStamp, pos)
-        endDrag(true)
+        commitActiveRecording(event.timeStamp)
       } else {
         const pos = useEditorStore.getState().livePosition
         const actor = findActor(
@@ -179,12 +199,17 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       if (getActivePointerId() !== event.pointerId) return
 
       if (isRecordingActive()) {
-        const pos = useEditorStore.getState().livePosition
-        pushRecordingSample(event.timeStamp, pos)
-        endDrag(true)
+        // Partial-stroke policy: pointercancel commits (trackpads often end
+        // the gesture here instead of pointerup).
+        commitActiveRecording(event.timeStamp)
         clearSnapChrome()
       } else {
-        // Same cleanup as Escape / blur / project teardown.
+        const state = useEditorStore.getState()
+        if (state.recordingIntent === 'continue' && state.mode === 'armed') {
+          state.cancelContinueRecording()
+          clearSnapChrome()
+          return
+        }
         cancelIdlePlacement()
         if (mode === 'recording') useEditorStore.getState().setIdle()
       }
@@ -192,10 +217,22 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
     [mode, clearSnapChrome, cancelIdlePlacement],
   )
 
-  // Escape / blur: same cancel path as pointercancel (capture + baseline).
+  // Escape discards continue. Blur resolves any active recording immediately
+  // (commit partial stroke, release capture/session) so nothing stays open.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
+      const state = useEditorStore.getState()
+      if (
+        state.recordingIntent === 'continue' &&
+        (state.mode === 'recording' || state.mode === 'armed')
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        cancelContinueStroke()
+        clearSnapChrome()
+        return
+      }
       if (isRecordingActive()) return
       if (getActivePointerId() === null) return
       event.preventDefault()
@@ -203,6 +240,17 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       cancelIdlePlacement()
     }
     const onBlur = () => {
+      if (isRecordingActive()) {
+        commitActiveRecording(performance.now())
+        clearSnapChrome()
+        return
+      }
+      const state = useEditorStore.getState()
+      if (state.recordingIntent === 'continue' && state.mode === 'armed') {
+        cancelContinueStroke()
+        clearSnapChrome()
+        return
+      }
       cancelIdlePlacement()
     }
     window.addEventListener('keydown', onKeyDown, true)
@@ -211,9 +259,11 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('blur', onBlur)
       // Unmount mid-gesture: drop capture without committing.
-      cancelIdlePlacement()
+      if (!cancelContinueStroke()) {
+        cancelIdlePlacement()
+      }
     }
-  }, [cancelIdlePlacement])
+  }, [cancelIdlePlacement, clearSnapChrome])
 
   return {
     pointerId,

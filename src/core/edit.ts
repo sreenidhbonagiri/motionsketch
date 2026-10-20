@@ -53,6 +53,13 @@ export function copyGeometryEdit(edit: GeometryEdit): GeometryEdit {
       edit.samples.length,
       edit.handleIndices,
     ),
+    ...(edit.timingBaked ? { timingBaked: true } : {}),
+    ...(typeof edit.restoreSteadySpeed === 'number'
+      ? { restoreSteadySpeed: edit.restoreSteadySpeed }
+      : {}),
+    ...(typeof edit.restoreGlide === 'number'
+      ? { restoreGlide: edit.restoreGlide }
+      : {}),
   }
 }
 
@@ -114,16 +121,34 @@ export function normalizeHandleIndices(
   return sorted
 }
 
+export type GeometryEditOptions = {
+  handleIndices?: number[] | null
+  timingBaked?: boolean
+  restoreSteadySpeed?: number
+  restoreGlide?: number
+}
+
 /** Build a GeometryEdit with normalized handles (default even spacing when omitted). */
 export function makeGeometryEdit(
   samples: MotionSample[],
   bakedSmoothing: number,
   handleIndices?: number[] | null,
+  options?: Omit<GeometryEditOptions, 'handleIndices'>,
 ): GeometryEdit {
   return {
     samples: copyPath(samples),
     bakedSmoothing,
-    handleIndices: normalizeHandleIndices(samples.length, handleIndices),
+    handleIndices: normalizeHandleIndices(
+      samples.length,
+      handleIndices ?? null,
+    ),
+    ...(options?.timingBaked ? { timingBaked: true } : {}),
+    ...(typeof options?.restoreSteadySpeed === 'number'
+      ? { restoreSteadySpeed: options.restoreSteadySpeed }
+      : {}),
+    ...(typeof options?.restoreGlide === 'number'
+      ? { restoreGlide: options.restoreGlide }
+      : {}),
   }
 }
 

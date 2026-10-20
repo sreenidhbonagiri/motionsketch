@@ -218,6 +218,21 @@ export interface GeometryEdit {
    * Older projects omit this; loaders fill defaults via selectHandleIndices.
    */
   handleIndices: number[]
+  /**
+   * When true, `samples` already include live Steady Speed / Glide timing
+   * (Continue path bake). Playback must not reapply those controls.
+   */
+  timingBaked?: boolean
+  /**
+   * Steady Speed to reinstate when Restore recorded path clears this edit
+   * (set when Continue bakes live timing into `samples`).
+   */
+  restoreSteadySpeed?: number
+  /**
+   * Glide to reinstate when Restore recorded path clears this edit
+   * (set when Continue bakes live timing into `samples`).
+   */
+  restoreGlide?: number
 }
 
 export interface Keyframe {

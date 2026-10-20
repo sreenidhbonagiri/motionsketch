@@ -42,6 +42,9 @@ import {
  * v11: actor.faceAlongPath / directionOffsetDeg (older → off / 0°).
  * v12: actor.glide (older → 0).
  * v13: appearance.text + kind 'text' (older → text null; kind unchanged).
+ *
+ * Additive (no version bump): geometryEdit.timingBaked / restoreSteadySpeed /
+ * restoreGlide — older files omit them (treated as unset / not timing-baked).
  */
 export const PERSIST_FORMAT_VERSION = 13 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
