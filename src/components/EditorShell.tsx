@@ -95,8 +95,11 @@ export function EditorShell() {
   const afterPathToastTextId = useId()
   const headerRef = useRef<HTMLElement>(null)
   const toolbarSlotRef = useRef<HTMLDivElement>(null)
+  const afterPathToastRef = useRef<HTMLDivElement>(null)
   // Toast top tracks measured header height so wrapped mobile chrome never overlaps.
   const [toastTopPx, setToastTopPx] = useState(96)
+  // When the after-path toast is up, sheet/camera clearance includes its height.
+  const [afterPathToastHeightPx, setAfterPathToastHeightPx] = useState(0)
   // Actors panel sits above Sequence + dock; clearance tracks the live stack height.
   const [toolbarClearancePx, setToolbarClearancePx] = useState(96)
 
@@ -222,13 +225,35 @@ export function EditorShell() {
     openPanel === null &&
     !afterPathHintDismissedKeys.has(afterPathProjectKey)
 
+  useLayoutEffect(() => {
+    if (!showAfterPathWebsiteToast) {
+      setAfterPathToastHeightPx(0)
+      return
+    }
+    const el = afterPathToastRef.current
+    if (!el) return
+    const gapPx = 8
+    const update = () => {
+      setAfterPathToastHeightPx(
+        Math.ceil(el.getBoundingClientRect().height) + gapPx,
+      )
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [showAfterPathWebsiteToast])
+
+  // Sheets + workspace zoom clear the header, and the after-path toast when present.
+  const sheetTopPx = toastTopPx + afterPathToastHeightPx
+
   return (
     <div
       data-testid="app-shell"
       className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas,#eef1f5)] text-slate-900 antialiased"
       style={{
-        // Mobile contextual sheets clear the measured header + gap.
-        ['--ms-sheet-top' as string]: `${toastTopPx}px`,
+        // Mobile contextual sheets / camera bar clear header (+ toast when shown).
+        ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
       }}
     >
       <div
@@ -254,6 +279,7 @@ export function EditorShell() {
           style={{ top: toastTopPx }}
         >
           <div
+            ref={afterPathToastRef}
             role="status"
             data-testid="after-path-website-toast"
             aria-describedby={afterPathToastTextId}
@@ -514,7 +540,7 @@ export function EditorShell() {
             bottom: `max(${toolbarClearancePx}px, calc(env(safe-area-inset-bottom, 0px) + 0.75rem))`,
             // Keep at least the toggle row when Sequence + dock dominate (desktop /
             // collapsed). Expanded narrow Actors ignores this via position:fixed.
-            maxHeight: `max(2.75rem, calc(100dvh - env(safe-area-inset-top, 0px) - ${toastTopPx}px - ${toolbarClearancePx}px))`,
+            maxHeight: `max(2.75rem, calc(100dvh - env(safe-area-inset-top, 0px) - ${sheetTopPx}px - ${toolbarClearancePx}px))`,
           }}
           {...(sheetCoversChrome
             ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
@@ -535,8 +561,8 @@ export function EditorShell() {
           editing ? 'z-[60]' : 'z-30'
         }`}
         style={{
-          // Never climb into the measured header (stacked narrow chrome + gap).
-          maxHeight: `calc(100dvh - ${toastTopPx}px)`,
+          // Never climb into the measured header (+ after-path toast when shown).
+          maxHeight: `calc(100dvh - ${sheetTopPx}px)`,
         }}
         {...(sheetCoversChrome && !editing
           ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)

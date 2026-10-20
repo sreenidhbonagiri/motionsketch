@@ -1,3 +1,5 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { localToProject } from '../core/clip'
 import {
   CONTINUE_PATH_BAKE_NOTE,
@@ -18,6 +20,43 @@ import { resolveModeStatus } from '../lib/modeStatus'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 
+function PlayIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-4 fill-current"
+    >
+      <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.02-6.86a1 1 0 0 0 0-1.72L9.5 4.28a1 1 0 0 0-1.5.86z" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-4 fill-current"
+    >
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
+    </svg>
+  )
+}
+
+function StopSquareIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-3.5 fill-current"
+    >
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+    </svg>
+  )
+}
+
 function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
@@ -28,8 +67,6 @@ const control =
 const btnPrimary = `${control} bg-slate-900 text-white hover:bg-slate-800`
 const btnSecondary = `${control} text-slate-700 hover:bg-slate-900/[0.06]`
 const btnQuiet = `${control} text-slate-500 hover:bg-slate-900/[0.05]`
-/** Secondary to Play, but clearly stronger than disabled Undo/Redo. */
-const btnReset = `${control} text-slate-800 hover:bg-slate-900/[0.08] hover:text-slate-950`
 const btnIcon =
   'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:opacity-35'
 const surfaceChrome =
@@ -99,6 +136,18 @@ export function PlaybackDock() {
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const confirm = useConfirm()
   const coarsePointer = useCoarsePointer()
+  const [refineOpen, setRefineOpen] = useState(false)
+  const refineBtnRef = useRef<HTMLButtonElement>(null)
+  const refinePanelRef = useRef<HTMLDivElement>(null)
+  const refineReturnFocusRef = useRef<HTMLElement | null>(null)
+  /** Escape restores trigger focus; outside dismiss / session handoff must not. */
+  const refineRestoreFocusRef = useRef(false)
+  const refinePanelId = useId()
+  const [refinePopoverBox, setRefinePopoverBox] = useState<{
+    bottom: number
+    right: number
+    maxHeight: number
+  } | null>(null)
 
   const onRestoreRecordedPath = async () => {
     const ok = await confirm({
@@ -221,6 +270,160 @@ export function PlaybackDock() {
         : undefined
     : undefined
 
+  // Polish / Glide sessions own the chrome — close Refine; focus moves to the session.
+  useEffect(() => {
+    if (!polishSession && !glideSession) return
+    refineRestoreFocusRef.current = false
+    setRefineOpen(false)
+  }, [polishSession, glideSession])
+
+  // Portaled popover: position above the trigger and clamp to the viewport.
+  useLayoutEffect(() => {
+    if (!refineOpen) {
+      setRefinePopoverBox(null)
+      return
+    }
+    const update = () => {
+      const btn = refineBtnRef.current
+      if (!btn) return
+      const btnRect = btn.getBoundingClientRect()
+      // Sit above the whole dock so sibling controls stay clickable.
+      const dock = document.querySelector('[data-testid="playback-dock"]')
+      const dockTop =
+        dock instanceof HTMLElement
+          ? dock.getBoundingClientRect().top
+          : btnRect.top
+      const gap = 8
+      const margin = 12
+      const bottom = Math.max(margin, window.innerHeight - dockTop + gap)
+      const right = Math.max(margin, window.innerWidth - btnRect.right)
+      const available = dockTop - gap - margin
+      const maxHeight = Math.max(
+        12 * 16,
+        Math.min(window.innerHeight * 0.6, available),
+      )
+      setRefinePopoverBox({ bottom, right, maxHeight })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [refineOpen])
+
+  useEffect(() => {
+    if (!refineOpen) return
+    refineReturnFocusRef.current =
+      refineBtnRef.current ??
+      (document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null)
+    // Portal mounts after layout; focus once the panel node exists.
+    requestAnimationFrame(() => {
+      refinePanelRef.current?.focus()
+    })
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (document.querySelector('dialog[open]')) return
+      const editor = useEditorStore.getState()
+      if (editor.polishSession || editor.glideSession) return
+      if (
+        editor.mode === 'editing' &&
+        (editor.pathGestureActive ||
+          editor.editPreview !== null ||
+          editor.pathAddMode)
+      ) {
+        return
+      }
+      if (editor.pathGestureActive) return
+      e.preventDefault()
+      e.stopPropagation()
+      refineRestoreFocusRef.current = true
+      setRefineOpen(false)
+    }
+    // Dismiss on pointerup outside so unmount does not interrupt actor/stage
+    // pointer capture mid-gesture (placement, path edit, recording).
+    let outsidePointerId: number | null = null
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      if (!target) return
+      if (refinePanelRef.current?.contains(target)) {
+        outsidePointerId = null
+        return
+      }
+      if (refineBtnRef.current?.contains(target)) {
+        outsidePointerId = null
+        return
+      }
+      outsidePointerId = e.pointerId
+    }
+    const onPointerUp = (e: PointerEvent) => {
+      if (outsidePointerId === null || e.pointerId !== outsidePointerId) return
+      outsidePointerId = null
+      refineRestoreFocusRef.current = false
+      setRefineOpen(false)
+    }
+    const onPointerCancel = (e: PointerEvent) => {
+      if (outsidePointerId === null || e.pointerId !== outsidePointerId) return
+      outsidePointerId = null
+    }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('pointerup', onPointerUp, true)
+    window.addEventListener('pointercancel', onPointerCancel, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('pointerup', onPointerUp, true)
+      window.removeEventListener('pointercancel', onPointerCancel, true)
+      const shouldRestore = refineRestoreFocusRef.current
+      refineRestoreFocusRef.current = false
+      const restore = refineReturnFocusRef.current
+      refineReturnFocusRef.current = null
+      if (!shouldRestore) return
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (
+            restore &&
+            document.contains(restore) &&
+            !document.getElementById(refinePanelId)
+          ) {
+            restore.focus()
+          }
+        })
+      })
+    }
+  }, [refineOpen, refinePanelId])
+
+  const openPolishFromRefine = () => {
+    refineRestoreFocusRef.current = false
+    setRefineOpen(false)
+    beginPolishSession()
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>('[data-testid="polish-strength"]')
+          ?.focus()
+      })
+    })
+  }
+
+  const openGlideFromRefine = () => {
+    refineRestoreFocusRef.current = false
+    setRefineOpen(false)
+    beginGlideSession()
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>('[data-testid="glide-strength"]')
+          ?.focus()
+      })
+    })
+  }
+
   return (
     <div
       data-testid="playback-dock"
@@ -303,7 +506,11 @@ export function PlaybackDock() {
 
       <div
         data-testid="toolbar"
-        className="flex max-w-full flex-wrap items-center justify-center gap-1 sm:gap-1.5"
+        className={
+          editing
+            ? 'flex max-w-full flex-wrap items-center justify-center gap-1 sm:gap-1.5'
+            : 'flex w-full max-w-full flex-col gap-1'
+        }
       >
         {editing ? (
           <>
@@ -519,257 +726,341 @@ export function PlaybackDock() {
           </>
         ) : (
           <>
-            {isRecordingLike ? (
+            {/* Transport: balanced 1fr | Play | 1fr so Play stays dock-centered. */}
+            <div
+              data-testid="dock-transport"
+              className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-1 gap-y-1"
+            >
+              <div className="flex min-w-0 flex-wrap items-center justify-start gap-1 max-sm:col-span-3 max-sm:row-start-1 max-sm:justify-center sm:col-start-1 sm:row-start-1">
+                {isRecordingLike ? (
+                  <button
+                    type="button"
+                    data-testid="btn-stop"
+                    onClick={stopFromUi}
+                    aria-label={
+                      mode === 'armed' ? 'Cancel record' : 'Stop recording'
+                    }
+                    aria-describedby={
+                      mode === 'armed' && modeStatus ? dockStatusId : undefined
+                    }
+                    title={mode === 'armed' ? 'Cancel record' : 'Stop recording'}
+                    className={`${control} gap-1.5 bg-red-500 text-white hover:bg-red-600`}
+                  >
+                    {mode === 'armed' ? (
+                      'Cancel'
+                    ) : (
+                      <>
+                        <StopSquareIcon />
+                        Stop
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="btn-record"
+                    aria-describedby={
+                      !hasAnyRecording ? emptyBoardHintId : undefined
+                    }
+                    onClick={() => {
+                      void (async () => {
+                        if (recording) {
+                          const label = selectedActor?.name ?? 'this actor'
+                          const ok = await confirm({
+                            title: `Re-record “${label}”?`,
+                            body: 'This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.',
+                            confirmLabel: 'Replace recording',
+                            testId: 'rerecord-confirm',
+                            confirmTestId: 'btn-rerecord-confirm',
+                            cancelTestId: 'btn-rerecord-cancel',
+                            bodyTestId: 'rerecord-confirm-copy',
+                          })
+                          if (!ok) return
+                        }
+                        setPlaybackHead(0)
+                        armRecording()
+                      })()
+                    }}
+                    // Empty board: Record is the primary action. After a path exists,
+                    // Play takes the primary style so preview/export stays front-of-mind.
+                    className={`${hasAnyRecording ? btnSecondary : btnPrimary} gap-1.5`}
+                  >
+                    <span
+                      aria-hidden
+                      className="size-2 shrink-0 rounded-full bg-red-500"
+                    />
+                    Record
+                  </button>
+                )}
+
+                {hasRecording && !isRecordingLike && (
+                  <button
+                    type="button"
+                    data-testid="btn-continue-path"
+                    onClick={() => {
+                      armContinuePath()
+                    }}
+                    disabled={!continueAvail.enabled}
+                    title={continueAvail.reason ?? CONTINUE_PATH_HELP}
+                    aria-describedby="continue-path-help"
+                    className={btnSecondary}
+                  >
+                    Continue path
+                  </button>
+                )}
+              </div>
+
+              <div className="flex justify-center max-sm:col-start-2 max-sm:row-start-2 sm:col-start-2 sm:row-start-1">
+                {mode === 'playing' ? (
+                  <button
+                    type="button"
+                    data-testid="btn-pause"
+                    onClick={pause}
+                    aria-label="Pause"
+                    title="Pause"
+                    className={`${btnPrimary} min-h-8 min-w-8 px-2`}
+                  >
+                    <PauseIcon />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="btn-play"
+                    onClick={() => play()}
+                    disabled={playbackDisabled}
+                    aria-label="Play"
+                    title="Play"
+                    aria-describedby={playbackDescribedBy}
+                    className={`${hasAnyRecording ? btnPrimary : btnSecondary} min-h-8 min-w-8 px-2`}
+                  >
+                    <PlayIcon />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-1 max-sm:col-start-3 max-sm:row-start-2 sm:col-start-3 sm:row-start-1">
+                <button
+                  type="button"
+                  data-testid="btn-restart"
+                  onClick={() => restartPlayback()}
+                  disabled={playbackDisabled}
+                  aria-label="Restart"
+                  aria-describedby={playbackDescribedBy}
+                  title="Restart from the beginning"
+                  className={btnIcon}
+                >
+                  <span aria-hidden>↻</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="btn-undo-transform"
+                  onClick={() => undoActorEdit()}
+                  disabled={isRecordingLike || actorEditOrder.length === 0}
+                  className={btnIcon}
+                  aria-label="Undo"
+                  title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                >
+                  <span aria-hidden>↶</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="btn-redo-transform"
+                  onClick={() => redoActorEdit()}
+                  disabled={isRecordingLike || actorEditRedoOrder.length === 0}
+                  className={btnIcon}
+                  aria-label="Redo"
+                  title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                >
+                  <span aria-hidden>↷</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Editing: Edit path + Refine, with quieter Reset slightly apart. */}
+            <div
+              data-testid="dock-editing"
+              className="flex w-full flex-nowrap items-center justify-center gap-1"
+            >
               <button
                 type="button"
-                data-testid="btn-stop"
-                onClick={stopFromUi}
-                aria-label={
-                  mode === 'armed' ? 'Cancel record' : 'Stop recording'
-                }
-                aria-describedby={
-                  mode === 'armed' && modeStatus ? dockStatusId : undefined
-                }
-                className={`${control} bg-red-500 text-white hover:bg-red-600`}
+                data-testid="btn-edit-path"
+                onClick={enterEditMode}
+                disabled={editPathDisabled}
+                aria-describedby={editDescribedBy}
+                className={btnSecondary}
               >
-                {mode === 'armed' ? 'Cancel' : 'Stop'}
+                Edit path
               </button>
-            ) : (
+
+              <div data-testid="refine-motion" className="relative w-auto shrink-0">
+                <button
+                  ref={refineBtnRef}
+                  type="button"
+                  data-testid="btn-refine-motion"
+                  aria-expanded={refineOpen}
+                  aria-haspopup="dialog"
+                  aria-controls={refinePanelId}
+                  title="Refine"
+                  onClick={() => setRefineOpen((open) => !open)}
+                  className={`${btnSecondary} min-h-8 px-2.5`}
+                >
+                  Refine
+                </button>
+                {refineOpen &&
+                  refinePopoverBox &&
+                  createPortal(
+                    <div
+                      ref={refinePanelRef}
+                      id={refinePanelId}
+                      data-testid="refine-motion-tools"
+                      role="dialog"
+                      aria-label="Refine"
+                      tabIndex={-1}
+                      className="pointer-events-auto fixed z-[70] flex w-[min(17.5rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
+                      style={{
+                        bottom: refinePopoverBox.bottom,
+                        right: refinePopoverBox.right,
+                        maxHeight: refinePopoverBox.maxHeight,
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain bg-white p-2">
+                        <div className="rounded-lg px-1 py-1">
+                          <button
+                            type="button"
+                            data-testid="btn-polish-motion"
+                            onClick={openPolishFromRefine}
+                            disabled={polishDisabled}
+                            title="Preview a gentler path while keeping pauses and corners"
+                            className={`${btnSecondary} h-10 min-h-10 w-full justify-start px-2.5`}
+                          >
+                            Polish motion
+                          </button>
+                          <p
+                            data-testid="polish-motion-help"
+                            className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
+                          >
+                            Soften wobble; pauses and corners stay put.
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg px-1 py-1">
+                          <button
+                            type="button"
+                            data-testid="btn-glide"
+                            onClick={openGlideFromRefine}
+                            disabled={glideDisabled}
+                            title="Softens starts and stops while keeping your path and pauses"
+                            className={`${btnSecondary} h-10 min-h-10 w-full justify-start px-2.5`}
+                          >
+                            Glide
+                          </button>
+                          <p
+                            data-testid="glide-motion-help"
+                            className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
+                          >
+                            Ease starts and stops; path and pauses stay.
+                          </p>
+                        </div>
+
+                        {!isRecordingLike && (
+                          <div className="rounded-lg px-1 py-1">
+                            <button
+                              type="button"
+                              data-testid="snap-to-grid-toggle"
+                              aria-pressed={snapToGrid}
+                              aria-describedby="snap-to-grid-help"
+                              title="Align placement and path edits to the dots. Recording stays freehand."
+                              onClick={() => setSnapToGrid(!snapToGrid)}
+                              className={`${
+                                snapToGrid ? btnPrimary : btnSecondary
+                              } h-10 min-h-10 w-full justify-start gap-2 px-2.5`}
+                            >
+                              <span
+                                data-testid="snap-to-grid-indicator"
+                                data-checked={snapToGrid ? 'true' : 'false'}
+                                aria-hidden
+                                className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${
+                                  snapToGrid
+                                    ? 'border-white bg-white text-slate-900'
+                                    : 'border-slate-400 bg-white text-transparent'
+                                }`}
+                              >
+                                <svg
+                                  viewBox="0 0 16 16"
+                                  className="size-3 fill-current"
+                                >
+                                  <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
+                                </svg>
+                              </span>
+                              {snapToGrid ? 'Snap on' : 'Snap to grid'}
+                            </button>
+                          </div>
+                        )}
+
+                        {geometryEdit && (
+                          <div className="mt-1 border-t border-slate-900/[0.08] bg-white px-1 pt-2">
+                            <button
+                              type="button"
+                              data-testid="btn-restore-path"
+                              onClick={() => {
+                                void onRestoreRecordedPath()
+                              }}
+                              title={RESTORE_RECORDED_PATH_HELP}
+                              aria-describedby="restore-path-help"
+                              className={`${btnQuiet} h-10 min-h-10 w-full justify-start px-2.5`}
+                            >
+                              Restore recorded path
+                            </button>
+                            <p
+                              id="restore-path-help"
+                              data-testid="restore-path-help"
+                              className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
+                            >
+                              {RESTORE_RECORDED_PATH_HELP}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
+              </div>
+
+              <span
+                aria-hidden
+                className="mx-0.5 h-4 w-px shrink-0 bg-slate-900/10"
+              />
+
               <button
                 type="button"
-                data-testid="btn-record"
-                aria-describedby={
-                  !hasAnyRecording ? emptyBoardHintId : undefined
-                }
+                data-testid="btn-reset"
                 onClick={() => {
                   void (async () => {
                     if (recording) {
                       const label = selectedActor?.name ?? 'this actor'
                       const ok = await confirm({
-                        title: `Re-record “${label}”?`,
-                        body: 'This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.',
-                        confirmLabel: 'Replace recording',
-                        testId: 'rerecord-confirm',
-                        confirmTestId: 'btn-rerecord-confirm',
-                        cancelTestId: 'btn-rerecord-cancel',
-                        bodyTestId: 'rerecord-confirm-copy',
+                        title: `Reset motion for “${label}”?`,
+                        body: 'Clears this actor’s recorded path, path edits, and transform keyframes. Appearance, other actors, and project Duration / Loop stay the same.',
+                        confirmLabel: 'Reset motion',
+                        danger: true,
+                        testId: 'reset-actor-confirm',
+                        confirmTestId: 'btn-reset-actor-confirm',
+                        cancelTestId: 'btn-reset-actor-cancel',
+                        bodyTestId: 'reset-actor-confirm-copy',
                       })
                       if (!ok) return
                     }
-                    setPlaybackHead(0)
-                    armRecording()
+                    resetRecording()
                   })()
                 }}
-                // Empty board: Record is the primary action. After a path exists,
-                // Play takes the primary style so preview/export stays front-of-mind.
-                className={hasAnyRecording ? btnSecondary : btnPrimary}
+                disabled={resetDisabled}
+                aria-describedby={resetDescribedBy}
+                className={btnQuiet}
               >
-                Record
+                Reset motion
               </button>
-            )}
-
-            {hasRecording && !isRecordingLike && (
-              <button
-                type="button"
-                data-testid="btn-continue-path"
-                onClick={() => {
-                  armContinuePath()
-                }}
-                disabled={!continueAvail.enabled}
-                title={continueAvail.reason ?? CONTINUE_PATH_HELP}
-                aria-describedby="continue-path-help"
-                className={btnSecondary}
-              >
-                Continue path
-              </button>
-            )}
-
-            {mode === 'playing' ? (
-              <button
-                type="button"
-                data-testid="btn-pause"
-                onClick={pause}
-                className={btnPrimary}
-              >
-                Pause
-              </button>
-            ) : (
-              <button
-                type="button"
-                data-testid="btn-play"
-                onClick={() => play()}
-                disabled={playbackDisabled}
-                aria-describedby={playbackDescribedBy}
-                className={hasAnyRecording ? btnPrimary : btnSecondary}
-              >
-                Play
-              </button>
-            )}
-
-            <button
-              type="button"
-              data-testid="btn-edit-path"
-              onClick={enterEditMode}
-              disabled={editPathDisabled}
-              aria-describedby={editDescribedBy}
-              className={btnSecondary}
-            >
-              Edit path
-            </button>
-
-            <button
-              type="button"
-              data-testid="btn-reset"
-              onClick={() => {
-                void (async () => {
-                  if (recording) {
-                    const label = selectedActor?.name ?? 'this actor'
-                    const ok = await confirm({
-                      title: `Reset motion for “${label}”?`,
-                      body: 'Clears this actor’s recorded path, path edits, and transform keyframes. Appearance, other actors, and project Duration / Loop stay the same.',
-                      confirmLabel: 'Reset motion',
-                      danger: true,
-                      testId: 'reset-actor-confirm',
-                      confirmTestId: 'btn-reset-actor-confirm',
-                      cancelTestId: 'btn-reset-actor-cancel',
-                      bodyTestId: 'reset-actor-confirm-copy',
-                    })
-                    if (!ok) return
-                  }
-                  resetRecording()
-                })()
-              }}
-              disabled={resetDisabled}
-              aria-describedby={resetDescribedBy}
-              className={btnReset}
-            >
-              Reset motion
-            </button>
-
-            <span
-              aria-hidden
-              className="mx-0.5 hidden h-4 w-px bg-slate-900/10 sm:inline-block"
-            />
-
-            <button
-              type="button"
-              data-testid="btn-restart"
-              onClick={() => restartPlayback()}
-              disabled={playbackDisabled}
-              aria-label="Restart"
-              aria-describedby={playbackDescribedBy}
-              title="Restart from the beginning"
-              className={btnIcon}
-            >
-              <span aria-hidden>↻</span>
-            </button>
-
-            <button
-              type="button"
-              data-testid="btn-undo-transform"
-              onClick={() => undoActorEdit()}
-              disabled={isRecordingLike || actorEditOrder.length === 0}
-              className={btnIcon}
-              aria-label="Undo"
-              title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
-            >
-              <span aria-hidden>↶</span>
-            </button>
-            <button
-              type="button"
-              data-testid="btn-redo-transform"
-              onClick={() => redoActorEdit()}
-              disabled={isRecordingLike || actorEditRedoOrder.length === 0}
-              className={btnIcon}
-              aria-label="Redo"
-              title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
-            >
-              <span aria-hidden>↷</span>
-            </button>
-
-            <details
-              data-testid="refine-motion"
-              className="w-full min-w-0 sm:w-auto"
-            >
-              <summary
-                data-testid="refine-motion-summary"
-                className={`${control} cursor-pointer list-none gap-1 text-xs text-slate-600 hover:bg-slate-900/[0.05] sm:text-sm [&::-webkit-details-marker]:hidden`}
-              >
-                <span
-                  aria-hidden
-                  className="text-slate-400 [[open]_&]:rotate-90"
-                >
-                  ▸
-                </span>
-                Refine motion
-              </summary>
-              <div
-                data-testid="refine-motion-tools"
-                className="mt-1 flex max-w-full flex-wrap items-center justify-center gap-1 sm:justify-start"
-              >
-                <button
-                  type="button"
-                  data-testid="btn-polish-motion"
-                  onClick={() => beginPolishSession()}
-                  disabled={polishDisabled}
-                  title="Preview a gentler path while keeping pauses and corners"
-                  className={btnSecondary}
-                >
-                  Polish motion
-                </button>
-
-                <button
-                  type="button"
-                  data-testid="btn-glide"
-                  onClick={() => beginGlideSession()}
-                  disabled={glideDisabled}
-                  title="Softens starts and stops while keeping your path and pauses"
-                  className={btnSecondary}
-                >
-                  Glide
-                </button>
-
-                {!isRecordingLike && (
-                  <button
-                    type="button"
-                    data-testid="snap-to-grid-toggle"
-                    aria-pressed={snapToGrid}
-                    aria-describedby="snap-to-grid-help"
-                    title="Align placement and path edits to the dots. Recording stays freehand."
-                    onClick={() => setSnapToGrid(!snapToGrid)}
-                    className={
-                      snapToGrid ? btnPrimary : btnSecondary
-                    }
-                  >
-                    {snapToGrid ? 'Snap on' : 'Snap to grid'}
-                  </button>
-                )}
-
-                {geometryEdit && (
-                  <>
-                    <button
-                      type="button"
-                      data-testid="btn-restore-path"
-                      onClick={() => {
-                        void onRestoreRecordedPath()
-                      }}
-                      title={RESTORE_RECORDED_PATH_HELP}
-                      aria-describedby="restore-path-help"
-                      className={btnQuiet}
-                    >
-                      Restore recorded path
-                    </button>
-                    <span
-                      id="restore-path-help"
-                      data-testid="restore-path-help"
-                      className="basis-full text-xs leading-snug text-slate-500"
-                    >
-                      {RESTORE_RECORDED_PATH_HELP}
-                    </span>
-                  </>
-                )}
-              </div>
-            </details>
+            </div>
           </>
         )}
 
@@ -792,11 +1083,7 @@ export function PlaybackDock() {
         <p
           id="continue-path-help"
           data-testid="continue-path-help"
-          className={
-            continueAvail.enabled
-              ? 'max-w-xl text-center text-[11px] leading-snug text-slate-500'
-              : 'sr-only'
-          }
+          className="sr-only"
         >
           {continueAvail.reason ?? CONTINUE_PATH_BAKE_NOTE}
         </p>

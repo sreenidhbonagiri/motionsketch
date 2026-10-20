@@ -542,7 +542,7 @@ export function CanvasStage() {
         so it sits just below the header without overlap.
       */}
       <div
-        className="pointer-events-none absolute right-2 z-20 sm:right-3"
+        className="pointer-events-none absolute right-2 z-[32] sm:right-3"
         style={{ top: 'var(--ms-sheet-top, 4.5rem)' }}
       >
         <WorkspaceCameraBar

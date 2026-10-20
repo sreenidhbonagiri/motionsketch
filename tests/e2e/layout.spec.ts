@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import {
   ensureEditor,
   openCssDialog,
@@ -6,6 +6,28 @@ import {
   recordSimplePath,
   expandExportOtherWays,
 } from './helpers'
+
+/** Play/Pause center X should match the dock center (balanced transport columns). */
+async function assertPlayCenteredInDock(page: Page, tolerancePx = 6) {
+  const play = page.getByTestId('btn-play').or(page.getByTestId('btn-pause'))
+  await expect(play).toBeVisible()
+  const centered = await page.evaluate(() => {
+    const dock = document.querySelector('[data-testid="playback-dock"]')
+    const control =
+      document.querySelector('[data-testid="btn-play"]') ??
+      document.querySelector('[data-testid="btn-pause"]')
+    if (!(dock instanceof HTMLElement) || !(control instanceof HTMLElement)) {
+      return { ok: false, delta: Infinity }
+    }
+    const dr = dock.getBoundingClientRect()
+    const cr = control.getBoundingClientRect()
+    const dockMid = dr.left + dr.width / 2
+    const controlMid = cr.left + cr.width / 2
+    return { ok: true, delta: Math.abs(dockMid - controlMid) }
+  })
+  expect(centered.ok, 'dock and play control present').toBe(true)
+  expect(centered.delta).toBeLessThanOrEqual(tolerancePx)
+}
 
 async function assertFullyInViewport(
   page: import('@playwright/test').Page,
@@ -254,6 +276,204 @@ test.describe('workspace layout', () => {
     )
   })
 
+  test('mobile: after-path toast clears Fit/zoom; both stay clickable', async ({
+    page,
+  }) => {
+    for (const width of [390, 320] as const) {
+      await page.setViewportSize({ width, height: 844 })
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      const toast = page.getByTestId('after-path-website-toast')
+      const bar = page.getByTestId('workspace-camera-bar')
+      const fit = page.getByTestId('btn-fit-stage')
+      const zoomIn = page.getByTestId('btn-zoom-in')
+      await expect(toast).toBeVisible()
+      await expect(bar).toBeVisible()
+      await expect(fit).toBeVisible()
+
+      const geometry = await page.evaluate(() => {
+        const toastEl = document.querySelector(
+          '[data-testid="after-path-website-toast"]',
+        )
+        const barEl = document.querySelector(
+          '[data-testid="workspace-camera-bar"]',
+        )
+        const fitEl = document.querySelector('[data-testid="btn-fit-stage"]')
+        const zoomEl = document.querySelector('[data-testid="btn-zoom-in"]')
+        const dismissEl = document.querySelector(
+          '[data-testid="btn-dismiss-after-path-toast"]',
+        )
+        if (
+          !(toastEl instanceof HTMLElement) ||
+          !(barEl instanceof HTMLElement) ||
+          !(fitEl instanceof HTMLElement) ||
+          !(zoomEl instanceof HTMLElement) ||
+          !(dismissEl instanceof HTMLElement)
+        ) {
+          return { ok: false, reason: 'missing' }
+        }
+        const tr = toastEl.getBoundingClientRect()
+        const br = barEl.getBoundingClientRect()
+        const overlap =
+          tr.left < br.right - 1 &&
+          tr.right > br.left + 1 &&
+          tr.top < br.bottom - 1 &&
+          tr.bottom > br.top + 1
+        const hit = (el: HTMLElement) => {
+          const r = el.getBoundingClientRect()
+          const top = document.elementFromPoint(
+            r.left + r.width / 2,
+            r.top + r.height / 2,
+          )
+          return top instanceof Element && (top === el || el.contains(top))
+        }
+        return {
+          ok: !overlap && hit(fitEl) && hit(zoomEl) && hit(dismissEl),
+          reason: overlap
+            ? 'overlap'
+            : !hit(fitEl)
+              ? 'fit-blocked'
+              : !hit(zoomEl)
+                ? 'zoom-blocked'
+                : !hit(dismissEl)
+                  ? 'dismiss-blocked'
+                  : 'ok',
+          barBelowToast: br.top >= tr.bottom - 1,
+        }
+      })
+      expect(geometry, `${width}px toast vs camera`).toMatchObject({
+        ok: true,
+        reason: 'ok',
+        barBelowToast: true,
+      })
+
+      await fit.click()
+      await expect(page.getByTestId('zoom-percent')).toBeVisible()
+      await page.getByTestId('btn-dismiss-after-path-toast').click()
+      await expect(toast).toHaveCount(0)
+      await expect(bar).toBeVisible()
+      await expect(fit).toBeVisible()
+    }
+  })
+
+  test('Play stays dock-centered empty, recorded, and recording', async ({
+    page,
+  }) => {
+    for (const width of [1280, 390, 320] as const) {
+      await page.setViewportSize({ width, height: 844 })
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+
+      await expect(page.getByTestId('dock-transport')).toBeVisible()
+      await expect(page.getByTestId('dock-editing')).toBeVisible()
+
+      // Empty: no Continue; Record primary — Play must not shift.
+      await expect(page.getByTestId('btn-continue-path')).toHaveCount(0)
+      await assertPlayCenteredInDock(page)
+
+      await recordSimplePath(page)
+      await expect(page.getByTestId('btn-continue-path')).toBeVisible()
+      await assertPlayCenteredInDock(page)
+
+      await page.getByTestId('btn-record').click()
+      const confirm = page.getByTestId('btn-rerecord-confirm')
+      if (await confirm.isVisible().catch(() => false)) await confirm.click()
+      await expect(page.getByTestId('btn-stop')).toBeVisible()
+      // Armed/recording: Continue hidden, Stop replaces Record — Play stays put.
+      await assertPlayCenteredInDock(page)
+
+      const actor = page.getByTestId('actor')
+      const box = await actor.boundingBox()
+      expect(box).toBeTruthy()
+      const x = box!.x + box!.width / 2
+      const y = box!.y + box!.height / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x + 30, y - 10, { steps: 4 })
+      await expect(page.getByTestId('mode-status-label')).toContainText(
+        /Recording/i,
+      )
+      await assertPlayCenteredInDock(page)
+      await page.mouse.up()
+    }
+  })
+
+  test('mobile 390x844: Refine popover stacks above Actors; Snap indicator syncs', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    const listToggle = page.getByTestId('btn-toggle-actor-list')
+    if ((await listToggle.getAttribute('aria-expanded')) !== 'true') {
+      await listToggle.click()
+    }
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+
+    await page.getByTestId('btn-refine-motion').click()
+    const tools = page.getByTestId('refine-motion-tools')
+    await expect(tools).toBeVisible()
+
+    // Opaque surface — dock chrome must not paint through the popover.
+    const surface = await tools.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return {
+        bg: style.backgroundColor,
+        opacity: style.opacity,
+        z: style.zIndex,
+      }
+    })
+    expect(surface.opacity).toBe('1')
+    expect(surface.bg).toMatch(/rgba?\(\s*255,\s*255,\s*255/)
+    expect(Number(surface.z)).toBeGreaterThanOrEqual(70)
+
+    // Hit-test Polish + Snap centers: Refine must win over Actors / Sequence.
+    const snap = page.getByTestId('snap-to-grid-toggle')
+    await expect(snap).toBeVisible()
+    for (const testId of ['btn-polish-motion', 'snap-to-grid-toggle'] as const) {
+      const hit = await page.getByTestId(testId).evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        const x = r.left + r.width / 2
+        const y = r.top + r.height / 2
+        const top = document.elementFromPoint(x, y)
+        if (!(top instanceof Element)) return { ok: false, reason: 'no-hit' }
+        const inTools = !!top.closest('[data-testid="refine-motion-tools"]')
+        const inActors = !!top.closest('[data-testid="actor-list"]')
+        const inSequence = !!top.closest('[data-testid="clip-timeline"]')
+        return {
+          ok: inTools && !inActors && !inSequence,
+          reason: inTools
+            ? inActors
+              ? 'actors'
+              : inSequence
+                ? 'sequence'
+                : 'ok'
+            : 'outside-tools',
+        }
+      })
+      expect(hit, `${testId} above Actors/Sequence`).toEqual({
+        ok: true,
+        reason: 'ok',
+      })
+    }
+
+    const indicator = page.getByTestId('snap-to-grid-indicator')
+    await expect(snap).toHaveAttribute('aria-pressed', 'false')
+    await expect(indicator).toHaveAttribute('data-checked', 'false')
+    await snap.click()
+    await expect(snap).toHaveAttribute('aria-pressed', 'true')
+    await expect(indicator).toHaveAttribute('data-checked', 'true')
+    await expect(snap).toContainText('Snap on')
+  })
+
   test('mobile 390x844: expanded Actors stays clear of Sequence and dock', async ({
     page,
   }) => {
@@ -275,10 +495,7 @@ test.describe('workspace layout', () => {
       await sequenceToggle.click()
       await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'false')
     }
-    const refine = page.getByTestId('refine-motion')
-    await refine.evaluate((el) => {
-      ;(el as HTMLDetailsElement).open = true
-    })
+    await page.getByTestId('btn-refine-motion').click()
     await expect(page.getByTestId('refine-motion-tools')).toBeVisible()
 
     // Expanded-state preference must survive the layout pass.

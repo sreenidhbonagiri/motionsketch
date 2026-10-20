@@ -45,7 +45,7 @@ test.describe('mode and path-tool status', () => {
     const overlay = page.getByTestId('path-move-overlay')
     await overlay.focus()
     await page.keyboard.down('ArrowRight')
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-gesture',
       'true',
     )
@@ -53,7 +53,7 @@ test.describe('mode and path-tool status', () => {
     await expect(page.getByTestId('mode-status-instruction')).toHaveCount(0)
     await page.keyboard.press('Escape')
     await page.keyboard.up('ArrowRight')
-    await expect(page.getByTestId('stage')).toHaveAttribute(
+    await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-gesture',
       'false',
     )

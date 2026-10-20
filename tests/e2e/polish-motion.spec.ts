@@ -5,6 +5,7 @@ import {
   POLISH_RAW_ACTOR_ID,
 } from '../fixtures/polishMotionProject'
 import {
+  clickPolishMotion,
   closeOpenChromePanels,
   ensureEditor,
   ensureRefineMotionOpen,
@@ -23,8 +24,7 @@ test.describe('polish motion', () => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
 
-    await ensureRefineMotionOpen(page)
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-panel')).toBeVisible()
     await expect(page.getByTestId('polish-compare-legend')).toContainText(
       /Original/i,
@@ -43,7 +43,7 @@ test.describe('polish motion', () => {
     await page.getByTestId('btn-polish-cancel').click()
     await expect(page.getByTestId('polish-panel')).toHaveCount(0)
 
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-panel')).toBeVisible()
     const status = page.getByTestId('polish-status')
     const apply = page.getByTestId('btn-polish-apply')
@@ -80,8 +80,7 @@ test.describe('polish motion', () => {
   test('save and open keeps polished geometry', async ({ page }) => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
-    await ensureRefineMotionOpen(page)
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     const apply = page.getByTestId('btn-polish-apply')
     if (!(await apply.isEnabled())) {
       await page.getByTestId('btn-polish-cancel').click()
@@ -114,8 +113,7 @@ test.describe('polish motion', () => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
 
-    await ensureRefineMotionOpen(page)
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-strength-value')).toHaveText('55%')
     await page.getByTestId('polish-strength').evaluate((el) => {
       const input = el as HTMLInputElement
@@ -130,17 +128,17 @@ test.describe('polish motion', () => {
     await expect(page.getByTestId('polish-strength-value')).toHaveText('80%')
     await page.getByTestId('btn-polish-cancel').click()
 
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-strength-value')).toHaveText('80%')
     await page.getByTestId('btn-polish-cancel').click()
 
     await selectActorByIndex(page, 1)
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-strength-value')).toHaveText('55%')
     await page.getByTestId('btn-polish-cancel').click()
 
     await selectActorByIndex(page, 0)
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-strength-value')).toHaveText('80%')
     await page.getByTestId('btn-polish-cancel').click()
   })
@@ -186,8 +184,7 @@ test.describe('polish motion', () => {
     await loadProjectSnapshot(page, buildPolishMotionFixtureJson())
     await ensureEditor(page, 'Polish motion fixture')
     await selectActorByIndex(page, 1)
-    await ensureRefineMotionOpen(page)
-    await page.getByTestId('btn-polish-motion').click()
+    await clickPolishMotion(page)
     await expect(page.getByTestId('polish-panel')).toBeVisible()
     const apply = page.getByTestId('btn-polish-apply')
     if (await apply.isEnabled()) {

@@ -322,21 +322,26 @@ async function scrollExportScrollerToCenter(locator: Locator) {
   })
 }
 
-/** Expand the dock’s Refine motion disclosure (Polish, Glide, Snap, Restore). */
+/** Open the dock’s Refine popover (Polish, Glide, Snap, Restore). */
 export async function ensureRefineMotionOpen(page: Page) {
-  const details = page.getByTestId('refine-motion')
-  await expect(details).toBeVisible()
-  const open = await details.evaluate(
-    (el) => (el as HTMLDetailsElement).open,
-  )
-  if (!open) {
-    await page.getByTestId('refine-motion-summary').click()
-  }
-  await expect
-    .poll(() =>
-      details.evaluate((el) => (el as HTMLDetailsElement).open),
-    )
-    .toBe(true)
+  const tools = page.getByTestId('refine-motion-tools')
+  if (await tools.isVisible().catch(() => false)) return
+  const btn = page.getByTestId('btn-refine-motion')
+  await expect(btn).toBeVisible()
+  await btn.click()
+  await expect(tools).toBeVisible()
+}
+
+/** Open Refine if needed, then start Polish motion. */
+export async function clickPolishMotion(page: Page) {
+  await ensureRefineMotionOpen(page)
+  await page.getByTestId('btn-polish-motion').click()
+}
+
+/** Open Refine if needed, then start Glide. */
+export async function clickGlide(page: Page) {
+  await ensureRefineMotionOpen(page)
+  await page.getByTestId('btn-glide').click()
 }
 
 /** Arm Continue path from the main dock (after Record, before Play). */

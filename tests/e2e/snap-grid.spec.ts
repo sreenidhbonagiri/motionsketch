@@ -22,17 +22,21 @@ test.describe('snap to grid', () => {
     await ensureEditor(page)
     await ensureRefineMotionOpen(page)
     const toggle = page.getByTestId('snap-to-grid-toggle')
+    const indicator = page.getByTestId('snap-to-grid-indicator')
     await expect(toggle).toBeVisible()
     await expect(toggle).toHaveAttribute('aria-pressed', 'false')
     await expect(toggle).toContainText('Snap to grid')
+    await expect(indicator).toHaveAttribute('data-checked', 'false')
     await expect(page.getByTestId('snap-to-grid-help')).toContainText(
       /Recording stays freehand/i,
     )
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-pressed', 'true')
     await expect(toggle).toContainText('Snap on')
+    await expect(indicator).toHaveAttribute('data-checked', 'true')
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await expect(indicator).toHaveAttribute('data-checked', 'false')
   })
 
   test('idle placement snaps to lattice; enabling alone does not move actor', async ({
@@ -58,12 +62,13 @@ test.describe('snap to grid', () => {
     await page.mouse.move(startX + 90, startY - 50, { steps: 12 })
     await page.mouse.up()
 
-    // Committed center should land on the shared project lattice.
+    // Committed center should land on the shared project lattice (composition
+    // frame — stage-frame — not the camera viewport).
     const box = await actor.boundingBox()
-    const stage = await page.getByTestId('stage').boundingBox()
-    expect(box && stage).toBeTruthy()
-    const cx = (box!.x + box!.width / 2 - stage!.x) / stage!.width
-    const cy = (box!.y + box!.height / 2 - stage!.y) / stage!.height
+    const frame = await page.getByTestId('stage-frame').boundingBox()
+    expect(box && frame).toBeTruthy()
+    const cx = (box!.x + box!.width / 2 - frame!.x) / frame!.width
+    const cy = (box!.y + box!.height / 2 - frame!.y) / frame!.height
     const step = 0.05
     expect(Math.abs(cx / step - Math.round(cx / step))).toBeLessThan(0.02)
     expect(Math.abs(cy / step - Math.round(cy / step))).toBeLessThan(0.02)

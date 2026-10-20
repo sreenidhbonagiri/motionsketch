@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { buildGlideFixtureJson } from '../fixtures/glideProject'
 import {
+  clickGlide,
   ensureEditor,
-  ensureRefineMotionOpen,
   loadProjectSnapshot,
   readExportedCss,
 } from './helpers'
@@ -16,8 +16,7 @@ test.describe('glide timing', () => {
     await loadProjectSnapshot(page, buildGlideFixtureJson())
     await ensureEditor(page, 'Glide fixture')
 
-    await ensureRefineMotionOpen(page)
-    await page.getByTestId('btn-glide').click()
+    await clickGlide(page)
     await expect(page.getByTestId('glide-panel')).toBeVisible()
     await expect(page.getByTestId('glide-help')).toContainText(
       /Softens starts and stops/i,
@@ -42,7 +41,7 @@ test.describe('glide timing', () => {
     await page.getByTestId('btn-glide-cancel').click()
     await expect(page.getByTestId('glide-panel')).toHaveCount(0)
 
-    await page.getByTestId('btn-glide').click()
+    await clickGlide(page)
     await expect(page.getByTestId('btn-glide-apply')).toBeEnabled()
     await page.getByTestId('btn-glide-apply').click()
     await expect(page.getByTestId('glide-panel')).toHaveCount(0)
@@ -60,8 +59,7 @@ test.describe('glide timing', () => {
   test('Escape cancels without applying', async ({ page }) => {
     await loadProjectSnapshot(page, buildGlideFixtureJson())
     await ensureEditor(page, 'Glide fixture')
-    await ensureRefineMotionOpen(page)
-    await page.getByTestId('btn-glide').click()
+    await clickGlide(page)
     await expect(page.getByTestId('glide-panel')).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('glide-panel')).toHaveCount(0)

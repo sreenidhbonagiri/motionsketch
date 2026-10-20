@@ -190,8 +190,8 @@ test.describe('touch-emulated idle placement', () => {
     const actor = page.getByTestId('actor')
     const before = await actor.boundingBox()
     expect(before).toBeTruthy()
-    const stage = await page.getByTestId('stage').boundingBox()
-    expect(stage).toBeTruthy()
+    const frame = await page.getByTestId('stage-frame').boundingBox()
+    expect(frame).toBeTruthy()
     const from = {
       x: before!.x + before!.width / 2,
       y: before!.y + before!.height / 2,
@@ -230,9 +230,9 @@ test.describe('touch-emulated idle placement', () => {
     }
 
     const cx =
-      (snapped!.x + snapped!.width / 2 - stage!.x) / stage!.width
+      (snapped!.x + snapped!.width / 2 - frame!.x) / frame!.width
     const cy =
-      (snapped!.y + snapped!.height / 2 - stage!.y) / stage!.height
+      (snapped!.y + snapped!.height / 2 - frame!.y) / frame!.height
     const step = 0.05
     expect(Math.abs(cx / step - Math.round(cx / step))).toBeLessThan(0.02)
     expect(Math.abs(cy / step - Math.round(cy / step))).toBeLessThan(0.02)
