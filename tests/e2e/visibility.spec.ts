@@ -8,12 +8,13 @@ import {
 } from './animationHelpers'
 import {
   applyClipSeconds,
+  clickAddActor,
   ensureEditor,
+  expandExportOtherWays,
   loadHtmlDocument,
   openPanel,
   recordSimplePath,
   selectActorByIndex,
-  expandExportOtherWays,
 } from './helpers'
 
 async function openClipTimeline(page: Page) {
@@ -252,7 +253,7 @@ test.describe('per-actor visibility timing', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 1)
     await openClipTimeline(page)
     await applyClipSeconds(page, '0.30', '0.90')
@@ -273,7 +274,7 @@ test.describe('per-actor visibility timing', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 1)
     await openClipTimeline(page)
     await applyClipSeconds(page, '0.30', '0.90')

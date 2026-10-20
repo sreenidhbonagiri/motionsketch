@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  clickAddActor,
   ensureEditor,
   openPanel,
   recordSimplePath,
@@ -92,7 +93,7 @@ test.describe('unified actor edit undo', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 0)
 
     await ensureClipTimelineOpen(page)

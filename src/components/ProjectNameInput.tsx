@@ -75,7 +75,7 @@ export function ProjectNameInput({
           type="button"
           data-testid="btn-rename-project"
           onClick={() => setEditing(true)}
-          className="block max-w-[min(16rem,50vw)] truncate text-left text-sm font-semibold tracking-tight text-slate-900 underline-offset-2 hover:underline"
+          className="block max-w-[min(10rem,36vw)] truncate text-left text-sm font-semibold tracking-tight text-slate-900 underline-offset-2 hover:underline sm:max-w-[min(16rem,50vw)]"
           title="Rename project"
         >
           {committedName}
@@ -101,7 +101,7 @@ export function ProjectNameInput({
         }
         commit()
       }}
-      className="w-[min(16rem,50vw)] rounded-md border border-slate-200 bg-white px-2 py-0.5 text-sm font-semibold text-slate-900"
+      className="w-[min(16rem,50vw)] rounded-md border border-slate-900/[0.08] bg-white/90 px-2 py-0.5 text-sm font-semibold tracking-tight text-slate-900"
     />
   )
 }

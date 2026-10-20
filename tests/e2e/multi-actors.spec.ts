@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
-  ensureEditor,
-  ensureRefineMotionOpen,
   actorIdsFromList,
+  clickAddActor,
   clickRecord,
   dragActor,
+  ensureActorListExpanded,
+  ensureEditor,
+  expandExportOtherWays,
   loadHtmlDocument,
   openPanel,
   readExportedCss,
@@ -27,9 +29,10 @@ test.describe('multiple actors', () => {
     await page.goto('/')
     await ensureEditor(page)
     await expect(page.getByTestId('actor-list')).toBeVisible()
+    await ensureActorListExpanded(page)
     await expect(page.getByTestId('btn-add-actor')).toBeEnabled()
 
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     let ids = await actorIdsFromList(page)
     expect(ids).toHaveLength(2)
     await expect(page.getByTestId('actor-name-input')).toHaveValue(/Actor/)
@@ -114,7 +117,7 @@ test.describe('multiple actors', () => {
     expect(ids).toHaveLength(2)
   })
 
-  test('appearance and recording are per-actor; playback is shared', async ({
+  test('appearance is per-actor; unrecorded actors stay at rest while scrubbing', async ({
     page,
   }) => {
     await page.goto('/')
@@ -129,7 +132,7 @@ test.describe('multiple actors', () => {
     await page.getByTestId('duration-slider').fill('2000')
     await expect(page.getByTestId('duration-value')).toHaveText('2.00 s')
 
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     const ids = await actorIdsFromList(page)
     expect(ids).toHaveLength(2)
 
@@ -148,6 +151,36 @@ test.describe('multiple actors', () => {
     expect(Math.abs(restAt07!.x - restAt0!.x)).toBeLessThan(2)
     expect(Math.abs(restAt07!.y - restAt0!.y)).toBeLessThan(2)
     await page.getByTestId('playback-scrubber').fill('0')
+
+    await selectActorByIndex(page, 0)
+    await openPanel(page, 'appearance')
+    await expect(page.getByTestId('actor-color-value')).toHaveText('#0f766e')
+    await expect(page.getByTestId('actor-size-value')).toHaveText(
+      '22% of stage',
+    )
+
+    await selectActorByIndex(page, 1)
+    await expect(page.getByTestId('actor-color-value')).toHaveText('#c2410c')
+    await expect(page.getByTestId('actor-size-value')).toHaveText(
+      '14% of stage',
+    )
+  })
+
+  test('recording is per-actor; shared duration and playback stay shared', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    await openPanel(page, 'adjust')
+    await page.getByTestId('duration-slider').fill('2000')
+    await expect(page.getByTestId('duration-value')).toHaveText('2.00 s')
+
+    await clickAddActor(page)
+    const ids = await actorIdsFromList(page)
+    expect(ids).toHaveLength(2)
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
 
     await clickRecord(page)
     await dragActor(page, { x: -40, y: 30 }, { x: -140, y: -40 })
@@ -177,19 +210,6 @@ test.describe('multiple actors', () => {
       Math.abs(a1At06!.y - a1At0!.y) > 2
     expect(moved0).toBeTruthy()
     expect(moved1).toBeTruthy()
-
-    await selectActorByIndex(page, 0)
-    await openPanel(page, 'appearance')
-    await expect(page.getByTestId('actor-color-value')).toHaveText('#0f766e')
-    await expect(page.getByTestId('actor-size-value')).toHaveText(
-      '22% of stage',
-    )
-
-    await selectActorByIndex(page, 1)
-    await expect(page.getByTestId('actor-color-value')).toHaveText('#c2410c')
-    await expect(page.getByTestId('actor-size-value')).toHaveText(
-      '14% of stage',
-    )
   })
 
   test('transform history clears on actor selection', async ({ page }) => {
@@ -202,7 +222,7 @@ test.describe('multiple actors', () => {
     await page.getByTestId('btn-set-transform-keyframe').click()
     await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
 
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await expect(page.getByTestId('btn-undo-transform')).toBeDisabled()
     await expect(page.getByTestId('btn-redo-transform')).toBeDisabled()
 
@@ -216,13 +236,12 @@ test.describe('multiple actors', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await clickRecord(page)
     await dragActor(page, { x: 20, y: 20 }, { x: 100, y: -30 })
 
     const ids = await actorIdsFromList(page)
     await selectActorByIndex(page, 0)
-    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-reset').click()
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',
@@ -246,7 +265,7 @@ test.describe('multiple actors', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await clickRecord(page)
     await dragActor(page, { x: -20, y: 10 }, { x: -110, y: 40 })
 
@@ -260,6 +279,7 @@ test.describe('multiple actors', () => {
     expect(css).not.toMatch(/^\.stage\s*\{/m)
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const html = await readDownloadText(await downloadPromise)
@@ -464,7 +484,7 @@ test.describe('multiple actors', () => {
       await page.getByTestId('btn-toggle-actor-list').click()
     }
     await expect(page.getByTestId('actor-list-items')).toBeVisible()
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     const ids = await actorIdsFromList(page)
 
     await openPanel(page, 'appearance')

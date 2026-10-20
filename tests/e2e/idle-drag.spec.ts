@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import {
   actorHasPointerCapture,
+  clickAddActor,
   dispatchActivePointerCancel,
   ensureEditor,
   ensureRefineMotionOpen,
@@ -16,7 +17,7 @@ test.describe('idle drag unrecorded actors', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 0)
 
     const actor = page.getByTestId('actor')

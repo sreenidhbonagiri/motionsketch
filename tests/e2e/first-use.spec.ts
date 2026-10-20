@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  clickAddActor,
   clickRecord,
   ensureEditor,
   expandExportOtherWays,
@@ -430,7 +431,7 @@ test.describe('first-use guidance and export wording', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 1)
     await openPanel(page, 'export')
     await expandExportOtherWays(page)

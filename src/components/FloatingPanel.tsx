@@ -16,8 +16,10 @@ interface FloatingPanelProps {
 }
 
 /**
- * Compact anchored panel. Pointer events stay inside the panel bounds so the
- * stage beneath remains interactive. Escape / Close dismiss without hitting the canvas.
+ * Compact anchored contextual panel — shared treatment for Adjust / Appearance /
+ * Project / Export. On narrow viewports this becomes a bounded sheet between the
+ * measured header and the safe-area bottom, with a sticky title/Close and one
+ * scrollable body. Escape / Close dismiss without hitting the canvas.
  */
 export function FloatingPanel({
   id,
@@ -35,8 +37,6 @@ export function FloatingPanel({
 
   useEffect(() => {
     if (!open) return
-    // Prefer the chrome trigger (aria-controls). After a pointer click, WebKit
-    // often leaves document.activeElement on body before this effect runs.
     const trigger = document.querySelector(
       `[aria-controls="${id}-panel-root"]`,
     )
@@ -46,12 +46,10 @@ export function FloatingPanel({
         : document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null
-    // Move focus into the panel without jumping straight to Close.
     panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (document.querySelector('dialog[open]')) return
-      // Path edit gestures / Add point own Escape first.
       const editor = useEditorStore.getState()
       if (editor.polishSession || editor.glideSession) return
       if (
@@ -71,8 +69,6 @@ export function FloatingPanel({
       window.removeEventListener('keydown', onKey, true)
       const restore = returnFocusRef.current
       returnFocusRef.current = null
-      // Defer restore until after unmount paint — WebKit needs two frames.
-      // Skip if the panel remounted (React Strict Mode cleanup).
       const panelDomId = `${id}-panel-root`
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -99,25 +95,18 @@ export function FloatingPanel({
       aria-modal="false"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`pointer-events-auto absolute top-full z-50 mt-2 flex max-h-[min(32rem,calc(100dvh-12rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-[max(5.5rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-[calc(100dvh-7rem)] max-sm:w-auto ${
+      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex max-h-[min(32rem,calc(100dvh-12rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-900/[0.08] bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
         align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      {/*
-        Close stays visually top-right but comes after the body in DOM/tab
-        order so keyboard and screen-reader users reach panel actions first.
-        max-h clears the dock for path tools / Record, but stays tall enough
-        that Export’s collapsed “Other ways” summary remains in view on
-        desktop (avoids WebKit scrollIntoView never-stable on that control).
-      */}
-      <div className="shrink-0 border-b border-slate-100 py-2.5 pl-3 pr-14">
+      <div className="shrink-0 border-b border-slate-900/[0.06] py-2 pl-3 pr-14">
         <div className="min-w-0">
           <h2
             id={titleId}
-            className="text-sm font-semibold text-slate-900"
+            className="text-sm font-semibold tracking-tight text-slate-800"
           >
             {title}
           </h2>
@@ -126,12 +115,6 @@ export function FloatingPanel({
           )}
         </div>
       </div>
-      {/*
-        Firefox puts overflow scrollers in the sequential tab order. Keep this
-        region scrollable for pointer/wheel, but tabIndex=-1 so Tab from the
-        dialog root reaches the first control (e.g. Export primary) instead of
-        this wrapper.
-      */}
       <div
         tabIndex={-1}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
@@ -143,7 +126,7 @@ export function FloatingPanel({
         type="button"
         data-testid={`btn-close-${id}`}
         onClick={onClose}
-        className="absolute top-2.5 right-3 shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+        className="absolute top-2 right-2.5 inline-flex h-7 min-h-7 shrink-0 items-center rounded-md px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06] hover:text-slate-700"
       >
         Close
       </button>

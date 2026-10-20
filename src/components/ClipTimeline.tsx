@@ -21,6 +21,11 @@ import {
   validateClipStartMoveForDraft,
 } from '../core/clip'
 import type { ActorClip } from '../core/types'
+import {
+  readPanelOpenPref,
+  SEQUENCE_PANEL_OPEN_KEY,
+  writePanelOpenPref,
+} from '../lib/panelOpenPref'
 import { useEditorStore } from '../state/store'
 
 type DragKind = 'move' | 'start' | 'end'
@@ -31,12 +36,12 @@ const SEQUENCE_HINT_KEY = 'motionsketch.sequenceHintDismissed'
 const SEQUENCE_TIME_STEP = 0.01
 
 /**
- * Max height for the expanded Sequence sheet: leave room for the playback
- * dock, slot padding, and safe-area insets so the header/Collapse stay on
- * screen and the dock remains reachable.
+ * Max height for the expanded Sequence sheet. `--ms-sheet-top` is the measured
+ * header clearance; remaining budget leaves room for the dock + slot padding.
+ * The toolbar slot also caps at `100dvh - sheet-top` so Collapse stays clickable.
  */
 const SEQUENCE_PANEL_MAX_HEIGHT =
-  'min(36rem, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 8.5rem))'
+  'min(36rem, calc(100dvh - var(--ms-sheet-top, 3.5rem) - env(safe-area-inset-bottom, 0px) - 7rem))'
 
 function formatSec(sec: number): string {
   return sec.toFixed(2)
@@ -63,8 +68,10 @@ export function ClipTimeline() {
   const finishClipGesture = useEditorStore((s) => s.finishClipGesture)
   const commitActorClip = useEditorStore((s) => s.commitActorClip)
 
-  // Collapsed by default so the dock stays reachable; expand on demand.
-  const [open, setOpen] = useState(false)
+  // Fresh workspace: collapsed. Explicit toggles persist for this tab.
+  const [open, setOpen] = useState(() =>
+    readPanelOpenPref(SEQUENCE_PANEL_OPEN_KEY, false),
+  )
   const [hintDismissed, setHintDismissed] = useState(() => {
     try {
       return sessionStorage.getItem(SEQUENCE_HINT_KEY) === '1'
@@ -325,47 +332,71 @@ export function ClipTimeline() {
 
   const rulerTicks = [0, 0.5, 1] as const
 
-  return (
-    <div
-      data-testid="clip-timeline"
-      data-sequence-open={open ? 'true' : 'false'}
-      className={`pointer-events-auto flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/92 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md ${
-        open ? 'max-sm:rounded-b-none' : ''
-      }`}
-      style={open ? { maxHeight: SEQUENCE_PANEL_MAX_HEIGHT } : undefined}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
+  const setOpenPref = (next: boolean) => {
+    setOpen(next)
+    writePanelOpenPref(SEQUENCE_PANEL_OPEN_KEY, next)
+  }
+
+  if (!open) {
+    return (
       <div
-        data-testid="sequence-header"
-        className="flex shrink-0 items-stretch border-b border-transparent"
+        data-testid="clip-timeline"
+        data-sequence-open="false"
+        className="pointer-events-auto flex w-full justify-center"
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           data-testid="btn-toggle-clip-timeline"
-          aria-expanded={open}
+          aria-expanded={false}
           aria-controls="sequence-panel-body"
-          onClick={() => setOpen((v) => !v)}
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-800"
+          onClick={() => setOpenPref(true)}
+          className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-slate-900/[0.08] bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white"
         >
           <span>Sequence</span>
-          <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-600">
-            {open ? (
-              <span data-testid="sequence-collapse-label">Collapse</span>
-            ) : (
-              <span className="sr-only">Expand</span>
-            )}
+          <span className="sr-only">Expand</span>
+          <span aria-hidden className="text-slate-400">
+            ▸
+          </span>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      data-testid="clip-timeline"
+      data-sequence-open="true"
+      className="pointer-events-auto flex w-full min-h-0 max-h-full flex-1 flex-col overflow-hidden rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      style={{ maxHeight: SEQUENCE_PANEL_MAX_HEIGHT }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div
+        data-testid="sequence-header"
+        className="flex shrink-0 items-stretch border-b border-slate-900/[0.05]"
+      >
+        <button
+          type="button"
+          data-testid="btn-toggle-clip-timeline"
+          aria-expanded={true}
+          aria-controls="sequence-panel-body"
+          onClick={() => setOpenPref(false)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-1.5 text-left text-sm font-semibold tracking-tight text-slate-800"
+        >
+          <span>Sequence</span>
+          <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+            <span data-testid="sequence-collapse-label">Collapse</span>
             <span aria-hidden className="text-slate-400">
-              {open ? '▾' : '▸'}
+              ▾
             </span>
           </span>
         </button>
       </div>
 
-      {open && (
-        <div
+      <div
           id="sequence-panel-body"
           data-testid="sequence-panel-body"
-          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain border-t border-slate-100 px-2.5 pb-2.5 pt-2"
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2.5 pb-2.5 pt-2"
         >
           <p
             data-testid="clip-timeline-help"
@@ -730,7 +761,6 @@ export function ClipTimeline() {
             </div>
           )}
         </div>
-      )}
     </div>
   )
 }

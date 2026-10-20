@@ -200,8 +200,17 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await page.getByTestId('loop-toggle').check()
 
-    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-reset').click()
+    await expect(page.getByTestId('reset-actor-confirm')).toBeVisible()
+    await expect(page.getByTestId('reset-actor-confirm')).toContainText(
+      'Reset motion for “Actor 1”',
+    )
+    await expect(page.getByTestId('reset-actor-confirm-copy')).toContainText(
+      /Appearance, other actors, and project Duration \/ Loop stay the same/,
+    )
+    await expect(page.getByTestId('btn-reset-actor-confirm')).toHaveText(
+      'Reset motion',
+    )
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',
       confirmTestId: 'btn-reset-actor-confirm',
@@ -223,7 +232,6 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('3000')
     await page.getByTestId('loop-toggle').check()
-    await ensureRefineMotionOpen(page)
     await page.getByTestId('btn-reset').click()
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',

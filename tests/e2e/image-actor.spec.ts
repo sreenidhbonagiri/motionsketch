@@ -5,6 +5,7 @@ import {
   openPanel,
   readExportedCss,
   recordSimplePath,
+  expandExportOtherWays,
 } from './helpers'
 
 async function makePngBytes(
@@ -37,7 +38,7 @@ async function makePngBytes(
 test.describe('image actors', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
-  test('transparent wide PNG preserves aspect, center, and round-trips', async ({
+  test('transparent wide PNG preserves aspect, center, and kind toggle', async ({
     page,
   }) => {
     await page.goto('/')
@@ -98,22 +99,35 @@ test.describe('image actors', () => {
       'data-actor-kind',
       'image',
     )
+  })
+
+  test('image actor CSS omits embed; HTML demo and project file include it', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    await openPanel(page, 'appearance')
+    const png = await makePngBytes(page, 400, 100, '#94a3b8')
+    await page.getByTestId('actor-image-input').setInputFiles({
+      name: 'wide-logo.png',
+      mimeType: 'image/png',
+      buffer: png,
+    })
+    await expect(page.getByTestId('actor-image-status')).toContainText('Loaded')
 
     const css = await readExportedCss(page)
     expect(css).toMatch(/does NOT embed the image/i)
     expect(css).toContain('<img class="ms-actor"')
 
     await openPanel(page, 'export')
+    await expandExportOtherWays(page)
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-html-demo').click()
     const download = await downloadPromise
     const path = await download.path()
     expect(path).toBeTruthy()
-    const html = await page.evaluate(async (p) => {
-      // Playwright download path is local — read via Node in test instead.
-      return p
-    }, path)
-    void html
     const fs = await import('node:fs')
     const demo = fs.readFileSync(path!, 'utf8')
     expect(demo).toContain('<img class="ms-actor"')

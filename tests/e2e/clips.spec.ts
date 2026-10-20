@@ -2,16 +2,17 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { buildClipsTimingFixtureJson } from '../fixtures/clipsTimingProject'
 import {
-  applyClipSeconds,
-  ensureEditor,
   actorIdsFromList,
+  applyClipSeconds,
+  clickAddActor,
+  ensureEditor,
+  expandExportOtherWays,
   loadHtmlDocument,
   loadProjectSnapshot,
   openPanel,
   readExportedCss,
   recordSimplePath,
   selectActorByIndex,
-  expandExportOtherWays,
 } from './helpers'
 
 async function ensureClipTimelineOpen(
@@ -189,7 +190,7 @@ test.describe('per-actor clip timing', () => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await ensureClipTimelineOpen(page)
     const ids = await actorIdsFromList(page)
     await page.getByTestId(`clip-row-${ids[0]}`).click()

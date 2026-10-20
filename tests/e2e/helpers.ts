@@ -218,6 +218,13 @@ export async function ensureActorListExpanded(page: Page) {
   if ((await listToggle.getAttribute('aria-expanded')) === 'true') return
   await listToggle.click()
   await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByTestId('actor-list-body')).toBeVisible()
+}
+
+/** Expand Actors then click Add (panel starts collapsed on a fresh workspace). */
+export async function clickAddActor(page: Page) {
+  await ensureActorListExpanded(page)
+  await page.getByTestId('btn-add-actor').click()
 }
 
 export async function actorIdsFromList(page: Page): Promise<string[]> {
@@ -237,7 +244,15 @@ export async function actorIdsFromList(page: Page): Promise<string[]> {
 export async function selectActorByIndex(page: Page, index: number) {
   const ids = await actorIdsFromList(page)
   expect(ids.length).toBeGreaterThan(index)
-  await page.getByTestId(`actor-list-item-${ids[index]}`).click()
+  const item = page.getByTestId(`actor-list-item-${ids[index]}`)
+  await item.evaluate((el) => {
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+  // On short viewports the Actors sheet can sit tight under Sequence; use the
+  // element click path so selection isn’t blocked by the adjacent toggle.
+  await item.evaluate((el) => {
+    ;(el as HTMLButtonElement).click()
+  })
   await expect(
     page.getByTestId(`actor-list-item-${ids[index]}`),
   ).toHaveAttribute('data-selected', 'true')
@@ -305,7 +320,7 @@ async function scrollExportScrollerToCenter(locator: Locator) {
   })
 }
 
-/** Expand the dock’s Refine motion disclosure (Polish, Glide, Snap, Restore, Reset). */
+/** Expand the dock’s Refine motion disclosure (Polish, Glide, Snap, Restore). */
 export async function ensureRefineMotionOpen(page: Page) {
   const details = page.getByTestId('refine-motion')
   await expect(details).toBeVisible()

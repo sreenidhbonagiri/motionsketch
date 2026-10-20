@@ -59,7 +59,7 @@ export function PresetPanel() {
   return (
     <div
       data-testid="preset-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-2xl border border-white/80 bg-white/95 px-3 py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md"
+      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">

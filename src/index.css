@@ -1,8 +1,21 @@
 @import 'tailwindcss';
 
 :root {
-  color: #0f172a;
-  background: #e7ebf2;
+  /* Canvas-first chrome — restrained surfaces (Vibe Draw–inspired, own identity). */
+  --ms-ink: #0f172a;
+  --ms-muted: #64748b;
+  --ms-canvas: #eef1f5;
+  --ms-surface: rgb(255 255 255 / 0.82);
+  --ms-surface-strong: rgb(255 255 255 / 0.92);
+  --ms-border: rgb(15 23 42 / 0.08);
+  --ms-shadow: 0 2px 16px rgb(15 23 42 / 0.06);
+  --ms-shadow-sm: 0 1px 6px rgb(15 23 42 / 0.05);
+  --ms-control-h: 2rem;
+  --ms-radius: 0.75rem;
+  --ms-radius-sm: 0.5rem;
+
+  color: var(--ms-ink);
+  background: var(--ms-canvas);
   font-family:
     'Segoe UI',
     'Helvetica Neue',
@@ -40,7 +53,7 @@ dialog {
 }
 
 dialog::backdrop {
-  background: rgb(15 23 42 / 0.4);
+  background: rgb(15 23 42 / 0.32);
 }
 
 dialog.confirm-dialog:not([open]) {
@@ -74,6 +87,16 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgb(15 23 42 / 0.28);
+  outline-offset: 2px;
 }
 
 /* Override global textarea font inherit for readable CSS export */

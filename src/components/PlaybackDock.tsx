@@ -16,12 +16,18 @@ function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-const btnPrimary =
-  'rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40'
-const btnSecondary =
-  'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-40'
-const btnQuiet =
-  'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40'
+/** Shared control height — filled primary, ghost secondary; icons for support. */
+const control =
+  'inline-flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
+const btnPrimary = `${control} bg-slate-900 text-white hover:bg-slate-800`
+const btnSecondary = `${control} text-slate-700 hover:bg-slate-900/[0.06]`
+const btnQuiet = `${control} text-slate-500 hover:bg-slate-900/[0.05]`
+/** Secondary to Play, but clearly stronger than disabled Undo/Redo. */
+const btnReset = `${control} text-slate-800 hover:bg-slate-900/[0.08] hover:text-slate-950`
+const btnIcon =
+  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:opacity-35'
+const surfaceChrome =
+  'rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
 
 export function PlaybackDock() {
   const mode = useEditorStore((s) => s.mode)
@@ -188,15 +194,15 @@ export function PlaybackDock() {
   return (
     <div
       data-testid="playback-dock"
-      className="pointer-events-auto flex w-full max-w-2xl shrink-0 flex-col gap-2 rounded-2xl border border-white/80 bg-white/92 px-3 py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.12)] backdrop-blur-md"
+      className={`pointer-events-auto flex w-full max-w-xl shrink-0 flex-col gap-1 ${surfaceChrome} px-2 py-1.5 sm:max-w-2xl sm:px-2.5 sm:py-2`}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {hasAnyRecording && !editing && (
         <div
           data-testid="playback-timeline"
-          className="flex flex-col gap-1"
+          className="flex flex-col gap-0.5"
         >
-          <div className="flex items-center justify-between gap-2 text-xs tabular-nums text-slate-600">
+          <div className="flex items-center justify-between gap-2 text-[11px] tabular-nums text-slate-500">
             <span data-testid="playback-elapsed">
               {goingBack
                 ? `← ${formatSeconds(elapsedMs)}`
@@ -267,7 +273,7 @@ export function PlaybackDock() {
 
       <div
         data-testid="toolbar"
-        className="flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:gap-2"
+        className="flex max-w-full flex-wrap items-center justify-center gap-1 sm:gap-1.5"
       >
         {editing ? (
           <>
@@ -299,7 +305,7 @@ export function PlaybackDock() {
             </button>
             <div
               data-testid="path-tool-toggle"
-              className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+              className="flex h-8 items-center rounded-lg bg-slate-900/[0.04] p-0.5"
               role="group"
               aria-label="Path edit tool"
             >
@@ -310,8 +316,8 @@ export function PlaybackDock() {
                 aria-pressed={pathTool === 'edit-points'}
                 className={
                   pathTool === 'edit-points'
-                    ? 'rounded-md bg-slate-900 px-2.5 py-1 text-sm font-medium text-white'
-                    : 'rounded-md px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-white'
+                    ? 'h-7 rounded-md bg-slate-900 px-2.5 text-sm font-medium text-white'
+                    : 'h-7 rounded-md px-2.5 text-sm font-medium text-slate-600 hover:bg-white/70'
                 }
               >
                 Edit points
@@ -331,8 +337,8 @@ export function PlaybackDock() {
                 aria-describedby="path-move-help"
                 className={
                   pathTool === 'move-path'
-                    ? 'rounded-md bg-teal-700 px-2.5 py-1 text-sm font-medium text-white'
-                    : 'rounded-md px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-white'
+                    ? 'h-7 rounded-md bg-teal-700 px-2.5 text-sm font-medium text-white'
+                    : 'h-7 rounded-md px-2.5 text-sm font-medium text-slate-600 hover:bg-white/70'
                 }
               >
                 Move path
@@ -487,7 +493,7 @@ export function PlaybackDock() {
                 aria-describedby={
                   mode === 'armed' && modeStatus ? dockStatusId : undefined
                 }
-                className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-600"
+                className={`${control} bg-red-500 text-white hover:bg-red-600`}
               >
                 {mode === 'armed' ? 'Cancel' : 'Stop'}
               </button>
@@ -549,17 +555,6 @@ export function PlaybackDock() {
 
             <button
               type="button"
-              data-testid="btn-restart"
-              onClick={() => restartPlayback()}
-              disabled={playbackDisabled}
-              aria-describedby={playbackDescribedBy}
-              className={btnSecondary}
-            >
-              Restart
-            </button>
-
-            <button
-              type="button"
               data-testid="btn-edit-path"
               onClick={enterEditMode}
               disabled={editPathDisabled}
@@ -571,23 +566,72 @@ export function PlaybackDock() {
 
             <button
               type="button"
+              data-testid="btn-reset"
+              onClick={() => {
+                void (async () => {
+                  if (recording) {
+                    const label = selectedActor?.name ?? 'this actor'
+                    const ok = await confirm({
+                      title: `Reset motion for “${label}”?`,
+                      body: 'Clears this actor’s recorded path, path edits, and transform keyframes. Appearance, other actors, and project Duration / Loop stay the same.',
+                      confirmLabel: 'Reset motion',
+                      danger: true,
+                      testId: 'reset-actor-confirm',
+                      confirmTestId: 'btn-reset-actor-confirm',
+                      cancelTestId: 'btn-reset-actor-cancel',
+                      bodyTestId: 'reset-actor-confirm-copy',
+                    })
+                    if (!ok) return
+                  }
+                  resetRecording()
+                })()
+              }}
+              disabled={resetDisabled}
+              aria-describedby={resetDescribedBy}
+              className={btnReset}
+            >
+              Reset motion
+            </button>
+
+            <span
+              aria-hidden
+              className="mx-0.5 hidden h-4 w-px bg-slate-900/10 sm:inline-block"
+            />
+
+            <button
+              type="button"
+              data-testid="btn-restart"
+              onClick={() => restartPlayback()}
+              disabled={playbackDisabled}
+              aria-label="Restart"
+              aria-describedby={playbackDescribedBy}
+              title="Restart from the beginning"
+              className={btnIcon}
+            >
+              <span aria-hidden>↻</span>
+            </button>
+
+            <button
+              type="button"
               data-testid="btn-undo-transform"
               onClick={() => undoActorEdit()}
               disabled={isRecordingLike || actorEditOrder.length === 0}
-              className={btnQuiet}
+              className={btnIcon}
+              aria-label="Undo"
               title="Undo placement, transform, sequence timing, Glide, or a motion preset for the selected actor"
             >
-              Undo
+              <span aria-hidden>↶</span>
             </button>
             <button
               type="button"
               data-testid="btn-redo-transform"
               onClick={() => redoActorEdit()}
               disabled={isRecordingLike || actorEditRedoOrder.length === 0}
-              className={btnQuiet}
+              className={btnIcon}
+              aria-label="Redo"
               title="Redo placement, transform, sequence timing, Glide, or a motion preset for the selected actor"
             >
-              Redo
+              <span aria-hidden>↷</span>
             </button>
 
             <details
@@ -596,7 +640,7 @@ export function PlaybackDock() {
             >
               <summary
                 data-testid="refine-motion-summary"
-                className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden"
+                className={`${control} cursor-pointer list-none gap-1 text-xs text-slate-600 hover:bg-slate-900/[0.05] sm:text-sm [&::-webkit-details-marker]:hidden`}
               >
                 <span
                   aria-hidden
@@ -608,7 +652,7 @@ export function PlaybackDock() {
               </summary>
               <div
                 data-testid="refine-motion-tools"
-                className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-1.5 sm:justify-start"
+                className="mt-1 flex max-w-full flex-wrap items-center justify-center gap-1 sm:justify-start"
               >
                 <button
                   type="button"
@@ -641,9 +685,7 @@ export function PlaybackDock() {
                     title="Align placement and path edits to the dots. Recording stays freehand."
                     onClick={() => setSnapToGrid(!snapToGrid)}
                     className={
-                      snapToGrid
-                        ? 'shrink-0 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800'
-                        : `${btnSecondary} shrink-0`
+                      snapToGrid ? btnPrimary : btnSecondary
                     }
                   >
                     {snapToGrid ? 'Snap on' : 'Snap to grid'}
@@ -660,35 +702,6 @@ export function PlaybackDock() {
                     Restore recorded path
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  data-testid="btn-reset"
-                  onClick={() => {
-                    void (async () => {
-                      if (recording) {
-                        const label = selectedActor?.name ?? 'this actor'
-                        const ok = await confirm({
-                          title: `Reset “${label}”?`,
-                          body: 'Clears that actor’s path, path edits, and transform — not other actors.',
-                          confirmLabel: 'Reset actor',
-                          danger: true,
-                          testId: 'reset-actor-confirm',
-                          confirmTestId: 'btn-reset-actor-confirm',
-                          cancelTestId: 'btn-reset-actor-cancel',
-                          bodyTestId: 'reset-actor-confirm-copy',
-                        })
-                        if (!ok) return
-                      }
-                      resetRecording()
-                    })()
-                  }}
-                  disabled={resetDisabled}
-                  aria-describedby={resetDescribedBy}
-                  className={btnQuiet}
-                >
-                  Reset actor
-                </button>
               </div>
             </details>
           </>
@@ -702,11 +715,7 @@ export function PlaybackDock() {
             aria-describedby="snap-to-grid-help"
             title="Align placement and path edits to the dots. Recording stays freehand."
             onClick={() => setSnapToGrid(!snapToGrid)}
-            className={
-              snapToGrid
-                ? 'shrink-0 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800'
-                : `${btnSecondary} shrink-0`
-            }
+            className={snapToGrid ? btnPrimary : btnSecondary}
           >
             {snapToGrid ? 'Snap on' : 'Snap to grid'}
           </button>

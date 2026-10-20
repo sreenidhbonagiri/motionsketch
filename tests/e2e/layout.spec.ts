@@ -112,6 +112,293 @@ test.describe('workspace layout', () => {
     })
   }
 
+  test('mobile 390x844: fresh workspace chrome fits without horizontal clip', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+
+    const fit = await page.evaluate(() => {
+      const ids = [
+        'btn-project',
+        'btn-examples',
+        'btn-adjust',
+        'btn-appearance',
+        'btn-export',
+        'playback-dock',
+        'btn-record',
+        'btn-toggle-actor-list',
+      ]
+      const clipped: string[] = []
+      for (const id of ids) {
+        const el = document.querySelector(`[data-testid="${id}"]`)
+        if (!(el instanceof HTMLElement)) {
+          clipped.push(`${id}:missing`)
+          continue
+        }
+        const r = el.getBoundingClientRect()
+        if (
+          r.left < -1 ||
+          r.right > window.innerWidth + 1 ||
+          r.top < -1 ||
+          r.bottom > window.innerHeight + 1
+        ) {
+          clipped.push(id)
+        }
+      }
+      const root = document.documentElement
+      return {
+        clipped,
+        pageOverflowX: root.scrollWidth > root.clientWidth + 1,
+        pageOverflowY: root.scrollHeight > root.clientHeight + 1,
+      }
+    })
+    expect(fit.clipped, 'header/dock controls must stay in viewport').toEqual(
+      [],
+    )
+    expect(fit.pageOverflowX).toBe(false)
+    expect(fit.pageOverflowY).toBe(false)
+  })
+
+  test('mobile 390x844: Adjust sheet is bounded; Actors/Sequence prefs survive', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    const listToggle = page.getByTestId('btn-toggle-actor-list')
+    if ((await listToggle.getAttribute('aria-expanded')) !== 'true') {
+      await listToggle.click()
+    }
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+
+    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
+    if ((await sequenceToggle.getAttribute('aria-expanded')) !== 'true') {
+      await sequenceToggle.click()
+    }
+    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+
+    await openPanel(page, 'adjust')
+    const sheet = page.getByTestId('adjust-panel-root')
+    await expect(sheet).toBeVisible()
+    await expect(page.getByTestId('btn-close-adjust')).toBeVisible()
+
+    const bounds = await page.evaluate(() => {
+      const panel = document.querySelector('[data-testid="adjust-panel-root"]')
+      const close = document.querySelector('[data-testid="btn-close-adjust"]')
+      const title = document.querySelector(
+        '[data-testid="adjust-panel-root"] h2',
+      )
+      if (
+        !(panel instanceof HTMLElement) ||
+        !(close instanceof HTMLElement) ||
+        !(title instanceof HTMLElement)
+      ) {
+        return null
+      }
+      const pr = panel.getBoundingClientRect()
+      const cr = close.getBoundingClientRect()
+      const tr = title.getBoundingClientRect()
+      const vh = window.innerHeight
+      const vw = window.innerWidth
+      return {
+        panelInView:
+          pr.top >= -1 &&
+          pr.left >= -1 &&
+          pr.bottom <= vh + 1 &&
+          pr.right <= vw + 1,
+        closeInView:
+          cr.top >= -1 &&
+          cr.left >= -1 &&
+          cr.bottom <= vh + 1 &&
+          cr.right <= vw + 1,
+        titleInView:
+          tr.top >= -1 &&
+          tr.left >= -1 &&
+          tr.bottom <= vh + 1 &&
+          tr.right <= vw + 1,
+        dockInert: document
+          .querySelector('[data-testid="toolbar-slot"]')
+          ?.hasAttribute('inert'),
+        actorsInert: document
+          .querySelector('[data-testid="actor-list-slot"]')
+          ?.hasAttribute('inert'),
+      }
+    })
+    expect(bounds).toBeTruthy()
+    expect(bounds!.panelInView).toBe(true)
+    expect(bounds!.closeInView).toBe(true)
+    expect(bounds!.titleInView).toBe(true)
+    expect(bounds!.dockInert).toBe(true)
+    expect(bounds!.actorsInert).toBe(true)
+
+    // Prefs must not be collapsed while the sheet is open.
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+
+    await page.getByTestId('btn-close-adjust').click()
+    await expect(sheet).toHaveCount(0)
+
+    // Closing the sheet restores interaction and keeps open prefs.
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+    await expect(page.getByTestId('toolbar-slot')).not.toHaveAttribute('inert')
+    await expect(page.getByTestId('actor-list-slot')).not.toHaveAttribute(
+      'inert',
+    )
+  })
+
+  test('mobile 390x844: expanded Actors stays clear of Sequence and dock', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    const listToggle = page.getByTestId('btn-toggle-actor-list')
+    if ((await listToggle.getAttribute('aria-expanded')) !== 'true') {
+      await listToggle.click()
+    }
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+
+    // Leave Sequence collapsed (header only) and open Refine so the dock is tall.
+    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
+    if ((await sequenceToggle.getAttribute('aria-expanded')) === 'true') {
+      await sequenceToggle.click()
+      await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'false')
+    }
+    const refine = page.getByTestId('refine-motion')
+    await refine.evaluate((el) => {
+      ;(el as HTMLDetailsElement).open = true
+    })
+    await expect(page.getByTestId('refine-motion-tools')).toBeVisible()
+
+    // Expanded-state preference must survive the layout pass.
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+
+    const controls = [
+      'btn-add-actor',
+      'btn-duplicate-actor',
+      'btn-delete-actor',
+      'actor-list-help',
+    ] as const
+    for (const id of controls) {
+      const target = page.getByTestId(id)
+      await target.evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      const clear = await page.evaluate((testId) => {
+        const el = document.querySelector(`[data-testid="${testId}"]`)
+        const list = document.querySelector('[data-testid="actor-list"]')
+        const sequence = document.querySelector('[data-testid="clip-timeline"]')
+        const dock = document.querySelector('[data-testid="playback-dock"]')
+        if (!(el instanceof HTMLElement) || !(list instanceof HTMLElement)) {
+          return { ok: false, reason: 'missing' }
+        }
+        const er = el.getBoundingClientRect()
+        const lr = list.getBoundingClientRect()
+        // Control must sit inside the Actors panel bounds (reachable via scroll).
+        if (
+          er.top < lr.top - 1 ||
+          er.bottom > lr.bottom + 1 ||
+          er.left < lr.left - 1 ||
+          er.right > lr.right + 1
+        ) {
+          return { ok: false, reason: 'outside-list' }
+        }
+        // Sequence / dock must not cover the control’s center.
+        const x = er.left + er.width / 2
+        const y = er.top + er.height / 2
+        for (const overlay of [sequence, dock]) {
+          if (!(overlay instanceof HTMLElement)) continue
+          const or = overlay.getBoundingClientRect()
+          if (x >= or.left && x <= or.right && y >= or.top && y <= or.bottom) {
+            return { ok: false, reason: 'covered' }
+          }
+        }
+        return { ok: true, reason: 'ok' }
+      }, id)
+      expect(clear, `${id} reachable above Sequence/dock`).toEqual({
+        ok: true,
+        reason: 'ok',
+      })
+    }
+  })
+
+  test('mobile 390x844: actor control reachable with Sequence expanded', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    const listToggle = page.getByTestId('btn-toggle-actor-list')
+    if ((await listToggle.getAttribute('aria-expanded')) !== 'true') {
+      await listToggle.click()
+    }
+    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
+    if ((await sequenceToggle.getAttribute('aria-expanded')) !== 'true') {
+      await sequenceToggle.click()
+    }
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+
+    // Body must have real height — not crushed to the toggle row.
+    const bodyBox = await page.getByTestId('actor-list-body').boundingBox()
+    expect(bodyBox).toBeTruthy()
+    expect(bodyBox!.height).toBeGreaterThan(80)
+
+    const add = page.getByTestId('btn-add-actor')
+    await add.evaluate((el) => {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    })
+    await expect(add).toBeVisible()
+
+    // Hit-test the control center: must land on Add (not Sequence/dock/header).
+    const hit = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="btn-add-actor"]')
+      if (!(el instanceof HTMLElement)) return { ok: false, reason: 'missing' }
+      const r = el.getBoundingClientRect()
+      if (r.width < 8 || r.height < 8) {
+        return { ok: false, reason: 'zero-size' }
+      }
+      const x = r.left + r.width / 2
+      const y = r.top + r.height / 2
+      const top = document.elementFromPoint(x, y)
+      if (!(top instanceof Element)) return { ok: false, reason: 'no-hit' }
+      const onAdd = !!top.closest('[data-testid="btn-add-actor"]')
+      return {
+        ok: onAdd,
+        reason: onAdd ? 'ok' : (top as HTMLElement).dataset?.testid ?? top.tagName,
+      }
+    })
+    expect(hit, 'Add must be the topmost target at its center').toEqual({
+      ok: true,
+      reason: 'ok',
+    })
+
+    // Actually use the control — proves reachability, not just geometry.
+    await add.click()
+    await expect(page.getByTestId('actor-list')).toContainText('2/8')
+
+    // Prefs and Sequence stay open after the interaction.
+    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+    await assertFullyInViewport(page, 'sequence-collapse-label')
+    await assertFullyInViewport(page, 'btn-play')
+  })
+
   test('mobile 390x844: labeled menus stay reachable', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')

@@ -36,7 +36,7 @@ export function PolishPanel() {
   return (
     <div
       data-testid="polish-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-2xl border border-white/80 bg-white/95 px-3 py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.14)] backdrop-blur-md"
+      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -150,7 +150,7 @@ export function PolishPanel() {
           type="button"
           data-testid="btn-polish-cancel"
           onClick={() => cancelPolish()}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06]"
         >
           Cancel
         </button>
@@ -159,7 +159,7 @@ export function PolishPanel() {
           data-testid="btn-polish-apply"
           onClick={() => applyPolish()}
           disabled={!session.changed}
-          className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex h-8 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
         >
           Apply
         </button>

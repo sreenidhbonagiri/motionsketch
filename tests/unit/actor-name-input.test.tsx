@@ -162,19 +162,7 @@ describe('ActorNameInput', () => {
 
 describe('ActorList rename integration', () => {
   beforeEach(() => {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: true,
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    })
+    sessionStorage.setItem('motionsketch.actorsPanelOpen', '1')
     const project = makeProject({
       actors: [
         makeActor({

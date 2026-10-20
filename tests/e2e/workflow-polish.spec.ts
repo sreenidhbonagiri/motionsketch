@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
 import {
   applyClipSeconds,
+  clickAddActor,
   dragActor,
+  ensureActorListExpanded,
   ensureEditor,
-  ensureRefineMotionOpen,
   openPanel,
   recordSimplePath,
   selectActorByIndex,
@@ -26,6 +27,7 @@ test.describe('editor workflow polish', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
+    await ensureActorListExpanded(page)
 
     await expect(page.getByTestId('btn-delete-actor')).toBeDisabled()
     await expect(page.getByTestId('btn-delete-actor')).toHaveAttribute(
@@ -45,7 +47,6 @@ test.describe('editor workflow polish', () => {
 
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('dock-status')).toContainText(/Ready|drag/i)
-    await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('btn-reset')).toBeDisabled()
     await expect(page.getByTestId('btn-reset')).toHaveAttribute(
       'aria-describedby',
@@ -82,7 +83,7 @@ test.describe('editor workflow polish', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 1)
     await openPanel(page, 'adjust')
 
@@ -159,7 +160,7 @@ test.describe('editor workflow polish', () => {
     await expect(page.getByTestId('btn-apply-clip-times')).toBeDisabled()
 
     // Actor switch discards uncommitted draft.
-    await page.getByTestId('btn-add-actor').click()
+    await clickAddActor(page)
     await selectActorByIndex(page, 0)
     await openClipTimeline(page)
     await page.getByTestId('clip-start-input').fill('0.50')

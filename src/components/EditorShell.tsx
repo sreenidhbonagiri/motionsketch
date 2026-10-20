@@ -45,11 +45,14 @@ import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 
 const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
 
-const chromeBtn =
-  'inline-flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md transition hover:bg-white'
-/** Primary chrome CTA — used for Export once a path exists. */
-const chromeBtnPrimary =
-  'inline-flex items-center gap-1.5 rounded-xl border border-slate-900 bg-slate-900 px-2.5 py-1.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(15,23,42,0.16)] transition hover:bg-slate-800'
+/** Quiet control inside the slim header clusters. */
+const headerBtn =
+  'inline-flex h-7 min-h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]'
+/** Primary Export once a path exists. */
+const headerBtnPrimary =
+  'inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-slate-900 px-2.5 text-xs font-medium text-white transition hover:bg-slate-800'
+const headerCluster =
+  'flex min-w-0 max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-slate-900/[0.08] bg-white/85 p-1 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl'
 
 export function EditorShell() {
   usePlaybackClock()
@@ -91,8 +94,11 @@ export function EditorShell() {
   )
   const afterPathToastTextId = useId()
   const headerRef = useRef<HTMLElement>(null)
+  const toolbarSlotRef = useRef<HTMLDivElement>(null)
   // Toast top tracks measured header height so wrapped mobile chrome never overlaps.
   const [toastTopPx, setToastTopPx] = useState(96)
+  // Actors panel sits above Sequence + dock; clearance tracks the live stack height.
+  const [toolbarClearancePx, setToolbarClearancePx] = useState(96)
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
@@ -155,7 +161,46 @@ export function EditorShell() {
     return () => ro.disconnect()
   }, [])
 
+  useLayoutEffect(() => {
+    const slot = toolbarSlotRef.current
+    if (!slot) return
+    const gapPx = 8
+    const update = () => {
+      const stack = slot.firstElementChild
+      if (!(stack instanceof HTMLElement)) return
+      const top = stack.getBoundingClientRect().top
+      const fromBottom = Math.max(0, window.innerHeight - top)
+      setToolbarClearancePx(Math.ceil(fromBottom) + gapPx)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(slot)
+    const stack = slot.firstElementChild
+    if (stack instanceof HTMLElement) ro.observe(stack)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [editing, polishSession, glideSession, presetSession, hasRecording])
+
   const coarsePointer = useCoarsePointer()
+  // Narrow sheets cover the dock; inert only there so desktop dock stays usable
+  // under Adjust / Appearance / Export.
+  const [narrowViewport, setNarrowViewport] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false
+    return window.matchMedia('(max-width: 639px)').matches
+  })
+  useEffect(() => {
+    if (!window.matchMedia) return
+    const mq = window.matchMedia('(max-width: 639px)')
+    const onChange = () => setNarrowViewport(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  const sheetCoversChrome = !!openPanel && narrowViewport
+
   // Empty-board Record cue — hide once any take exists; dock covers armed/recording.
   const tipBusy =
     mode !== 'idle' ||
@@ -180,7 +225,11 @@ export function EditorShell() {
   return (
     <div
       data-testid="app-shell"
-      className="fixed inset-0 overflow-hidden bg-[#eef1f6] text-slate-900 antialiased"
+      className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas,#eef1f5)] text-slate-900 antialiased"
+      style={{
+        // Mobile contextual sheets clear the measured header + gap.
+        ['--ms-sheet-top' as string]: `${toastTopPx}px`,
+      }}
     >
       <div
         data-testid="action-live-region"
@@ -208,7 +257,7 @@ export function EditorShell() {
             role="status"
             data-testid="after-path-website-toast"
             aria-describedby={afterPathToastTextId}
-            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-white/70 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow-[0_8px_24px_rgba(15,23,42,0.12)] backdrop-blur-md"
+            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2 text-xs text-slate-700 shadow-[var(--ms-shadow)] backdrop-blur-xl"
           >
             <p
               id={afterPathToastTextId}
@@ -229,126 +278,118 @@ export function EditorShell() {
         </div>
       )}
 
-      {/* Top chrome — pointer-events only on controls.
-          When a floating panel is open, raise above the bottom dock (also z-40)
-          so mobile panel actions are not covered by Sequence / Playback. */}
+      {/* Slim cohesive header — stacks on narrow so clusters never clip horizontally.
+          When a panel is open, raise above the bottom dock so sheet actions stay reachable. */}
       <header
         ref={headerRef}
-        className={`pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-4 sm:pt-4 ${
+        className={`pointer-events-none absolute inset-x-0 top-0 flex flex-col items-stretch gap-1.5 px-2.5 pt-[max(0.5rem,env(safe-area-inset-top))] sm:flex-row sm:items-start sm:justify-between sm:gap-2 sm:px-3 sm:pt-3 ${
           openPanel ? 'z-50' : 'z-40'
         }`}
       >
-        <div className="pointer-events-auto relative flex min-w-0 flex-wrap items-center gap-2">
-          <div className="rounded-xl border border-white/80 bg-white/90 px-2.5 py-1.5 shadow-[0_6px_20px_rgba(15,23,42,0.08)] backdrop-blur-md">
-            <div className="flex min-w-0 items-baseline gap-2">
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {/*
+          Panels stay outside the blurred cluster so max-sm:fixed anchors to the
+          viewport (backdrop-filter on an ancestor would trap fixed positioning).
+        */}
+        <div className="pointer-events-auto relative w-full min-w-0 sm:max-w-[min(100%,28rem)]">
+          <div className={`${headerCluster} w-full`}>
+            <div className="flex min-w-0 flex-1 flex-col justify-center px-1.5 py-0.5">
+              <span className="hidden text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:block">
                 MotionSketch
               </span>
+              <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                <ProjectNameInput
+                  committedName={projectName}
+                  onCommit={renameProject}
+                />
+                {saveLabel && (
+                  <p
+                    data-testid="header-save-status"
+                    className={
+                      status === 'saved'
+                        ? 'text-[10px] text-slate-500'
+                        : 'text-[10px] font-medium text-amber-800'
+                    }
+                  >
+                    {saveLabel}
+                  </p>
+                )}
+              </div>
             </div>
-            <ProjectNameInput
-              committedName={projectName}
-              onCommit={renameProject}
-            />
-            {saveLabel && (
-              <p
-                data-testid="header-save-status"
-                className={
-                  status === 'saved'
-                    ? 'text-xs text-slate-500'
-                    : 'text-xs font-medium text-amber-800'
-                }
-              >
-                {saveLabel}
-              </p>
-            )}
-          </div>
 
-          <div className="relative">
+            <div
+              className="mx-0.5 hidden h-5 w-px shrink-0 bg-slate-900/10 sm:block"
+              aria-hidden
+            />
+
             <button
               type="button"
               data-testid="btn-project"
               aria-expanded={openPanel === 'project'}
               aria-controls="project-panel-root"
               onClick={() => togglePanel('project')}
-              className={chromeBtn}
+              className={headerBtn}
             >
-              <span aria-hidden className="text-slate-500">
+              <span aria-hidden className="text-slate-400">
                 ▦
               </span>
               Project
             </button>
-            <FloatingPanel
-              id="project"
-              title="Project"
-              open={openPanel === 'project'}
-              onClose={closePanel}
-              align="left"
-            >
-              <div data-testid="project-menu">
-                <ProjectPanel />
-              </div>
-            </FloatingPanel>
-          </div>
 
-          <button
-            type="button"
-            data-testid="btn-examples"
-            aria-haspopup="dialog"
-            aria-expanded={examplesOpen}
-            onClick={openExamples}
-            className={chromeBtn}
+            <button
+              type="button"
+              data-testid="btn-examples"
+              aria-haspopup="dialog"
+              aria-expanded={examplesOpen}
+              onClick={openExamples}
+              className={headerBtn}
+            >
+              Examples
+            </button>
+          </div>
+          <FloatingPanel
+            id="project"
+            title="Project"
+            open={openPanel === 'project'}
+            onClose={closePanel}
+            align="left"
           >
-            Examples
-          </button>
+            <div data-testid="project-menu">
+              <ProjectPanel />
+            </div>
+          </FloatingPanel>
         </div>
 
-        <div className="pointer-events-auto relative flex flex-wrap items-center justify-end gap-2">
-          <div className="relative">
+        <div className="pointer-events-auto relative w-full min-w-0 sm:w-auto">
+          <div className={`${headerCluster} w-full justify-end sm:w-auto`}>
             <button
               type="button"
               data-testid="btn-adjust"
               aria-expanded={openPanel === 'adjust'}
               aria-controls="adjust-panel-root"
               onClick={() => togglePanel('adjust')}
-              className={chromeBtn}
+              className={headerBtn}
             >
-              <span aria-hidden className="text-slate-500">
+              <span aria-hidden className="text-slate-400">
                 ⚙
               </span>
               Adjust
               {hasRecording && (
                 <span
                   data-testid="adjust-summary"
-                  className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium tabular-nums text-slate-600"
+                  className="rounded-md bg-slate-900/[0.06] px-1 py-px text-[10px] font-medium tabular-nums text-slate-600"
                 >
                   {(durationMs / 1000).toFixed(1)}s
                 </span>
               )}
             </button>
-            <FloatingPanel
-              id="adjust"
-              title="Adjust"
-              open={openPanel === 'adjust'}
-              onClose={closePanel}
-              align="right"
-              summary={
-                hasRecording
-                  ? `Duration ${(durationMs / 1000).toFixed(2)} s`
-                  : 'No animation yet'
-              }
-            >
-              <AdjustPanel />
-            </FloatingPanel>
-          </div>
 
-          <div className="relative">
             <button
               type="button"
               data-testid="btn-appearance"
               aria-expanded={openPanel === 'appearance'}
               aria-controls="appearance-panel-root"
               onClick={() => togglePanel('appearance')}
-              className={chromeBtn}
+              className={headerBtn}
             >
               {actorIsImage ? (
                 <img
@@ -356,100 +397,129 @@ export function EditorShell() {
                   data-testid="appearance-swatch"
                   src={actor.image!.dataUrl}
                   alt=""
-                  className="inline-block size-3.5 rounded-sm border border-slate-300 object-contain bg-white"
+                  className="inline-block size-3 rounded-sm border border-slate-300 object-contain bg-white"
                 />
               ) : (
                 <span
                   aria-hidden
                   data-testid="appearance-swatch"
-                  className="inline-block size-3.5 rounded-sm border border-slate-300"
+                  className="inline-block size-3 rounded-sm border border-slate-300"
                   style={{ background: actorColor }}
                 />
               )}
               Appearance
             </button>
-            <FloatingPanel
-              id="appearance"
-              title="Appearance"
-              open={openPanel === 'appearance'}
-              onClose={closePanel}
-              align="right"
-              summary={
-                actorIsImage ? (
-                  <span className="inline-flex items-center gap-1.5 truncate">
-                    <img
-                      src={actor.image!.dataUrl}
-                      alt=""
-                      className="inline-block size-3 rounded-sm border border-slate-300 object-contain bg-white"
-                    />
-                    {actor.image!.label}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span
-                      className="inline-block size-3 rounded-sm border border-slate-300"
-                      style={{ background: actorColor }}
-                    />
-                    {actorColor}
-                  </span>
-                )
-              }
-            >
-              <AppearancePanel />
-            </FloatingPanel>
-          </div>
 
-          <div className="relative">
             <button
               type="button"
               data-testid="btn-export"
               aria-expanded={openPanel === 'export'}
               aria-controls="export-panel-root"
               onClick={() => togglePanel('export')}
-              className={hasRecording ? chromeBtnPrimary : chromeBtn}
+              className={hasRecording ? headerBtnPrimary : headerBtn}
             >
               <span
                 aria-hidden
-                className={hasRecording ? 'text-slate-300' : 'text-slate-500'}
+                className={hasRecording ? 'text-slate-300' : 'text-slate-400'}
               >
                 ↗
               </span>
               Export
             </button>
-            <FloatingPanel
-              id="export"
-              title="Export"
-              open={openPanel === 'export'}
-              onClose={closePanel}
-              align="right"
-              summary={
-                hasRecording
-                  ? 'Download for your website, or other ways'
-                  : 'Create a path first'
-              }
-            >
-              <div className="p-3">
-                {hasRecording ? (
-                  <ExportPanel />
-                ) : (
-                  <p
-                    data-testid="export-empty"
-                    className="text-sm text-slate-500"
-                  >
-                    Create a path (Record, Import SVG, or a Motion preset) to
-                    download a website package — or open Other ways for React,
-                    your own HTML, CSS-only, and the project file.
-                  </p>
-                )}
-              </div>
-            </FloatingPanel>
           </div>
+          <FloatingPanel
+            id="adjust"
+            title="Adjust"
+            open={openPanel === 'adjust'}
+            onClose={closePanel}
+            align="right"
+            summary={
+              hasRecording
+                ? `Duration ${(durationMs / 1000).toFixed(2)} s`
+                : 'No animation yet'
+            }
+          >
+            <AdjustPanel />
+          </FloatingPanel>
+          <FloatingPanel
+            id="appearance"
+            title="Appearance"
+            open={openPanel === 'appearance'}
+            onClose={closePanel}
+            align="right"
+            summary={
+              actorIsImage ? (
+                <span className="inline-flex items-center gap-1.5 truncate">
+                  <img
+                    src={actor.image!.dataUrl}
+                    alt=""
+                    className="inline-block size-3 rounded-sm border border-slate-300 object-contain bg-white"
+                  />
+                  {actor.image!.label}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="inline-block size-3 rounded-sm border border-slate-300"
+                    style={{ background: actorColor }}
+                  />
+                  {actorColor}
+                </span>
+              )
+            }
+          >
+            <AppearancePanel />
+          </FloatingPanel>
+          <FloatingPanel
+            id="export"
+            title="Export"
+            open={openPanel === 'export'}
+            onClose={closePanel}
+            align="right"
+            summary={
+              hasRecording
+                ? 'Download for your website, or other ways'
+                : 'Create a path first'
+            }
+          >
+            <div className="p-3">
+              {hasRecording ? (
+                <ExportPanel />
+              ) : (
+                <p
+                  data-testid="export-empty"
+                  className="text-sm text-slate-500"
+                >
+                  Create a path (Record, Import SVG, or a Motion preset) to
+                  download a website package — or open Other ways for React,
+                  your own HTML, CSS-only, and the project file.
+                </p>
+              )}
+            </div>
+          </FloatingPanel>
         </div>
       </header>
 
-      {/* Actor list — left, above the dock */}
+      {/* Actor list — left, above Sequence + dock (clearance from live stack height).
+          z-35 stacks above the toolbar (z-30) so the narrow Actors sheet is not
+          covered by Sequence, and stays under the header (z-40).
+          On narrow, expanded Actors floats as a fixed sheet (see ActorList) so the
+          body is not crushed when Sequence owns the toolbar clearance.
+          On narrow chrome sheets, inert the slot (prefs stay open). */}
       {!editing && (
-        <div className="pointer-events-none absolute bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-3 z-40 sm:bottom-24 sm:left-4">
+        <div
+          data-testid="actor-list-slot"
+          className="pointer-events-none absolute left-3 z-[35] flex sm:left-4"
+          style={{
+            bottom: `max(${toolbarClearancePx}px, calc(env(safe-area-inset-bottom, 0px) + 0.75rem))`,
+            // Keep at least the toggle row when Sequence + dock dominate (desktop /
+            // collapsed). Expanded narrow Actors ignores this via position:fixed.
+            maxHeight: `max(2.75rem, calc(100dvh - env(safe-area-inset-top, 0px) - ${toastTopPx}px - ${toolbarClearancePx}px))`,
+          }}
+          {...(sheetCoversChrome
+            ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
+            : {})}
+        >
           <ActorList />
         </div>
       )}
@@ -457,14 +527,22 @@ export function EditorShell() {
       {/* Bottom dock — min-h-0 so Sequence can shrink and scroll inside the slot.
           While path-editing, stack above chrome panels (z-50) so Move path /
           Edit points stay reachable under a tall Adjust sheet. Otherwise keep
-          z-40 so an open Export panel can cover Sequence (mobile layout). */}
+          z-30 under the header. Narrow sheets inert without collapsing prefs. */}
       <div
+        ref={toolbarSlotRef}
         data-testid="toolbar-slot"
-        className={`pointer-events-none absolute inset-x-0 bottom-0 flex max-h-[100dvh] flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4 ${
-          editing ? 'z-[60]' : 'z-40'
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4 ${
+          editing ? 'z-[60]' : 'z-30'
         }`}
+        style={{
+          // Never climb into the measured header (stacked narrow chrome + gap).
+          maxHeight: `calc(100dvh - ${toastTopPx}px)`,
+        }}
+        {...(sheetCoversChrome && !editing
+          ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
+          : {})}
       >
-        <div className="flex min-h-0 w-full max-w-2xl flex-col items-center gap-2">
+        <div className="flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center justify-end gap-2">
           {!editing &&
             !polishSession &&
             !glideSession &&
@@ -477,7 +555,7 @@ export function EditorShell() {
             <p
               id="stage-empty-hint"
               data-testid="stage-empty-hint"
-              className="pointer-events-auto rounded-full border border-white/60 bg-white/85 px-3 py-1 text-center text-xs text-slate-600 shadow-sm backdrop-blur-md"
+              className="pointer-events-auto rounded-full border border-slate-900/[0.08] bg-white/85 px-3 py-1 text-center text-xs text-slate-600 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
             >
               {emptyTip}
             </p>
@@ -485,7 +563,7 @@ export function EditorShell() {
           {showExamplesHint && (
             <div
               data-testid="examples-empty-hint"
-              className="pointer-events-auto flex max-w-md items-center gap-2 rounded-full border border-white/70 bg-white/90 px-3 py-1.5 text-xs text-slate-700 shadow-sm backdrop-blur-md"
+              className="pointer-events-auto flex max-w-md items-center gap-2 rounded-full border border-slate-900/[0.08] bg-white/85 px-3 py-1.5 text-xs text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
             >
               <button
                 type="button"

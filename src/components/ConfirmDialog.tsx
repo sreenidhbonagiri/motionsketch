@@ -101,7 +101,7 @@ export function ConfirmDialog({
       data-testid={testId}
       aria-labelledby={titleId}
       aria-describedby={bodyId}
-      className="confirm-dialog fixed inset-0 z-[100] m-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)]"
+      className="confirm-dialog fixed inset-0 z-[100] m-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-900/[0.08] bg-white p-0 text-slate-900 shadow-[0_16px_48px_rgba(15,23,42,0.16)]"
       onClick={(e) => {
         if (e.target === dialogRef.current) requestCancel()
       }}
@@ -123,7 +123,7 @@ export function ConfirmDialog({
             type="button"
             data-testid={cancelTestId}
             onClick={requestCancel}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-900/[0.06]"
           >
             {cancelLabel}
           </button>
