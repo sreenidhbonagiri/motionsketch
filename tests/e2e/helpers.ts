@@ -61,6 +61,7 @@ export async function dispatchActivePointerCancel(
   await page.evaluate((sel) => {
     const targets = [
       document.querySelector(sel),
+      document.querySelector('[data-testid="stage-frame"]'),
       document.querySelector('[data-testid="stage"]'),
     ].filter(Boolean) as Element[]
     if (targets.length === 0) throw new Error(`missing ${sel}`)
@@ -86,6 +87,7 @@ export async function actorHasPointerCapture(
   return page.evaluate((sel) => {
     const els = [
       document.querySelector(sel),
+      document.querySelector('[data-testid="stage-frame"]'),
       document.querySelector('[data-testid="stage"]'),
     ].filter(Boolean) as Element[]
     for (const el of els) {

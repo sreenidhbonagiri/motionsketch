@@ -8,6 +8,14 @@ export function clamp01(value: number): number {
   return clamp(value, 0, 1)
 }
 
+/**
+ * Client → normalized stage coords using the stage-frame border box.
+ *
+ * Pass `stageFrame.getBoundingClientRect()` so CSS workspace pan/zoom on an
+ * ancestor is already baked into the rect. This is the single shared mapping
+ * for recording, Continue path, placement, Edit points, Move path, and snap.
+ * Camera never rewrites stored samples — only this view rect changes.
+ */
 export function clientToNormalized(
   clientX: number,
   clientY: number,
@@ -25,7 +33,8 @@ export function clientToNormalized(
 /**
  * Stage-normalized pointer without clamping to the stage.
  * Use for path translation deltas so edge drags do not jump when the
- * pointer leaves the stage rect.
+ * pointer leaves the stage-frame rect. Same camera contract as
+ * `clientToNormalized` (pass the transformed stage-frame rect).
  */
 export function clientToStageNormalized(
   clientX: number,

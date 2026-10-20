@@ -11,14 +11,16 @@ MotionSketch stores each project’s **logical stage aspect** (`stageAspect` = w
 
 ## How the editor presents the stage
 
-The interactive stage fills the viewport edge to edge. Normalized coordinates map to the full painted area. If the window’s ratio differs from the project’s stored `stageAspect`, presentation **stretches** (or compresses) relative to the logical stage — the same way CSS `cqw`/`cqh` map onto a stage box of a different ratio.
+The workspace fills the viewport with the same light canvas wash as before. Inside it, a **stage frame** uses the project’s stored `stageAspect` (the exported scene), marked by a subtle hairline when the bounds are visible. Normalized coordinates map to that frame. A view-only camera (empty-canvas pan / zoom / Fit stage; Space pans over actors) moves the view; it never rewrites samples, `stageAspect`, undo history, or export output. Panning does not enlarge the exported animation area.
+
+Off-frame workspace is for navigation only. Sample centers stay clamped to the stage (`[0, 1]²`); this version does not enable off-stage drawing or change export clipping.
 
 ## Tradeoff (intentional)
 
 | Behavior | Choice |
 | --- | --- |
-| Crop or letterbox the stage inside the window | **No** — the board stays full-bleed |
+| Show a framed stage matching export aspect | **Yes** — distinct from the surrounding workspace |
 | Rewrite samples when the window changes | **No** — geometry is stable |
-| Stretch presentation when ratios differ | **Yes** — discoverable drawing surface over pixel-perfect letterboxing |
+| Persist camera / infinite canvas / export camera | **No** — Fit resets the view; export ignores the editor camera |
 
-CSS and HTML demo exports use the project’s stored `stageAspect` (not the live window) so a download matches the project’s reference geometry. Compare the editor and the HTML demo at the **same** aspect ratio for a 1:1 visual check; at a different window ratio the editor may look stretched while the demo still letterboxes to the stored aspect.
+CSS and HTML demo exports use the project’s stored `stageAspect` (not the live window or camera) so a download matches the project’s reference geometry.

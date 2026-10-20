@@ -2,9 +2,9 @@
  * Logical stage aspect = width / height.
  *
  * Coordinates are normalized to [0, 1] × [0, 1] in this logical space.
- * The editor paints that space across the full viewport (may stretch when the
- * window ratio differs). Resizing never rewrites stored samples — see
- * docs/stage-aspect.md.
+ * The editor shows that space inside a bounded stage frame (export aspect)
+ * within a pannable/zoomable workspace. Resizing never rewrites stored
+ * samples — see docs/stage-aspect.md.
  */
 
 /** Historical MotionSketch stage (16:10). Used when migrating format v1 projects. */

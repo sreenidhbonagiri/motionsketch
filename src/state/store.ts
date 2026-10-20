@@ -57,6 +57,10 @@ import {
   polishMotion,
   polishRoundingAvailability,
 } from '../core/polish'
+import {
+  DEFAULT_CAMERA,
+  type WorkspaceCamera,
+} from '../core/camera'
 import { clamp } from '../core/coords'
 import type { PlaybackDirection } from '../core/playback'
 import type { PersistedSnapshot } from '../core/persist/document'
@@ -208,6 +212,14 @@ interface EditorStore {
   snapIndicator: Vec2 | null
 
   /**
+   * Editor workspace camera (pan/zoom). View-only — never persisted, never
+   * written into samples, actor transforms, stageAspect, undo, or export.
+   */
+  camera: WorkspaceCamera
+  /** Bumped to ask the stage to Fit (new project / load). */
+  cameraFitNonce: number
+
+  /**
    * Working geometry for the selected actor (mirrors actor.geometryEdit when idle).
    * Path undo/redo apply only to this selection — stacks clear on actor change.
    */
@@ -338,6 +350,9 @@ interface EditorStore {
   setShowPathComparison: (show: boolean) => void
   setSnapToGrid: (on: boolean) => void
   setSnapIndicator: (point: Vec2 | null) => void
+  setCamera: (camera: WorkspaceCamera) => void
+  /** Reset view-only camera and request Fit (does not touch project data). */
+  resetWorkspaceCamera: () => void
   setActorColor: (color: string) => void
   setActorSize: (size: number) => void
   setActorBorderRadius: (radius: number) => void
@@ -612,6 +627,7 @@ function clearHistoryForActorSwitch(
   options?: { resetContinue?: boolean },
 ) {
   const resetContinue = options?.resetContinue === true
+  const keepGlobal = (k: ActorEditKind) => k === 'continuePath'
   return {
     ...clearEditState(),
     ...clearTransformEditState(),
@@ -628,12 +644,8 @@ function clearHistoryForActorSwitch(
           continuePathRedoStack: [] as ContinuePathSnapshot[],
         }
       : {
-          actorEditOrder: state.actorEditOrder.filter(
-            (k) => k === 'continuePath',
-          ),
-          actorEditRedoOrder: state.actorEditRedoOrder.filter(
-            (k) => k === 'continuePath',
-          ),
+          actorEditOrder: state.actorEditOrder.filter(keepGlobal),
+          actorEditRedoOrder: state.actorEditRedoOrder.filter(keepGlobal),
         }),
     recordingIntent: 'replace' as RecordingIntent,
   }
@@ -724,6 +736,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     showPathComparison: false,
     snapToGrid: false,
     snapIndicator: null,
+    camera: { ...DEFAULT_CAMERA },
+    cameraFitNonce: 0,
     stageHint: 'default',
     actionAnnouncement: null,
     polishStrengthByActorId: {},
@@ -1480,6 +1494,12 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }),
 
     setSnapIndicator: (point) => set({ snapIndicator: point }),
+    setCamera: (camera) => set({ camera: { ...camera } }),
+    resetWorkspaceCamera: () =>
+      set({
+        camera: { ...DEFAULT_CAMERA },
+        cameraFitNonce: get().cameraFitNonce + 1,
+      }),
 
     setActorColor: (color) =>
       set((state) => ({
@@ -1787,6 +1807,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedActorId: project.actors[0].id,
         ...clearHistoryForActorSwitch(get(), { resetContinue: true }),
         polishStrengthByActorId: {},
+        camera: { ...DEFAULT_CAMERA },
+        cameraFitNonce: get().cameraFitNonce + 1,
         project,
       })
       return true
@@ -1837,6 +1859,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedActorId,
         ...clearHistoryForActorSwitch(get(), { resetContinue: true }),
         polishStrengthByActorId: {},
+        camera: { ...DEFAULT_CAMERA },
+        cameraFitNonce: get().cameraFitNonce + 1,
         geometryEdit: geometryMirror(first?.geometryEdit),
         project,
       })

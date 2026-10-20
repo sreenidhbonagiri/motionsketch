@@ -10,11 +10,13 @@ import type { MotionSample, Vec2 } from '../core/types'
 import { usePathEditor } from '../hooks/usePathEditor'
 import { usePointerRecorder } from '../hooks/usePointerRecorder'
 import { useStageSize } from '../hooks/useStageSize'
+import { useWorkspaceCamera } from '../hooks/useWorkspaceCamera'
 import { selectProcessedPathForActor } from '../state/selectors'
 import { useEditorStore } from '../state/store'
 import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
 import { PathMoveOverlay } from './PathMoveOverlay'
+import { WorkspaceCameraBar } from './WorkspaceCameraBar'
 
 /** Draw the shared project-space lattice (same points used for snap targets). */
 function drawGrid(
@@ -156,11 +158,32 @@ function drawPolishRoundingHighlight(
   ctx.restore()
 }
 
-/** Full-viewport interactive stage — no inset card or aspect box. */
+/**
+ * Full-viewport workspace with a bounded stage frame (export aspect).
+ * Camera pan/zoom is CSS on the world layer; pointer tools read the
+ * stage-frame’s getBoundingClientRect() so one mapping serves every tool.
+ */
 export function CanvasStage() {
+  const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const size = useStageSize(stageRef)
+
+  const {
+    layout,
+    worldTransform,
+    spaceHeld,
+    spacePanActive,
+    backgroundPanEnabled,
+    panning,
+    fitStage,
+    zoomIn,
+    zoomOut,
+    onViewportPointerDown,
+    onViewportPointerMove,
+    onViewportPointerUp,
+    onViewportPointerCancel,
+  } = useWorkspaceCamera(viewportRef)
 
   const project = useEditorStore((s) => s.project)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
@@ -344,129 +367,190 @@ export function CanvasStage() {
     snapIndicator,
   ])
 
+  // Grab on empty canvas; grabbing while panning; Space override uses grab too.
+  const cursorClass = panning
+    ? 'cursor-grabbing'
+    : spacePanActive || backgroundPanEnabled
+      ? editing && pathAddMode
+        ? 'cursor-crosshair'
+        : 'cursor-grab'
+      : editing && pathAddMode
+        ? 'cursor-crosshair'
+        : ''
+
   return (
     <div
-      ref={stageRef}
+      ref={viewportRef}
       data-testid="stage"
-      data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
-      data-path-tool={editing ? pathTool : undefined}
-      data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
-      className={`absolute inset-0 touch-none overflow-hidden bg-[#eef1f6] ${
-        editing && pathAddMode ? 'cursor-crosshair' : ''
-      }`}
-      onPointerDown={
-        editing && pathAddMode && pathTool === 'edit-points'
-          ? onStagePointerDown
-          : undefined
-      }
-      onPointerMove={
-        editing
-          ? pathAddMode && pathTool === 'edit-points'
-            ? onStagePointerMove
-            : undefined
-          : onRecordPointerMove
-      }
-      onPointerUp={editing ? undefined : onRecordPointerUp}
-      onPointerCancel={editing ? undefined : onRecordPointerCancel}
+      tabIndex={-1}
+      className={`absolute inset-0 touch-none overflow-hidden bg-[#eef1f6] outline-none ${cursorClass}`}
+      onPointerDown={onViewportPointerDown}
+      onPointerMove={onViewportPointerMove}
+      onPointerUp={onViewportPointerUp}
+      onPointerCancel={onViewportPointerCancel}
     >
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-      {size.width > 0 &&
-        !editing &&
-        project.actors.map((actor, index) => {
-          const isSelected = actor.id === selectedActorId
-          const viewActor =
-            isSelected && presetPreviewActive && presetSession
-              ? applyMotionStateToActor(actor, presetSession.proposed)
-              : actor
-          // Recording/armed need the active actor visible for dragging.
-          // Normal playback/idle never silently reveals a selected hidden actor.
-          const forceVisible =
-            isSelected && (mode === 'armed' || mode === 'recording')
-          const hidden =
-            !forceVisible && !isActorVisibleAt(playbackHead, viewActor.clip)
-          const actorView = isSelected
-            ? pathView
-            : {
-                geometryEdit: viewActor.geometryEdit,
-                editSession: null,
-                editPreview: null,
+      <div
+        data-testid="workspace-world"
+        className="absolute left-0 top-0 will-change-transform"
+        style={{
+          transform: worldTransform,
+          transformOrigin: '0 0',
+        }}
+      >
+        <div
+          ref={stageRef}
+          data-testid="stage-frame"
+          data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
+          data-path-tool={editing ? pathTool : undefined}
+          data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
+          className="relative overflow-hidden bg-[#eef1f6] shadow-[0_0_0_1px_rgba(15,23,42,0.10)]"
+          style={{
+            width: layout.width > 0 ? layout.width : undefined,
+            height: layout.height > 0 ? layout.height : undefined,
+          }}
+          onPointerDown={
+            !spacePanActive &&
+            editing &&
+            pathAddMode &&
+            pathTool === 'edit-points'
+              ? onStagePointerDown
+              : undefined
+          }
+          onPointerMove={
+            spacePanActive
+              ? undefined
+              : editing
+                ? pathAddMode && pathTool === 'edit-points'
+                  ? onStagePointerMove
+                  : undefined
+                : onRecordPointerMove
+          }
+          onPointerUp={
+            spacePanActive || editing ? undefined : onRecordPointerUp
+          }
+          onPointerCancel={
+            spacePanActive || editing ? undefined : onRecordPointerCancel
+          }
+        >
+          <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+          {size.width > 0 &&
+            !editing &&
+            project.actors.map((actor, index) => {
+              const isSelected = actor.id === selectedActorId
+              const viewActor =
+                isSelected && presetPreviewActive && presetSession
+                  ? applyMotionStateToActor(actor, presetSession.proposed)
+                  : actor
+              // Recording/armed need the active actor visible for dragging.
+              // Normal playback/idle never silently reveals a selected hidden actor.
+              const forceVisible =
+                isSelected && (mode === 'armed' || mode === 'recording')
+              const hidden =
+                !forceVisible && !isActorVisibleAt(playbackHead, viewActor.clip)
+              const actorView = isSelected
+                ? pathView
+                : {
+                    geometryEdit: viewActor.geometryEdit,
+                    editSession: null,
+                    editPreview: null,
+                  }
+              // One path lookup per actor: position + facing share the same array
+              // (warm Glide/steady caches return identical references).
+              const path = selectProcessedPathForActor(
+                project,
+                viewActor,
+                actorView,
+              )
+              const localT = projectToLocal(playbackHead, viewActor.clip)
+              const xf = evaluateTransform(viewActor.transform, localT)
+              let position = viewActor.restPosition
+              if (isSelected && (mode === 'recording' || mode === 'armed')) {
+                position = livePosition
+              } else if (path.length === 0) {
+                if (isSelected && mode === 'idle') position = livePosition
+              } else {
+                position = evaluate(path, localT)
               }
-          // One path lookup per actor: position + facing share the same array
-          // (warm Glide/steady caches return identical references).
-          const path = selectProcessedPathForActor(
-            project,
-            viewActor,
-            actorView,
-          )
-          const localT = projectToLocal(playbackHead, viewActor.clip)
-          const xf = evaluateTransform(viewActor.transform, localT)
-          let position = viewActor.restPosition
-          if (isSelected && (mode === 'recording' || mode === 'armed')) {
-            position = livePosition
-          } else if (path.length === 0) {
-            if (isSelected && mode === 'idle') position = livePosition
-          } else {
-            position = evaluate(path, localT)
-          }
-          const rotationDeg = evaluateActorRotationDeg(
-            viewActor,
-            path,
-            localT,
-            project.stageAspect,
-          )
-          return (
-            <Actor
-              key={actor.id}
-              actor={viewActor.appearance}
-              actorId={actor.id}
-              name={viewActor.name}
-              position={position}
-              stageWidth={size.width}
-              stageHeight={size.height}
-              zIndex={10 + index}
-              selected={isSelected}
-              armed={mode === 'armed' && isSelected}
-              recording={mode === 'recording' && isSelected}
-              hidden={hidden}
-              rotationDeg={rotationDeg}
-              scale={xf.scale}
-              onPointerDown={(e) => onActorPointerDown(actor.id, e)}
+              const rotationDeg = evaluateActorRotationDeg(
+                viewActor,
+                path,
+                localT,
+                project.stageAspect,
+              )
+              return (
+                <Actor
+                  key={actor.id}
+                  actor={viewActor.appearance}
+                  actorId={actor.id}
+                  name={viewActor.name}
+                  position={position}
+                  stageWidth={size.width}
+                  stageHeight={size.height}
+                  zIndex={10 + index}
+                  selected={isSelected}
+                  armed={mode === 'armed' && isSelected && !spaceHeld}
+                  recording={mode === 'recording' && isSelected && !spaceHeld}
+                  hidden={hidden}
+                  // Space temporarily disables actor hits so pan can override.
+                  interactive={!spaceHeld}
+                  rotationDeg={rotationDeg}
+                  scale={xf.scale}
+                  onPointerDown={(e) => onActorPointerDown(actor.id, e)}
+                />
+              )
+            })}
+          {editing &&
+            !polishSession &&
+            workingSamples &&
+            size.width > 0 &&
+            moveTool &&
+            !spaceHeld && (
+            <PathMoveOverlay
+              samples={workingSamples}
+              hovered={moveHovered}
+              dragging={moveDragging}
+              snapAnchor={
+                moveDragging && snapIndicator ? snapIndicator : null
+              }
+              onPointerDown={onMovePathPointerDown}
+              onPointerMove={onMovePathPointerMove}
+              onPointerLeave={onMovePathPointerLeave}
+              onFocus={onMovePathFocus}
+              onBlur={onMovePathBlur}
             />
-          )
-        })}
-      {editing &&
-        !polishSession &&
-        workingSamples &&
-        size.width > 0 &&
-        moveTool && (
-        <PathMoveOverlay
-          samples={workingSamples}
-          hovered={moveHovered}
-          dragging={moveDragging}
-          snapAnchor={
-            moveDragging && snapIndicator ? snapIndicator : null
-          }
-          onPointerDown={onMovePathPointerDown}
-          onPointerMove={onMovePathPointerMove}
-          onPointerLeave={onMovePathPointerLeave}
-          onFocus={onMovePathFocus}
-          onBlur={onMovePathBlur}
+          )}
+          {editing &&
+            !polishSession &&
+            workingSamples &&
+            size.width > 0 &&
+            !moveTool &&
+            !spaceHeld && (
+            <PathHandles
+              samples={workingSamples}
+              handleIndices={handleIndices}
+              selectedIndex={selectedHandleIndex}
+              candidateIndex={pathAddCandidateIndex}
+              addMode={pathAddMode}
+              onHandlePointerDown={onHandlePointerDown}
+            />
+          )}
+        </div>
+      </div>
+
+      {/*
+        Screen-fixed chrome — uses measured header clearance (--ms-sheet-top)
+        so it sits just below the header without overlap.
+      */}
+      <div
+        className="pointer-events-none absolute right-2 z-20 sm:right-3"
+        style={{ top: 'var(--ms-sheet-top, 4.5rem)' }}
+      >
+        <WorkspaceCameraBar
+          zoomIn={zoomIn}
+          zoomOut={zoomOut}
+          fitStage={fitStage}
         />
-      )}
-      {editing &&
-        !polishSession &&
-        workingSamples &&
-        size.width > 0 &&
-        !moveTool && (
-        <PathHandles
-          samples={workingSamples}
-          handleIndices={handleIndices}
-          selectedIndex={selectedHandleIndex}
-          candidateIndex={pathAddCandidateIndex}
-          addMode={pathAddMode}
-          onHandlePointerDown={onHandlePointerDown}
-        />
-      )}
+      </div>
     </div>
   )
 }

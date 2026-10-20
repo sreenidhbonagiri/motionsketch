@@ -18,10 +18,11 @@ export function useStageSize(ref: RefObject<HTMLElement | null>): StageSize {
     if (!el) return
 
     const update = () => {
-      const rect = el.getBoundingClientRect()
+      // Layout box (offset*), not getBoundingClientRect — CSS camera
+      // pan/zoom on an ancestor must not inflate the drawing surface size.
       setSize({
-        width: rect.width,
-        height: rect.height,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
         dpr: window.devicePixelRatio || 1,
       })
     }

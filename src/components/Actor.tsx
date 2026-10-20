@@ -19,6 +19,11 @@ interface ActorProps {
   recording: boolean
   /** When true, not painted for hit-testing; still mounted for layout tests. */
   hidden?: boolean
+  /**
+   * When false, visible but not interactive (e.g. workspace Hand / Space pan).
+   * Does not change saved visibility.
+   */
+  interactive?: boolean
   /** Explicit path-edit preview label (does not change saved visibility). */
   editingPreview?: boolean
   rotationDeg?: number
@@ -38,6 +43,7 @@ export function Actor({
   armed,
   recording,
   hidden = false,
+  interactive = true,
   editingPreview = false,
   rotationDeg = 0,
   scale = 1,
@@ -71,7 +77,7 @@ export function Actor({
       ? '0 0 0 2px rgba(180, 83, 9, 0.55), 0 12px 28px rgba(15, 23, 42, 0.18)'
       : shadow,
     visibility: hidden ? 'hidden' : 'visible',
-    pointerEvents: hidden ? 'none' : 'auto',
+    pointerEvents: hidden || !interactive ? 'none' : 'auto',
   }
 
   const label =
