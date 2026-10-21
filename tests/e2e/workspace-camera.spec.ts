@@ -193,10 +193,15 @@ test.describe('workspace camera', () => {
     await waitForSaved(page)
     const beforeSamples = await readActor0Samples(page)
     await closeOpenChromePanels(page)
+    // waitForSaved opens Project then closes it; FloatingPanel may briefly
+    // return focus to btn-project. Take the stage afterward and assert it
+    // before Space — Space on a focused button is intentionally ignored.
     await page.getByTestId('stage').focus()
+    await expect(page.getByTestId('stage')).toBeFocused()
     await expect(page.getByTestId('btn-hand-tool')).toHaveCount(0)
     const before = await readCamera(page)
 
+    await expect(page.getByTestId('stage')).toBeFocused()
     await page.keyboard.down(' ')
     // Drag starting over the actor — Space overrides actor interaction.
     const actor = page.getByTestId('actor')

@@ -3,6 +3,28 @@ import { useEditorStore } from '../state/store'
 
 export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
 
+/**
+ * After a chrome panel unmounts, return-focus to the opener only when focus
+ * is still neutral (body / gone with the panel). If the user or a test already
+ * moved focus elsewhere (e.g. the stage for Space-pan), leave it alone —
+ * double-rAF restore must not steal that focus back onto the opener button.
+ */
+export function shouldReturnFocusOnClose(
+  active: Element | null,
+  restore: HTMLElement,
+): boolean {
+  if (!restore.isConnected) return false
+  if (
+    !active ||
+    active === document.body ||
+    active === document.documentElement
+  ) {
+    return true
+  }
+  if (active === restore || restore.contains(active)) return true
+  return false
+}
+
 interface FloatingPanelProps {
   id: ChromePanel
   title: string
@@ -72,13 +94,11 @@ export function FloatingPanel({
       const panelDomId = `${id}-panel-root`
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (
-            restore &&
-            document.contains(restore) &&
-            !document.getElementById(panelDomId)
-          ) {
-            restore.focus()
+          if (!restore || document.getElementById(panelDomId)) return
+          if (!shouldReturnFocusOnClose(document.activeElement, restore)) {
+            return
           }
+          restore.focus()
         })
       })
     }
