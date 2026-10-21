@@ -36,12 +36,12 @@ const SEQUENCE_HINT_KEY = 'motionsketch.sequenceHintDismissed'
 const SEQUENCE_TIME_STEP = 0.01
 
 /**
- * Max height for the expanded Sequence sheet. `--ms-sheet-top` is the measured
- * header clearance; remaining budget leaves room for the dock + slot padding.
- * The toolbar slot also caps at `100dvh - sheet-top` so Collapse stays clickable.
+ * Max height for the expanded Sequence sheet. The toolbar slot is already capped
+ * at `100dvh - sheet-top` (header + after-path toast); Sequence shares that flex
+ * column with the dock, so cap against the parent — do not subtract another dock
+ * estimate or Collapse gets crushed on short viewports.
  */
-const SEQUENCE_PANEL_MAX_HEIGHT =
-  'min(36rem, calc(100dvh - var(--ms-sheet-top, 3.5rem) - env(safe-area-inset-bottom, 0px) - 7rem))'
+const SEQUENCE_PANEL_MAX_HEIGHT = 'min(36rem, 100%)'
 
 function formatSec(sec: number): string {
   return sec.toFixed(2)
@@ -367,13 +367,16 @@ export function ClipTimeline() {
     <div
       data-testid="clip-timeline"
       data-sequence-open="true"
-      className="pointer-events-auto flex w-full min-h-0 max-h-full flex-1 flex-col overflow-hidden rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      // min-h-10 keeps the Collapse row fully inside the panel. overflow-clip
+      // (not hidden) blocks scrollIntoView from shifting the header out of the
+      // clip — otherwise hits fall through to the stage canvas underneath.
+      className="pointer-events-auto relative z-[1] flex w-full min-h-10 max-h-full flex-1 flex-col overflow-clip rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       style={{ maxHeight: SEQUENCE_PANEL_MAX_HEIGHT }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div
         data-testid="sequence-header"
-        className="flex shrink-0 items-stretch border-b border-slate-900/[0.05]"
+        className="relative z-[1] flex shrink-0 items-stretch border-b border-slate-900/[0.05] bg-white/90"
       >
         <button
           type="button"

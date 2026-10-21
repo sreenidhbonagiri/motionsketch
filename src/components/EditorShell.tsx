@@ -557,7 +557,7 @@ export function EditorShell() {
       <div
         ref={toolbarSlotRef}
         data-testid="toolbar-slot"
-        className={`pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 sm:pb-4 ${
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 overflow-clip px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:pt-6 sm:pb-4 ${
           editing ? 'z-[60]' : 'z-30'
         }`}
         style={{
@@ -568,7 +568,7 @@ export function EditorShell() {
           ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
           : {})}
       >
-        <div className="flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center justify-end gap-2">
+        <div className="flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center gap-2 overflow-clip">
           {!editing &&
             !polishSession &&
             !glideSession &&

@@ -116,3 +116,26 @@ textarea.css-export-code {
   overflow-wrap: normal;
   word-break: normal;
 }
+
+/*
+ * Short viewports (toast + Sequence + dock): hide informational time labels
+ * only. Scrubber, transform markers, transport, Continue, Snap, and path
+ * tools stay. dock-status is live status text (not an action); keep it as
+ * sr-only so assistive tech still hears it. Desktop / normal mobile unchanged.
+ */
+@media (max-height: 420px) {
+  [data-testid='playback-dock'] [data-testid='playback-timeline'] > div:has([data-testid='playback-elapsed']) {
+    display: none;
+  }
+  [data-testid='playback-dock'] [data-testid='dock-status'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}

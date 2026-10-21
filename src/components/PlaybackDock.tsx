@@ -427,7 +427,9 @@ export function PlaybackDock() {
   return (
     <div
       data-testid="playback-dock"
-      className={`pointer-events-auto flex w-full max-w-xl shrink-0 flex-col gap-1 ${surfaceChrome} px-2 py-1.5 sm:max-w-2xl sm:px-2.5 sm:py-2`}
+      // mt-auto pins the dock to the slot bottom when Sequence is absent.
+      // Short viewports hide elapsed/total labels only (see index.css) — actions stay.
+      className={`pointer-events-auto relative mt-auto flex w-full max-w-xl shrink-0 flex-col gap-1 ${surfaceChrome} px-2 py-1.5 sm:max-w-2xl sm:px-2.5 sm:py-2`}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {hasAnyRecording && !editing && (
