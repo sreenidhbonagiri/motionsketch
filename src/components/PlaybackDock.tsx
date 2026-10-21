@@ -437,7 +437,10 @@ export function PlaybackDock() {
           data-testid="playback-timeline"
           className="flex flex-col gap-0.5"
         >
-          <div className="flex items-center justify-between gap-2 text-[11px] tabular-nums text-slate-500">
+          <div
+            data-testid="playback-time-labels"
+            className="flex items-center justify-between gap-2 text-[11px] tabular-nums text-slate-500"
+          >
             <span data-testid="playback-elapsed">
               {goingBack
                 ? `← ${formatSeconds(elapsedMs)}`

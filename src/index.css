@@ -124,7 +124,12 @@ textarea.css-export-code {
  * sr-only so assistive tech still hears it. Desktop / normal mobile unchanged.
  */
 @media (max-height: 420px) {
-  [data-testid='playback-dock'] [data-testid='playback-timeline'] > div:has([data-testid='playback-elapsed']) {
+  /* ~8–10px: Linux CI fonts leave Play ~7px past 360 after labels hide. */
+  [data-testid='playback-dock'] {
+    padding-block: 0.25rem;
+    gap: 0.125rem;
+  }
+  [data-testid='playback-dock'] [data-testid='playback-time-labels'] {
     display: none;
   }
   [data-testid='playback-dock'] [data-testid='dock-status'] {
