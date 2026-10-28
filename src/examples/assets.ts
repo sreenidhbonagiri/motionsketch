@@ -1,5 +1,9 @@
 import type { ActorImage } from '../core/types'
-import paperPlanePngDataUrl from './paper-plane.png?inline'
+import {
+  PAPER_PLANE_PNG_DATA_URL,
+  PAPER_PLANE_PNG_NATURAL_HEIGHT,
+  PAPER_PLANE_PNG_NATURAL_WIDTH,
+} from './paperPlanePngData'
 
 /**
  * Original MotionSketch mark — geometric “M” on a rounded tile.
@@ -10,13 +14,6 @@ const MOTIONSKETCH_MARK_SVG = `<?xml version="1.0" encoding="UTF-8"?>
   <rect x="8" y="8" width="112" height="112" rx="28" fill="#0f766e"/>
   <path d="M34 92 V36 L64 72 L94 36 V92" fill="none" stroke="#ecfdf5" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`
-
-/** Cropped notebook-plane PNG (transparent). Nose ~−43° CSS from +x. */
-const PAPER_PLANE_PNG = {
-  dataUrl: paperPlanePngDataUrl,
-  naturalWidth: 640,
-  naturalHeight: 550,
-} as const
 
 function toSvgDataUrl(svg: string): string {
   // Percent-encoded data URL — works in browser and Node without Buffer.
@@ -38,9 +35,9 @@ export function createMotionSketchMarkImage(): ActorImage {
 export function createPaperPlaneImage(): ActorImage {
   return {
     mimeType: 'image/png',
-    dataUrl: PAPER_PLANE_PNG.dataUrl,
-    naturalWidth: PAPER_PLANE_PNG.naturalWidth,
-    naturalHeight: PAPER_PLANE_PNG.naturalHeight,
+    dataUrl: PAPER_PLANE_PNG_DATA_URL,
+    naturalWidth: PAPER_PLANE_PNG_NATURAL_WIDTH,
+    naturalHeight: PAPER_PLANE_PNG_NATURAL_HEIGHT,
     label: 'Paper plane',
   }
 }
