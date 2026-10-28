@@ -18,6 +18,9 @@ import {
   afterPathWebsiteHintProjectKey,
   EMPTY_BOARD_RECORD_HINT_COARSE,
   EMPTY_BOARD_RECORD_HINT_FINE,
+  FIRST_USE_HEADLINE,
+  FIRST_USE_NEXT_STEP_COARSE,
+  FIRST_USE_NEXT_STEP_FINE,
   readAfterPathWebsiteHintDismissedKeys,
   writeAfterPathWebsiteHintDismissedKeys,
 } from '../lib/modeStatus'
@@ -116,7 +119,7 @@ export function EditorShell() {
     setExamplesOpen(true)
   }
 
-  const dismissExamplesHint = () => {
+  const dismissFirstUseIntro = () => {
     setHintDismissed(true)
     try {
       sessionStorage.setItem(EXAMPLES_HINT_KEY, '1')
@@ -126,7 +129,6 @@ export function EditorShell() {
   }
 
   const isEmptyProject = useEditorStore((s) => !projectHasMeaningfulWork(s.project))
-  const showExamplesHint = isEmptyProject && !hintDismissed && !examplesOpen
   const project = useEditorStore((s) => s.project)
   const projectName = project.name
   const renameProject = useEditorStore((s) => s.renameProject)
@@ -204,18 +206,28 @@ export function EditorShell() {
   }, [])
   const sheetCoversChrome = !!openPanel && narrowViewport
 
-  // Empty-board Record cue — hide once any take exists; dock covers armed/recording.
+  // Empty-board cue — hide once any take exists; dock covers armed/recording.
   const tipBusy =
     mode !== 'idle' ||
     !!polishSession ||
     !!glideSession ||
     !!presetSession
-  const emptyTip =
-    !tipBusy && !hasRecording
-      ? coarsePointer
-        ? EMPTY_BOARD_RECORD_HINT_COARSE
-        : EMPTY_BOARD_RECORD_HINT_FINE
-      : null
+  const emptyBoardHelp = coarsePointer
+    ? EMPTY_BOARD_RECORD_HINT_COARSE
+    : EMPTY_BOARD_RECORD_HINT_FINE
+  const firstUseNextStep = coarsePointer
+    ? FIRST_USE_NEXT_STEP_COARSE
+    : FIRST_USE_NEXT_STEP_FINE
+  // One dismissible intro on a fresh empty project (same session key as the old examples hint).
+  const showFirstUseIntro =
+    !tipBusy &&
+    !hasRecording &&
+    isEmptyProject &&
+    !hintDismissed &&
+    !examplesOpen
+  // After dismiss (or non-empty untitled board), keep a screen-reader target for Record/Play.
+  const showEmptyBoardSrHint =
+    !tipBusy && !hasRecording && !showFirstUseIntro
   // Top toast: after a path, idle only; dismissible per project for this tab session.
   // Hide while a chrome panel is open — toast still competes for layout/hit-testing
   // with Export/Adjust scroll bodies even when inert for keyboard.
@@ -577,39 +589,49 @@ export function EditorShell() {
           {glideSession && <GlidePanel />}
           {presetSession && <PresetPanel />}
           <PlaybackDock />
-          {emptyTip && (
-            <p
+          {showFirstUseIntro && (
+            <div
               id="stage-empty-hint"
               data-testid="stage-empty-hint"
-              className="pointer-events-auto rounded-full border border-slate-900/[0.08] bg-white/85 px-3 py-1 text-center text-xs text-slate-600 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
+              className="pointer-events-auto flex w-full max-w-sm flex-col gap-1.5 rounded-xl border border-slate-900/[0.08] bg-white/90 px-3.5 py-2.5 text-center shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
             >
-              {emptyTip}
-            </p>
-          )}
-          {showExamplesHint && (
-            <div
-              data-testid="examples-empty-hint"
-              className="pointer-events-auto flex max-w-md items-center gap-2 rounded-full border border-slate-900/[0.08] bg-white/85 px-3 py-1.5 text-xs text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
-            >
-              <button
-                type="button"
-                data-testid="btn-try-example"
-                onClick={openExamples}
-                className="font-medium text-slate-900 underline-offset-2 hover:underline"
+              <p
+                data-testid="first-use-headline"
+                className="text-sm font-semibold tracking-tight text-slate-900"
               >
-                Try an example
-              </button>
-              <span className="text-slate-500">to explore a starter scene.</span>
-              <button
-                type="button"
-                data-testid="btn-dismiss-examples-hint"
-                onClick={dismissExamplesHint}
-                className="ml-1 rounded-md px-1.5 py-0.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-                aria-label="Dismiss example hint"
+                {FIRST_USE_HEADLINE}
+              </p>
+              <p
+                data-testid="first-use-next-step"
+                className="text-xs leading-snug text-slate-600"
               >
-                ✕
-              </button>
+                {firstUseNextStep}
+              </p>
+              <div className="mt-0.5 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  data-testid="btn-try-example"
+                  onClick={openExamples}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-slate-800 underline-offset-2 transition hover:bg-slate-900/[0.05] hover:underline"
+                >
+                  Try an example
+                </button>
+                <button
+                  type="button"
+                  data-testid="btn-dismiss-examples-hint"
+                  onClick={dismissFirstUseIntro}
+                  className="rounded-md px-1.5 py-0.5 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                  aria-label="Dismiss introduction"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
+          )}
+          {showEmptyBoardSrHint && (
+            <p id="stage-empty-hint" data-testid="stage-empty-hint" className="sr-only">
+              {emptyBoardHelp}
+            </p>
           )}
         </div>
       </div>

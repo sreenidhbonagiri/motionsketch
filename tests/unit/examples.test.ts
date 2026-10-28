@@ -7,6 +7,7 @@ import {
   serializeSnapshot,
 } from '../../src/core/persist/document'
 import { evaluateTransform } from '../../src/core/transform'
+import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
 import { EXAMPLE_CATALOG } from '../../src/examples/catalog'
 import {
   cloneExampleProject,
@@ -171,5 +172,57 @@ describe('starter examples', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
     expect(parsed.snapshot.project.actors[0].appearance.kind).toBe('image')
+  })
+
+  it('paper plane is a hero composition with Face along path', () => {
+    const loaded = loadExampleSnapshot('paper-plane')
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    const project = loaded.snapshot.project
+    expect(project.actors).toHaveLength(2)
+    // Plane first so applyPersistedSnapshot selects it for Record / Edit path.
+    expect(project.actors[0]?.id).toBe('ex-plane')
+    const headline = project.actors.find((a) => a.id === 'ex-plane-headline')!
+    const plane = project.actors.find((a) => a.id === 'ex-plane')!
+    expect(headline.appearance.kind).toBe('text')
+    expect(headline.appearance.text?.content).toMatch(/Ship the motion/i)
+    expect(headline.recording).toBeNull()
+    expect(plane.appearance.kind).toBe('image')
+    expect(plane.faceAlongPath).toBe(true)
+    expect(plane.recording?.samples.length).toBeGreaterThan(8)
+    const svg = decodeURIComponent(
+      plane.appearance.image!.dataUrl.replace(
+        /^data:image\/svg\+xml;charset=utf-8,/,
+        '',
+      ),
+    )
+    expect(svg).toMatch(/<svg[\s>]/i)
+    expect(svg).not.toMatch(/fill\s*=\s*["']#fff/i)
+    expect(svg).not.toMatch(/fill\s*=\s*["']white/i)
+    expect(svg).not.toMatch(/<rect\b/i)
+    const path = selectProcessedPathForActor(project, plane, {
+      geometryEdit: null,
+      editSession: null,
+      editPreview: null,
+    })
+    const start = evaluate(path, 0)
+    const mid = evaluate(path, 0.5)
+    const end = evaluate(path, 1)
+    expect(end.x).toBeGreaterThan(start.x)
+    expect(start.x).toBeLessThan(headline.restPosition.x)
+    expect(end.x).toBeGreaterThan(headline.restPosition.x)
+    expect(Math.hypot(mid.x - start.x, mid.y - start.y)).toBeGreaterThan(0.05)
+
+    useEditorStore.getState().applyPersistedSnapshot(loaded.snapshot)
+    expect(useEditorStore.getState().selectedActorId).toBe('ex-plane')
+
+    const html = buildHtmlDemoFromProject(project)
+    expect(html).toContain('Ship the motion.')
+    expect(html).toMatch(/background:\s*transparent/)
+    const exportedSvg = decodeURIComponent(
+      html.match(/data:image\/svg\+xml;charset=utf-8,([^"'\s]+)/)![1]!,
+    )
+    expect(exportedSvg).not.toMatch(/<rect\b/i)
+    expect(exportedSvg).not.toMatch(/fill\s*=\s*["']#fff/i)
   })
 })

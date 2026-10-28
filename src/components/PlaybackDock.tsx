@@ -145,8 +145,10 @@ export function PlaybackDock() {
   const refinePanelId = useId()
   const [refinePopoverBox, setRefinePopoverBox] = useState<{
     bottom: number
-    right: number
+    left: number
+    width: number
     maxHeight: number
+    placement: 'anchored' | 'sheet'
   } | null>(null)
 
   const onRestoreRecordedPath = async () => {
@@ -277,7 +279,7 @@ export function PlaybackDock() {
     setRefineOpen(false)
   }, [polishSession, glideSession])
 
-  // Portaled popover: position above the trigger and clamp to the viewport.
+  // Portaled popover: anchor above the trigger; sheet-center when space is tight.
   useLayoutEffect(() => {
     if (!refineOpen) {
       setRefinePopoverBox(null)
@@ -294,15 +296,39 @@ export function PlaybackDock() {
           ? dock.getBoundingClientRect().top
           : btnRect.top
       const gap = 8
-      const margin = 12
-      const bottom = Math.max(margin, window.innerHeight - dockTop + gap)
-      const right = Math.max(margin, window.innerWidth - btnRect.right)
-      const available = dockTop - gap - margin
-      const maxHeight = Math.max(
-        12 * 16,
-        Math.min(window.innerHeight * 0.6, available),
-      )
-      setRefinePopoverBox({ bottom, right, maxHeight })
+      const margin = 16
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const width = Math.min(17.5 * 16, vw - margin * 2)
+      const bottom = Math.max(margin, vh - dockTop + gap)
+      const available = Math.max(0, dockTop - gap - margin)
+      // Narrow / short viewports: centered sheet above the dock (covers ~500×short).
+      const useSheet =
+        vw <= 520 || available < 14 * 16 || width >= vw - margin * 2 - 8
+      let left: number
+      let maxHeight: number
+      if (useSheet) {
+        left = Math.max(margin, (vw - width) / 2)
+        maxHeight = Math.max(
+          10 * 16,
+          Math.min(vh * 0.55, Math.max(available, vh * 0.4)),
+        )
+      } else {
+        // Align popover’s right edge with the trigger, then clamp into the viewport.
+        left = btnRect.right - width
+        left = Math.min(Math.max(left, margin), vw - width - margin)
+        maxHeight = Math.max(
+          12 * 16,
+          Math.min(vh * 0.6, available),
+        )
+      }
+      setRefinePopoverBox({
+        bottom,
+        left,
+        width,
+        maxHeight,
+        placement: useSheet ? 'sheet' : 'anchored',
+      })
     }
     update()
     window.addEventListener('resize', update)
@@ -881,7 +907,8 @@ export function PlaybackDock() {
               </div>
             </div>
 
-            {/* Editing: Edit path + Refine, with quieter Reset slightly apart. */}
+            {/* Motion-editing actions appear only once a path exists — keeps the empty dock compact. */}
+            {hasAnyRecording && (
             <div
               data-testid="dock-editing"
               className="flex w-full flex-nowrap items-center justify-center gap-1"
@@ -918,13 +945,15 @@ export function PlaybackDock() {
                       ref={refinePanelRef}
                       id={refinePanelId}
                       data-testid="refine-motion-tools"
+                      data-placement={refinePopoverBox.placement}
                       role="dialog"
                       aria-label="Refine"
                       tabIndex={-1}
-                      className="pointer-events-auto fixed z-[70] flex w-[min(17.5rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
+                      className="pointer-events-auto fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
                       style={{
                         bottom: refinePopoverBox.bottom,
-                        right: refinePopoverBox.right,
+                        left: refinePopoverBox.left,
+                        width: refinePopoverBox.width,
                         maxHeight: refinePopoverBox.maxHeight,
                       }}
                       onPointerDown={(e) => e.stopPropagation()}
@@ -1066,6 +1095,7 @@ export function PlaybackDock() {
                 Reset motion
               </button>
             </div>
+            )}
           </>
         )}
 

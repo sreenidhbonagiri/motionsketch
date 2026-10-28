@@ -379,13 +379,15 @@ test.describe('workspace layout', () => {
       await ensureEditor(page)
 
       await expect(page.getByTestId('dock-transport')).toBeVisible()
-      await expect(page.getByTestId('dock-editing')).toBeVisible()
+      // Empty board: hide motion-editing row so the dock stays compact.
+      await expect(page.getByTestId('dock-editing')).toHaveCount(0)
 
       // Empty: no Continue; Record primary — Play must not shift.
       await expect(page.getByTestId('btn-continue-path')).toHaveCount(0)
       await assertPlayCenteredInDock(page)
 
       await recordSimplePath(page)
+      await expect(page.getByTestId('dock-editing')).toBeVisible()
       await expect(page.getByTestId('btn-continue-path')).toBeVisible()
       await assertPlayCenteredInDock(page)
 
@@ -409,6 +411,37 @@ test.describe('workspace layout', () => {
       )
       await assertPlayCenteredInDock(page)
       await page.mouse.up()
+    }
+  })
+
+  test('Refine stays in-viewport on 500-wide short, 390, and 320', async ({
+    page,
+  }) => {
+    for (const size of [
+      { width: 500, height: 700 },
+      { width: 390, height: 844 },
+      { width: 320, height: 720 },
+    ] as const) {
+      await page.setViewportSize(size)
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+      await recordSimplePath(page)
+      await page.getByTestId('btn-refine-motion').click()
+      const tools = page.getByTestId('refine-motion-tools')
+      await expect(tools).toBeVisible()
+      await expect(tools).toHaveAttribute('data-placement', 'sheet')
+      const box = await tools.boundingBox()
+      expect(box, `${size.width}x${size.height} box`).toBeTruthy()
+      expect(box!.x).toBeGreaterThanOrEqual(8)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(size.width + 1)
+      expect(box!.y).toBeGreaterThanOrEqual(8)
+      expect(box!.y + box!.height).toBeLessThanOrEqual(size.height + 1)
+      // Comfortable edge spacing — not flush against the left edge.
+      expect(box!.x).toBeGreaterThan(10)
+      await page.keyboard.press('Escape')
+      await expect(tools).toHaveCount(0)
     }
   })
 

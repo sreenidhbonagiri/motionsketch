@@ -6,7 +6,7 @@ import type {
   Recording,
   TransformTrack,
 } from '../core/types'
-import { createMotionSketchMarkImage } from './assets'
+import { createMotionSketchMarkImage, createPaperPlaneImage } from './assets'
 
 /** Authored stage aspect for all bundled examples (independent of viewport). */
 export const EXAMPLE_STAGE_ASPECT = 16 / 10
@@ -36,6 +36,114 @@ function transformTrack(
       rotationDeg: k.rotationDeg,
       scale: k.scale,
     })),
+  }
+}
+
+/**
+ * Sample a cubic Bézier in normalized stage space (for authored flight paths).
+ */
+function sampleCubic(
+  p0: { x: number; y: number },
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+  p3: { x: number; y: number },
+  steps: number,
+): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = []
+  const n = Math.max(2, steps)
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1)
+    const u = 1 - t
+    out.push({
+      x:
+        u * u * u * p0.x +
+        3 * u * u * t * p1.x +
+        3 * u * t * t * p2.x +
+        t * t * t * p3.x,
+      y:
+        u * u * u * p0.y +
+        3 * u * u * t * p1.y +
+        3 * u * t * t * p2.y +
+        t * t * t * p3.y,
+    })
+  }
+  return out
+}
+
+/**
+ * Website-hero composition: restrained headline + paper plane on a graceful
+ * flight path with Face along path. Plane is first so load selects it for
+ * Record / Edit path. Re-record the plane to redraw the flight.
+ */
+export function buildPaperPlaneProject(): Project {
+  const durationMs = 2400
+  // Launch left of the headline with clearance, climb over it, settle upper-right.
+  const flight = sampleCubic(
+    { x: 0.1, y: 0.74 },
+    { x: 0.3, y: 0.28 },
+    { x: 0.58, y: 0.2 },
+    { x: 0.88, y: 0.34 },
+    36,
+  )
+  return {
+    version: 1,
+    name: 'Paper plane',
+    stageAspect: EXAMPLE_STAGE_ASPECT,
+    stageWidth: EXAMPLE_STAGE_SIZE.width,
+    stageHeight: EXAMPLE_STAGE_SIZE.height,
+    playback: {
+      durationMs,
+      loop: false,
+      loopMode: 'repeat',
+      trigger: 'page-load',
+    },
+    actors: [
+      // First actor is selected on load — keep the animated plane selected.
+      createSceneActor({
+        id: 'ex-plane',
+        name: 'Plane',
+        appearance: {
+          kind: 'image',
+          width: 0.13,
+          height: 0.13,
+          borderRadius: 0,
+          color: '#0f766e',
+          image: createPaperPlaneImage(),
+        },
+        recording: recordingFromPath(flight, durationMs),
+        restPosition: { ...flight[0]! },
+        smoothing: 0.12,
+        steadySpeed: 0.25,
+        faceAlongPath: true,
+        directionOffsetDeg: 0,
+        clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
+      }),
+      createSceneActor({
+        id: 'ex-plane-headline',
+        name: 'Headline',
+        appearance: {
+          kind: 'text',
+          width: 0.4,
+          height: 0.4,
+          borderRadius: 0.28,
+          color: '#0f172a',
+          image: null,
+          text: {
+            content: 'Ship the motion.',
+            fontSize: 0.07,
+            fontWeight: 700,
+            align: 'left',
+            fontFamily: 'system',
+          },
+        },
+        recording: null,
+        // Center-left; flight clears above with space from the start pose.
+        restPosition: { x: 0.4, y: 0.58 },
+        smoothing: 0,
+        steadySpeed: 0,
+        clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
+      }),
+    ],
   }
 }
 

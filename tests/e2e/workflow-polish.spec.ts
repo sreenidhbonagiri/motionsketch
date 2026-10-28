@@ -44,14 +44,12 @@ test.describe('editor workflow polish', () => {
       'stage-empty-hint',
     )
     await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
+    // Fresh board: motion-editing row stays hidden until a path exists.
+    await expect(page.getByTestId('dock-editing')).toHaveCount(0)
 
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('dock-status')).toContainText(/Ready|drag/i)
-    await expect(page.getByTestId('btn-reset')).toBeDisabled()
-    await expect(page.getByTestId('btn-reset')).toHaveAttribute(
-      'aria-describedby',
-      'dock-status',
-    )
+    await expect(page.getByTestId('dock-editing')).toHaveCount(0)
     await page.getByTestId('btn-stop').click()
 
     await openPanel(page, 'appearance')

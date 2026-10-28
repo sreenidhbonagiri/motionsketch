@@ -2,10 +2,15 @@ import {
   buildFollowTheLeaderProject,
   buildLogoEntranceProject,
   buildOrbitProject,
+  buildPaperPlaneProject,
 } from './buildScenes'
 import type { Project } from '../core/types'
 
-export type ExampleId = 'logo-entrance' | 'follow-the-leader' | 'orbit'
+export type ExampleId =
+  | 'paper-plane'
+  | 'logo-entrance'
+  | 'follow-the-leader'
+  | 'orbit'
 
 export interface ExampleDefinition {
   id: ExampleId
@@ -22,6 +27,14 @@ export interface ExampleDefinition {
  * never reuse actors/recordings across loads.
  */
 export const EXAMPLE_CATALOG: readonly ExampleDefinition[] = [
+  {
+    id: 'paper-plane',
+    title: 'Paper plane',
+    description:
+      'A website-hero flight with Face along path. Select the plane and Record to draw a replacement path.',
+    thumbnailLabel: 'Paper plane thumbnail',
+    build: buildPaperPlaneProject,
+  },
   {
     id: 'logo-entrance',
     title: 'Logo entrance',
