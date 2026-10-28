@@ -110,4 +110,8 @@ describe('resolveModeStatus', () => {
   it('returns null when idle with a selected recording', () => {
     expect(resolveModeStatus({ ...base, mode: 'idle' })).toBeNull()
   })
+
+  it('returns null while playing so the dock does not grow a status row', () => {
+    expect(resolveModeStatus({ ...base, mode: 'playing' })).toBeNull()
+  })
 })

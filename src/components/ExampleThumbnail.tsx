@@ -21,12 +21,25 @@ export function ExampleThumbnail({
           <div className="absolute left-[12%] top-[54%] h-1.5 w-[26%] rounded-sm bg-slate-500/45" />
           <div className="absolute left-[18%] top-[42%] h-px w-[52%] rotate-[-16deg] border-t border-dashed border-slate-400/70" />
           <svg
-            className="absolute left-[62%] top-[26%] h-6 w-8 -rotate-[14deg] text-teal-700"
+            className="absolute left-[60%] top-[24%] h-7 w-9 -rotate-[14deg] drop-shadow-sm"
             viewBox="0 0 112 80"
             aria-hidden
           >
-            <path fill="currentColor" d="M4 40 L108 8 L64 40 L108 72 Z" />
-            <path fill="currentColor" fillOpacity="0.55" d="M4 40 L64 40 L40 54 Z" />
+            <path
+              fill="#f7f4ec"
+              stroke="#d6d0c4"
+              strokeWidth="1.2"
+              strokeLinejoin="round"
+              d="M6 40 L106 10 L62 40 L106 70 Z"
+            />
+            <path
+              fill="none"
+              stroke="#9db7d4"
+              strokeWidth="1.1"
+              d="M22 30 H86 M22 38 H86 M22 46 H86"
+            />
+            <path fill="none" stroke="#d97777" strokeWidth="1.4" d="M30 20 V58" />
+            <path fill="#e8e2d6" d="M6 40 L62 40 L40 52 Z" />
           </svg>
         </>
       )}

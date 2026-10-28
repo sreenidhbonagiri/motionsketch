@@ -11,15 +11,23 @@ const MOTIONSKETCH_MARK_SVG = `<?xml version="1.0" encoding="UTF-8"?>
 </svg>`
 
 /**
- * Original paper plane — transparent canvas, nose along +x for Face along path.
- * Tight viewBox so the actor box hugs the artwork (no padded “card”).
+ * Original notebook-paper plane — off-white ruled sheet, red margin, fold shade.
+ * Transparent canvas; nose along +x for Face along path (no direction offset).
+ * Tight viewBox so the actor box hugs the silhouette.
  * See ./ASSETS.md for attribution.
  */
 const PAPER_PLANE_SVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="112" height="80" viewBox="0 0 112 80" role="img" aria-label="Paper plane">
-  <path fill="#0f766e" d="M4 40 L108 8 L64 40 L108 72 Z"/>
-  <path fill="#115e59" d="M4 40 L64 40 L40 54 Z"/>
-  <path fill="#14b8a6" fill-opacity="0.92" d="M64 40 L108 8 L86 40 Z"/>
+  <!-- Body (nose +x): off-white notebook paper -->
+  <path fill="#f7f4ec" stroke="#d6d0c4" stroke-width="1.2" stroke-linejoin="round" d="M6 40 L106 10 L62 40 L106 70 Z"/>
+  <!-- Blue ruled lines on the upper face (kept inside the silhouette) -->
+  <path fill="none" stroke="#9db7d4" stroke-width="1.15" stroke-linecap="round" d="M24 26 L78 20 M22 34 L84 28 M20 42 L80 38"/>
+  <!-- Restrained red margin -->
+  <path fill="none" stroke="#d97777" stroke-width="1.5" stroke-linecap="round" d="M30 22 L36 48"/>
+  <!-- Fold shading -->
+  <path fill="#e8e2d6" d="M6 40 L62 40 L40 52 Z"/>
+  <path fill="#ddd6c8" d="M62 40 L106 10 L88 40 Z"/>
+  <path fill="none" stroke="#c9c2b4" stroke-width="1" stroke-linecap="round" d="M6 40 L62 40"/>
 </svg>`
 
 function toSvgDataUrl(svg: string): string {

@@ -414,6 +414,65 @@ test.describe('workspace layout', () => {
     }
   })
 
+  test('dock bounds stay stable between paused and playing', async ({
+    page,
+  }) => {
+    for (const width of [1280, 390, 320] as const) {
+      await page.setViewportSize({ width, height: 844 })
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      const dock = page.getByTestId('playback-dock')
+      const edit = page.getByTestId('btn-edit-path')
+      const pausedBox = await dock.boundingBox()
+      const playBox = await page.getByTestId('btn-play').boundingBox()
+      const editBox = await edit.boundingBox()
+      expect(pausedBox).toBeTruthy()
+      expect(playBox).toBeTruthy()
+      expect(editBox).toBeTruthy()
+
+      await expect(page.getByTestId('dock-status')).toHaveCount(0)
+      await expect(edit).toBeEnabled()
+
+      await page.getByTestId('btn-play').click()
+      await expect(page.getByTestId('btn-pause')).toBeVisible()
+      // Playing no longer mounts a visible “Pause before editing…” status row.
+      await expect(page.getByTestId('dock-status')).toHaveCount(0)
+      await expect(edit).toBeDisabled()
+      await expect(edit).toHaveAttribute('title', 'Pause before editing the path.')
+      await expect(edit).toHaveAttribute(
+        'aria-describedby',
+        'playing-edit-path-hint',
+      )
+      await expect(page.getByTestId('playing-edit-path-hint')).toHaveText(
+        'Pause before editing the path.',
+      )
+
+      const playingBox = await dock.boundingBox()
+      const pauseBox = await page.getByTestId('btn-pause').boundingBox()
+      const editPlaying = await edit.boundingBox()
+      expect(playingBox).toBeTruthy()
+      expect(pauseBox).toBeTruthy()
+      expect(editPlaying).toBeTruthy()
+
+      expect(Math.abs(playingBox!.height - pausedBox!.height)).toBeLessThanOrEqual(
+        2,
+      )
+      expect(Math.abs(playingBox!.y - pausedBox!.y)).toBeLessThanOrEqual(2)
+      expect(Math.abs(pauseBox!.x - playBox!.x)).toBeLessThanOrEqual(2)
+      expect(Math.abs(pauseBox!.y - playBox!.y)).toBeLessThanOrEqual(2)
+      expect(Math.abs(editPlaying!.x - editBox!.x)).toBeLessThanOrEqual(2)
+      expect(Math.abs(editPlaying!.y - editBox!.y)).toBeLessThanOrEqual(2)
+
+      await page.getByTestId('btn-pause').click()
+      await expect(page.getByTestId('btn-play')).toBeVisible()
+      await assertPlayCenteredInDock(page)
+    }
+  })
+
   test('Refine stays in-viewport on 500-wide short, 390, and 320', async ({
     page,
   }) => {

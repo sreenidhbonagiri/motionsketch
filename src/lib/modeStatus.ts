@@ -38,6 +38,13 @@ export const ARMED_INSTRUCTION = 'Drag the actor to draw its path.'
 
 export const ARMED_ANNOUNCEMENT = `Ready — ${ARMED_INSTRUCTION}`
 
+/**
+ * Why Edit path is unavailable while playing.
+ * Shown via the disabled control’s tooltip / accessible description — not as a
+ * visible dock status row (avoids docking layout shift on Play/Pause).
+ */
+export const PLAYING_EDIT_PATH_HINT = 'Pause before editing the path.'
+
 /** First-use intro headline (empty board). */
 export const FIRST_USE_HEADLINE = 'Draw motion. Ship it to your website.'
 
@@ -193,13 +200,7 @@ export function resolveModeStatus(input: {
     }
   }
 
-  if (mode === 'playing') {
-    return {
-      kind: 'info',
-      label: '',
-      instruction: 'Pause before editing the path.',
-    }
-  }
-
+  // Playing: no dock status row — keeps paused/playing layout stable.
+  // Edit-path help lives on the disabled control (see PLAYING_EDIT_PATH_HINT).
   return null
 }

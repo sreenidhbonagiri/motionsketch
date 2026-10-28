@@ -16,7 +16,10 @@ import {
 import { traversalElapsedMs } from '../core/playback'
 import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { useConfirm } from '../hooks/useConfirm'
-import { resolveModeStatus } from '../lib/modeStatus'
+import {
+  PLAYING_EDIT_PATH_HINT,
+  resolveModeStatus,
+} from '../lib/modeStatus'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 
@@ -250,6 +253,7 @@ export function PlaybackDock() {
   })
 
   const emptyBoardHintId = 'stage-empty-hint'
+  const playingEditHintId = 'playing-edit-path-hint'
   const playbackDescribedBy = playbackDisabled
     ? modeStatus
       ? dockStatusId
@@ -257,13 +261,16 @@ export function PlaybackDock() {
         ? emptyBoardHintId
         : undefined
     : undefined
-  const editDescribedBy = editPathDisabled
-    ? modeStatus
-      ? dockStatusId
-      : !hasAnyRecording
-        ? emptyBoardHintId
+  const editDescribedBy =
+    mode === 'playing'
+      ? playingEditHintId
+      : editPathDisabled
+        ? modeStatus
+          ? dockStatusId
+          : !hasAnyRecording
+            ? emptyBoardHintId
+            : undefined
         : undefined
-    : undefined
   const resetDescribedBy = resetDisabled
     ? modeStatus
       ? dockStatusId
@@ -841,7 +848,7 @@ export function PlaybackDock() {
                 )}
               </div>
 
-              <div className="flex justify-center max-sm:col-start-2 max-sm:row-start-2 sm:col-start-2 sm:row-start-1">
+              <div className="flex h-8 w-8 justify-center max-sm:col-start-2 max-sm:row-start-2 sm:col-start-2 sm:row-start-1">
                 {mode === 'playing' ? (
                   <button
                     type="button"
@@ -849,7 +856,7 @@ export function PlaybackDock() {
                     onClick={pause}
                     aria-label="Pause"
                     title="Pause"
-                    className={`${btnPrimary} min-h-8 min-w-8 px-2`}
+                    className={`${btnPrimary} h-8 w-8 min-h-8 min-w-8 px-0`}
                   >
                     <PauseIcon />
                   </button>
@@ -862,7 +869,7 @@ export function PlaybackDock() {
                     aria-label="Play"
                     title="Play"
                     aria-describedby={playbackDescribedBy}
-                    className={`${hasAnyRecording ? btnPrimary : btnSecondary} min-h-8 min-w-8 px-2`}
+                    className={`${hasAnyRecording ? btnPrimary : btnSecondary} h-8 w-8 min-h-8 min-w-8 px-0`}
                   >
                     <PlayIcon />
                   </button>
@@ -919,6 +926,13 @@ export function PlaybackDock() {
                 onClick={enterEditMode}
                 disabled={editPathDisabled}
                 aria-describedby={editDescribedBy}
+                title={
+                  mode === 'playing'
+                    ? PLAYING_EDIT_PATH_HINT
+                    : editPathDisabled
+                      ? undefined
+                      : 'Edit path'
+                }
                 className={btnSecondary}
               >
                 Edit path
@@ -1121,6 +1135,16 @@ export function PlaybackDock() {
           className="sr-only"
         >
           {continueAvail.reason ?? CONTINUE_PATH_BAKE_NOTE}
+        </p>
+      )}
+
+      {hasAnyRecording && (
+        <p
+          id={playingEditHintId}
+          data-testid="playing-edit-path-hint"
+          className="sr-only"
+        >
+          {PLAYING_EDIT_PATH_HINT}
         </p>
       )}
 

@@ -197,9 +197,12 @@ describe('starter examples', () => {
       ),
     )
     expect(svg).toMatch(/<svg[\s>]/i)
+    expect(svg).toMatch(/#f7f4ec/i)
+    expect(svg).toMatch(/#9db7d4/i)
+    expect(svg).toMatch(/#d97777/i)
     expect(svg).not.toMatch(/fill\s*=\s*["']#fff/i)
     expect(svg).not.toMatch(/fill\s*=\s*["']white/i)
-    expect(svg).not.toMatch(/<rect\b/i)
+    expect(svg).not.toMatch(/fill\s*=\s*["']#0f766e/i)
     const path = selectProcessedPathForActor(project, plane, {
       geometryEdit: null,
       editSession: null,
@@ -222,7 +225,8 @@ describe('starter examples', () => {
     const exportedSvg = decodeURIComponent(
       html.match(/data:image\/svg\+xml;charset=utf-8,([^"'\s]+)/)![1]!,
     )
-    expect(exportedSvg).not.toMatch(/<rect\b/i)
+    expect(exportedSvg).toMatch(/#f7f4ec/i)
     expect(exportedSvg).not.toMatch(/fill\s*=\s*["']#fff/i)
+    expect(exportedSvg).not.toMatch(/fill\s*=\s*["']#0f766e/i)
   })
 })
