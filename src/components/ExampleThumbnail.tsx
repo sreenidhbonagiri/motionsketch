@@ -1,4 +1,5 @@
 import type { ExampleId } from '../examples/catalog'
+import { createPaperPlaneImage } from '../examples/assets'
 
 /** Static decorative thumbnail for the gallery card (not a live preview). */
 export function ExampleThumbnail({
@@ -8,6 +9,8 @@ export function ExampleThumbnail({
   id: ExampleId
   label: string
 }) {
+  const paperPlane =
+    id === 'paper-plane' ? createPaperPlaneImage() : null
   return (
     <div
       data-testid={`example-thumb-${id}`}
@@ -15,32 +18,18 @@ export function ExampleThumbnail({
       aria-label={label}
       className="relative h-24 w-full overflow-hidden rounded-lg border border-slate-200 bg-[#eef1f6]"
     >
-      {id === 'paper-plane' && (
+      {paperPlane && (
         <>
           <div className="absolute left-[12%] top-[48%] h-2.5 w-[36%] rounded-sm bg-slate-800/90" />
           <div className="absolute left-[12%] top-[54%] h-1.5 w-[26%] rounded-sm bg-slate-500/45" />
           <div className="absolute left-[18%] top-[42%] h-px w-[52%] rotate-[-16deg] border-t border-dashed border-slate-400/70" />
-          <svg
-            className="absolute left-[60%] top-[24%] h-7 w-9 -rotate-[14deg] drop-shadow-sm"
-            viewBox="0 0 112 80"
+          <img
+            src={paperPlane.dataUrl}
+            alt=""
             aria-hidden
-          >
-            <path
-              fill="#f7f4ec"
-              stroke="#d6d0c4"
-              strokeWidth="1.2"
-              strokeLinejoin="round"
-              d="M6 40 L106 10 L62 40 L106 70 Z"
-            />
-            <path
-              fill="none"
-              stroke="#9db7d4"
-              strokeWidth="1.1"
-              d="M22 30 H86 M22 38 H86 M22 46 H86"
-            />
-            <path fill="none" stroke="#d97777" strokeWidth="1.4" d="M30 20 V58" />
-            <path fill="#e8e2d6" d="M6 40 L62 40 L40 52 Z" />
-          </svg>
+            className="absolute left-[52%] top-[14%] h-14 w-auto max-w-[46%] -rotate-[8deg] object-contain drop-shadow-sm"
+            draggable={false}
+          />
         </>
       )}
       {id === 'logo-entrance' && (

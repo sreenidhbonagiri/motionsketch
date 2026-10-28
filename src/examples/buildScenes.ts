@@ -104,8 +104,10 @@ export function buildPaperPlaneProject(): Project {
         name: 'Plane',
         appearance: {
           kind: 'image',
-          width: 0.13,
-          height: 0.13,
+          // Slightly larger than the old SVG dart — PNG silhouette reads smaller
+          // once letterboxed and rotated with Face along path.
+          width: 0.17,
+          height: 0.17,
           borderRadius: 0,
           color: '#0f766e',
           image: createPaperPlaneImage(),
@@ -115,7 +117,9 @@ export function buildPaperPlaneProject(): Project {
         smoothing: 0.12,
         steadySpeed: 0.25,
         faceAlongPath: true,
-        directionOffsetDeg: 0,
+        // Artwork nose points ~−43° (upper-right), not +x — offset so the tip
+        // tracks the flight tangent.
+        directionOffsetDeg: 43,
         clip: { start: 0, end: 1, hideBeforeStart: false, hideAfterEnd: false },
       }),
       createSceneActor({

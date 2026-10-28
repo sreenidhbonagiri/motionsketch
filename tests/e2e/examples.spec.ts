@@ -196,19 +196,7 @@ test.describe('starter examples', () => {
     expect(html).toContain('<title>Paper plane</title>')
     expect(html).toContain('Ship the motion.')
     expect(html).toContain('@keyframes')
-    expect(html).toMatch(/data:image\/svg\+xml/)
-    const svgMatch = html.match(
-      /data:image\/svg\+xml;charset=utf-8,([^"'\s]+)/,
-    )
-    expect(svgMatch).toBeTruthy()
-    const svg = decodeURIComponent(svgMatch![1]!)
-    expect(svg).toMatch(/<svg[\s>]/i)
-    expect(svg).toMatch(/#f7f4ec/i)
-    expect(svg).toMatch(/#9db7d4/i)
-    expect(svg).toMatch(/#d97777/i)
-    expect(svg).not.toMatch(/fill\s*=\s*["']#fff/i)
-    expect(svg).not.toMatch(/fill\s*=\s*["']white/i)
-    expect(svg).not.toMatch(/fill\s*=\s*["']#0f766e/i)
+    expect(html).toMatch(/data:image\/png;base64,/)
     expect(html).toMatch(/background:\s*transparent/)
   })
 

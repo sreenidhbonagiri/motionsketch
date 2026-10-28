@@ -189,20 +189,14 @@ describe('starter examples', () => {
     expect(headline.recording).toBeNull()
     expect(plane.appearance.kind).toBe('image')
     expect(plane.faceAlongPath).toBe(true)
+    expect(plane.directionOffsetDeg).toBe(43)
     expect(plane.recording?.samples.length).toBeGreaterThan(8)
-    const svg = decodeURIComponent(
-      plane.appearance.image!.dataUrl.replace(
-        /^data:image\/svg\+xml;charset=utf-8,/,
-        '',
-      ),
-    )
-    expect(svg).toMatch(/<svg[\s>]/i)
-    expect(svg).toMatch(/#f7f4ec/i)
-    expect(svg).toMatch(/#9db7d4/i)
-    expect(svg).toMatch(/#d97777/i)
-    expect(svg).not.toMatch(/fill\s*=\s*["']#fff/i)
-    expect(svg).not.toMatch(/fill\s*=\s*["']white/i)
-    expect(svg).not.toMatch(/fill\s*=\s*["']#0f766e/i)
+    const image = plane.appearance.image!
+    expect(image.mimeType).toBe('image/png')
+    expect(image.dataUrl).toMatch(/^data:image\/png;base64,/)
+    expect(image.naturalWidth).toBeGreaterThan(0)
+    expect(image.naturalHeight).toBeGreaterThan(0)
+    expect(image.naturalWidth / image.naturalHeight).toBeGreaterThan(1)
     const path = selectProcessedPathForActor(project, plane, {
       geometryEdit: null,
       editSession: null,
@@ -222,11 +216,6 @@ describe('starter examples', () => {
     const html = buildHtmlDemoFromProject(project)
     expect(html).toContain('Ship the motion.')
     expect(html).toMatch(/background:\s*transparent/)
-    const exportedSvg = decodeURIComponent(
-      html.match(/data:image\/svg\+xml;charset=utf-8,([^"'\s]+)/)![1]!,
-    )
-    expect(exportedSvg).toMatch(/#f7f4ec/i)
-    expect(exportedSvg).not.toMatch(/fill\s*=\s*["']#fff/i)
-    expect(exportedSvg).not.toMatch(/fill\s*=\s*["']#0f766e/i)
+    expect(html).toMatch(/data:image\/png;base64,/)
   })
 })
