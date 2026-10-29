@@ -39,8 +39,8 @@ export function MotionPresets() {
                 onClick={() => onPick(preset.id)}
                 className={
                   active
-                    ? 'flex w-full flex-col items-start rounded-xl border border-teal-700/30 bg-teal-50/80 px-2.5 py-2 text-left'
-                    : 'flex w-full flex-col items-start rounded-xl border border-slate-900/[0.06] bg-white/70 px-2.5 py-2 text-left transition hover:bg-slate-900/[0.03] disabled:opacity-40'
+                    ? 'flex w-full flex-col items-start rounded-xl border border-ms-primary/30 bg-ms-selected px-2.5 py-2 text-left'
+                    : 'flex w-full flex-col items-start rounded-xl border border-ms-border bg-white/70 px-2.5 py-2 text-left transition hover:bg-slate-900/[0.03] disabled:opacity-40'
                 }
               >
                 <span className="text-sm font-medium text-slate-800">

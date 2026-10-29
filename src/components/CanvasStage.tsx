@@ -13,6 +13,7 @@ import { useStageSize } from '../hooks/useStageSize'
 import { useWorkspaceCamera } from '../hooks/useWorkspaceCamera'
 import { selectProcessedPathForActor } from '../state/selectors'
 import { useEditorStore } from '../state/store'
+import { msPalette } from '../theme/palette'
 import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
 import { PathMoveOverlay } from './PathMoveOverlay'
@@ -24,7 +25,7 @@ function drawGrid(
   width: number,
   height: number,
 ) {
-  ctx.fillStyle = '#eef1f6'
+  ctx.fillStyle = msPalette.canvas
   ctx.fillRect(0, 0, width, height)
 
   const lines = gridLineCoords()
@@ -51,8 +52,8 @@ function drawSnapIndicator(
   const x = point.x * width
   const y = point.y * height
   ctx.save()
-  ctx.strokeStyle = 'rgba(15, 118, 110, 0.9)'
-  ctx.fillStyle = 'rgba(45, 212, 191, 0.35)'
+  ctx.strokeStyle = 'rgba(48, 72, 184, 0.9)'
+  ctx.fillStyle = 'rgba(48, 72, 184, 0.22)'
   ctx.lineWidth = 1.5
   ctx.beginPath()
   ctx.arc(x, y, 6, 0, Math.PI * 2)
@@ -106,7 +107,7 @@ function drawPlayhead(
   position: Vec2,
 ) {
   ctx.save()
-  ctx.fillStyle = '#0f766e'
+  ctx.fillStyle = msPalette.primary
   ctx.beginPath()
   ctx.arc(position.x * width, position.y * height, 4.5, 0, Math.PI * 2)
   ctx.fill()
@@ -270,7 +271,15 @@ export function CanvasStage() {
 
     if (mode === 'recording' || mode === 'armed') {
       if (liveTrail.length >= 2) {
-        drawPath(ctx, size.width, size.height, liveTrail, '#0f766e', 2.5, 0.85)
+        drawPath(
+          ctx,
+          size.width,
+          size.height,
+          liveTrail,
+          msPalette.primary,
+          2.5,
+          0.85,
+        )
       }
     } else if (selected?.recording) {
       if (polishSession) {
@@ -282,7 +291,7 @@ export function CanvasStage() {
             size.width,
             size.height,
             original,
-            '#94a3b8',
+            msPalette.pathCompare,
             2.25,
             0.75,
             true,
@@ -294,7 +303,7 @@ export function CanvasStage() {
             size.width,
             size.height,
             polished,
-            '#0f766e',
+            msPalette.primary,
             2.75,
             0.95,
           )
@@ -325,7 +334,7 @@ export function CanvasStage() {
             size.width,
             size.height,
             rawSamples,
-            '#94a3b8',
+            msPalette.pathCompare,
             2,
             0.7,
             true,
@@ -337,7 +346,7 @@ export function CanvasStage() {
             size.width,
             size.height,
             processed,
-            '#0f766e',
+            msPalette.primary,
             2.75,
             0.95,
           )
@@ -383,7 +392,7 @@ export function CanvasStage() {
       ref={viewportRef}
       data-testid="stage"
       tabIndex={-1}
-      className={`absolute inset-0 touch-none overflow-hidden bg-[#eef1f6] outline-none ${cursorClass}`}
+      className={`absolute inset-0 touch-none overflow-hidden bg-[#F8F9FC] outline-none ${cursorClass}`}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
       onPointerUp={onViewportPointerUp}
@@ -403,7 +412,7 @@ export function CanvasStage() {
           data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
           data-path-tool={editing ? pathTool : undefined}
           data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
-          className="relative overflow-hidden bg-[#eef1f6] shadow-[0_0_0_1px_rgba(15,23,42,0.10)]"
+          className="relative overflow-hidden bg-[#F8F9FC] shadow-[0_0_0_1px_rgba(15,23,42,0.10)]"
           style={{
             width: layout.width > 0 ? layout.width : undefined,
             height: layout.height > 0 ? layout.height : undefined,

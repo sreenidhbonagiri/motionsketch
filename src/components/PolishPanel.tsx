@@ -36,7 +36,7 @@ export function PolishPanel() {
   return (
     <div
       data-testid="polish-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-ms-border bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -47,7 +47,7 @@ export function PolishPanel() {
         >
           <span className="font-medium text-slate-600">Dashed</span> Original
           {' · '}
-          <span className="font-medium text-teal-800">Solid</span> Polished
+          <span className="font-medium text-ms-primary-pressed">Solid</span> Polished
           {session.allowRoundingAtPoint && (
             <>
               {' · '}
@@ -76,7 +76,7 @@ export function PolishPanel() {
           step={0.05}
           value={session.strength}
           onChange={(e) => setPolishStrength(Number(e.target.value))}
-          className="w-full accent-teal-700"
+          className="w-full accent-ms-primary"
           aria-describedby="polish-strength-help"
         />
         <p
@@ -94,13 +94,13 @@ export function PolishPanel() {
       {showRoundingControl && (
         <div
           data-testid="polish-rounding-control"
-          className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2"
+          className="mt-2 space-y-1 rounded-lg border border-ms-border bg-slate-50/80 px-2.5 py-2"
         >
           <label className="flex items-start gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
               data-testid="polish-allow-rounding"
-              className="mt-0.5 accent-teal-700"
+              className="mt-0.5 accent-ms-primary"
               checked={session.allowRoundingAtPoint}
               disabled={!roundingEnabled}
               onChange={(e) => setPolishAllowRounding(e.target.checked)}
@@ -159,7 +159,7 @@ export function PolishPanel() {
           data-testid="btn-polish-apply"
           onClick={() => applyPolish()}
           disabled={!session.changed}
-          className="inline-flex h-8 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex h-8 items-center rounded-lg bg-ms-primary px-3 text-sm font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
         >
           Apply
         </button>

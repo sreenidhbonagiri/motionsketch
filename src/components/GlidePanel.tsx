@@ -36,7 +36,7 @@ export function GlidePanel() {
   return (
     <div
       data-testid="glide-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-ms-border bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -62,7 +62,7 @@ export function GlidePanel() {
           onClick={() => setGlideCompareMode('original')}
           className={
             session.compareMode === 'original'
-              ? 'inline-flex h-7 items-center rounded-lg bg-slate-900 px-2.5 text-xs font-medium text-white'
+              ? 'inline-flex h-7 items-center rounded-lg bg-ms-primary px-2.5 text-xs font-medium text-white'
               : 'inline-flex h-7 items-center rounded-lg px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-900/[0.06]'
           }
         >
@@ -75,7 +75,7 @@ export function GlidePanel() {
           onClick={() => setGlideCompareMode('glide')}
           className={
             session.compareMode === 'glide'
-              ? 'inline-flex h-7 items-center rounded-lg bg-slate-900 px-2.5 text-xs font-medium text-white'
+              ? 'inline-flex h-7 items-center rounded-lg bg-ms-primary px-2.5 text-xs font-medium text-white'
               : 'inline-flex h-7 items-center rounded-lg px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-900/[0.06]'
           }
         >
@@ -102,7 +102,7 @@ export function GlidePanel() {
           step={0.05}
           value={session.strength}
           onChange={(e) => setGlideStrength(Number(e.target.value))}
-          className="w-full accent-teal-700"
+          className="w-full accent-ms-primary"
           aria-describedby="glide-strength-help"
         />
         <p
@@ -143,7 +143,7 @@ export function GlidePanel() {
           data-testid="btn-glide-apply"
           onClick={() => applyGlide()}
           disabled={Math.abs(session.strength - committedGlide) < 1e-9}
-          className="inline-flex h-8 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+          className="inline-flex h-8 items-center rounded-lg bg-ms-primary px-3 text-sm font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
         >
           Apply
         </button>

@@ -30,7 +30,7 @@ export function WorkspaceCameraBar({
   return (
     <div
       data-testid="workspace-camera-bar"
-      className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-slate-900/[0.08] bg-white/90 p-0.5 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
+      className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-ms-border bg-white/90 p-0.5 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <button

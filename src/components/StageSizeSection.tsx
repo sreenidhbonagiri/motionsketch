@@ -102,7 +102,7 @@ export function StageSizeSection() {
             disabled={busy}
             aria-describedby={helpId}
             onChange={(e) => setWidthDraft(e.target.value)}
-            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 disabled:opacity-40"
+            className="w-full rounded-md border border-ms-border bg-white px-2 py-1.5 text-xs text-slate-800 disabled:opacity-40"
           />
         </label>
         <label className="space-y-1" htmlFor={heightId}>
@@ -121,7 +121,7 @@ export function StageSizeSection() {
             disabled={busy}
             aria-describedby={helpId}
             onChange={(e) => setHeightDraft(e.target.value)}
-            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 disabled:opacity-40"
+            className="w-full rounded-md border border-ms-border bg-white px-2 py-1.5 text-xs text-slate-800 disabled:opacity-40"
           />
         </label>
       </div>
@@ -155,15 +155,15 @@ export function StageSizeSection() {
                 onClick={() => setAnchor(key)}
                 className={
                   selected
-                    ? 'flex size-7 items-center justify-center rounded-md border border-teal-600 bg-teal-50 text-teal-800 disabled:opacity-40'
-                    : 'flex size-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40'
+                    ? 'flex size-7 items-center justify-center rounded-md border border-ms-primary bg-ms-selected text-ms-primary-pressed disabled:opacity-40'
+                    : 'flex size-7 items-center justify-center rounded-md border border-ms-border bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40'
                 }
               >
                 <span
                   aria-hidden
                   className={
                     selected
-                      ? 'size-2 rounded-full bg-teal-700'
+                      ? 'size-2 rounded-full bg-ms-primary'
                       : 'size-1.5 rounded-full bg-slate-300'
                   }
                 />
@@ -181,7 +181,7 @@ export function StageSizeSection() {
         data-testid="btn-stage-resize"
         onClick={handleResize}
         disabled={busy}
-        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Resize
       </button>

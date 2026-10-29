@@ -74,7 +74,7 @@ export function AdjustPanel() {
           disabled={!hasAnyRecording}
           aria-describedby="duration-help"
           onChange={(e) => setDurationMs(Number(e.target.value))}
-          className="w-full accent-teal-700 disabled:opacity-40"
+          className="w-full accent-ms-primary disabled:opacity-40"
         />
         <p
           id="duration-help"
@@ -108,7 +108,7 @@ export function AdjustPanel() {
           disabled={!selectedHasRecording || smoothingLocked}
           aria-describedby="smoothing-help"
           onChange={(e) => setSmoothing(Number(e.target.value))}
-          className="w-full accent-teal-700 disabled:opacity-40"
+          className="w-full accent-ms-primary disabled:opacity-40"
         />
         <p
           id="smoothing-help"
@@ -140,7 +140,7 @@ export function AdjustPanel() {
           disabled={!selectedHasRecording}
           aria-describedby="steady-speed-help"
           onChange={(e) => setSteadySpeed(Number(e.target.value))}
-          className="w-full accent-teal-700 disabled:opacity-40"
+          className="w-full accent-ms-primary disabled:opacity-40"
         />
         <p
           id="steady-speed-help"
@@ -162,7 +162,7 @@ export function AdjustPanel() {
             checked={loop}
             disabled={!hasAnyRecording || editing}
             onChange={(e) => setLoop(e.target.checked)}
-            className="size-4 accent-teal-700 disabled:opacity-40"
+            className="size-4 accent-ms-primary disabled:opacity-40"
           />
         </label>
         <p className="text-xs leading-relaxed text-slate-500">
@@ -184,7 +184,7 @@ export function AdjustPanel() {
                 name="loop-mode"
                 checked={loopMode === 'repeat'}
                 onChange={() => setLoopMode('repeat')}
-                className="mt-0.5 size-3.5 accent-teal-700"
+                className="mt-0.5 size-3.5 accent-ms-primary"
               />
               <span>
                 <span className="font-medium">Repeat</span>
@@ -201,7 +201,7 @@ export function AdjustPanel() {
                 name="loop-mode"
                 checked={loopMode === 'alternate'}
                 onChange={() => setLoopMode('alternate')}
-                className="mt-0.5 size-3.5 accent-teal-700"
+                className="mt-0.5 size-3.5 accent-ms-primary"
               />
               <span>
                 <span className="font-medium">Back and forth</span>
@@ -223,7 +223,7 @@ export function AdjustPanel() {
           checked={showPathComparison}
           disabled={!selectedHasRecording || editing}
           onChange={(e) => setShowPathComparison(e.target.checked)}
-          className="size-4 accent-teal-700 disabled:opacity-40"
+          className="size-4 accent-ms-primary disabled:opacity-40"
         />
       </label>
       {showPathComparison && selectedHasRecording && (

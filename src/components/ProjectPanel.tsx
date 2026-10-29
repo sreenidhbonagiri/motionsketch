@@ -207,7 +207,7 @@ export function ProjectPanel() {
       )}
 
       {importError && (
-        <p data-testid="import-error" className="text-[11px] text-red-700">
+        <p data-testid="import-error" className="text-[11px] text-ms-danger">
           {importError}
         </p>
       )}
@@ -218,7 +218,7 @@ export function ProjectPanel() {
           type="button"
           data-testid="btn-new-project"
           onClick={() => void handleNewProject()}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
         >
           New project
         </button>
@@ -228,7 +228,7 @@ export function ProjectPanel() {
           onClick={handleDownload}
           disabled={!canDownloadProject}
           aria-describedby="download-project-help"
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Download project file
         </button>
@@ -236,7 +236,7 @@ export function ProjectPanel() {
           type="button"
           data-testid="btn-open-project"
           onClick={handleOpenClick}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
         >
           Open project
         </button>

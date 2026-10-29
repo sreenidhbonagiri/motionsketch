@@ -101,7 +101,7 @@ export function ProjectNameInput({
         }
         commit()
       }}
-      className="w-[min(16rem,50vw)] rounded-md border border-slate-900/[0.08] bg-white/90 px-2 py-0.5 text-sm font-semibold tracking-tight text-slate-900"
+      className="w-[min(16rem,50vw)] rounded-md border border-ms-border bg-white/90 px-2 py-0.5 text-sm font-semibold tracking-tight text-slate-900"
     />
   )
 }

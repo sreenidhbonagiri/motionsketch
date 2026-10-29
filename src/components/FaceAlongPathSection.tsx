@@ -71,7 +71,7 @@ export function FaceAlongPathSection() {
           disabled={disabled}
           aria-describedby={helpId}
           onChange={(e) => setFaceAlongPath(e.target.checked)}
-          className="size-3.5 accent-teal-700 disabled:opacity-40"
+          className="size-3.5 accent-ms-primary disabled:opacity-40"
         />
         <span>Face along path</span>
       </label>
@@ -108,7 +108,7 @@ export function FaceAlongPathSection() {
             aria-valuetext={formatOffset(offset)}
             aria-describedby={offsetHelpId}
             onChange={(e) => setDirectionOffsetDeg(Number(e.target.value))}
-            className="w-full accent-teal-700 disabled:opacity-40"
+            className="w-full accent-ms-primary disabled:opacity-40"
           />
           <input
             data-testid="direction-offset-input"
@@ -121,7 +121,7 @@ export function FaceAlongPathSection() {
             aria-label="Direction offset in degrees"
             aria-describedby={offsetHelpId}
             onChange={(e) => setDirectionOffsetDeg(Number(e.target.value))}
-            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
+            className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
           />
         </div>
       )}

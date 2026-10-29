@@ -104,7 +104,7 @@ export function AppearancePanel() {
                 setActorKind('shape')
                 setStatus(null)
               }}
-              className="size-3.5 accent-teal-700"
+              className="size-3.5 accent-ms-primary"
             />
             Shape
           </label>
@@ -123,7 +123,7 @@ export function AppearancePanel() {
               onChange={() => {
                 if (actor.image) setActorKind('image')
               }}
-              className="size-3.5 accent-teal-700 disabled:opacity-40"
+              className="size-3.5 accent-ms-primary disabled:opacity-40"
             />
             Image
           </label>
@@ -137,7 +137,7 @@ export function AppearancePanel() {
                 setActorKind('text')
                 setStatus(null)
               }}
-              className="size-3.5 accent-teal-700"
+              className="size-3.5 accent-ms-primary"
             />
             Text
           </label>
@@ -180,7 +180,7 @@ export function AppearancePanel() {
             value={actorSize}
             aria-describedby="actor-size-help"
             onChange={(e) => setActorSize(Number(e.target.value))}
-            className="w-full accent-teal-700"
+            className="w-full accent-ms-primary"
           />
           <p
             id="actor-size-help"
@@ -214,7 +214,7 @@ export function AppearancePanel() {
               value={actor.color}
               aria-describedby="actor-color-help"
               onChange={(e) => setActorColor(e.target.value)}
-              className="h-9 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-0.5"
+              className="h-9 w-full cursor-pointer rounded-md border border-ms-border bg-white p-0.5"
             />
             <p
               id="actor-color-help"
@@ -248,7 +248,7 @@ export function AppearancePanel() {
               value={actor.borderRadius}
               aria-describedby="actor-radius-help"
               onChange={(e) => setActorBorderRadius(Number(e.target.value))}
-              className="w-full accent-teal-700"
+              className="w-full accent-ms-primary"
             />
             <p
               id="actor-radius-help"
@@ -279,7 +279,7 @@ export function AppearancePanel() {
                 maxLength={MAX_ACTOR_TEXT_LENGTH}
                 value={actor.text.content}
                 onChange={(e) => setActorTextContent(e.target.value)}
-                className="w-full resize-y rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800"
+                className="w-full resize-y rounded-md border border-ms-border bg-white px-2 py-1.5 text-sm text-slate-800"
                 aria-describedby="actor-text-content-help"
               />
               <p
@@ -314,7 +314,7 @@ export function AppearancePanel() {
                 step={0.002}
                 value={actor.text.fontSize}
                 onChange={(e) => setActorTextFontSize(Number(e.target.value))}
-                className="w-full accent-teal-700"
+                className="w-full accent-ms-primary"
               />
             </div>
 
@@ -328,7 +328,7 @@ export function AppearancePanel() {
                     name="actor-text-weight"
                     checked={actor.text.fontWeight === 400}
                     onChange={() => setActorTextWeight(400)}
-                    className="size-3.5 accent-teal-700"
+                    className="size-3.5 accent-ms-primary"
                   />
                   Regular
                 </label>
@@ -339,7 +339,7 @@ export function AppearancePanel() {
                     name="actor-text-weight"
                     checked={actor.text.fontWeight === 700}
                     onChange={() => setActorTextWeight(700)}
-                    className="size-3.5 accent-teal-700"
+                    className="size-3.5 accent-ms-primary"
                   />
                   Bold
                 </label>
@@ -360,7 +360,7 @@ export function AppearancePanel() {
                       name="actor-text-align"
                       checked={actor.text!.align === align}
                       onChange={() => setActorTextAlign(align)}
-                      className="size-3.5 accent-teal-700"
+                      className="size-3.5 accent-ms-primary"
                     />
                     {align}
                   </label>
@@ -384,7 +384,7 @@ export function AppearancePanel() {
                     e.target.value as 'system' | 'serif' | 'mono',
                   )
                 }
-                className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800"
+                className="w-full rounded-md border border-ms-border bg-white px-2 py-1.5 text-sm text-slate-800"
               >
                 <option value="system">System UI</option>
                 <option value="serif">Serif</option>
@@ -420,7 +420,7 @@ export function AppearancePanel() {
                   data-testid="actor-image-preview"
                   src={actor.image.dataUrl}
                   alt=""
-                  className="size-14 rounded-md border border-slate-200 bg-white object-contain"
+                  className="size-14 rounded-md border border-ms-border bg-white object-contain"
                 />
                 <div className="min-w-0 flex-1 space-y-1">
                   <label
@@ -436,7 +436,7 @@ export function AppearancePanel() {
                     value={actor.image.label}
                     maxLength={64}
                     onChange={(e) => setActorImageLabel(e.target.value)}
-                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800"
+                    className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm text-slate-800"
                   />
                   <p
                     data-testid="actor-image-meta"
@@ -471,7 +471,7 @@ export function AppearancePanel() {
                   e.stopPropagation()
                   pickFile()
                 }}
-                className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+                className="rounded-lg bg-ms-primary px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
               >
                 {actor.image ? 'Replace image' : 'Upload image'}
               </button>
@@ -485,7 +485,7 @@ export function AppearancePanel() {
                     clearActorImage()
                     setStatus('Image removed. Back to shape.')
                   }}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+                  className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
                 >
                   Remove image
                 </button>

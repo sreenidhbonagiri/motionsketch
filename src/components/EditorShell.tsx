@@ -53,9 +53,9 @@ const headerBtn =
   'inline-flex h-7 min-h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]'
 /** Primary Export once a path exists. */
 const headerBtnPrimary =
-  'inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-slate-900 px-2.5 text-xs font-medium text-white transition hover:bg-slate-800'
+  'inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-ms-primary px-2.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover active:bg-ms-primary-pressed'
 const headerCluster =
-  'flex min-w-0 max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-slate-900/[0.08] bg-white/85 p-1 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl'
+  'flex min-w-0 max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-ms-border bg-white/85 p-1 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl'
 
 export function EditorShell() {
   usePlaybackClock()
@@ -262,7 +262,7 @@ export function EditorShell() {
   return (
     <div
       data-testid="app-shell"
-      className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas,#eef1f5)] text-slate-900 antialiased"
+      className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas)] text-ms-ink antialiased"
       style={{
         // Mobile contextual sheets / camera bar clear header (+ toast when shown).
         ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
@@ -295,7 +295,7 @@ export function EditorShell() {
             role="status"
             data-testid="after-path-website-toast"
             aria-describedby={afterPathToastTextId}
-            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2 text-xs text-slate-700 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-ms-border bg-white/90 px-3 py-2 text-xs text-slate-700 shadow-[var(--ms-shadow)] backdrop-blur-xl"
           >
             <p
               id={afterPathToastTextId}
@@ -594,7 +594,7 @@ export function EditorShell() {
             <div
               id="stage-empty-hint"
               data-testid="stage-empty-hint"
-              className="pointer-events-auto flex w-full max-w-sm flex-col gap-1.5 rounded-xl border border-slate-900/[0.08] bg-white/90 px-3.5 py-2.5 text-center shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
+              className="pointer-events-auto flex w-full max-w-sm flex-col gap-1.5 rounded-xl border border-ms-border bg-white/90 px-3.5 py-2.5 text-center shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
             >
               <p
                 data-testid="first-use-headline"

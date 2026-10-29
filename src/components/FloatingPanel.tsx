@@ -115,14 +115,14 @@ export function FloatingPanel({
       aria-modal="false"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex max-h-[min(32rem,calc(100dvh-12rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-900/[0.08] bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
+      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex max-h-[min(32rem,calc(100dvh-12rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-ms-border bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
         align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="shrink-0 border-b border-slate-900/[0.06] py-2 pl-3 pr-14">
+      <div className="shrink-0 border-b border-ms-border py-2 pl-3 pr-14">
         <div className="min-w-0">
           <h2
             id={titleId}
