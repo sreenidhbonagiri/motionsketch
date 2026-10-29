@@ -370,7 +370,7 @@ test.describe('Continue path', () => {
     await page.getByTestId('btn-record').click()
     await page.getByTestId('btn-rerecord-confirm').click()
     await expect(page.getByTestId('dock-status')).toContainText(
-      /Drag the actor to draw its path/i,
+      /Drag the element to record/i,
     )
     await page.getByTestId('btn-stop').click()
 

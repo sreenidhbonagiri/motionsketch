@@ -33,10 +33,16 @@ export const ADD_POINT_PLACEMENT_FINE =
 export const ADD_POINT_PLACEMENT_COARSE =
   'The ghost sits on the sample that will become the handle. Tap near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
 
-/** Armed-record guidance — same drag verb for mouse, touch, and SR/keyboard focus. */
-export const ARMED_INSTRUCTION = 'Drag the actor to draw its path.'
+/**
+ * Armed-record guidance — same drag verb for mouse, touch, and SR/keyboard focus.
+ * Shown in the dock as “Ready — …” and re-announced when empty-canvas drag misses.
+ */
+export const ARMED_INSTRUCTION = 'Drag the element to record.'
 
 export const ARMED_ANNOUNCEMENT = `Ready — ${ARMED_INSTRUCTION}`
+
+/** Visible + live-region copy after an armed empty-canvas miss (mode stays armed). */
+export const ARMED_MISS_INSTRUCTION = ARMED_INSTRUCTION
 
 /**
  * Why Edit path is unavailable while playing.

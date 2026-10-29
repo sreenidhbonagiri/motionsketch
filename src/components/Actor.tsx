@@ -89,7 +89,7 @@ export function Actor({
   const ariaLabel = editingPreview
     ? `${label} (editing preview)`
     : armed
-      ? `${label}. Drag to draw its path.`
+      ? `${label}. Drag the element to record.`
       : recording
         ? `${label}. Recording — release to finish.`
         : label

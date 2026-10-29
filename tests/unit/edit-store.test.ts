@@ -240,7 +240,7 @@ describe('edit store', () => {
   it('announces armed and recording readiness once', () => {
     useEditorStore.getState().armRecording()
     expect(useEditorStore.getState().actionAnnouncement).toBe(
-      'Ready — Drag the actor to draw its path.',
+      'Ready — Drag the element to record.',
     )
     useEditorStore.getState().beginRecording(1, { x: 0.4, y: 0.5 })
     expect(useEditorStore.getState().actionAnnouncement).toBe('Recording')

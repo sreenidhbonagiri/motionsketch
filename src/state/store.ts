@@ -60,7 +60,10 @@ import {
   type StageResizeAnchor,
   type StageResizeSnapshot,
 } from '../core/stageResize'
-import { ARMED_ANNOUNCEMENT } from '../lib/modeStatus'
+import {
+  ARMED_ANNOUNCEMENT,
+  ARMED_MISS_INSTRUCTION,
+} from '../lib/modeStatus'
 import { selectProcessedPathForActor } from './selectors'
 import {
   polishMotion,
@@ -314,6 +317,11 @@ interface EditorStore {
   actionAnnouncement: string | null
 
   armRecording: () => void
+  /**
+   * Empty-canvas pointer while armed: keep armed, re-announce drag-to-record
+   * guidance (does not pan or start a take).
+   */
+  noteArmedCanvasMiss: () => void
   /** Arm append-at-end recording for the selected actor’s existing path. */
   armContinuePath: () => boolean
   cancelArm: () => void
@@ -796,6 +804,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         liveTrail: [],
         stageHint: 'default',
         actionAnnouncement: ARMED_ANNOUNCEMENT,
+      })
+    },
+
+    noteArmedCanvasMiss: () => {
+      if (get().mode !== 'armed') return
+      // Clear then set so a repeated miss re-triggers the live region.
+      set({ actionAnnouncement: null })
+      queueMicrotask(() => {
+        if (get().mode !== 'armed') return
+        set({ actionAnnouncement: ARMED_MISS_INSTRUCTION })
       })
     },
 
