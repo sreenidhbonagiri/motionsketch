@@ -53,6 +53,16 @@ export type WebPackageOk = {
 export type WebPackageErr = { ok: false; error: string }
 export type WebPackageResult = WebPackageOk | WebPackageErr
 
+/** Placement-labeled copy blocks for embedding (paths match the ZIP layout). */
+export type WebPackageHostSections = {
+  /** Stylesheet link + host sizing — paste inside `<head>`. */
+  head: string
+  /** Scene markup + Play/Replay control — paste inside `<body>`. */
+  body: string
+  /** Controller script + init — paste before `</body>`. */
+  scripts: string
+}
+
 /** In-app / README host integration (no ZIP) — filenames match the package. */
 export type WebPackageIntegrationGuide = {
   ok: true
@@ -61,7 +71,11 @@ export type WebPackageIntegrationGuide = {
   assetHrefs: string[]
   requiredFiles: string[]
   markup: string
+  /** head + body + scripts joined — same as the three labeled sections. */
   completeExample: string
+  sections: WebPackageHostSections
+  folderLayout: string
+  playButtonHelp: string
   initOptions: TriggerControllerOptions
   initOptionsLiteral: string
 }
@@ -128,19 +142,22 @@ function buildPackageReadme(args: {
     ? 'Pause is offered in the preview (looping, or automatic trigger longer than 5s). Host sites can call pause()/resume() on the controller.'
     : 'Pause is omitted in the preview for this short non-looping scene; host sites can still call pause()/resume() if needed.'
   const aspectCss = formatCssAspectRatio(project.stageAspect)
-  const completeExample = buildCompleteHostExample({
+  const sections = buildHostExampleSections({
     scope,
     markup,
     initOptionsLiteral,
     aspectCss,
   })
+  const folderLayout = buildFolderLayoutText(assetHrefs)
+  const playButtonHelp = buildPlayButtonHelp()
 
   const triggerSection = needsJs
     ? `Playback trigger: ${trigger}
 -------------------
 This scene waits with class "${MS_WAITING_CLASS}" until activated.
 Include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call MotionSketchTrigger.init (see
-Embed below for a complete copyable example).
+Embed sections below). Changing the trigger in MotionSketch updates the
+generated markup and init options — copy or download again after you change it.
 
 API: play(), pause(), resume(), restart(), destroy(), get(root).
 init() twice on the same root replaces the previous instance (no duplicate
@@ -157,6 +174,8 @@ CSS animations start on their own when prefers-reduced-motion is off.
 Still include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call MotionSketchTrigger.init
 when you embed — required for Replay, reduced-motion Play (adds
 "${MS_MOTION_OK_CLASS}"), and pause()/resume() on host pages.
+Changing the trigger in MotionSketch updates the generated code — copy or
+download again afterward.
 ${pauseNote}
 `
 
@@ -179,6 +198,10 @@ Actors, motion, and (when present) image files under assets/. It does not
 include the editor path overlay, stage grid, selection chrome, or playback
 dock — those stay in MotionSketch only.
 
+Folder layout (keep relative paths)
+-----------------------------------
+${folderLayout}
+
 Package contents
 ----------------
 ${fileList}
@@ -194,19 +217,16 @@ Preview locally
 2. Open ${WEB_PACKAGE_HTML_NAME} in a browser (double-click or File → Open).
 3. The preview links ${WEB_PACKAGE_CSS_NAME}, ${WEB_PACKAGE_TRIGGER_JS_NAME},
    and any files under assets/ with relative paths.
-4. Use Play / Replay (and Pause / Resume when shown — looping scenes, or
-   automatic page-load / viewport scenes longer than 5s). When
-   prefers-reduced-motion is on, animation stays off until you press Play
+4. ${playButtonHelp}
+   When prefers-reduced-motion is on, animation stays off until you press Play
    (adds "${MS_MOTION_OK_CLASS}"). Automatic triggers never override that
    preference.
 
 Embed in an existing website
 ----------------------------
-Copy these next to your page (keep relative paths, or update href/src):
-
-  - ${WEB_PACKAGE_CSS_NAME}
-  - ${WEB_PACKAGE_TRIGGER_JS_NAME}
-  - assets/   (if listed above)
+Copy ${WEB_PACKAGE_CSS_NAME}, ${WEB_PACKAGE_TRIGGER_JS_NAME}, and assets/ (if
+listed) next to your page — same layout as above. Paste the three sections
+into your HTML (paths assume that arrangement).
 
 Give .${scope.stageClass} an explicit size. Exported rules use container query
 units (cqw / cqh / cqmin); without a width (and height or aspect-ratio) the
@@ -217,10 +237,19 @@ root's parent, or anywhere inside the nearest ancestor with
 data-ms-demo-shell (same pattern as ${WEB_PACKAGE_HTML_NAME}). Put your Play
 control inside that shell, or call the controller API yourself (below).
 
-Complete example (responsive wrapper + init — works for page-load too).
-Stage aspect-ratio matches this project (${aspectCss}):
+Stage aspect-ratio matches this project (${aspectCss}).
 
-${completeExample}
+In <head>
+---------
+${sections.head}
+
+Where you want the animation, inside <body>
+-------------------------------------------
+${sections.body}
+
+Before </body>
+--------------
+${sections.scripts}
 
 Reduced motion: under prefers-reduced-motion: reduce, animations stay off
 until the scene root also has class "${MS_MOTION_OK_CLASS}" (set by the
@@ -255,6 +284,8 @@ per live instance.
 Edit again in MotionSketch
 --------------------------
 Open ${WEB_PACKAGE_PROJECT_NAME} with MotionSketch (Project → Open project).
+${WEB_PACKAGE_README_NAME} is instructions only; ${WEB_PACKAGE_PROJECT_NAME} is
+for reopening — neither is required to run the embedded animation.
 
 Generated by MotionSketch. Do not hand-edit selectors unless you also update
 ${WEB_PACKAGE_CSS_NAME} to match.
@@ -274,18 +305,38 @@ function formatInitOptionsLiteral(ctlOpts: TriggerControllerOptions): string {
   }`
 }
 
-function buildCompleteHostExample(args: {
+function buildFolderLayoutText(assetHrefs: string[]): string {
+  const hasAssets = assetHrefs.length > 0
+  return `  ${WEB_PACKAGE_HTML_NAME}       optional local preview (or use your own page)
+  ${WEB_PACKAGE_CSS_NAME}
+  ${WEB_PACKAGE_TRIGGER_JS_NAME}
+${hasAssets ? '  assets/           image files used by the scene\n' : ''}  ${WEB_PACKAGE_README_NAME}       instructions only — not required to run
+  ${WEB_PACKAGE_PROJECT_NAME}    reopen in MotionSketch — not required to run`
+}
+
+function buildPlayButtonHelp(): string {
+  return (
+    'The included [data-ms-play] button starts as “Play animation”. After the ' +
+    'scene has played it becomes “Replay” (restarts from the beginning). With ' +
+    'prefers-reduced-motion it stays “Play animation” until pressed (that ' +
+    `opt-in adds "${MS_MOTION_OK_CLASS}" and starts motion). It does not pause; ` +
+    'Pause / Resume appear only when the package offers them (looping scenes, ' +
+    'or long automatic page-load / viewport scenes).'
+  )
+}
+
+function buildHostExampleSections(args: {
   scope: ExportScope
   markup: string
   initOptionsLiteral: string
   aspectCss: string
-}): string {
+}): WebPackageHostSections {
   const { scope, markup, initOptionsLiteral, aspectCss } = args
   const indentedMarkup = markup
     .split('\n')
     .map((line) => (line.length ? `    ${line}` : line))
     .join('\n')
-  return `<link rel="stylesheet" href="${WEB_PACKAGE_CSS_NAME}">
+  const head = `<link rel="stylesheet" href="${WEB_PACKAGE_CSS_NAME}">
 <style>
   /* Host sizing — required. Aspect matches the MotionSketch project. */
   .ms-embed-frame {
@@ -295,16 +346,14 @@ function buildCompleteHostExample(args: {
     width: 100%;
     aspect-ratio: ${aspectCss};
   }
-</style>
-
-<div data-ms-demo-shell class="ms-embed">
+</style>`
+  const body = `<div data-ms-demo-shell class="ms-embed">
   <div class="ms-embed-frame">
 ${indentedMarkup}
   </div>
   <button type="button" data-ms-play>Play animation</button>
-</div>
-
-<script src="${WEB_PACKAGE_TRIGGER_JS_NAME}"></script>
+</div>`
+  const scripts = `<script src="${WEB_PACKAGE_TRIGGER_JS_NAME}"></script>
 <script>
 (function () {
   var api = window.MotionSketchTrigger;
@@ -314,6 +363,15 @@ ${indentedMarkup}
   api.init(root, ${initOptionsLiteral});
 })();
 </script>`
+  return { head, body, scripts }
+}
+
+function joinHostExampleSections(sections: WebPackageHostSections): string {
+  return `${sections.head}
+
+${sections.body}
+
+${sections.scripts}`
 }
 
 /**
@@ -348,6 +406,12 @@ export function describeWebPackageIntegration(
     WEB_PACKAGE_TRIGGER_JS_NAME,
     ...assetHrefs,
   ]
+  const sections = buildHostExampleSections({
+    scope,
+    markup,
+    initOptionsLiteral,
+    aspectCss,
+  })
   return {
     ok: true,
     scope,
@@ -355,12 +419,10 @@ export function describeWebPackageIntegration(
     assetHrefs,
     requiredFiles,
     markup,
-    completeExample: buildCompleteHostExample({
-      scope,
-      markup,
-      initOptionsLiteral,
-      aspectCss,
-    }),
+    completeExample: joinHostExampleSections(sections),
+    sections,
+    folderLayout: buildFolderLayoutText(assetHrefs),
+    playButtonHelp: buildPlayButtonHelp(),
     initOptions: ctlOpts,
     initOptionsLiteral,
   }
