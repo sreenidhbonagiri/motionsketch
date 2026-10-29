@@ -143,4 +143,8 @@ textarea.css-export-code {
     white-space: nowrap;
     border-width: 0;
   }
+  /* Drop reserved status-slot height when the status itself is sr-only. */
+  [data-testid='playback-dock'] [data-testid='dock-status-slot'] {
+    min-height: 0;
+  }
 }

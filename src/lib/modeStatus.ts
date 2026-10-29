@@ -33,10 +33,42 @@ export const ADD_POINT_PLACEMENT_FINE =
 export const ADD_POINT_PLACEMENT_COARSE =
   'The ghost sits on the sample that will become the handle. Tap near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
 
-/** Armed-record guidance — same drag verb for mouse, touch, and SR/keyboard focus. */
-export const ARMED_INSTRUCTION = 'Drag the actor to draw its path.'
+/**
+ * Armed-record guidance — same drag verb for mouse, touch, and SR/keyboard focus.
+ * Shown in the dock as “Ready — …” and re-announced when empty-canvas drag misses.
+ */
+export const ARMED_INSTRUCTION = 'Drag the element to record.'
 
 export const ARMED_ANNOUNCEMENT = `Ready — ${ARMED_INSTRUCTION}`
+
+/** Visible + live-region copy after an armed empty-canvas miss (mode stays armed). */
+export const ARMED_MISS_INSTRUCTION = ARMED_INSTRUCTION
+
+/** Live-region copy while a replace take is in progress. */
+export const RECORDING_ANNOUNCEMENT = 'Recording'
+
+/** Live-region copy while a continue-path take is in progress. */
+export const RECORDING_CONTINUATION_ANNOUNCEMENT = 'Recording continuation'
+
+/**
+ * Mode/chrome announcements that belong on the dock / live region only —
+ * not Project file-status UI.
+ */
+export function isRecordingChromeAnnouncement(message: string): boolean {
+  if (
+    message === RECORDING_ANNOUNCEMENT ||
+    message === RECORDING_CONTINUATION_ANNOUNCEMENT ||
+    message === ARMED_ANNOUNCEMENT ||
+    message === ARMED_MISS_INSTRUCTION ||
+    message === ARMED_INSTRUCTION ||
+    message === CONTINUE_PATH_ANNOUNCEMENT
+  ) {
+    return true
+  }
+  // Continue-armed dock copy (“Continue — …”) shares the Ready pattern.
+  if (message.startsWith('Ready — ')) return true
+  return false
+}
 
 /**
  * Why Edit path is unavailable while playing.
