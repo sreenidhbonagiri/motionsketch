@@ -163,6 +163,9 @@ test.describe('web package export', () => {
     expect(readme).toContain('assets/asset-01.png')
     expect(readme).toContain('MotionSketchTrigger.init')
     expect(readme).toContain('ms-trigger.js')
+    expect(readme).toContain('data-ms-demo-shell')
+    expect(readme).toContain('data-ms-play')
+    expect(readme).toMatch(/does not\s+include the editor path overlay/i)
 
     const unzipped = unzipSync(new Uint8Array(readFileSync(zipPath!)))
     const assetNames = Object.keys(unzipped).filter((k) =>

@@ -108,13 +108,7 @@ function buildPackageReadme(args: {
     ? 'Pause is offered in the preview (looping, or automatic trigger longer than 5s). Host sites can call pause()/resume() on the controller.'
     : 'Pause is omitted in the preview for this short non-looping scene; host sites can still call pause()/resume() if needed.'
 
-  const triggerSection = needsJs
-    ? `Playback trigger: ${trigger}
--------------------
-This scene waits with class "${MS_WAITING_CLASS}" until activated.
-Include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call:
-
-  MotionSketchTrigger.init(root, {
+  const initOptionsLiteral = `{
     mode: "${trigger}",
     loop: ${ctlOpts.loop ? 'true' : 'false'},
     durationMs: ${ctlOpts.durationMs},
@@ -123,9 +117,16 @@ Include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call:
     viewportThreshold: ${ctlOpts.viewportThreshold},
     actorSelector: ${JSON.stringify(ctlOpts.actorSelector)},
     offerPause: ${ctlOpts.offerPause ? 'true' : 'false'}
-  });
+  }`
 
-API: play(), pause(), resume(), restart(), destroy().
+  const triggerSection = needsJs
+    ? `Playback trigger: ${trigger}
+-------------------
+This scene waits with class "${MS_WAITING_CLASS}" until activated.
+Include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call MotionSketchTrigger.init (see
+Embed below for a complete copyable example).
+
+API: play(), pause(), resume(), restart(), destroy(), get(root).
 init() twice on the same root replaces the previous instance (no duplicate
 listeners). destroy() removes listeners, observers, and the registry entry.
 Loop/alternate settings still apply after the scene starts; a looping scene
@@ -136,10 +137,17 @@ root is visible; without IntersectionObserver it waits for Play.
 `
     : `Playback trigger: page-load
 -----------------------
-CSS animations start on their own. ${WEB_PACKAGE_TRIGGER_JS_NAME} is still
-included for Replay / reduced-motion Play / pause controls in the preview.
+CSS animations start on their own when prefers-reduced-motion is off.
+Still include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call MotionSketchTrigger.init
+when you embed — required for Replay, reduced-motion Play (adds
+"${MS_MOTION_OK_CLASS}"), and pause()/resume() on host pages.
 ${pauseNote}
 `
+
+  const indentedMarkup = markup
+    .split('\n')
+    .map((line) => (line.length ? `    ${line}` : line))
+    .join('\n')
 
   return `MotionSketch web package
 =======================
@@ -153,6 +161,12 @@ Waiting class (armed triggers): ${MS_WAITING_CLASS}
 
 This folder is self-contained. It does not need MotionSketch, a build step,
 or network access.
+
+What the export includes
+------------------------
+Actors, motion, and (when present) image files under assets/. It does not
+include the editor path overlay, stage grid, selection chrome, or playback
+dock — those stay in MotionSketch only.
 
 Package contents
 ----------------
@@ -177,31 +191,74 @@ Preview locally
 
 Embed in an existing website
 ----------------------------
-1. Copy ${WEB_PACKAGE_CSS_NAME}${needsJs ? `, ${WEB_PACKAGE_TRIGGER_JS_NAME},` : ''} and the assets/
-   folder (if present) next to your page, or adjust href paths.
-2. Add the stylesheet:
+Copy these next to your page (keep relative paths, or update href/src):
 
-   <link rel="stylesheet" href="${WEB_PACKAGE_CSS_NAME}">
-${
-  needsJs
-    ? `
-3. Add the controller:
+  - ${WEB_PACKAGE_CSS_NAME}
+  - ${WEB_PACKAGE_TRIGGER_JS_NAME}
+  - assets/   (if listed above)
 
-   <script src="${WEB_PACKAGE_TRIGGER_JS_NAME}"></script>
-`
-    : ''
-}
-${needsJs ? '4' : '3'}. Paste this markup (selectors match ${WEB_PACKAGE_CSS_NAME}):
+Give .${scope.stageClass} an explicit size. Exported rules use container query
+units (cqw / cqh / cqmin); without a width (and height or aspect-ratio) the
+stage can collapse.
 
-${markup}
+Automatic Play / Replay binding looks for [data-ms-play] under the scene
+root's parent, or anywhere inside the nearest ancestor with
+data-ms-demo-shell (same pattern as ${WEB_PACKAGE_HTML_NAME}). Put your Play
+control inside that shell, or call the controller API yourself (below).
 
-${needsJs ? '5' : '4'}. Size the stage with CSS as needed. The exported rules use container query
-   units (cqw / cqh / cqmin) on .${scope.stageClass}.
+Complete example (responsive wrapper + init — works for page-load too):
 
-${needsJs ? '6' : '5'}. Image <img> tags already point at the packaged files listed above.
+<link rel="stylesheet" href="${WEB_PACKAGE_CSS_NAME}">
+<style>
+  /* Host sizing — required. Tune max-width / aspect to your layout. */
+  .ms-embed-frame {
+    width: min(100%, 40rem);
+  }
+  .ms-embed-frame .${scope.stageClass} {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+  }
+</style>
 
-${needsJs ? '7' : '6'}. Reduced motion: under prefers-reduced-motion: reduce, animations stay off
-   until the scene root also has class "${MS_MOTION_OK_CLASS}".
+<div data-ms-demo-shell class="ms-embed">
+  <div class="ms-embed-frame">
+${indentedMarkup}
+  </div>
+  <button type="button" data-ms-play>Play animation</button>
+</div>
+
+<script src="${WEB_PACKAGE_TRIGGER_JS_NAME}"></script>
+<script>
+(function () {
+  var api = window.MotionSketchTrigger;
+  if (!api || typeof api.init !== 'function') return;
+  var root = document.querySelector('[data-ms-scene="${scope.sceneId}"]');
+  if (!root) return;
+  api.init(root, ${initOptionsLiteral});
+})();
+</script>
+
+Reduced motion: under prefers-reduced-motion: reduce, animations stay off
+until the scene root also has class "${MS_MOTION_OK_CLASS}" (set by the
+bound Play control or by controller.play() / restart()).
+
+Play button outside data-ms-demo-shell
+-------------------------------------
+Do not rely on [data-ms-play] outside the shell — it will not auto-bind.
+Keep the controller returned by init (or call get later) and wire your own
+control:
+
+<script>
+(function () {
+  var api = window.MotionSketchTrigger;
+  var root = document.querySelector('[data-ms-scene="${scope.sceneId}"]');
+  var ctl = api.init(root, ${initOptionsLiteral});
+  document.querySelector('#my-play').addEventListener('click', function () {
+    ctl.play(); // reduced-motion opt-in + play / replay from the start
+  });
+  // Later, from another script: api.get(root).restart();
+})();
+</script>
 
 Multiple scenes on one page
 ---------------------------

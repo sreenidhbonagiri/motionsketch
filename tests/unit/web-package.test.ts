@@ -169,6 +169,13 @@ describe('web package export', () => {
     expect(readme).toContain('MotionSketchTrigger.init')
     expect(readme).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
     expect(readme).toContain(WEB_PACKAGE_PROJECT_NAME)
+    expect(readme).toContain('data-ms-demo-shell')
+    expect(readme).toContain('data-ms-play')
+    expect(readme).toContain('ms-embed-frame')
+    expect(readme).toContain('aspect-ratio')
+    expect(readme).toContain('api.get(root)')
+    expect(readme).toMatch(/does not\s+include the editor path overlay/i)
+    expect(readme).toContain('Play button outside data-ms-demo-shell')
 
     const parsed = parseSnapshotJson(projectJson)
     expect(parsed.ok).toBe(true)
@@ -223,5 +230,34 @@ describe('web package export', () => {
     const htmlB = strFromU8(unzipSync(b.zip)[WEB_PACKAGE_HTML_NAME])
     expect(htmlB).toContain(b.scope.rootClass)
     expect(htmlB).not.toContain(`class="${a.scope.rootClass}"`)
+  })
+
+  it('page-load README still documents trigger JS, shell binding, and stage sizing', () => {
+    const project = makeProject({
+      name: 'Page load pack',
+      actors: [makeActor({ recording: makeRecording(10) })],
+      playback: {
+        durationMs: 2400,
+        loop: false,
+        loopMode: 'repeat',
+        trigger: 'page-load',
+      },
+    })
+    const packed = buildWebPackage(project)
+    expect(packed.ok).toBe(true)
+    if (!packed.ok) return
+    const readme = strFromU8(
+      packed.files.find((f) => f.path === WEB_PACKAGE_README_NAME)!.bytes,
+    )
+    expect(readme).toContain('Playback trigger: page-load')
+    expect(readme).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
+    expect(readme).toContain('MotionSketchTrigger.init')
+    expect(readme).toContain('data-ms-demo-shell')
+    expect(readme).toContain('data-ms-play')
+    expect(readme).toContain(`mode: "page-load"`)
+    expect(readme).toContain('Play button outside data-ms-demo-shell')
+    expect(readme).toContain('ctl.play()')
+    expect(readme).toMatch(/aspect-ratio:\s*16\s*\/\s*10/)
+    expect(readme).toMatch(/does not\s+include the editor path overlay/i)
   })
 })
