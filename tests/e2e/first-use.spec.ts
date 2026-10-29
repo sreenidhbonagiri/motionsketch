@@ -20,12 +20,15 @@ test.describe('first-use guidance and export wording', () => {
     await ensureEditor(page)
 
     const record = page.getByTestId('btn-record')
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    await expect(page.getByTestId('first-use-headline')).toHaveText(
+      'Draw motion. Ship it to your website.',
+    )
+    await expect(page.getByTestId('first-use-next-step')).toHaveText(
+      'Click Record, then drag the actor.',
     )
     await expect(record).toHaveAttribute('aria-describedby', 'stage-empty-hint')
-    await expect(page.getByTestId('examples-empty-hint')).toBeVisible()
     await expect(page.getByTestId('btn-try-example')).toBeVisible()
+    await expect(page.getByTestId('dock-editing')).toHaveCount(0)
 
     await record.click()
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
@@ -62,12 +65,13 @@ test.describe('first-use guidance and export wording', () => {
     await page.goto('/')
     await ensureEditor(page)
 
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    await expect(page.getByTestId('first-use-headline')).toHaveText(
+      'Draw motion. Ship it to your website.',
     )
-    await expect(page.getByTestId('examples-empty-hint')).toContainText(
-      /Try an example/i,
+    await expect(page.getByTestId('first-use-next-step')).toHaveText(
+      'Click Record, then drag the actor.',
     )
+    await expect(page.getByTestId('btn-try-example')).toBeVisible()
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-empty')).toContainText(
       /Create a path \(Record, Import SVG, or a Motion preset\)/i,
@@ -203,8 +207,11 @@ test.describe('first-use guidance and export wording', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    await expect(page.getByTestId('first-use-headline')).toHaveText(
+      'Draw motion. Ship it to your website.',
+    )
+    await expect(page.getByTestId('first-use-next-step')).toHaveText(
+      'Click Record, then drag the actor.',
     )
 
     await page.getByTestId('btn-record').click()
@@ -215,9 +222,9 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
 
     await page.getByTestId('btn-stop').click()
-    await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    await expect(page.getByTestId('first-use-headline')).toBeVisible()
+    await expect(page.getByTestId('first-use-next-step')).toHaveText(
+      'Click Record, then drag the actor.',
     )
 
     await recordSimplePath(page)

@@ -7,6 +7,7 @@ import {
   serializeSnapshot,
 } from '../../src/core/persist/document'
 import { evaluateTransform } from '../../src/core/transform'
+import { buildHtmlDemoFromProject } from '../../src/core/export/htmlDemo'
 import { EXAMPLE_CATALOG } from '../../src/examples/catalog'
 import {
   cloneExampleProject,
@@ -171,5 +172,50 @@ describe('starter examples', () => {
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
     expect(parsed.snapshot.project.actors[0].appearance.kind).toBe('image')
+  })
+
+  it('paper plane is a hero composition with Face along path', () => {
+    const loaded = loadExampleSnapshot('paper-plane')
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    const project = loaded.snapshot.project
+    expect(project.actors).toHaveLength(2)
+    // Plane first so applyPersistedSnapshot selects it for Record / Edit path.
+    expect(project.actors[0]?.id).toBe('ex-plane')
+    const headline = project.actors.find((a) => a.id === 'ex-plane-headline')!
+    const plane = project.actors.find((a) => a.id === 'ex-plane')!
+    expect(headline.appearance.kind).toBe('text')
+    expect(headline.appearance.text?.content).toMatch(/Ship the motion/i)
+    expect(headline.recording).toBeNull()
+    expect(plane.appearance.kind).toBe('image')
+    expect(plane.faceAlongPath).toBe(true)
+    expect(plane.directionOffsetDeg).toBe(43)
+    expect(plane.recording?.samples.length).toBeGreaterThan(8)
+    const image = plane.appearance.image!
+    expect(image.mimeType).toBe('image/png')
+    expect(image.dataUrl).toMatch(/^data:image\/png;base64,/)
+    expect(image.naturalWidth).toBeGreaterThan(0)
+    expect(image.naturalHeight).toBeGreaterThan(0)
+    expect(image.naturalWidth / image.naturalHeight).toBeGreaterThan(1)
+    const path = selectProcessedPathForActor(project, plane, {
+      geometryEdit: null,
+      editSession: null,
+      editPreview: null,
+    })
+    const start = evaluate(path, 0)
+    const mid = evaluate(path, 0.5)
+    const end = evaluate(path, 1)
+    expect(end.x).toBeGreaterThan(start.x)
+    expect(start.x).toBeLessThan(headline.restPosition.x)
+    expect(end.x).toBeGreaterThan(headline.restPosition.x)
+    expect(Math.hypot(mid.x - start.x, mid.y - start.y)).toBeGreaterThan(0.05)
+
+    useEditorStore.getState().applyPersistedSnapshot(loaded.snapshot)
+    expect(useEditorStore.getState().selectedActorId).toBe('ex-plane')
+
+    const html = buildHtmlDemoFromProject(project)
+    expect(html).toContain('Ship the motion.')
+    expect(html).toMatch(/background:\s*transparent/)
+    expect(html).toMatch(/data:image\/png;base64,/)
   })
 })

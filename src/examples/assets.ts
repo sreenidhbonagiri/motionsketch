@@ -1,4 +1,9 @@
 import type { ActorImage } from '../core/types'
+import {
+  PAPER_PLANE_PNG_DATA_URL,
+  PAPER_PLANE_PNG_NATURAL_HEIGHT,
+  PAPER_PLANE_PNG_NATURAL_WIDTH,
+} from './paperPlanePngData'
 
 /**
  * Original MotionSketch mark — geometric “M” on a rounded tile.
@@ -23,5 +28,16 @@ export function createMotionSketchMarkImage(): ActorImage {
     naturalWidth: 128,
     naturalHeight: 128,
     label: 'MotionSketch mark',
+  }
+}
+
+/** Fresh paper-plane image each call — never share a mutable object across loads. */
+export function createPaperPlaneImage(): ActorImage {
+  return {
+    mimeType: 'image/png',
+    dataUrl: PAPER_PLANE_PNG_DATA_URL,
+    naturalWidth: PAPER_PLANE_PNG_NATURAL_WIDTH,
+    naturalHeight: PAPER_PLANE_PNG_NATURAL_HEIGHT,
+    label: 'Paper plane',
   }
 }

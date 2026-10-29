@@ -12,10 +12,13 @@ test.describe('named project entry', () => {
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
       'Untitled project',
     )
-    await expect(page.getByTestId('stage-empty-hint')).toContainText(
+    await expect(page.getByTestId('first-use-headline')).toHaveText(
+      'Draw motion. Ship it to your website.',
+    )
+    await expect(page.getByTestId('first-use-next-step')).toContainText(
       /drag the actor/i,
     )
-    await expect(page.getByTestId('examples-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('btn-try-example')).toBeVisible()
     await expect(page.getByTestId('header-save-status')).toHaveCount(0)
 
     const storage = await page.evaluate(() =>

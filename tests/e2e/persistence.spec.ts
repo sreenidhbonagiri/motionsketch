@@ -147,8 +147,11 @@ test.describe('project persistence', () => {
 
     await expect(page.getByTestId('export-panel')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeDisabled()
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    await expect(page.getByTestId('first-use-headline')).toHaveText(
+      'Draw motion. Ship it to your website.',
+    )
+    await expect(page.getByTestId('first-use-next-step')).toHaveText(
+      'Click Record, then drag the actor.',
     )
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
@@ -244,8 +247,11 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('duration-value')).toHaveText('1.20 s')
     await expect(page.getByTestId('loop-toggle')).not.toBeChecked()
-    await expect(page.getByTestId('stage-empty-hint')).toHaveText(
-      'Draw a path to make CSS motion for your site — click Record, then drag the actor.',
+    await expect(page.getByTestId('first-use-headline')).toHaveText(
+      'Draw motion. Ship it to your website.',
+    )
+    await expect(page.getByTestId('first-use-next-step')).toHaveText(
+      'Click Record, then drag the actor.',
     )
   })
 

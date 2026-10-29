@@ -23,9 +23,10 @@ test.describe('starter examples', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
-    await expect(page.getByTestId('examples-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('first-use-headline')).toBeVisible()
     await page.getByTestId('btn-dismiss-examples-hint').click()
-    await expect(page.getByTestId('examples-empty-hint')).toHaveCount(0)
+    await expect(page.getByTestId('first-use-headline')).toHaveCount(0)
+    await expect(page.getByTestId('stage-empty-hint')).toHaveClass(/sr-only/)
 
     const storageBefore = await page.evaluate(() =>
       localStorage.getItem('motionsketch.project.v1'),
@@ -158,6 +159,45 @@ test.describe('starter examples', () => {
     await expect(page.getByTestId('btn-rename-project')).toContainText(
       'Follow the leader',
     )
+  })
+
+  test('paper plane loads with face-along path and exports HTML', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await openExamples(page)
+    await expect(page.getByTestId('example-thumb-paper-plane')).toBeVisible()
+    await page.getByTestId('btn-use-paper-plane').click()
+    await expect(page.getByTestId('btn-rename-project')).toContainText(
+      'Paper plane',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    // Plane is first in the scene graph — selected on load for Record / Edit.
+    await expect(page.getByTestId('actor')).toHaveAttribute(
+      'data-actor-kind',
+      'image',
+    )
+    await expect(page.getByTestId('actor')).toHaveAccessibleName(/Paper plane/i)
+    await ensureActorListExpanded(page)
+    await expect(page.locator('[data-testid^="actor-list-item-"]')).toHaveCount(
+      2,
+    )
+    await openPanel(page, 'appearance')
+    await expect(page.getByTestId('face-along-path-toggle')).toBeChecked()
+    await page.keyboard.press('Escape')
+
+    await openPanel(page, 'export')
+    await expandExportOtherWays(page)
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-html-demo').click()
+    const download = await downloadPromise
+    const html = readFileSync((await download.path())!, 'utf8')
+    expect(html).toContain('<title>Paper plane</title>')
+    expect(html).toContain('Ship the motion.')
+    expect(html).toContain('@keyframes')
+    expect(html).toMatch(/data:image\/png;base64,/)
+    expect(html).toMatch(/background:\s*transparent/)
   })
 
   test('gallery is keyboard accessible', async ({ page }) => {

@@ -38,11 +38,27 @@ export const ARMED_INSTRUCTION = 'Drag the actor to draw its path.'
 
 export const ARMED_ANNOUNCEMENT = `Ready — ${ARMED_INSTRUCTION}`
 
-export const EMPTY_BOARD_RECORD_HINT_FINE =
-  'Draw a path to make CSS motion for your site — click Record, then drag the actor.'
+/**
+ * Why Edit path is unavailable while playing.
+ * Shown via the disabled control’s tooltip / accessible description — not as a
+ * visible dock status row (avoids docking layout shift on Play/Pause).
+ */
+export const PLAYING_EDIT_PATH_HINT = 'Pause before editing the path.'
 
-export const EMPTY_BOARD_RECORD_HINT_COARSE =
-  'Draw a path to make CSS motion for your site — tap Record, then drag the actor.'
+/** First-use intro headline (empty board). */
+export const FIRST_USE_HEADLINE = 'Draw motion. Ship it to your website.'
+
+/** Next-step line under the headline — fine pointer (mouse). */
+export const FIRST_USE_NEXT_STEP_FINE = 'Click Record, then drag the actor.'
+
+/** Next-step line under the headline — coarse pointer (touch). */
+export const FIRST_USE_NEXT_STEP_COARSE = 'Tap Record, then drag the actor.'
+
+/** Accessible Record/Play empty-board help (same wording as the intro next step). */
+export const EMPTY_BOARD_RECORD_HINT_FINE = FIRST_USE_NEXT_STEP_FINE
+
+/** Accessible Record/Play empty-board help — coarse pointer. */
+export const EMPTY_BOARD_RECORD_HINT_COARSE = FIRST_USE_NEXT_STEP_COARSE
 
 /** After a path exists — next step toward using the motion on a website. */
 export const AFTER_PATH_WEBSITE_HINT =
@@ -184,13 +200,7 @@ export function resolveModeStatus(input: {
     }
   }
 
-  if (mode === 'playing') {
-    return {
-      kind: 'info',
-      label: '',
-      instruction: 'Pause before editing the path.',
-    }
-  }
-
+  // Playing: no dock status row — keeps paused/playing layout stable.
+  // Edit-path help lives on the disabled control (see PLAYING_EDIT_PATH_HINT).
   return null
 }
