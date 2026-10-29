@@ -246,10 +246,24 @@ test.describe('first-use guidance and export wording', () => {
       'true',
     )
     await expect(page.getByTestId('export-guide-html')).toBeVisible()
-    await expect(page.getByTestId('export-html-host-example')).toBeVisible()
+    await expect(page.getByTestId('export-html-folder-layout')).toContainText(
+      'animation.css',
+    )
+    await expect(page.getByTestId('export-html-section-head-code')).toBeVisible()
+    await expect(page.getByTestId('export-html-section-body-code')).toBeVisible()
+    await expect(
+      page.getByTestId('export-html-section-scripts-code'),
+    ).toBeVisible()
     await expect(page.getByTestId('btn-download-web-package')).toHaveText(
       'Download for your website',
     )
+    await expect(page.getByTestId('export-trigger-regen-help')).toContainText(
+      /Changing the trigger updates the generated embed code/i,
+    )
+    await expect(page.getByTestId('export-play-button-help')).toContainText(
+      /Replay/i,
+    )
+    await expect(page.getByTestId('btn-export-path-files')).toHaveCount(0)
     const websiteHelp = page.getByTestId('export-web-package-help')
     await expect(websiteHelp).toContainText(
       /ZIP with a working index\.html preview/i,
@@ -302,15 +316,20 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-own-element')).toBeHidden()
     await expect(page.getByTestId('btn-export-download-project')).toBeHidden()
 
-    // Visual order: Add to your website → playback trigger → Advanced exports.
-    const primaryBox = await page.getByTestId('export-primary').boundingBox()
+    // Visual order: download → playback trigger → HTML sections → Advanced.
+    const downloadBox = await page.getByTestId('btn-download-web-package').boundingBox()
     const triggerBox = await page.getByTestId('export-trigger-select').boundingBox()
+    const headSectionBox = await page
+      .getByTestId('export-html-section-head')
+      .boundingBox()
     const otherBox = await otherWays.boundingBox()
-    expect(primaryBox).toBeTruthy()
+    expect(downloadBox).toBeTruthy()
     expect(triggerBox).toBeTruthy()
+    expect(headSectionBox).toBeTruthy()
     expect(otherBox).toBeTruthy()
-    expect(primaryBox!.y).toBeLessThan(triggerBox!.y)
-    expect(triggerBox!.y).toBeLessThan(otherBox!.y)
+    expect(downloadBox!.y).toBeLessThan(triggerBox!.y)
+    expect(triggerBox!.y).toBeLessThan(headSectionBox!.y)
+    expect(headSectionBox!.y).toBeLessThan(otherBox!.y)
   })
 
   test('Advanced exports expands to CSS, own-element, and project file', async ({
@@ -323,7 +342,7 @@ test.describe('first-use guidance and export wording', () => {
 
     await expect(page.getByTestId('btn-export-path-html')).toBeVisible()
     await expect(page.getByTestId('btn-export-path-react')).toBeVisible()
-    await expect(page.getByTestId('btn-export-path-files')).toBeVisible()
+    await expect(page.getByTestId('btn-export-path-files')).toHaveCount(0)
 
     await expandExportOtherWays(page)
     await expect(page.getByTestId('export-embed-advanced')).toContainText(
@@ -406,20 +425,21 @@ test.describe('first-use guidance and export wording', () => {
       expect(tabOrder.at(-1)).toBe('btn-close-export')
       const htmlPathIdx = tabOrder.indexOf('btn-export-path-html')
       const reactPathIdx = tabOrder.indexOf('btn-export-path-react')
-      const filesPathIdx = tabOrder.indexOf('btn-export-path-files')
       const webIdx = tabOrder.indexOf('btn-download-web-package')
       const triggerIdx = tabOrder.indexOf('export-trigger-select')
       const previewIdx = tabOrder.indexOf('btn-preview-trigger')
+      const copyHeadIdx = tabOrder.indexOf('btn-copy-html-section-head')
       const otherIdx = tabOrder.indexOf('export-other-ways-summary')
       const closeIdx = tabOrder.indexOf('btn-close-export')
       expect(htmlPathIdx).toBe(0)
       expect(reactPathIdx).toBeGreaterThan(htmlPathIdx)
-      expect(filesPathIdx).toBeGreaterThan(reactPathIdx)
-      expect(webIdx).toBeGreaterThan(filesPathIdx)
+      expect(webIdx).toBeGreaterThan(reactPathIdx)
       expect(triggerIdx).toBeGreaterThan(webIdx)
       expect(previewIdx).toBeGreaterThan(triggerIdx)
-      expect(otherIdx).toBeGreaterThan(previewIdx)
+      expect(copyHeadIdx).toBeGreaterThan(previewIdx)
+      expect(otherIdx).toBeGreaterThan(copyHeadIdx)
       expect(closeIdx).toBeGreaterThan(otherIdx)
+      expect(tabOrder.indexOf('btn-export-path-files')).toBe(-1)
       // Collapsed Advanced: CSS / own-element not in the tab order yet.
       // React download lives under the React path tab (not selected).
       expect(tabOrder.indexOf('btn-download-react-package')).toBe(-1)
@@ -588,7 +608,7 @@ test.describe('first-use guidance and export wording', () => {
     })
   }
 
-  test('format chooser highlight and content switch together for HTML → React → files', async ({
+  test('format chooser highlight and content switch together for HTML → React', async ({
     page,
   }) => {
     await page.goto('/')
@@ -597,12 +617,12 @@ test.describe('first-use guidance and export wording', () => {
     await openPanel(page, 'export')
 
     const assertPath = async (
-      path: 'html' | 'react' | 'files',
+      path: 'html' | 'react',
       guideTestId: string,
     ) => {
       await page.getByTestId(`btn-export-path-${path}`).click()
       await expect(page.getByTestId(guideTestId)).toBeVisible()
-      for (const id of ['html', 'react', 'files'] as const) {
+      for (const id of ['html', 'react'] as const) {
         const selected = id === path
         const tab = page.getByTestId(`btn-export-path-${id}`)
         await expect(tab).toHaveAttribute(
@@ -636,14 +656,11 @@ test.describe('first-use guidance and export wording', () => {
       await expect(page.getByTestId('export-guide-react')).toHaveCount(
         path === 'react' ? 1 : 0,
       )
-      await expect(page.getByTestId('export-guide-files')).toHaveCount(
-        path === 'files' ? 1 : 0,
-      )
+      await expect(page.getByTestId('export-guide-files')).toHaveCount(0)
     }
 
     await assertPath('html', 'export-guide-html')
     await assertPath('react', 'export-guide-react')
-    await assertPath('files', 'export-guide-files')
     await assertPath('html', 'export-guide-html')
   })
 

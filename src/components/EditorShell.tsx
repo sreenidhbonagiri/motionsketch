@@ -529,7 +529,7 @@ export function EditorShell() {
                   className="text-sm text-slate-500"
                 >
                   Create a path (Record, Import SVG, or a Motion preset) to add
-                  the animation to your website (HTML, React, or download files)
+                  the animation to your website (HTML or React)
                   — or open Advanced exports for CSS-only, your own HTML, and the
                   project file.
                 </p>

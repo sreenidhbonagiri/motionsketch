@@ -33,7 +33,8 @@ import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
 
 type OwnCopyKind = 'css' | 'html' | 'react' | 'trigger'
-type WebsitePath = 'html' | 'react' | 'files'
+type WebsitePath = 'html' | 'react'
+type HtmlSectionCopy = 'head' | 'body' | 'scripts'
 
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
@@ -50,7 +51,10 @@ export function ExportPanel() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [websitePath, setWebsitePath] = useState<WebsitePath>('html')
   const [webDownloadSuccess, setWebDownloadSuccess] = useState(false)
-  const [htmlExampleCopied, setHtmlExampleCopied] = useState(false)
+  const [htmlSectionCopied, setHtmlSectionCopied] =
+    useState<HtmlSectionCopy | null>(null)
+  const triggerRegenHelpId = useId()
+  const playButtonHelpId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const previewRef = useRef<HTMLDialogElement>(null)
   const viewBtnRef = useRef<HTMLButtonElement>(null)
@@ -245,13 +249,20 @@ export function ExportPanel() {
     })
   }
 
-  const copyHtmlExample = async () => {
+  const copyHtmlSection = async (section: HtmlSectionCopy) => {
     if (!websiteIntegration || !websiteIntegration.ok) return
-    const ok = await copyText(websiteIntegration.completeExample)
+    const text = websiteIntegration.sections[section]
+    const ok = await copyText(text)
     if (!ok) return
-    setHtmlExampleCopied(true)
-    window.setTimeout(() => setHtmlExampleCopied(false), 1500)
-    announce('HTML host example copied.')
+    setHtmlSectionCopied(section)
+    window.setTimeout(() => setHtmlSectionCopied(null), 1500)
+    const label =
+      section === 'head'
+        ? 'In <head>'
+        : section === 'body'
+          ? 'Body placement'
+          : 'Before </body>'
+    announce(`${label} snippet copied.`)
   }
 
   const downloadReactPackage = () => {
@@ -437,14 +448,13 @@ export function ExportPanel() {
         <div
           role="tablist"
           aria-label="Website integration path"
-          className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+          className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
           data-testid="export-website-path-tabs"
         >
           {(
             [
               ['html', 'HTML website'],
               ['react', 'React'],
-              ['files', 'Download files'],
             ] as const
           ).map(([id, label]) => {
             const selected = websitePath === id
@@ -512,72 +522,13 @@ export function ExportPanel() {
                 : ''}
               . Downloading does not publish anything.
             </p>
-            <ol
-              data-testid="export-html-steps"
-              className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600"
-            >
-              <li>
-                Unzip and keep <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
-                <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
-                {websiteIntegration?.ok &&
-                websiteIntegration.assetHrefs.length > 0
-                  ? ', and the assets/ folder'
-                  : ''}{' '}
-                together.
-              </li>
-              <li>
-                Preview by opening <code>{WEB_PACKAGE_HTML_NAME}</code> from the
-                unzipped folder.
-              </li>
-              <li>
-                On your site, copy those files next to your page (or update
-                paths), then paste the complete host example below — markup,
-                sizing, Play/Replay, and reduced-motion for this project
-                {websiteIntegration?.ok
-                  ? ` (stage aspect ${websiteIntegration.aspectCss})`
-                  : ''}
-                .
-              </li>
-            </ol>
-            <p
-              data-testid="export-html-required-files"
-              className="text-[11px] leading-relaxed text-slate-500"
-            >
-              Required files match the ZIP:{' '}
-              <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
-              <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
-              {websiteIntegration?.ok &&
-              websiteIntegration.assetHrefs.length > 0
-                ? `, ${websiteIntegration.assetHrefs.join(', ')}`
-                : ''}
-              .
-            </p>
             {websiteIntegration?.ok ? (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-medium text-slate-800">
-                    Complete host example
-                  </p>
-                  <button
-                    type="button"
-                    data-testid="btn-copy-html-host-example"
-                    onClick={() => void copyHtmlExample()}
-                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    {htmlExampleCopied ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
-                <textarea
-                  data-testid="export-html-host-example"
-                  readOnly
-                  spellCheck={false}
-                  wrap="off"
-                  value={websiteIntegration.completeExample}
-                  className="h-36 w-full resize-y rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
-                />
-              </div>
-            ) : websiteIntegration && !websiteIntegration.ok ? (
-              <p className="text-[11px] text-amber-800">{websiteIntegration.error}</p>
+              <pre
+                data-testid="export-html-folder-layout"
+                className="overflow-x-auto rounded-md border border-slate-100 bg-slate-50 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-slate-700 whitespace-pre"
+              >
+                {websiteIntegration.folderLayout}
+              </pre>
             ) : null}
           </div>
         )}
@@ -614,134 +565,210 @@ export function ExportPanel() {
               trigger script, and a Vite React README. Same motion as the HTML
               package. Downloading does not publish anything.
             </p>
+          </div>
+        )}
+
+        <div className="space-y-2" data-testid="export-playback-settings">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-slate-800">
+              Playback trigger
+            </span>
+            <select
+              data-testid="export-trigger-select"
+              value={trigger}
+              aria-describedby={describedBy(triggerHelpId, triggerRegenHelpId)}
+              onChange={(e) => onTriggerChange(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+            >
+              {PLAYBACK_TRIGGERS.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode === 'page-load'
+                    ? 'Page load'
+                    : mode === 'click'
+                      ? 'Click / tap'
+                      : mode === 'hover'
+                        ? 'Hover / focus'
+                        : 'Enter viewport'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p
+            id={triggerHelpId}
+            data-testid="export-trigger-help"
+            className="text-[11px] leading-relaxed text-slate-500"
+          >
+            {triggerHelpText(trigger)}
+            {triggerNeedsJavaScript(trigger)
+              ? ' Download CSS is CSS-only — this trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
+              : ' Download CSS works alone for page-load.'}{' '}
+            Loop / alternate still apply after the scene starts.
+          </p>
+          <p
+            id={triggerRegenHelpId}
+            data-testid="export-trigger-regen-help"
+            className="text-[11px] leading-relaxed text-slate-500"
+          >
+            Changing the trigger updates the generated embed code below.
+            Copy the sections again (and download a fresh ZIP if you need the
+            package files) after you change it.
+          </p>
+          {websitePath === 'html' && websiteIntegration?.ok ? (
+            <p
+              id={playButtonHelpId}
+              data-testid="export-play-button-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              {websiteIntegration.playButtonHelp}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            data-testid="btn-preview-trigger"
+            onClick={openTriggerPreview}
+            disabled={busy}
+            aria-describedby={describedBy(
+              previewTriggerHelpId,
+              busy && packagingHelpId,
+            )}
+            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Preview trigger
+          </button>
+          <p
+            id={previewTriggerHelpId}
+            className="text-[11px] leading-relaxed text-slate-500"
+          >
+            Isolated export preview — does not change the editor playhead,
+            recording, or undo history.
+          </p>
+        </div>
+
+        {websitePath === 'html' && (
+          <div
+            data-testid="export-html-integration"
+            className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
+          >
             <ol
-              data-testid="export-react-steps"
+              data-testid="export-html-steps"
               className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600"
             >
               <li>
-                Unzip <strong>all</strong> files into a folder in your Vite React
-                app (for example <code>src/motionsketch/</code>). The archive is
-                flat — do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code>{' '}
-                at the project root.
+                Unzip the package. Keep <code>{WEB_PACKAGE_HTML_NAME}</code>,{' '}
+                <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+                <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
+                {websiteIntegration?.ok &&
+                websiteIntegration.assetHrefs.length > 0
+                  ? ', and assets/'
+                  : ''}{' '}
+                together as shown above.
               </li>
               <li>
-                Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
-                <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
-                <code>assets/</code> files beside the component.
+                Preview by opening <code>{WEB_PACKAGE_HTML_NAME}</code>, or copy
+                those files next to your page and paste the three sections
+                below
+                {websiteIntegration?.ok
+                  ? ` (stage aspect ${websiteIntegration.aspectCss})`
+                  : ''}
+                .
               </li>
               <li>
-                Import and render{' '}
-                <code>{`{ MotionSketchScene }`}</code> from{' '}
-                <code>{REACT_PACKAGE_COMPONENT_NAME}</code> (see the package{' '}
-                <code>README.md</code> for a full <code>main.tsx</code> example).
+                <code>README.txt</code> is instructions;{' '}
+                <code>project.json</code> reopens the project in MotionSketch.
+                Neither is required to run the embedded animation.
               </li>
             </ol>
+            <p
+              data-testid="export-html-required-files"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              Required to run:{' '}
+              <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+              <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
+              {websiteIntegration?.ok &&
+              websiteIntegration.assetHrefs.length > 0
+                ? `, ${websiteIntegration.assetHrefs.join(', ')}`
+                : ''}
+              .
+            </p>
+            {websiteIntegration?.ok ? (
+              (
+                [
+                  ['head', 'In <head>', websiteIntegration.sections.head],
+                  [
+                    'body',
+                    'Where you want the animation, inside <body>',
+                    websiteIntegration.sections.body,
+                  ],
+                  [
+                    'scripts',
+                    'Before </body>',
+                    websiteIntegration.sections.scripts,
+                  ],
+                ] as const
+              ).map(([id, label, value]) => (
+                <div
+                  key={id}
+                  data-testid={`export-html-section-${id}`}
+                  className="space-y-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium text-slate-800">
+                      {label}
+                    </p>
+                    <button
+                      type="button"
+                      data-testid={`btn-copy-html-section-${id}`}
+                      onClick={() => void copyHtmlSection(id)}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      {htmlSectionCopied === id ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <textarea
+                    data-testid={`export-html-section-${id}-code`}
+                    readOnly
+                    spellCheck={false}
+                    wrap="off"
+                    value={value}
+                    aria-label={label}
+                    className="h-28 w-full resize-y rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
+                  />
+                </div>
+              ))
+            ) : websiteIntegration && !websiteIntegration.ok ? (
+              <p className="text-[11px] text-amber-800">
+                {websiteIntegration.error}
+              </p>
+            ) : null}
           </div>
         )}
 
-        {websitePath === 'files' && (
-          <div
-            id="export-guide-files"
-            role="tabpanel"
-            data-testid="export-guide-files"
-            className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
+        {websitePath === 'react' && (
+          <ol
+            data-testid="export-react-steps"
+            className="list-decimal space-y-1.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 pl-6 text-[11px] leading-relaxed text-slate-600"
           >
-            <button
-              type="button"
-              data-testid="btn-download-web-package"
-              onClick={downloadWebPackage}
-              disabled={busy}
-              aria-busy={packaging === 'web'}
-              aria-describedby={describedBy(
-                packageStatusId,
-                'export-files-help',
-                webDownloadSuccess && downloadSuccessId,
-                busy && packagingHelpId,
-              )}
-              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {packaging === 'web'
-                ? 'Building website package…'
-                : 'Download for your website'}
-            </button>
-            <p
-              id="export-files-help"
-              className="text-[11px] leading-relaxed text-slate-500"
-              data-testid="export-files-help"
-            >
-              Same website ZIP as HTML — includes a working{' '}
-              <code>{WEB_PACKAGE_HTML_NAME}</code> preview. Downloading does not
-              publish anything.
-            </p>
-            <p className="text-[11px] font-medium text-slate-800">
-              Download files
-            </p>
-            <p className="text-[11px] leading-relaxed text-slate-600">
-              Use this when you already know the filenames. For step-by-step
-              embed instructions, switch to HTML website.
-            </p>
-          </div>
+            <li>
+              Unzip <strong>all</strong> files into a folder in your Vite React
+              app (for example <code>src/motionsketch/</code>). The archive is
+              flat — do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code> at
+              the project root.
+            </li>
+            <li>
+              Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
+              <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
+              <code>assets/</code> files beside the component.
+            </li>
+            <li>
+              Import and render <code>{`{ MotionSketchScene }`}</code> from{' '}
+              <code>{REACT_PACKAGE_COMPONENT_NAME}</code> (see the package{' '}
+              <code>README.md</code> for a full <code>main.tsx</code> example).
+            </li>
+          </ol>
         )}
 
       </section>
-
-      <div className="space-y-2">
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-slate-800">
-            Playback trigger
-          </span>
-          <select
-            data-testid="export-trigger-select"
-            value={trigger}
-            aria-describedby={triggerHelpId}
-            onChange={(e) => onTriggerChange(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
-          >
-            {PLAYBACK_TRIGGERS.map((mode) => (
-              <option key={mode} value={mode}>
-                {mode === 'page-load'
-                  ? 'Page load'
-                  : mode === 'click'
-                    ? 'Click / tap'
-                    : mode === 'hover'
-                      ? 'Hover / focus'
-                      : 'Enter viewport'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p
-          id={triggerHelpId}
-          data-testid="export-trigger-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          {triggerHelpText(trigger)}
-          {triggerNeedsJavaScript(trigger)
-            ? ' Download CSS is CSS-only — this trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
-            : ' Download CSS works alone for page-load.'}{' '}
-          Loop / alternate still apply after the scene starts.
-        </p>
-        <button
-          type="button"
-          data-testid="btn-preview-trigger"
-          onClick={openTriggerPreview}
-          disabled={busy}
-          aria-describedby={describedBy(
-            previewTriggerHelpId,
-            busy && packagingHelpId,
-          )}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Preview trigger
-        </button>
-        <p
-          id={previewTriggerHelpId}
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          Isolated export preview — does not change the editor playhead,
-          recording, or undo history.
-        </p>
-      </div>
 
       <details
         data-testid="export-other-ways"

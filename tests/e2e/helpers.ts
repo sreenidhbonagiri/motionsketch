@@ -351,10 +351,10 @@ export async function clickContinuePath(page: Page) {
   await btn.click()
 }
 
-/** Select Add to your website path tab (html | react | files). */
+/** Select Add to your website path tab (html | react). */
 export async function selectExportWebsitePath(
   page: Page,
-  path: 'html' | 'react' | 'files',
+  path: 'html' | 'react',
 ) {
   await page.getByTestId(`btn-export-path-${path}`).click()
   await expect(page.getByTestId(`btn-export-path-${path}`)).toHaveAttribute(

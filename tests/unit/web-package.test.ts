@@ -288,7 +288,33 @@ describe('web package export', () => {
     if (!guide.ok) return
     expect(guide.aspectCss).toBe(expected)
     expect(guide.completeExample).toContain(`aspect-ratio: ${expected}`)
+    expect(guide.sections.head).toContain(`aspect-ratio: ${expected}`)
+    expect(guide.sections.head).toContain(`href="${WEB_PACKAGE_CSS_NAME}"`)
+    expect(guide.sections.body).toContain('data-ms-demo-shell')
+    expect(guide.sections.body).toContain('data-ms-play')
+    expect(guide.sections.scripts).toContain(
+      `src="${WEB_PACKAGE_TRIGGER_JS_NAME}"`,
+    )
+    expect(guide.sections.scripts).toContain('window.MotionSketchTrigger')
+    expect(guide.sections.scripts).toContain('api.init')
+    expect(guide.completeExample).toBe(
+      `${guide.sections.head}\n\n${guide.sections.body}\n\n${guide.sections.scripts}`,
+    )
+    expect(guide.folderLayout).toContain(WEB_PACKAGE_HTML_NAME)
+    expect(guide.folderLayout).toContain(WEB_PACKAGE_CSS_NAME)
+    expect(guide.folderLayout).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
+    expect(guide.folderLayout).toMatch(/README\.txt.*instructions only/i)
+    expect(guide.folderLayout).toMatch(/project\.json.*reopen/i)
+    expect(guide.playButtonHelp).toMatch(/Replay/)
     expect(guide.requiredFiles).toContain(WEB_PACKAGE_CSS_NAME)
     expect(guide.requiredFiles).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
+
+    expect(readme).toContain('In <head>')
+    expect(readme).toContain('Where you want the animation, inside <body>')
+    expect(readme).toContain('Before </body>')
+    expect(readme).toContain(guide.sections.head)
+    expect(readme).toContain(guide.sections.body)
+    expect(readme).toContain(guide.sections.scripts)
+    expect(readme).toMatch(/neither is required to run the embedded animation/i)
   })
 })
