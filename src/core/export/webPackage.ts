@@ -170,10 +170,11 @@ root is visible; without IntersectionObserver it waits for Play.
 `
     : `Playback trigger: page-load
 -----------------------
-CSS animations start on their own when prefers-reduced-motion is off.
-Still include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call MotionSketchTrigger.init
-when you embed — required for Replay, reduced-motion Play (adds
-"${MS_MOTION_OK_CLASS}"), and pause()/resume() on host pages.
+For page-load, CSS alone can start the motion when prefers-reduced-motion is
+off. The documented website integration still includes
+${WEB_PACKAGE_TRIGGER_JS_NAME} and MotionSketchTrigger.init so Play/Replay,
+reduced-motion Play (adds "${MS_MOTION_OK_CLASS}"), and pause()/resume() work
+on host pages. Download CSS alone skips that controller.
 Changing the trigger in MotionSketch updates the generated code — copy or
 download again afterward.
 ${pauseNote}
@@ -215,6 +216,8 @@ Preview locally
 ---------------
 1. Keep this folder together (do not move files out of place).
 2. Open ${WEB_PACKAGE_HTML_NAME} in a browser (double-click or File → Open).
+   That file is a self-contained preview page (layout and controls). The three
+   embed sections below are the equivalent pieces to paste into an existing page.
 3. The preview links ${WEB_PACKAGE_CSS_NAME}, ${WEB_PACKAGE_TRIGGER_JS_NAME},
    and any files under assets/ with relative paths.
 4. ${playButtonHelp}
@@ -225,8 +228,9 @@ Preview locally
 Embed in an existing website
 ----------------------------
 Copy ${WEB_PACKAGE_CSS_NAME}, ${WEB_PACKAGE_TRIGGER_JS_NAME}, and assets/ (if
-listed) next to your page — same layout as above. Paste the three sections
-into your HTML (paths assume that arrangement).
+listed) next to your page — same layout as above (paths assume that
+arrangement). Paste each section where its label indicates, in the order shown.
+Initialization goes after the scene markup, before </body>.
 
 Give .${scope.stageClass} an explicit size. Exported rules use container query
 units (cqw / cqh / cqmin); without a width (and height or aspect-ratio) the
@@ -247,8 +251,8 @@ Where you want the animation, inside <body>
 -------------------------------------------
 ${sections.body}
 
-Before </body>
---------------
+Before </body> (after the scene markup)
+---------------------------------------
 ${sections.scripts}
 
 Reduced motion: under prefers-reduced-motion: reduce, animations stay off

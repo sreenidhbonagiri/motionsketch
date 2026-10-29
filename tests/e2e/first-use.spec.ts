@@ -295,7 +295,25 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-trigger-select')).toBeVisible()
     await expect(page.getByTestId('btn-preview-trigger')).toBeVisible()
     await expect(page.getByTestId('export-trigger-help')).toContainText(
-      'Download CSS works alone for page-load',
+      /CSS alone can start the motion/i,
+    )
+    await expect(page.getByTestId('export-trigger-help')).toContainText(
+      /ms-trigger\.js/i,
+    )
+    await expect(page.getByTestId('btn-preview-trigger')).toHaveText(
+      'Test playback behavior',
+    )
+    await expect(page.getByTestId('export-preview-trigger-help')).toContainText(
+      /isolated preview of the selected start setting/i,
+    )
+    await expect(page.getByTestId('export-html-paste-order')).toContainText(
+      'Paste each section where its label indicates, in the order shown.',
+    )
+    await expect(page.getByTestId('export-html-section-scripts')).toContainText(
+      /after the scene markup/i,
+    )
+    await expect(page.getByTestId('export-html-steps')).toContainText(
+      /self-contained preview page/i,
     )
     await page.getByTestId('export-trigger-select').selectOption('click')
     await expect(page.getByTestId('export-trigger-help')).toContainText(
