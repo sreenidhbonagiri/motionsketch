@@ -7,9 +7,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { buildReactPackage } from '../../src/core/export/reactPackage'
 import { createSceneActor } from '../../src/core/sceneActor'
 import type { PlaybackTrigger, Project } from '../../src/core/types'
-import { ensureEditor, openPanel, recordSimplePath,
-  expandExportOtherWays,
-} from './helpers'
+import { ensureEditor, openPanel, recordSimplePath } from './helpers'
 import {
   makeActor,
   makeProject,
@@ -305,7 +303,7 @@ test.describe('react package export', () => {
     await ensureEditor(page, 'React zip')
     await recordSimplePath(page)
     await openPanel(page, 'export')
-    await expandExportOtherWays(page)
+    await page.getByTestId('btn-export-path-react').click()
     await expect(page.getByTestId('btn-download-react-package')).toBeVisible()
     const downloadPromise = page.waitForEvent('download')
     await page.getByTestId('btn-download-react-package').click()

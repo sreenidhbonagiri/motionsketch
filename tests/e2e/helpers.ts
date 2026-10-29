@@ -351,7 +351,19 @@ export async function clickContinuePath(page: Page) {
   await btn.click()
 }
 
-/** Expand Export → Other ways (React, CSS, own-element, project file). */
+/** Select Add to your website path tab (html | react | files). */
+export async function selectExportWebsitePath(
+  page: Page,
+  path: 'html' | 'react' | 'files',
+) {
+  await page.getByTestId(`btn-export-path-${path}`).click()
+  await expect(page.getByTestId(`btn-export-path-${path}`)).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+}
+
+/** Expand Export → Advanced exports (CSS, own-element, project file). */
 export async function expandExportOtherWays(page: Page) {
   const details = page.getByTestId('export-other-ways')
   await expect(details).toBeVisible()
@@ -361,7 +373,17 @@ export async function expandExportOtherWays(page: Page) {
   if (!open) {
     const summary = page.getByTestId('export-other-ways-summary')
     await scrollExportScrollerToCenter(summary)
+    // Prefer a real summary click (a11y path). If the taller “Add to your
+    // website” guide leaves the hit target flaky under parallel Firefox/
+    // WebKit load, force the details open so Advanced exports stay reachable.
     await summary.click()
+    if (
+      !(await details.evaluate((el) => (el as HTMLDetailsElement).open))
+    ) {
+      await details.evaluate((el) => {
+        ;(el as HTMLDetailsElement).open = true
+      })
+    }
   }
   await expect
     .poll(() =>

@@ -2,8 +2,19 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildProjectCssExport } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
 import { buildOwnElementExport } from '../core/export/ownElement'
-import { buildReactPackage } from '../core/export/reactPackage'
-import { buildWebPackage } from '../core/export/webPackage'
+import {
+  buildReactPackage,
+  REACT_PACKAGE_COMPONENT_NAME,
+  REACT_PACKAGE_CSS_NAME,
+  REACT_PACKAGE_TRIGGER_JS_NAME,
+} from '../core/export/reactPackage'
+import {
+  buildWebPackage,
+  describeWebPackageIntegration,
+  WEB_PACKAGE_CSS_NAME,
+  WEB_PACKAGE_HTML_NAME,
+  WEB_PACKAGE_TRIGGER_JS_NAME,
+} from '../core/export/webPackage'
 import {
   PLAYBACK_TRIGGERS,
   coercePlaybackTrigger,
@@ -22,6 +33,7 @@ import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
 
 type OwnCopyKind = 'css' | 'html' | 'react' | 'trigger'
+type WebsitePath = 'html' | 'react' | 'files'
 
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
@@ -36,16 +48,22 @@ export function ExportPanel() {
   const [actionStatus, setActionStatus] = useState<string | null>(null)
   const [packaging, setPackaging] = useState<null | 'web' | 'react'>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [websitePath, setWebsitePath] = useState<WebsitePath>('html')
+  const [webDownloadSuccess, setWebDownloadSuccess] = useState(false)
+  const [htmlExampleCopied, setHtmlExampleCopied] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const previewRef = useRef<HTMLDialogElement>(null)
   const viewBtnRef = useRef<HTMLButtonElement>(null)
   const codeRef = useRef<HTMLTextAreaElement>(null)
+  const htmlGuideRef = useRef<HTMLDivElement>(null)
+  const downloadSuccessRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const packageStatusId = useId()
   const reactPackageStatusId = useId()
   const triggerHelpId = useId()
   const previewTitleId = useId()
   const embedHeadingId = useId()
+  const websiteLimitsId = useId()
   const ownElementHeadingId = useId()
   const ownElementHelpId = useId()
   const projectHeadingId = useId()
@@ -59,6 +77,15 @@ export function ExportPanel() {
   const htmlDemoHelpId = useId()
   const packagingHelpId = useId()
   const ownElementTriggerHelpId = useId()
+  const downloadSuccessId = useId()
+
+  useEffect(() => {
+    if (!webDownloadSuccess) return
+    downloadSuccessRef.current?.scrollIntoView({
+      block: 'nearest',
+      behavior: 'smooth',
+    })
+  }, [webDownloadSuccess])
 
   const describedBy = (...ids: Array<string | false | null | undefined>) => {
     const list = ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -79,6 +106,11 @@ export function ExportPanel() {
     if (!hasExport) return null
     return buildOwnElementExport(project, selectedActorId)
   }, [project, selectedActorId, hasExport])
+
+  const websiteIntegration = useMemo(() => {
+    if (!hasExport) return null
+    return describeWebPackageIntegration(project)
+  }, [project, hasExport])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -169,12 +201,14 @@ export function ExportPanel() {
   const downloadWebPackage = () => {
     if (packaging) return
     setPackaging('web')
-    setActionStatus('Building web package…')
+    setWebDownloadSuccess(false)
+    setActionStatus('Building website package…')
     // Yield so the busy state paints before ZIP work.
     window.setTimeout(() => {
       try {
         const result = buildWebPackage(project)
         if (!result.ok) {
+          setWebDownloadSuccess(false)
           announce(result.error)
           return
         }
@@ -186,16 +220,38 @@ export function ExportPanel() {
           stampProjectFilename(`${project.name}-web`, 'zip'),
         )
         if (ok) {
-          announce('Web package download started.')
+          setWebDownloadSuccess(true)
+          setActionStatus(null)
+          const message =
+            'Website package download started. Unzip the folder and open index.html to preview.'
+          announceAction(message)
           return
         }
-        announce('Could not download the web package.')
+        setWebDownloadSuccess(false)
+        announce('Could not download the website package.')
       } catch {
-        announce('Couldn’t build the web package.')
+        setWebDownloadSuccess(false)
+        announce('Couldn’t build the website package.')
       } finally {
         setPackaging(null)
       }
     }, 0)
+  }
+
+  const showHtmlIntegration = () => {
+    setWebsitePath('html')
+    requestAnimationFrame(() => {
+      htmlGuideRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    })
+  }
+
+  const copyHtmlExample = async () => {
+    if (!websiteIntegration || !websiteIntegration.ok) return
+    const ok = await copyText(websiteIntegration.completeExample)
+    if (!ok) return
+    setHtmlExampleCopied(true)
+    window.setTimeout(() => setHtmlExampleCopied(false), 1500)
+    announce('HTML host example copied.')
   }
 
   const downloadReactPackage = () => {
@@ -311,41 +367,294 @@ export function ExportPanel() {
       ) : null}
 
       <section
-        className="space-y-2"
+        className="space-y-3"
         data-testid="export-primary"
         aria-labelledby={embedHeadingId}
-        aria-describedby={packageStatusId}
+        aria-describedby={describedBy(websiteLimitsId, packageStatusId)}
       >
-        <h3
-          id={embedHeadingId}
-          className="text-xs font-semibold text-slate-900"
+        <div className="space-y-1.5">
+          <h3
+            id={embedHeadingId}
+            className="text-xs font-semibold text-slate-900"
+          >
+            Add to your website
+          </h3>
+          <p
+            id={websiteLimitsId}
+            data-testid="export-website-limits"
+            className="text-[11px] leading-relaxed text-slate-500"
+          >
+            You need access to your site’s code (HTML/CSS/JS or a React app).
+            This does not install into WordPress or Webflow, and downloading does
+            not publish anything.
+          </p>
+          <p id={packageStatusId} className="sr-only" data-testid="export-web-package-help">
+            ZIP with a working index.html preview and files to add the animation
+            to your site. Downloading does not publish anything.
+          </p>
+        </div>
+
+        {webDownloadSuccess ? (
+          <div
+            ref={downloadSuccessRef}
+            id={downloadSuccessId}
+            data-testid="export-download-success"
+            role="status"
+            className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/80 px-2.5 py-2"
+          >
+            <p
+              data-testid="export-download-success-title"
+              className="text-[11px] font-medium text-teal-950"
+            >
+              Website package download started.
+            </p>
+            <p
+              data-testid="export-download-success-hint"
+              className="text-[11px] leading-relaxed text-teal-900/90"
+            >
+              Unzip the folder and open index.html to preview.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid="btn-export-view-integration"
+                onClick={showHtmlIntegration}
+                className="rounded-md bg-teal-900 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-teal-800"
+              >
+                View integration instructions
+              </button>
+              <button
+                type="button"
+                data-testid="btn-dismiss-download-success"
+                onClick={() => setWebDownloadSuccess(false)}
+                className="rounded-md border border-teal-200 bg-white px-2.5 py-1 text-[11px] font-medium text-teal-900 transition hover:bg-teal-50"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div
+          role="tablist"
+          aria-label="Website integration path"
+          className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+          data-testid="export-website-path-tabs"
         >
-          Download for your website
-        </h3>
-        <button
-          type="button"
-          data-testid="btn-download-web-package"
-          onClick={downloadWebPackage}
-          disabled={busy}
-          aria-busy={packaging === 'web'}
-          aria-describedby={describedBy(
-            packageStatusId,
-            busy && packagingHelpId,
-          )}
-          className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {packaging === 'web'
-            ? 'Building website package…'
-            : 'Download for your website'}
-        </button>
-        <p
-          id={packageStatusId}
-          data-testid="export-web-package-help"
-          className="text-[11px] leading-relaxed text-slate-500"
-        >
-          ZIP with a working <code>index.html</code> preview and files to add the
-          animation to your site. Downloading does not publish anything.
-        </p>
+          {(
+            [
+              ['html', 'HTML website'],
+              ['react', 'React'],
+              ['files', 'Download files'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              data-testid={`btn-export-path-${id}`}
+              aria-selected={websitePath === id}
+              onClick={() => setWebsitePath(id)}
+              className={`rounded-md px-1.5 py-1.5 text-[11px] font-medium transition ${
+                websitePath === id
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {websitePath === 'html' && (
+          <div
+            ref={htmlGuideRef}
+            data-testid="export-guide-html"
+            className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
+          >
+            <p className="text-[11px] font-medium text-slate-800">
+              HTML website
+            </p>
+            <ol className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600">
+              <li>
+                Download the website package (ZIP). Keep{' '}
+                <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+                <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
+                {websiteIntegration?.ok &&
+                websiteIntegration.assetHrefs.length > 0
+                  ? ', and the assets/ folder'
+                  : ''}{' '}
+                together.
+              </li>
+              <li>
+                Preview by opening <code>{WEB_PACKAGE_HTML_NAME}</code> from the
+                unzipped folder.
+              </li>
+              <li>
+                On your site, copy those files next to your page (or update
+                paths), then paste the complete host example below — it includes
+                markup, sizing, Play/Replay, and reduced-motion setup for this
+                project
+                {websiteIntegration?.ok
+                  ? ` (stage aspect ${websiteIntegration.aspectCss})`
+                  : ''}
+                .
+              </li>
+            </ol>
+            <p
+              data-testid="export-html-required-files"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              Required files match the ZIP:{' '}
+              <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+              <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
+              {websiteIntegration?.ok &&
+              websiteIntegration.assetHrefs.length > 0
+                ? `, ${websiteIntegration.assetHrefs.join(', ')}`
+                : ''}
+              .
+            </p>
+            <button
+              type="button"
+              data-testid="btn-download-web-package"
+              onClick={downloadWebPackage}
+              disabled={busy}
+              aria-busy={packaging === 'web'}
+              aria-describedby={describedBy(
+                packageStatusId,
+                webDownloadSuccess && downloadSuccessId,
+                busy && packagingHelpId,
+              )}
+              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {packaging === 'web'
+                ? 'Building website package…'
+                : 'Download for your website'}
+            </button>
+            {websiteIntegration?.ok ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium text-slate-800">
+                    Complete host example
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="btn-copy-html-host-example"
+                    onClick={() => void copyHtmlExample()}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {htmlExampleCopied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+                <textarea
+                  data-testid="export-html-host-example"
+                  readOnly
+                  spellCheck={false}
+                  wrap="off"
+                  value={websiteIntegration.completeExample}
+                  className="h-36 w-full resize-y rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
+                />
+              </div>
+            ) : websiteIntegration && !websiteIntegration.ok ? (
+              <p className="text-[11px] text-amber-800">{websiteIntegration.error}</p>
+            ) : null}
+          </div>
+        )}
+
+        {websitePath === 'react' && (
+          <div
+            data-testid="export-guide-react"
+            className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
+          >
+            <p className="text-[11px] font-medium text-slate-800">React</p>
+            <ol className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600">
+              <li>
+                Download the React package ZIP and unzip{' '}
+                <strong>all</strong> files into a folder in your Vite React app
+                (for example <code>src/motionsketch/</code>). The archive is flat —
+                do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code> at the
+                project root.
+              </li>
+              <li>
+                Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
+                <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
+                <code>assets/</code> files beside the component.
+              </li>
+              <li>
+                Import and render{' '}
+                <code>{`{ MotionSketchScene }`}</code> from{' '}
+                <code>{REACT_PACKAGE_COMPONENT_NAME}</code> (see the package{' '}
+                <code>README.md</code> for a full <code>main.tsx</code> example).
+              </li>
+            </ol>
+            <p
+              id={reactPackageStatusId}
+              data-testid="export-react-package-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images, trigger
+              script, and a Vite React README. Same motion as the HTML package.
+              Downloading does not publish anything.
+            </p>
+            <button
+              type="button"
+              data-testid="btn-download-react-package"
+              onClick={downloadReactPackage}
+              disabled={busy}
+              aria-busy={packaging === 'react'}
+              aria-describedby={describedBy(
+                reactPackageStatusId,
+                busy && packagingHelpId,
+              )}
+              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {packaging === 'react'
+                ? 'Building React package…'
+                : 'Download React package'}
+            </button>
+          </div>
+        )}
+
+        {websitePath === 'files' && (
+          <div
+            data-testid="export-guide-files"
+            className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
+          >
+            <p className="text-[11px] font-medium text-slate-800">
+              Download files
+            </p>
+            <p className="text-[11px] leading-relaxed text-slate-600">
+              Get the website ZIP first if you have not already. It includes a
+              working <code>{WEB_PACKAGE_HTML_NAME}</code> preview plus the files
+              listed under HTML website.
+            </p>
+            <p
+              className="text-[11px] leading-relaxed text-slate-500"
+              data-testid="export-files-help"
+            >
+              Same package as HTML website. Downloading does not publish
+              anything.
+            </p>
+            <button
+              type="button"
+              data-testid="btn-download-web-package"
+              onClick={downloadWebPackage}
+              disabled={busy}
+              aria-busy={packaging === 'web'}
+              aria-describedby={describedBy(
+                packageStatusId,
+                webDownloadSuccess && downloadSuccessId,
+                busy && packagingHelpId,
+              )}
+              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {packaging === 'web'
+                ? 'Building website package…'
+                : 'Download for your website'}
+            </button>
+          </div>
+        )}
+
       </section>
 
       <div className="space-y-2">
@@ -414,7 +723,7 @@ export function ExportPanel() {
           data-testid="export-other-ways-summary"
           className="cursor-pointer list-outside px-2.5 py-2 text-xs font-semibold text-slate-800 marker:text-slate-400"
         >
-          Other ways
+          Advanced exports
         </summary>
         <div className="space-y-4 border-t border-slate-100 px-2.5 py-3">
           <section
@@ -422,31 +731,6 @@ export function ExportPanel() {
             data-testid="export-goal-embed"
             aria-labelledby={advancedHeadingId}
           >
-            <button
-              type="button"
-              data-testid="btn-download-react-package"
-              onClick={downloadReactPackage}
-              disabled={busy}
-              aria-busy={packaging === 'react'}
-              aria-describedby={describedBy(
-                reactPackageStatusId,
-                busy && packagingHelpId,
-              )}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {packaging === 'react'
-                ? 'Building React package…'
-                : 'Download React package'}
-            </button>
-            <p
-              id={reactPackageStatusId}
-              data-testid="export-react-package-help"
-              className="text-[11px] leading-relaxed text-slate-500"
-            >
-              ZIP with MotionSketchScene.tsx, scoped CSS, images, trigger script,
-              and a Vite React README.
-            </p>
-
             <div
               data-testid="export-embed-advanced"
               className="space-y-2 rounded-lg border border-slate-100 bg-white/80 px-2.5 py-2"

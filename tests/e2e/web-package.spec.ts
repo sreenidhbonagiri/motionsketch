@@ -137,14 +137,29 @@ test.describe('web package export', () => {
     await page.getByTestId('btn-download-web-package').click()
     const download = await downloadPromise
     expect(download.suggestedFilename()).toMatch(/web-pack-web-.*\.zip/)
-    await expect(page.getByTestId('export-action-status')).toHaveText(
-      'Web package download started.',
+    await expect(page.getByTestId('export-download-success-title')).toHaveText(
+      'Website package download started.',
+    )
+    await expect(page.getByTestId('export-download-success-hint')).toHaveText(
+      'Unzip the folder and open index.html to preview.',
+    )
+    await expect(page.getByTestId('btn-export-view-integration')).toBeVisible()
+    await expect(page.getByTestId('action-live-region')).toContainText(
+      'Website package download started.',
     )
     await expect(page.getByTestId('btn-download-web-package')).toBeEnabled()
     await expect(page.getByTestId('btn-download-web-package')).toHaveAttribute(
       'aria-busy',
       'false',
     )
+    await page.getByTestId('btn-export-view-integration').click()
+    await expect(page.getByTestId('btn-export-path-html')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(page.getByTestId('export-guide-html')).toBeVisible()
+    await page.getByTestId('btn-dismiss-download-success').click()
+    await expect(page.getByTestId('export-download-success')).toHaveCount(0)
 
     const zipPath = await download.path()
     expect(zipPath).toBeTruthy()

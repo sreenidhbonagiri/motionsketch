@@ -77,10 +77,10 @@ test.describe('first-use guidance and export wording', () => {
       /Create a path \(Record, Import SVG, or a Motion preset\)/i,
     )
     await expect(page.getByTestId('export-empty')).toContainText(
-      /download a website package/i,
+      /add the animation to your website/i,
     )
     await expect(page.getByTestId('export-empty')).toContainText(
-      /Other ways/i,
+      /Advanced exports/i,
     )
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('svg-path-import-help')).toContainText(
@@ -236,14 +236,23 @@ test.describe('first-use guidance and export wording', () => {
 
     await openPanel(page, 'export')
     await expect(page.getByTestId('export-primary')).toContainText(
-      'Download for your website',
+      'Add to your website',
     )
+    await expect(page.getByTestId('export-website-limits')).toContainText(
+      /does not install into WordPress or Webflow/i,
+    )
+    await expect(page.getByTestId('btn-export-path-html')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(page.getByTestId('export-guide-html')).toBeVisible()
+    await expect(page.getByTestId('export-html-host-example')).toBeVisible()
     await expect(page.getByTestId('btn-download-web-package')).toHaveText(
       'Download for your website',
     )
     const websiteHelp = page.getByTestId('export-web-package-help')
-    await expect(websiteHelp).toHaveText(
-      'ZIP with a working index.html preview and files to add the animation to your site. Downloading does not publish anything.',
+    await expect(websiteHelp).toContainText(
+      /ZIP with a working index\.html preview/i,
     )
     await expect(page.getByTestId('btn-download-web-package')).toHaveAttribute(
       'aria-describedby',
@@ -261,6 +270,14 @@ test.describe('first-use guidance and export wording', () => {
       expect(text.length, `empty describedby target ${id}`).toBeGreaterThan(0)
     }
 
+    await page.getByTestId('btn-export-path-react').click()
+    await expect(page.getByTestId('export-guide-react')).toBeVisible()
+    await expect(page.getByTestId('btn-download-react-package')).toBeVisible()
+    await expect(page.getByTestId('export-react-package-help')).toContainText(
+      /MotionSketchScene\.tsx/i,
+    )
+    await page.getByTestId('btn-export-path-html').click()
+
     await expect(page.getByTestId('export-trigger-select')).toBeVisible()
     await expect(page.getByTestId('btn-preview-trigger')).toBeVisible()
     await expect(page.getByTestId('export-trigger-help')).toContainText(
@@ -275,18 +292,17 @@ test.describe('first-use guidance and export wording', () => {
     const otherWays = page.getByTestId('export-other-ways')
     await expect(otherWays).toBeVisible()
     await expect(page.getByTestId('export-other-ways-summary')).toHaveText(
-      'Other ways',
+      'Advanced exports',
     )
     await expect
       .poll(() => otherWays.evaluate((el) => (el as HTMLDetailsElement).open))
       .toBe(false)
-    await expect(page.getByTestId('btn-download-react-package')).toBeHidden()
     await expect(page.getByTestId('btn-download-css')).toBeHidden()
     await expect(page.getByTestId('btn-download-html-demo')).toBeHidden()
     await expect(page.getByTestId('export-own-element')).toBeHidden()
     await expect(page.getByTestId('btn-export-download-project')).toBeHidden()
 
-    // Visual order: website download → playback trigger → Other ways.
+    // Visual order: Add to your website → playback trigger → Advanced exports.
     const primaryBox = await page.getByTestId('export-primary').boundingBox()
     const triggerBox = await page.getByTestId('export-trigger-select').boundingBox()
     const otherBox = await otherWays.boundingBox()
@@ -297,7 +313,7 @@ test.describe('first-use guidance and export wording', () => {
     expect(triggerBox!.y).toBeLessThan(otherBox!.y)
   })
 
-  test('Other ways expands to React, CSS, own-element, and project file', async ({
+  test('Advanced exports expands to CSS, own-element, and project file', async ({
     page,
   }) => {
     await page.goto('/')
@@ -305,11 +321,11 @@ test.describe('first-use guidance and export wording', () => {
     await recordSimplePath(page)
     await openPanel(page, 'export')
 
+    await expect(page.getByTestId('btn-export-path-html')).toBeVisible()
+    await expect(page.getByTestId('btn-export-path-react')).toBeVisible()
+    await expect(page.getByTestId('btn-export-path-files')).toBeVisible()
+
     await expandExportOtherWays(page)
-    await expect(page.getByTestId('btn-download-react-package')).toBeVisible()
-    await expect(page.getByTestId('export-react-package-help')).toContainText(
-      /MotionSketchScene\.tsx/i,
-    )
     await expect(page.getByTestId('export-embed-advanced')).toContainText(
       'CSS and offline preview',
     )
@@ -336,22 +352,18 @@ test.describe('first-use guidance and export wording', () => {
     )
 
     const webBox = await page.getByTestId('btn-download-web-package').boundingBox()
-    const reactBox = await page
-      .getByTestId('btn-download-react-package')
-      .boundingBox()
     const cssBox = await page.getByTestId('btn-download-css').boundingBox()
     const htmlBox = await page.getByTestId('btn-download-html-demo').boundingBox()
     const ownBox = await page.getByTestId('export-own-element').boundingBox()
     const projectBox = await page.getByTestId('export-goal-project').boundingBox()
-    expect(webBox!.y).toBeLessThan(reactBox!.y)
-    expect(reactBox!.y).toBeLessThan(cssBox!.y)
+    expect(webBox!.y).toBeLessThan(cssBox!.y)
     expect(cssBox!.y).toBeLessThan(htmlBox!.y)
     expect(htmlBox!.y).toBeLessThan(ownBox!.y)
     expect(ownBox!.y).toBeLessThan(projectBox!.y)
   })
 
   test(
-    'export: keyboard reaches primary then trigger then Other ways before Close; help is associated',
+    'export: keyboard reaches path tabs then download then trigger then Advanced before Close; help is associated',
     { tag: '@smoke' },
     async ({ page, browserName }) => {
     await page.goto('/')
@@ -364,6 +376,7 @@ test.describe('first-use guidance and export wording', () => {
     // DOM order there; full Tab sequence on Chromium/Firefox.
     if (browserName === 'webkit') {
       for (const id of [
+        'btn-export-path-html',
         'btn-download-web-package',
         'export-trigger-select',
         'btn-preview-trigger',
@@ -373,15 +386,15 @@ test.describe('first-use guidance and export wording', () => {
         await page.getByTestId(id).focus()
         await expect(page.getByTestId(id)).toBeFocused()
       }
-      await expect(page.getByTestId('btn-download-react-package')).toBeHidden()
+      await expect(page.getByTestId('btn-download-css')).toBeHidden()
       await expect(page.getByTestId('btn-copy-own-element-css')).toBeHidden()
     } else {
       await expect(page.getByTestId('export-panel-root')).toBeFocused()
       await page.keyboard.press('Tab')
-      await expect(page.getByTestId('btn-download-web-package')).toBeFocused()
+      await expect(page.getByTestId('btn-export-path-html')).toBeFocused()
 
-      const tabOrder: string[] = ['btn-download-web-package']
-      for (let i = 0; i < 40; i++) {
+      const tabOrder: string[] = ['btn-export-path-html']
+      for (let i = 0; i < 50; i++) {
         await page.keyboard.press('Tab')
         const testId = await page.evaluate(() => {
           const el = document.activeElement as HTMLElement | null
@@ -391,17 +404,24 @@ test.describe('first-use guidance and export wording', () => {
         if (testId === 'btn-close-export') break
       }
       expect(tabOrder.at(-1)).toBe('btn-close-export')
+      const htmlPathIdx = tabOrder.indexOf('btn-export-path-html')
+      const reactPathIdx = tabOrder.indexOf('btn-export-path-react')
+      const filesPathIdx = tabOrder.indexOf('btn-export-path-files')
       const webIdx = tabOrder.indexOf('btn-download-web-package')
       const triggerIdx = tabOrder.indexOf('export-trigger-select')
       const previewIdx = tabOrder.indexOf('btn-preview-trigger')
       const otherIdx = tabOrder.indexOf('export-other-ways-summary')
       const closeIdx = tabOrder.indexOf('btn-close-export')
-      expect(webIdx).toBe(0)
+      expect(htmlPathIdx).toBe(0)
+      expect(reactPathIdx).toBeGreaterThan(htmlPathIdx)
+      expect(filesPathIdx).toBeGreaterThan(reactPathIdx)
+      expect(webIdx).toBeGreaterThan(filesPathIdx)
       expect(triggerIdx).toBeGreaterThan(webIdx)
       expect(previewIdx).toBeGreaterThan(triggerIdx)
       expect(otherIdx).toBeGreaterThan(previewIdx)
       expect(closeIdx).toBeGreaterThan(otherIdx)
-      // Collapsed: secondary actions are not in the tab order yet.
+      // Collapsed Advanced: CSS / own-element not in the tab order yet.
+      // React download lives under the React path tab (not selected).
       expect(tabOrder.indexOf('btn-download-react-package')).toBe(-1)
       expect(tabOrder.indexOf('btn-copy-own-element-css')).toBe(-1)
     }
@@ -460,7 +480,7 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('btn-copy-own-element-react')).toBeDisabled()
   })
 
-  test('narrow viewport: primary and Other ways stay reachable by scroll', async ({
+  test('narrow viewport: primary and Advanced exports stay reachable by scroll', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })

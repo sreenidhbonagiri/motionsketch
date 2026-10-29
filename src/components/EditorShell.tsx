@@ -528,9 +528,10 @@ export function EditorShell() {
                   data-testid="export-empty"
                   className="text-sm text-slate-500"
                 >
-                  Create a path (Record, Import SVG, or a Motion preset) to
-                  download a website package — or open Other ways for React,
-                  your own HTML, CSS-only, and the project file.
+                  Create a path (Record, Import SVG, or a Motion preset) to add
+                  the animation to your website (HTML, React, or download files)
+                  — or open Advanced exports for CSS-only, your own HTML, and the
+                  project file.
                 </p>
               )}
             </div>

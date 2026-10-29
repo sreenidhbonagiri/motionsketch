@@ -8,12 +8,14 @@ import {
 } from '../../src/core/export/packageAssets'
 import {
   buildWebPackage,
+  describeWebPackageIntegration,
   WEB_PACKAGE_CSS_NAME,
   WEB_PACKAGE_HTML_NAME,
   WEB_PACKAGE_PROJECT_NAME,
   WEB_PACKAGE_README_NAME,
   WEB_PACKAGE_TRIGGER_JS_NAME,
 } from '../../src/core/export/webPackage'
+import { formatCssAspectRatio } from '../../src/core/stageAspect'
 import { parseSnapshotJson } from '../../src/core/persist/document'
 import { createSceneActor } from '../../src/core/sceneActor'
 import type { ActorImage } from '../../src/core/types'
@@ -257,7 +259,36 @@ describe('web package export', () => {
     expect(readme).toContain(`mode: "page-load"`)
     expect(readme).toContain('Play button outside data-ms-demo-shell')
     expect(readme).toContain('ctl.play()')
-    expect(readme).toMatch(/aspect-ratio:\s*16\s*\/\s*10/)
+    expect(readme).toContain(
+      `aspect-ratio: ${formatCssAspectRatio(project.stageAspect)}`,
+    )
     expect(readme).toMatch(/does not\s+include the editor path overlay/i)
+  })
+
+  it('README embed aspect-ratio matches a non-default project stageAspect', () => {
+    const stageAspect = 16 / 9
+    const project = makeProject({
+      name: 'Wide stage',
+      stageAspect,
+      actors: [makeActor({ recording: makeRecording(10) })],
+    })
+    const packed = buildWebPackage(project)
+    expect(packed.ok).toBe(true)
+    if (!packed.ok) return
+    const readme = strFromU8(
+      packed.files.find((f) => f.path === WEB_PACKAGE_README_NAME)!.bytes,
+    )
+    const expected = formatCssAspectRatio(stageAspect)
+    expect(expected).toBe('16 / 9')
+    expect(readme).toContain(`aspect-ratio: ${expected}`)
+    expect(readme).not.toContain('aspect-ratio: 16 / 10')
+
+    const guide = describeWebPackageIntegration(project)
+    expect(guide.ok).toBe(true)
+    if (!guide.ok) return
+    expect(guide.aspectCss).toBe(expected)
+    expect(guide.completeExample).toContain(`aspect-ratio: ${expected}`)
+    expect(guide.requiredFiles).toContain(WEB_PACKAGE_CSS_NAME)
+    expect(guide.requiredFiles).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
   })
 })
