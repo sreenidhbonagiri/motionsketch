@@ -384,9 +384,8 @@ export function ExportPanel() {
             data-testid="export-website-limits"
             className="text-[11px] leading-relaxed text-slate-500"
           >
-            You need access to your site’s code (HTML/CSS/JS or a React app).
-            This does not install into WordPress or Webflow, and downloading does
-            not publish anything.
+            Needs access to your site’s code. Does not install into WordPress or
+            Webflow, and downloading does not publish anything.
           </p>
           <p id={packageStatusId} className="sr-only" data-testid="export-web-package-help">
             ZIP with a working index.html preview and files to add the animation
@@ -472,13 +471,44 @@ export function ExportPanel() {
             data-testid="export-guide-html"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
-            <p className="text-[11px] font-medium text-slate-800">
-              HTML website
+            <button
+              type="button"
+              data-testid="btn-download-web-package"
+              onClick={downloadWebPackage}
+              disabled={busy}
+              aria-busy={packaging === 'web'}
+              aria-describedby={describedBy(
+                packageStatusId,
+                'export-html-download-blurb',
+                webDownloadSuccess && downloadSuccessId,
+                busy && packagingHelpId,
+              )}
+              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {packaging === 'web'
+                ? 'Building website package…'
+                : 'Download for your website'}
+            </button>
+            <p
+              id="export-html-download-blurb"
+              data-testid="export-html-download-blurb"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              ZIP with a working <code>{WEB_PACKAGE_HTML_NAME}</code> preview
+              plus <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+              <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
+              {websiteIntegration?.ok &&
+              websiteIntegration.assetHrefs.length > 0
+                ? ', and assets/'
+                : ''}
+              . Downloading does not publish anything.
             </p>
-            <ol className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600">
+            <ol
+              data-testid="export-html-steps"
+              className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600"
+            >
               <li>
-                Download the website package (ZIP). Keep{' '}
-                <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+                Unzip and keep <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
                 <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
                 {websiteIntegration?.ok &&
                 websiteIntegration.assetHrefs.length > 0
@@ -492,9 +522,8 @@ export function ExportPanel() {
               </li>
               <li>
                 On your site, copy those files next to your page (or update
-                paths), then paste the complete host example below — it includes
-                markup, sizing, Play/Replay, and reduced-motion setup for this
-                project
+                paths), then paste the complete host example below — markup,
+                sizing, Play/Replay, and reduced-motion for this project
                 {websiteIntegration?.ok
                   ? ` (stage aspect ${websiteIntegration.aspectCss})`
                   : ''}
@@ -514,23 +543,6 @@ export function ExportPanel() {
                 : ''}
               .
             </p>
-            <button
-              type="button"
-              data-testid="btn-download-web-package"
-              onClick={downloadWebPackage}
-              disabled={busy}
-              aria-busy={packaging === 'web'}
-              aria-describedby={describedBy(
-                packageStatusId,
-                webDownloadSuccess && downloadSuccessId,
-                busy && packagingHelpId,
-              )}
-              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {packaging === 'web'
-                ? 'Building website package…'
-                : 'Download for your website'}
-            </button>
             {websiteIntegration?.ok ? (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -566,36 +578,6 @@ export function ExportPanel() {
             data-testid="export-guide-react"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
-            <p className="text-[11px] font-medium text-slate-800">React</p>
-            <ol className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600">
-              <li>
-                Download the React package ZIP and unzip{' '}
-                <strong>all</strong> files into a folder in your Vite React app
-                (for example <code>src/motionsketch/</code>). The archive is flat —
-                do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code> at the
-                project root.
-              </li>
-              <li>
-                Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
-                <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
-                <code>assets/</code> files beside the component.
-              </li>
-              <li>
-                Import and render{' '}
-                <code>{`{ MotionSketchScene }`}</code> from{' '}
-                <code>{REACT_PACKAGE_COMPONENT_NAME}</code> (see the package{' '}
-                <code>README.md</code> for a full <code>main.tsx</code> example).
-              </li>
-            </ol>
-            <p
-              id={reactPackageStatusId}
-              data-testid="export-react-package-help"
-              className="text-[11px] leading-relaxed text-slate-500"
-            >
-              ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images, trigger
-              script, and a Vite React README. Same motion as the HTML package.
-              Downloading does not publish anything.
-            </p>
             <button
               type="button"
               data-testid="btn-download-react-package"
@@ -612,6 +594,37 @@ export function ExportPanel() {
                 ? 'Building React package…'
                 : 'Download React package'}
             </button>
+            <p
+              id={reactPackageStatusId}
+              data-testid="export-react-package-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images,
+              trigger script, and a Vite React README. Same motion as the HTML
+              package. Downloading does not publish anything.
+            </p>
+            <ol
+              data-testid="export-react-steps"
+              className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600"
+            >
+              <li>
+                Unzip <strong>all</strong> files into a folder in your Vite React
+                app (for example <code>src/motionsketch/</code>). The archive is
+                flat — do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code>{' '}
+                at the project root.
+              </li>
+              <li>
+                Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
+                <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
+                <code>assets/</code> files beside the component.
+              </li>
+              <li>
+                Import and render{' '}
+                <code>{`{ MotionSketchScene }`}</code> from{' '}
+                <code>{REACT_PACKAGE_COMPONENT_NAME}</code> (see the package{' '}
+                <code>README.md</code> for a full <code>main.tsx</code> example).
+              </li>
+            </ol>
           </div>
         )}
 
@@ -620,21 +633,6 @@ export function ExportPanel() {
             data-testid="export-guide-files"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
-            <p className="text-[11px] font-medium text-slate-800">
-              Download files
-            </p>
-            <p className="text-[11px] leading-relaxed text-slate-600">
-              Get the website ZIP first if you have not already. It includes a
-              working <code>{WEB_PACKAGE_HTML_NAME}</code> preview plus the files
-              listed under HTML website.
-            </p>
-            <p
-              className="text-[11px] leading-relaxed text-slate-500"
-              data-testid="export-files-help"
-            >
-              Same package as HTML website. Downloading does not publish
-              anything.
-            </p>
             <button
               type="button"
               data-testid="btn-download-web-package"
@@ -643,6 +641,7 @@ export function ExportPanel() {
               aria-busy={packaging === 'web'}
               aria-describedby={describedBy(
                 packageStatusId,
+                'export-files-help',
                 webDownloadSuccess && downloadSuccessId,
                 busy && packagingHelpId,
               )}
@@ -652,6 +651,22 @@ export function ExportPanel() {
                 ? 'Building website package…'
                 : 'Download for your website'}
             </button>
+            <p
+              id="export-files-help"
+              className="text-[11px] leading-relaxed text-slate-500"
+              data-testid="export-files-help"
+            >
+              Same website ZIP as HTML — includes a working{' '}
+              <code>{WEB_PACKAGE_HTML_NAME}</code> preview. Downloading does not
+              publish anything.
+            </p>
+            <p className="text-[11px] font-medium text-slate-800">
+              Download files
+            </p>
+            <p className="text-[11px] leading-relaxed text-slate-600">
+              Use this when you already know the filenames. For step-by-step
+              embed instructions, switch to HTML website.
+            </p>
           </div>
         )}
 

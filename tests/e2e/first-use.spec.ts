@@ -530,6 +530,64 @@ test.describe('first-use guidance and export wording', () => {
     }
   })
 
+  for (const { width, height, label } of [
+    { width: 1280, height: 800, label: 'desktop' },
+    { width: 390, height: 844, label: 'mobile' },
+  ] as const) {
+    test(`HTML and React primary downloads visible without scroll (${label} ${width}×${height})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height })
+      await page.goto('/')
+      await ensureEditor(page)
+      if (width < 500) {
+        const listExpanded = await page
+          .getByTestId('btn-toggle-actor-list')
+          .getAttribute('aria-expanded')
+        if (listExpanded === 'true') {
+          await page.getByTestId('btn-toggle-actor-list').click()
+        }
+      }
+      await recordSimplePath(page)
+      await openPanel(page, 'export')
+
+      await expect(page.getByTestId('export-website-limits')).toBeInViewport()
+      await expect(page.getByTestId('export-website-path-tabs')).toBeInViewport()
+
+      const htmlDownload = page.getByTestId('btn-download-web-package')
+      await expect(htmlDownload).toBeInViewport()
+      const tabsBox = await page.getByTestId('export-website-path-tabs').boundingBox()
+      const htmlBox = await htmlDownload.boundingBox()
+      const htmlSteps = page.getByTestId('export-html-steps')
+      const htmlStepsBox = await htmlSteps.boundingBox()
+      expect(tabsBox!.y).toBeLessThan(htmlBox!.y)
+      expect(htmlBox!.y).toBeLessThan(htmlStepsBox!.y)
+      // Primary action above the fold — no export-panel scroll required.
+      const scrolled = await page
+        .getByTestId('export-panel')
+        .evaluate((el) => {
+          const scroller = el.closest('.overflow-y-auto') as HTMLElement | null
+          return scroller?.scrollTop ?? 0
+        })
+      expect(scrolled).toBe(0)
+
+      await page.getByTestId('btn-export-path-react').click()
+      const reactDownload = page.getByTestId('btn-download-react-package')
+      await expect(reactDownload).toBeInViewport()
+      const reactBox = await reactDownload.boundingBox()
+      const reactStepsBox = await page.getByTestId('export-react-steps').boundingBox()
+      expect(tabsBox!.y).toBeLessThan(reactBox!.y)
+      expect(reactBox!.y).toBeLessThan(reactStepsBox!.y)
+      const scrolledReact = await page
+        .getByTestId('export-panel')
+        .evaluate((el) => {
+          const scroller = el.closest('.overflow-y-auto') as HTMLElement | null
+          return scroller?.scrollTop ?? 0
+        })
+      expect(scrolledReact).toBe(0)
+    })
+  }
+
   test('storage failure shows download recovery; failed download is not success', async ({
     page,
   }) => {
