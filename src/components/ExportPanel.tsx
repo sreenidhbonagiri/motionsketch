@@ -446,28 +446,37 @@ export function ExportPanel() {
               ['react', 'React'],
               ['files', 'Download files'],
             ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              data-testid={`btn-export-path-${id}`}
-              aria-selected={websitePath === id}
-              onClick={() => setWebsitePath(id)}
-              className={`rounded-md px-1.5 py-1.5 text-[11px] font-medium transition ${
-                websitePath === id
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          ).map(([id, label]) => {
+            const selected = websitePath === id
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                data-testid={`btn-export-path-${id}`}
+                aria-selected={selected}
+                aria-controls={`export-guide-${id}`}
+                data-selected={selected ? 'true' : 'false'}
+                onClick={() => setWebsitePath(id)}
+                // No color/bg transition — highlight must move with content in the
+                // same paint (animated lag made React look like HTML was still selected).
+                className={`rounded-md px-1.5 py-1.5 text-[11px] ${
+                  selected
+                    ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200'
+                    : 'font-medium text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
 
         {websitePath === 'html' && (
           <div
             ref={htmlGuideRef}
+            id="export-guide-html"
+            role="tabpanel"
             data-testid="export-guide-html"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
@@ -575,6 +584,8 @@ export function ExportPanel() {
 
         {websitePath === 'react' && (
           <div
+            id="export-guide-react"
+            role="tabpanel"
             data-testid="export-guide-react"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
@@ -630,6 +641,8 @@ export function ExportPanel() {
 
         {websitePath === 'files' && (
           <div
+            id="export-guide-files"
+            role="tabpanel"
             data-testid="export-guide-files"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >

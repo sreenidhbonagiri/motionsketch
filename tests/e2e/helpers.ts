@@ -361,6 +361,11 @@ export async function selectExportWebsitePath(
     'aria-selected',
     'true',
   )
+  await expect(page.getByTestId(`btn-export-path-${path}`)).toHaveAttribute(
+    'data-selected',
+    'true',
+  )
+  await expect(page.getByTestId(`export-guide-${path}`)).toBeVisible()
 }
 
 /** Expand Export → Advanced exports (CSS, own-element, project file). */

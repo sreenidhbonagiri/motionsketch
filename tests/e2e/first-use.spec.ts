@@ -588,6 +588,65 @@ test.describe('first-use guidance and export wording', () => {
     })
   }
 
+  test('format chooser highlight and content switch together for HTML → React → files', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'export')
+
+    const assertPath = async (
+      path: 'html' | 'react' | 'files',
+      guideTestId: string,
+    ) => {
+      await page.getByTestId(`btn-export-path-${path}`).click()
+      await expect(page.getByTestId(guideTestId)).toBeVisible()
+      for (const id of ['html', 'react', 'files'] as const) {
+        const selected = id === path
+        const tab = page.getByTestId(`btn-export-path-${id}`)
+        await expect(tab).toHaveAttribute(
+          'aria-selected',
+          selected ? 'true' : 'false',
+        )
+        await expect(tab).toHaveAttribute(
+          'data-selected',
+          selected ? 'true' : 'false',
+        )
+        // Selected paint must match aria in the same turn (no transition lag).
+        const style = await tab.evaluate((el) => {
+          const cs = getComputedStyle(el)
+          return {
+            bg: cs.backgroundColor,
+            hasWhiteClass: el.classList.contains('bg-white'),
+            hasRingClass: el.classList.contains('ring-1'),
+          }
+        })
+        expect(style.hasWhiteClass, `${id} bg-white`).toBe(selected)
+        expect(style.hasRingClass, `${id} ring`).toBe(selected)
+        if (selected) {
+          expect(style.bg).toMatch(/^rgb\(255,\s*255,\s*255\)$/)
+        } else {
+          expect(style.bg).toMatch(/^rgba?\(0,\s*0,\s*0,\s*0\)$/)
+        }
+      }
+      await expect(page.getByTestId('export-guide-html')).toHaveCount(
+        path === 'html' ? 1 : 0,
+      )
+      await expect(page.getByTestId('export-guide-react')).toHaveCount(
+        path === 'react' ? 1 : 0,
+      )
+      await expect(page.getByTestId('export-guide-files')).toHaveCount(
+        path === 'files' ? 1 : 0,
+      )
+    }
+
+    await assertPath('html', 'export-guide-html')
+    await assertPath('react', 'export-guide-react')
+    await assertPath('files', 'export-guide-files')
+    await assertPath('html', 'export-guide-html')
+  })
+
   test('storage failure shows download recovery; failed download is not success', async ({
     page,
   }) => {
