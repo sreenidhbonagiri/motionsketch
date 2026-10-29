@@ -240,10 +240,19 @@ describe('edit store', () => {
   it('announces armed and recording readiness once', () => {
     useEditorStore.getState().armRecording()
     expect(useEditorStore.getState().actionAnnouncement).toBe(
-      'Ready — Drag the actor to draw its path.',
+      'Ready — Drag the element to record.',
     )
     useEditorStore.getState().beginRecording(1, { x: 0.4, y: 0.5 })
     expect(useEditorStore.getState().actionAnnouncement).toBe('Recording')
+  })
+
+  it('clears Recording announcement when the take finishes and mode returns to idle', () => {
+    useEditorStore.getState().armRecording()
+    useEditorStore.getState().beginRecording(1, { x: 0.4, y: 0.5 })
+    expect(useEditorStore.getState().actionAnnouncement).toBe('Recording')
+    useEditorStore.getState().finishRecording(makeRecording(8))
+    expect(useEditorStore.getState().mode).toBe('idle')
+    expect(useEditorStore.getState().actionAnnouncement).toBeNull()
   })
 
   it('smooth bend commits one undo entry; no-op does not grow history', () => {

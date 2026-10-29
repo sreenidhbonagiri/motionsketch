@@ -46,7 +46,13 @@ export function MotionPresets() {
                 <span className="text-sm font-medium text-slate-800">
                   {preset.label}
                 </span>
-                <span className="mt-0.5 text-xs leading-snug text-slate-500">
+                <span
+                  className={
+                    active
+                      ? 'mt-0.5 text-xs leading-snug text-slate-600'
+                      : 'mt-0.5 text-xs leading-snug text-slate-500'
+                  }
+                >
                   {preset.summary}
                   {preset.prefersLoop ? ' · Loop recommended' : ''}
                 </span>

@@ -71,7 +71,10 @@ const btnPrimary = `${control} bg-ms-primary text-white hover:bg-ms-primary-hove
 const btnSecondary = `${control} text-slate-700 hover:bg-slate-900/[0.06]`
 const btnQuiet = `${control} text-slate-500 hover:bg-slate-900/[0.05]`
 const btnIcon =
-  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:opacity-35'
+  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-40'
+/** Shared width so Record ↔ Cancel does not shift the transport grid. */
+const recordSlot =
+  'inline-flex h-8 min-h-8 min-w-[5.75rem] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
 const surfaceChrome =
   'rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
 
@@ -782,7 +785,7 @@ export function PlaybackDock() {
                       mode === 'armed' && modeStatus ? dockStatusId : undefined
                     }
                     title={mode === 'armed' ? 'Cancel record' : 'Stop recording'}
-                    className={`${control} gap-1.5 bg-ms-danger text-white hover:bg-ms-danger-hover`}
+                    className={`${recordSlot} bg-ms-danger text-white hover:bg-ms-danger-hover`}
                   >
                     {mode === 'armed' ? (
                       'Cancel'
@@ -821,7 +824,7 @@ export function PlaybackDock() {
                     }}
                     // Empty board: Record is the primary action. After a path exists,
                     // Play takes the primary style so preview/export stays front-of-mind.
-                    className={`${hasAnyRecording ? btnSecondary : btnPrimary} gap-1.5`}
+                    className={`${recordSlot} ${hasAnyRecording ? 'text-slate-700 hover:bg-slate-900/[0.06]' : 'bg-ms-primary text-white hover:bg-ms-primary-hover active:bg-ms-primary-pressed'}`}
                   >
                     <span
                       aria-hidden
@@ -831,21 +834,31 @@ export function PlaybackDock() {
                   </button>
                 )}
 
-                {hasRecording && !isRecordingLike && (
-                  <button
-                    type="button"
-                    data-testid="btn-continue-path"
-                    onClick={() => {
-                      armContinuePath()
-                    }}
-                    disabled={!continueAvail.enabled}
-                    title={continueAvail.reason ?? CONTINUE_PATH_HELP}
-                    aria-describedby="continue-path-help"
-                    className={btnSecondary}
-                  >
-                    Continue path
-                  </button>
-                )}
+                {hasRecording &&
+                  (isRecordingLike ? (
+                    // Reserve Continue width while armed/recording so Play stays put.
+                    <span
+                      aria-hidden
+                      data-testid="btn-continue-path-spacer"
+                      className={`${btnSecondary} pointer-events-none invisible`}
+                    >
+                      Continue path
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="btn-continue-path"
+                      onClick={() => {
+                        armContinuePath()
+                      }}
+                      disabled={!continueAvail.enabled}
+                      title={continueAvail.reason ?? CONTINUE_PATH_HELP}
+                      aria-describedby="continue-path-help"
+                      className={btnSecondary}
+                    >
+                      Continue path
+                    </button>
+                  ))}
               </div>
 
               <div className="flex h-8 w-8 justify-center max-sm:col-start-2 max-sm:row-start-2 sm:col-start-2 sm:row-start-1">
@@ -877,40 +890,56 @@ export function PlaybackDock() {
               </div>
 
               <div className="flex items-center justify-end gap-1 max-sm:col-start-3 max-sm:row-start-2 sm:col-start-3 sm:row-start-1">
-                <button
-                  type="button"
-                  data-testid="btn-restart"
-                  onClick={() => restartPlayback()}
-                  disabled={playbackDisabled}
-                  aria-label="Restart"
-                  aria-describedby={playbackDescribedBy}
+                {/* title on wrapper so tooltips still work when the control is disabled */}
+                <span
+                  className="inline-flex"
                   title="Restart from the beginning"
-                  className={btnIcon}
                 >
-                  <span aria-hidden>↻</span>
-                </button>
-                <button
-                  type="button"
-                  data-testid="btn-undo-transform"
-                  onClick={() => undoActorEdit()}
-                  disabled={isRecordingLike || actorEditOrder.length === 0}
-                  className={btnIcon}
-                  aria-label="Undo"
+                  <button
+                    type="button"
+                    data-testid="btn-restart"
+                    onClick={() => restartPlayback()}
+                    disabled={playbackDisabled}
+                    aria-label="Restart"
+                    aria-describedby={playbackDescribedBy}
+                    title="Restart from the beginning"
+                    className={btnIcon}
+                  >
+                    <span aria-hidden>↻</span>
+                  </button>
+                </span>
+                <span
+                  className="inline-flex"
                   title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
                 >
-                  <span aria-hidden>↶</span>
-                </button>
-                <button
-                  type="button"
-                  data-testid="btn-redo-transform"
-                  onClick={() => redoActorEdit()}
-                  disabled={isRecordingLike || actorEditRedoOrder.length === 0}
-                  className={btnIcon}
-                  aria-label="Redo"
+                  <button
+                    type="button"
+                    data-testid="btn-undo-transform"
+                    onClick={() => undoActorEdit()}
+                    disabled={isRecordingLike || actorEditOrder.length === 0}
+                    className={btnIcon}
+                    aria-label="Undo"
+                    title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                  >
+                    <span aria-hidden>↶</span>
+                  </button>
+                </span>
+                <span
+                  className="inline-flex"
                   title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
                 >
-                  <span aria-hidden>↷</span>
-                </button>
+                  <button
+                    type="button"
+                    data-testid="btn-redo-transform"
+                    onClick={() => redoActorEdit()}
+                    disabled={isRecordingLike || actorEditRedoOrder.length === 0}
+                    className={btnIcon}
+                    aria-label="Redo"
+                    title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                  >
+                    <span aria-hidden>↷</span>
+                  </button>
+                </span>
               </div>
             </div>
 
@@ -1162,59 +1191,71 @@ export function PlaybackDock() {
         </p>
       )}
 
-      {modeStatus && (
+      {/* Outside path-edit: always reserve status-row height so arming/recording
+          does not grow the dock. While editing, only mount when there is status. */}
+      {(modeStatus || !editing) && (
         <div
-          id={dockStatusId}
-          data-testid="dock-status"
-          data-mode-status={modeStatus.kind}
-          role="status"
-          className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-xs leading-snug"
+          data-testid="dock-status-slot"
+          className={`flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-xs leading-snug ${
+            editing ? '' : 'min-h-[1.25rem]'
+          }`}
+          aria-hidden={!modeStatus}
         >
-          {modeStatus.kind === 'recording' ? (
-            <span
-              data-testid="mode-status-label"
-              className="inline-flex items-center gap-1.5 font-semibold text-ms-danger"
+          {modeStatus ? (
+            <div
+              id={dockStatusId}
+              data-testid="dock-status"
+              data-mode-status={modeStatus.kind}
+              role="status"
+              className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
             >
-              <span
-                aria-hidden="true"
-                className="inline-block size-2 shrink-0 rounded-full bg-ms-danger"
-              />
-              {modeStatus.label}
-            </span>
-          ) : modeStatus.kind === 'armed' ? (
-            <span
-              data-testid="mode-status-label"
-              className="font-semibold text-slate-700"
-            >
-              Ready
-            </span>
-          ) : modeStatus.label ? (
-            <span
-              data-testid="mode-status-label"
-              className="font-semibold text-slate-700"
-            >
-              {modeStatus.label}
-            </span>
-          ) : null}
-          {modeStatus.kind === 'armed' && modeStatus.instruction ? (
-            <>
-              <span aria-hidden="true" className="text-slate-500">
-                {' — '}
-              </span>
-              <span
-                data-testid="mode-status-instruction"
-                className="text-slate-500"
-              >
-                {modeStatus.instruction}
-              </span>
-            </>
-          ) : modeStatus.instruction ? (
-            <span
-              data-testid="mode-status-instruction"
-              className="text-slate-500"
-            >
-              {modeStatus.instruction}
-            </span>
+              {modeStatus.kind === 'recording' ? (
+                <span
+                  data-testid="mode-status-label"
+                  className="inline-flex items-center gap-1.5 font-semibold text-ms-danger"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-2 shrink-0 rounded-full bg-ms-danger"
+                  />
+                  {modeStatus.label}
+                </span>
+              ) : modeStatus.kind === 'armed' ? (
+                <span
+                  data-testid="mode-status-label"
+                  className="font-semibold text-slate-700"
+                >
+                  Ready
+                </span>
+              ) : modeStatus.label ? (
+                <span
+                  data-testid="mode-status-label"
+                  className="font-semibold text-slate-700"
+                >
+                  {modeStatus.label}
+                </span>
+              ) : null}
+              {modeStatus.kind === 'armed' && modeStatus.instruction ? (
+                <>
+                  <span aria-hidden="true" className="text-slate-500">
+                    {' — '}
+                  </span>
+                  <span
+                    data-testid="mode-status-instruction"
+                    className="text-slate-500"
+                  >
+                    {modeStatus.instruction}
+                  </span>
+                </>
+              ) : modeStatus.instruction ? (
+                <span
+                  data-testid="mode-status-instruction"
+                  className="text-slate-500"
+                >
+                  {modeStatus.instruction}
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
       )}

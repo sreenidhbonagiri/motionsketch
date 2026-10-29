@@ -6,6 +6,7 @@ import {
   statusLabel,
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
+import { isRecordingChromeAnnouncement } from '../lib/modeStatus'
 import { useEditorStore } from '../state/store'
 import { StageSizeSection } from './StageSizeSection'
 
@@ -37,9 +38,16 @@ export function ProjectPanel() {
   const saveFailed = status === 'save-error'
 
   useEffect(() => {
-    if (storeAnnouncement) {
-      setActionStatus(storeAnnouncement)
+    if (!storeAnnouncement) {
+      // Drop latched recording chrome once the shared announcement clears.
+      setActionStatus((prev) =>
+        prev && isRecordingChromeAnnouncement(prev) ? null : prev,
+      )
+      return
     }
+    // Project file status must not mirror dock recording/armed announcements.
+    if (isRecordingChromeAnnouncement(storeAnnouncement)) return
+    setActionStatus(storeAnnouncement)
   }, [storeAnnouncement])
 
   const startFreshUntitled = () => {

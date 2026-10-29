@@ -38,10 +38,10 @@ test.describe('first-use guidance and export wording', () => {
     )
     await expect(page.getByTestId('mode-status-label')).toHaveText('Ready')
     await expect(page.getByTestId('mode-status-instruction')).toHaveText(
-      'Drag the actor to draw its path.',
+      'Drag the element to record.',
     )
     await expect(page.getByTestId('action-live-region')).toHaveText(
-      'Ready — Drag the actor to draw its path.',
+      'Ready — Drag the element to record.',
     )
     await expect(page.getByTestId('btn-stop')).toHaveAccessibleName(
       'Cancel record',
@@ -51,7 +51,7 @@ test.describe('first-use guidance and export wording', () => {
       'dock-status',
     )
     await expect(page.getByTestId('actor')).toHaveAccessibleName(
-      /Drag to draw its path/i,
+      /Drag the element to record/i,
     )
 
     await page.getByTestId('btn-stop').click()
@@ -217,7 +217,7 @@ test.describe('first-use guidance and export wording', () => {
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('dock-status')).toBeVisible()
     await expect(page.getByTestId('dock-status')).toContainText(
-      /Drag the actor to draw its path/i,
+      /Drag the element to record/i,
     )
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
 

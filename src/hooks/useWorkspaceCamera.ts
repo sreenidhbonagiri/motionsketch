@@ -44,8 +44,10 @@ function viewportSizeOf(el: HTMLElement | null): ViewportSize {
  * Workspace pan/zoom around a letterboxed stage frame.
  * Camera is view-only; all geometry tools keep using stage-frame rects.
  *
- * Empty-canvas drag pans immediately. Space temporarily pans even over actors.
- * Actor / handle / Move path / recording gestures keep priority.
+ * Empty-canvas drag pans immediately while idle. Space temporarily pans even
+ * over actors. While Record is armed, empty-canvas drag does not pan (Space
+ * still pans); actor drag still starts recording. Handle / Move path /
+ * recording gestures keep priority.
  */
 export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
   const camera = useEditorStore((s) => s.camera)
@@ -56,6 +58,7 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
   const pathAddMode = useEditorStore((s) => s.pathAddMode)
   const pathTool = useEditorStore((s) => s.pathTool)
   const mode = useEditorStore((s) => s.mode)
+  const noteArmedCanvasMiss = useEditorStore((s) => s.noteArmedCanvasMiss)
 
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 })
   const [layout, setLayout] = useState<StageLayoutSize>({ width: 0, height: 0 })
@@ -79,7 +82,8 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
 
   /** Space override, or empty-canvas pan when no geometry gesture is active. */
   const spacePanActive = spaceHeld && !gestureBusy
-  const backgroundPanEnabled = !gestureBusy
+  // Armed empty-canvas must not pan; Space-held pan still uses spacePanActive.
+  const backgroundPanEnabled = !gestureBusy && mode !== 'armed'
 
   const syncLayout = useCallback(
     (nextViewport: ViewportSize, opts?: { fit?: boolean }) => {
@@ -189,6 +193,15 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
         return
       }
 
+      // Armed: empty-canvas drag must not pan or record — keep armed and nudge.
+      if (mode === 'armed') {
+        if (isBackgroundPanTarget(event.target, { excludeStageFrame: false })) {
+          event.preventDefault()
+          noteArmedCanvasMiss()
+        }
+        return
+      }
+
       // Add-point mode owns clicks on the stage frame; still allow pan outside.
       const excludeStageFrame =
         mode === 'editing' && pathAddMode && pathTool === 'edit-points'
@@ -201,7 +214,7 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
       }
       beginPan(event)
     },
-    [beginPan, mode, pathAddMode, pathTool],
+    [beginPan, mode, noteArmedCanvasMiss, pathAddMode, pathTool],
   )
 
   const onViewportPointerMove = useCallback(
