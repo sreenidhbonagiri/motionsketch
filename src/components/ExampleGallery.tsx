@@ -188,7 +188,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[min(92dvh,40rem)] w-[min(36rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]"
+        className="flex max-h-[min(92dvh,40rem)] w-[min(36rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-2xl border border-ms-border bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <div className="min-w-0">
@@ -207,7 +207,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
             type="button"
             data-testid="btn-close-examples"
             onClick={onClose}
-            className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+            className="shrink-0 rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
           >
             Close
           </button>
@@ -217,7 +217,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
           {error && (
             <p
               data-testid="examples-error"
-              className="mb-3 text-xs text-red-700"
+              className="mb-3 text-xs text-ms-danger"
             >
               {error}
             </p>
@@ -233,7 +233,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
                   className={`rounded-xl border p-3 transition ${
                     selected
                       ? 'border-slate-800 bg-slate-50'
-                      : 'border-slate-200 bg-white'
+                      : 'border-ms-border bg-white'
                   }`}
                 >
                   <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
@@ -260,7 +260,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
                               prev === example.id ? null : example.id,
                             )
                           }
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                          className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
                         >
                           {selected ? 'Hide preview' : 'Preview'}
                         </button>
@@ -268,7 +268,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
                           type="button"
                           data-testid={`btn-use-${example.id}`}
                           onClick={() => handleUse(example.id)}
-                          className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                          className="rounded-lg bg-ms-primary px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover"
                         >
                           Use this example
                         </button>
@@ -276,7 +276,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
                     </div>
                   </div>
                   {selected && previewProject && (
-                    <div className="mt-3 border-t border-slate-200 pt-3">
+                    <div className="mt-3 border-t border-ms-border pt-3">
                       <ExamplePreviewStage
                         key={example.id}
                         project={previewProject}

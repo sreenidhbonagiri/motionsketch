@@ -1,5 +1,6 @@
 import type { FocusEventHandler, PointerEventHandler } from 'react'
 import type { MotionSample, Vec2 } from '../core/types'
+import { msPalette } from '../theme/palette'
 
 interface PathMoveOverlayProps {
   samples: MotionSample[]
@@ -67,17 +68,18 @@ export function PathMoveOverlay({
         data-testid="path-move-stroke"
         points={points}
         fill="none"
-        stroke={dragging ? '#0f766e' : active ? '#0d9488' : '#115e59'}
+        stroke={
+          dragging
+            ? msPalette.primary
+            : active
+              ? msPalette.primaryHover
+              : msPalette.primaryPressed
+        }
         strokeWidth={active || dragging ? 0.85 : 0.55}
         strokeLinecap="round"
         strokeLinejoin="round"
         opacity={dragging ? 1 : active ? 0.95 : 0.75}
         className={dragging ? 'cursor-grabbing' : 'cursor-grab'}
-        style={
-          active || dragging
-            ? { filter: 'drop-shadow(0 0 0.35px rgba(15, 118, 110, 0.85))' }
-            : undefined
-        }
       />
       {dragging && (
         <g data-testid="path-move-anchor" aria-hidden>
@@ -85,8 +87,8 @@ export function PathMoveOverlay({
             cx={(snapAnchor?.x ?? start.x) * 100}
             cy={(snapAnchor?.y ?? start.y) * 100}
             r={1.4}
-            fill="#ccfbf1"
-            stroke="#0f766e"
+            fill={msPalette.selected}
+            stroke={msPalette.primary}
             strokeWidth={0.35}
             vectorEffect="non-scaling-stroke"
           />

@@ -11,9 +11,9 @@ import { useEditorStore } from '../state/store'
 import { ActorNameInput } from './ActorNameInput'
 
 const panelSurface =
-  'rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
+  'rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
 const togglePill =
-  'pointer-events-auto inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-slate-900/[0.08] bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white'
+  'pointer-events-auto inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-ms-border bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white'
 
 export function ActorList() {
   const actors = useEditorStore((s) => s.project.actors)
@@ -53,7 +53,7 @@ export function ActorList() {
         open
           ? // Narrow + open: float a bounded left sheet above Sequence so the
             // body is not crushed by toolbar clearance. Desktop stays in-slot.
-            `pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5 max-sm:pointer-events-auto max-sm:fixed max-sm:left-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:z-[35] max-sm:w-[min(16rem,calc(100vw-1.5rem))] max-sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-7rem))] max-sm:justify-start max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border max-sm:border-slate-900/[0.08] max-sm:bg-white/90 max-sm:shadow-[var(--ms-shadow)] max-sm:backdrop-blur-xl`
+            `pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5 max-sm:pointer-events-auto max-sm:fixed max-sm:left-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:z-[35] max-sm:w-[min(16rem,calc(100vw-1.5rem))] max-sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-7rem))] max-sm:justify-start max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border max-sm:border-ms-border max-sm:bg-white/90 max-sm:shadow-[var(--ms-shadow)] max-sm:backdrop-blur-xl`
           : 'pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5'
       }
     >
@@ -86,7 +86,7 @@ export function ActorList() {
                       onClick={() => selectActor(actor.id)}
                       className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition ${
                         selectedRow
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-ms-selected font-medium text-ms-ink ring-1 ring-ms-primary/30'
                           : 'text-slate-700 hover:bg-slate-900/[0.05]'
                       } disabled:opacity-50`}
                     >
@@ -152,7 +152,7 @@ export function ActorList() {
                 data-testid="btn-add-actor"
                 disabled={busy || actors.length >= MAX_ACTORS}
                 onClick={() => addActor()}
-                className="inline-flex h-8 min-h-8 items-center rounded-lg bg-slate-900 px-2.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+                className="inline-flex h-8 min-h-8 items-center rounded-lg bg-ms-primary px-2.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
               >
                 Add
               </button>
@@ -186,7 +186,7 @@ export function ActorList() {
                     if (ok) deleteSelectedActor()
                   })()
                 }}
-                className="inline-flex h-8 min-h-8 items-center rounded-lg px-2.5 text-xs font-medium text-red-700/90 transition hover:bg-red-50 disabled:opacity-40"
+                className="inline-flex h-8 min-h-8 items-center rounded-lg px-2.5 text-xs font-medium text-ms-danger transition hover:bg-red-50 disabled:opacity-40"
               >
                 Delete
               </button>
@@ -239,7 +239,7 @@ export function ActorList() {
           open
             ? // Sheet chrome on narrow (above the scroll body); pill under the
               // body on desktop.
-              `${togglePill} shrink-0 max-sm:order-first max-sm:h-auto max-sm:min-h-8 max-sm:w-full max-sm:justify-between max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:border-slate-900/[0.06] max-sm:bg-transparent max-sm:px-3 max-sm:py-1.5 max-sm:shadow-none max-sm:backdrop-blur-none`
+              `${togglePill} shrink-0 max-sm:order-first max-sm:h-auto max-sm:min-h-8 max-sm:w-full max-sm:justify-between max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:border-ms-border max-sm:bg-transparent max-sm:px-3 max-sm:py-1.5 max-sm:shadow-none max-sm:backdrop-blur-none`
             : `${togglePill} shrink-0`
         }
       >

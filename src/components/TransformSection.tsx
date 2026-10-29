@@ -134,7 +134,7 @@ export function TransformSection() {
             type="button"
             data-testid="btn-deselect-transform"
             onClick={() => selectTransform(null)}
-            className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            className="shrink-0 rounded-md border border-ms-border bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
           >
             Deselect
           </button>
@@ -171,7 +171,7 @@ export function TransformSection() {
           disabled={disabled}
           aria-valuetext={formatRotation(rotation)}
           onChange={(e) => setRotation(Number(e.target.value))}
-          className="w-full accent-teal-700 disabled:opacity-40"
+          className="w-full accent-ms-primary disabled:opacity-40"
         />
         <input
           data-testid="transform-rotation-input"
@@ -183,7 +183,7 @@ export function TransformSection() {
           disabled={disabled}
           aria-label="Rotation in degrees"
           onChange={(e) => setRotation(Number(e.target.value))}
-          className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
+          className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
         />
       </div>
 
@@ -206,7 +206,7 @@ export function TransformSection() {
           disabled={disabled}
           aria-valuetext={formatScale(scale)}
           onChange={(e) => setScale(Number(e.target.value))}
-          className="w-full accent-teal-700 disabled:opacity-40"
+          className="w-full accent-ms-primary disabled:opacity-40"
         />
       </div>
 
@@ -230,7 +230,7 @@ export function TransformSection() {
             disabled={disabled}
             aria-valuetext={formatTimePct(time)}
             onChange={(e) => setTime(Number(e.target.value))}
-            className="w-full accent-teal-700 disabled:opacity-40"
+            className="w-full accent-ms-primary disabled:opacity-40"
           />
         </div>
       )}
@@ -241,7 +241,7 @@ export function TransformSection() {
           data-testid="btn-set-transform-keyframe"
           disabled={disabled}
           onClick={onAddOrUpdate}
-          className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+          className="rounded-lg bg-ms-primary px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
         >
           {selected && nearSelected ? 'Update keyframe' : 'Add keyframe'}
         </button>
@@ -252,7 +252,7 @@ export function TransformSection() {
               data-testid="btn-update-transform-keyframe"
               disabled={disabled}
               onClick={onUpdateSelected}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
             >
               Apply to selected
             </button>
@@ -261,7 +261,7 @@ export function TransformSection() {
               data-testid="btn-delete-transform-keyframe"
               disabled={disabled}
               onClick={deleteSelected}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-40"
+              className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-sm font-medium text-ms-danger transition hover:bg-red-50 disabled:opacity-40"
             >
               Delete
             </button>

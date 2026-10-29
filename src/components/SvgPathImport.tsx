@@ -7,6 +7,7 @@ import {
 } from '../core/svgPathImport'
 import { formatCssAspectRatio } from '../core/stageAspect'
 import { useEditorStore } from '../state/store'
+import { msPalette } from '../theme/palette'
 
 /** Stage preview drawn from samples only — never mounts uploaded SVG markup. */
 function PathPreview({
@@ -25,7 +26,7 @@ function PathPreview({
     <div
       data-testid="svg-path-import-preview"
       data-stage-aspect={String(stageAspect)}
-      className="overflow-hidden rounded-lg border border-slate-200 bg-[#f4f6fb]"
+      className="overflow-hidden rounded-lg border border-ms-border bg-ms-canvas"
       style={{ aspectRatio: aspectCss }}
     >
       <svg
@@ -64,7 +65,7 @@ function PathPreview({
         <polyline
           points={points}
           fill="none"
-          stroke="#0f766e"
+          stroke={msPalette.primary}
           strokeWidth={1.1}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -75,7 +76,7 @@ function PathPreview({
             cx={samples[0].x * 100}
             cy={samples[0].y * 100}
             r={1.4}
-            fill="#115e59"
+            fill={msPalette.primaryPressed}
           />
         ) : null}
       </svg>
@@ -170,7 +171,7 @@ export function SvgPathImport() {
           disabled={busyModes || busy}
           aria-describedby={helpId}
           onClick={() => fileRef.current?.click()}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? 'Reading SVG…' : 'Import SVG path'}
         </button>
@@ -224,7 +225,7 @@ export function SvgPathImport() {
         ref={dialogRef}
         data-testid="svg-path-import-dialog"
         aria-labelledby={titleId}
-        className="fixed inset-0 z-50 m-auto h-[min(88dvh,calc(100dvh-1.5rem))] w-[min(92vw,560px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40"
+        className="fixed inset-0 z-50 m-auto h-[min(88dvh,calc(100dvh-1.5rem))] w-[min(92vw,560px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-ms-border bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40"
         onClose={closePreview}
         onClick={(e) => {
           if (e.target === dialogRef.current) closePreview()
@@ -240,7 +241,7 @@ export function SvgPathImport() {
                 type="button"
                 data-testid="btn-svg-path-import-cancel"
                 onClick={closePreview}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                className="rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Cancel
               </button>
@@ -279,7 +280,7 @@ export function SvgPathImport() {
                     step={0.005}
                     value={offsetX}
                     onChange={(e) => setOffsetX(Number(e.target.value))}
-                    className="w-40 accent-teal-700"
+                    className="w-40 accent-ms-primary"
                   />
                 </label>
                 <label className="flex items-center justify-between gap-3 text-[11px] text-slate-600">
@@ -292,7 +293,7 @@ export function SvgPathImport() {
                     step={0.005}
                     value={offsetY}
                     onChange={(e) => setOffsetY(Number(e.target.value))}
-                    className="w-40 accent-teal-700"
+                    className="w-40 accent-ms-primary"
                   />
                 </label>
                 <p className="text-[11px] leading-relaxed text-slate-500">
@@ -322,7 +323,7 @@ export function SvgPathImport() {
                 type="button"
                 data-testid="btn-svg-path-import-confirm"
                 onClick={confirmImport}
-                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                className="rounded-lg bg-ms-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover"
               >
                 {hasExistingTake ? 'Replace path' : 'Apply path'}
               </button>

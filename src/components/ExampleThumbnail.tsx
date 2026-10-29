@@ -16,7 +16,7 @@ export function ExampleThumbnail({
       data-testid={`example-thumb-${id}`}
       role="img"
       aria-label={label}
-      className="relative h-24 w-full overflow-hidden rounded-lg border border-slate-200 bg-[#eef1f6]"
+      className="relative h-24 w-full overflow-hidden rounded-lg border border-ms-border bg-ms-canvas"
     >
       {paperPlane && (
         <>

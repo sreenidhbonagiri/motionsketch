@@ -59,7 +59,7 @@ export function PresetPanel() {
   return (
     <div
       data-testid="preset-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-slate-900/[0.08] bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-ms-border bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -95,8 +95,8 @@ export function PresetPanel() {
               onClick={() => beginPresetPreview(preset.id)}
               className={
                 active
-                  ? 'rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white'
-                  : 'rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+                  ? 'rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white'
+                  : 'rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
               }
             >
               {PRESET_SHORT[preset.id]}
@@ -118,8 +118,8 @@ export function PresetPanel() {
           onClick={() => setPresetCompareMode('original')}
           className={
             comparingOriginal
-              ? 'rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white'
-              : 'rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+              ? 'rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white'
+              : 'rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
           }
         >
           Original
@@ -131,8 +131,8 @@ export function PresetPanel() {
           onClick={() => setPresetCompareMode('preset')}
           className={
             !comparingOriginal
-              ? 'rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white'
-              : 'rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
+              ? 'rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white'
+              : 'rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50'
           }
         >
           Preset
@@ -174,7 +174,7 @@ export function PresetPanel() {
             onChange={(e) =>
               setPresetTiming({ delayMs: Number(e.target.value) })
             }
-            className="w-full accent-teal-700"
+            className="w-full accent-ms-primary"
             aria-valuemin={0}
             aria-valuemax={maxDelay}
             aria-valuenow={Math.min(session.delayMs, maxDelay)}
@@ -203,7 +203,7 @@ export function PresetPanel() {
             onChange={(e) =>
               setPresetTiming({ durationMs: Number(e.target.value) })
             }
-            className="w-full accent-teal-700"
+            className="w-full accent-ms-primary"
             aria-valuemin={minDur}
             aria-valuemax={maxDuration}
             aria-valuenow={Math.min(session.durationMs, maxDuration)}
@@ -228,7 +228,7 @@ export function PresetPanel() {
           type="button"
           data-testid="btn-preset-cancel"
           onClick={() => cancelPreset()}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-ms-border bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           Cancel
         </button>
@@ -241,7 +241,7 @@ export function PresetPanel() {
               ? `Applies “${label}” (the selected preset), not the original motion on screen`
               : `Apply “${label}” to the selected actor`
           }
-          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+          className="rounded-lg bg-ms-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-ms-primary-hover"
         >
           Apply {label}
         </button>

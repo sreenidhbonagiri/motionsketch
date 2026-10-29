@@ -106,7 +106,7 @@ export function ExamplePreviewStage({
       <div
         ref={stageRef}
         data-testid="example-preview-stage"
-        className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-[#eef1f6]"
+        className="relative w-full overflow-hidden rounded-xl border border-ms-border bg-[#F8F9FC]"
         style={{ aspectRatio: `${aspect}` }}
       >
         {actors.map(({ actor, index, position, xf, hidden }) => {
@@ -200,7 +200,7 @@ export function ExamplePreviewStage({
             }
             setPlaying(true)
           }}
-          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          className="rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
         >
           {playing ? 'Pause' : 'Play'}
         </button>

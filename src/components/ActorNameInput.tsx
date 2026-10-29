@@ -94,7 +94,7 @@ export function ActorNameInput({
         }
         commit()
       }}
-      className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-800 disabled:opacity-40"
+      className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm text-slate-800 disabled:opacity-40"
     />
   )
 }

@@ -67,7 +67,7 @@ function formatSeconds(ms: number): string {
 /** Shared control height — filled primary, ghost secondary; icons for support. */
 const control =
   'inline-flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
-const btnPrimary = `${control} bg-slate-900 text-white hover:bg-slate-800`
+const btnPrimary = `${control} bg-ms-primary text-white hover:bg-ms-primary-hover active:bg-ms-primary-pressed`
 const btnSecondary = `${control} text-slate-700 hover:bg-slate-900/[0.06]`
 const btnQuiet = `${control} text-slate-500 hover:bg-slate-900/[0.05]`
 const btnIcon =
@@ -76,7 +76,7 @@ const btnIcon =
 const recordSlot =
   'inline-flex h-8 min-h-8 min-w-[5.75rem] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
 const surfaceChrome =
-  'rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
+  'rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
 
 export function PlaybackDock() {
   const mode = useEditorStore((s) => s.mode)
@@ -510,8 +510,8 @@ export function PlaybackDock() {
                     onClick={() => selectTransformKeyframe(kf.id)}
                     className={`absolute top-0 size-3 -translate-x-1/2 rounded-sm border transition disabled:opacity-40 ${
                       selected
-                        ? 'border-teal-800 bg-teal-600'
-                        : 'border-slate-400 bg-slate-200 hover:bg-teal-200'
+                        ? 'border-ms-primary-pressed bg-ms-primary'
+                        : 'border-slate-400 bg-slate-200 hover:bg-ms-selected'
                     }`}
                     style={{ left: `${projectT * 100}%` }}
                   />
@@ -540,7 +540,7 @@ export function PlaybackDock() {
               selectTransformKeyframe(null)
               scrubPlayback(Number(e.target.value))
             }}
-            className="w-full accent-teal-700 disabled:opacity-40"
+            className="w-full accent-ms-primary disabled:opacity-40"
           />
         </div>
       )}
@@ -583,7 +583,7 @@ export function PlaybackDock() {
             </button>
             <div
               data-testid="path-tool-toggle"
-              className="flex h-8 items-center rounded-lg bg-slate-900/[0.04] p-0.5"
+              className="flex h-8 items-center rounded-lg bg-ms-selected p-0.5"
               role="group"
               aria-label="Path edit tool"
             >
@@ -594,7 +594,7 @@ export function PlaybackDock() {
                 aria-pressed={pathTool === 'edit-points'}
                 className={
                   pathTool === 'edit-points'
-                    ? 'h-7 rounded-md bg-slate-900 px-2.5 text-sm font-medium text-white'
+                    ? 'h-7 rounded-md bg-ms-primary px-2.5 text-sm font-medium text-white'
                     : 'h-7 rounded-md px-2.5 text-sm font-medium text-slate-600 hover:bg-white/70'
                 }
               >
@@ -615,7 +615,7 @@ export function PlaybackDock() {
                 aria-describedby="path-move-help"
                 className={
                   pathTool === 'move-path'
-                    ? 'h-7 rounded-md bg-teal-700 px-2.5 text-sm font-medium text-white'
+                    ? 'h-7 rounded-md bg-ms-primary px-2.5 text-sm font-medium text-white'
                     : 'h-7 rounded-md px-2.5 text-sm font-medium text-slate-600 hover:bg-white/70'
                 }
               >
@@ -638,7 +638,7 @@ export function PlaybackDock() {
               }
               className={
                 pathAddMode
-                  ? 'rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-teal-800'
+                  ? 'rounded-lg bg-ms-primary px-3 py-1.5 text-sm font-medium text-white transition hover:bg-ms-primary-hover'
                   : btnSecondary
               }
             >
@@ -785,7 +785,7 @@ export function PlaybackDock() {
                       mode === 'armed' && modeStatus ? dockStatusId : undefined
                     }
                     title={mode === 'armed' ? 'Cancel record' : 'Stop recording'}
-                    className={`${recordSlot} bg-red-500 text-white hover:bg-red-600`}
+                    className={`${recordSlot} bg-ms-danger text-white hover:bg-ms-danger-hover`}
                   >
                     {mode === 'armed' ? (
                       'Cancel'
@@ -824,11 +824,11 @@ export function PlaybackDock() {
                     }}
                     // Empty board: Record is the primary action. After a path exists,
                     // Play takes the primary style so preview/export stays front-of-mind.
-                    className={`${recordSlot} ${hasAnyRecording ? 'text-slate-700 hover:bg-slate-900/[0.06]' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                    className={`${recordSlot} ${hasAnyRecording ? 'text-slate-700 hover:bg-slate-900/[0.06]' : 'bg-ms-primary text-white hover:bg-ms-primary-hover active:bg-ms-primary-pressed'}`}
                   >
                     <span
                       aria-hidden
-                      className="size-2 shrink-0 rounded-full bg-red-500"
+                      className="size-2 shrink-0 rounded-full bg-ms-danger"
                     />
                     Record
                   </button>
@@ -1076,7 +1076,7 @@ export function PlaybackDock() {
                         )}
 
                         {geometryEdit && (
-                          <div className="mt-1 border-t border-slate-900/[0.08] bg-white px-1 pt-2">
+                          <div className="mt-1 border-t border-ms-border bg-white px-1 pt-2">
                             <button
                               type="button"
                               data-testid="btn-restore-path"
@@ -1212,11 +1212,11 @@ export function PlaybackDock() {
               {modeStatus.kind === 'recording' ? (
                 <span
                   data-testid="mode-status-label"
-                  className="inline-flex items-center gap-1.5 font-semibold text-red-700"
+                  className="inline-flex items-center gap-1.5 font-semibold text-ms-danger"
                 >
                   <span
                     aria-hidden="true"
-                    className="inline-block size-2 shrink-0 rounded-full bg-red-600"
+                    className="inline-block size-2 shrink-0 rounded-full bg-ms-danger"
                   />
                   {modeStatus.label}
                 </span>

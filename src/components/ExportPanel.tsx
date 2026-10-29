@@ -410,17 +410,17 @@ export function ExportPanel() {
             id={downloadSuccessId}
             data-testid="export-download-success"
             role="status"
-            className="space-y-2 rounded-lg border border-teal-200 bg-teal-50/80 px-2.5 py-2"
+            className="space-y-2 rounded-lg border border-ms-success/25 bg-ms-success-surface px-2.5 py-2"
           >
             <p
               data-testid="export-download-success-title"
-              className="text-[11px] font-medium text-teal-950"
+              className="text-[11px] font-medium text-ms-success"
             >
               Website package download started.
             </p>
             <p
               data-testid="export-download-success-hint"
-              className="text-[11px] leading-relaxed text-teal-900/90"
+              className="text-[11px] leading-relaxed text-ms-success"
             >
               Unzip the folder and open index.html to preview.
             </p>
@@ -429,7 +429,7 @@ export function ExportPanel() {
                 type="button"
                 data-testid="btn-export-view-integration"
                 onClick={showHtmlIntegration}
-                className="rounded-md bg-teal-900 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-teal-800"
+                className="rounded-md bg-ms-primary px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-ms-primary-hover"
               >
                 View integration instructions
               </button>
@@ -437,7 +437,7 @@ export function ExportPanel() {
                 type="button"
                 data-testid="btn-dismiss-download-success"
                 onClick={() => setWebDownloadSuccess(false)}
-                className="rounded-md border border-teal-200 bg-white px-2.5 py-1 text-[11px] font-medium text-teal-900 transition hover:bg-teal-50"
+                className="rounded-md border border-ms-border bg-ms-panel px-2.5 py-1 text-[11px] font-medium text-ms-success transition hover:bg-ms-selected"
               >
                 Dismiss
               </button>
@@ -448,7 +448,7 @@ export function ExportPanel() {
         <div
           role="tablist"
           aria-label="Website integration path"
-          className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+          className="grid grid-cols-2 gap-1 rounded-lg border border-ms-border bg-slate-50 p-0.5"
           data-testid="export-website-path-tabs"
         >
           {(
@@ -472,8 +472,8 @@ export function ExportPanel() {
                 // same paint (animated lag made React look like HTML was still selected).
                 className={`rounded-md px-1.5 py-1.5 text-[11px] ${
                   selected
-                    ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-slate-200'
-                    : 'font-medium text-slate-600 hover:text-slate-900'
+                    ? 'bg-ms-panel font-semibold text-ms-ink shadow-sm ring-1 ring-ms-primary/25'
+                    : 'font-medium text-ms-muted hover:text-ms-ink'
                 }`}
               >
                 {label}
@@ -502,7 +502,7 @@ export function ExportPanel() {
                 webDownloadSuccess && downloadSuccessId,
                 busy && packagingHelpId,
               )}
-              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg bg-ms-primary px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-ms-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
               {packaging === 'web'
                 ? 'Building website package…'
@@ -550,7 +550,7 @@ export function ExportPanel() {
                 reactPackageStatusId,
                 busy && packagingHelpId,
               )}
-              className="w-full rounded-lg bg-slate-900 px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg bg-ms-primary px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-ms-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
             >
               {packaging === 'react'
                 ? 'Building React package…'
@@ -578,7 +578,7 @@ export function ExportPanel() {
               value={trigger}
               aria-describedby={describedBy(triggerHelpId, triggerRegenHelpId)}
               onChange={(e) => onTriggerChange(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800"
+              className="w-full rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs text-slate-800"
             >
               {PLAYBACK_TRIGGERS.map((mode) => (
                 <option key={mode} value={mode}>
@@ -631,7 +631,7 @@ export function ExportPanel() {
               previewTriggerHelpId,
               busy && packagingHelpId,
             )}
-            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Test playback behavior
           </button>
@@ -730,7 +730,7 @@ export function ExportPanel() {
                       type="button"
                       data-testid={`btn-copy-html-section-${id}`}
                       onClick={() => void copyHtmlSection(id)}
-                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
+                      className="rounded-md border border-ms-border bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
                     >
                       {htmlSectionCopied === id ? 'Copied' : 'Copy'}
                     </button>
@@ -742,7 +742,7 @@ export function ExportPanel() {
                     wrap="off"
                     value={value}
                     aria-label={label}
-                    className="h-28 w-full resize-y rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
+                    className="h-28 w-full resize-y rounded-md border border-ms-border bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
                   />
                 </div>
               ))
@@ -826,7 +826,7 @@ export function ExportPanel() {
                   cssFileHelpId,
                   busy && packagingHelpId,
                 )}
-                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Download CSS
               </button>
@@ -849,7 +849,7 @@ export function ExportPanel() {
                   data-testid="btn-copy-css"
                   onClick={() => void copyCss('inline')}
                   aria-describedby={cssCodeHelpId}
-                  className="min-h-9 min-w-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                  className="min-h-9 min-w-0 rounded-lg bg-ms-primary px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover"
                 >
                   {copiedInline ? 'Copied' : 'Copy CSS'}
                 </button>
@@ -859,7 +859,7 @@ export function ExportPanel() {
                   data-testid="btn-view-css"
                   onClick={openDialog}
                   aria-describedby={cssCodeHelpId}
-                  className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                  className="min-h-9 min-w-0 rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
                 >
                   View CSS
                 </button>
@@ -884,7 +884,7 @@ export function ExportPanel() {
                   htmlDemoHelpId,
                   busy && packagingHelpId,
                 )}
-                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Download HTML demo
               </button>
@@ -945,7 +945,7 @@ export function ExportPanel() {
                   ownElementHelpId,
                   ownElementTriggerHelpId,
                 )}
-                className="min-h-9 min-w-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                className="min-h-9 min-w-0 rounded-lg bg-ms-primary px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover"
               >
                 {ownCopied === 'css' ? 'Copied' : 'Copy wrapper CSS'}
               </button>
@@ -957,7 +957,7 @@ export function ExportPanel() {
                   ownElementHelpId,
                   ownElementTriggerHelpId,
                 )}
-                className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                className="min-h-9 min-w-0 rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
               >
                 {ownCopied === 'html' ? 'Copied' : 'Copy HTML example'}
               </button>
@@ -969,7 +969,7 @@ export function ExportPanel() {
                   ownElementHelpId,
                   ownElementTriggerHelpId,
                 )}
-                className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+                className="min-h-9 min-w-0 rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
               >
                 {ownCopied === 'react' ? 'Copied' : 'Copy React example'}
               </button>
@@ -1029,7 +1029,7 @@ export function ExportPanel() {
               data-testid="btn-copy-own-element-css"
               disabled
               aria-describedby={ownElementHelpId}
-              className="min-h-9 min-w-0 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-40"
+              className="min-h-9 min-w-0 rounded-lg bg-ms-primary px-2.5 py-1.5 text-xs font-medium text-white opacity-40"
             >
               Copy wrapper CSS
             </button>
@@ -1038,7 +1038,7 @@ export function ExportPanel() {
               data-testid="btn-copy-own-element-html"
               disabled
               aria-describedby={ownElementHelpId}
-              className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 opacity-40"
+              className="min-h-9 min-w-0 rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 opacity-40"
             >
               Copy HTML example
             </button>
@@ -1047,7 +1047,7 @@ export function ExportPanel() {
               data-testid="btn-copy-own-element-react"
               disabled
               aria-describedby={ownElementHelpId}
-              className="min-h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 opacity-40"
+              className="min-h-9 min-w-0 rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 opacity-40"
             >
               Copy React example
             </button>
@@ -1084,7 +1084,7 @@ export function ExportPanel() {
                 projectActionHelpId,
                 busy && packagingHelpId,
               )}
-              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Download project file
             </button>
@@ -1113,7 +1113,7 @@ export function ExportPanel() {
         ref={dialogRef}
         data-testid="css-dialog"
         aria-labelledby={titleId}
-        className="css-export-dialog fixed inset-0 z-50 m-auto h-[min(80dvh,calc(100dvh-1.5rem))] w-[min(85vw,1100px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40 max-sm:h-[calc(100dvh-1rem)] max-sm:w-[calc(100vw-1rem)]"
+        className="css-export-dialog fixed inset-0 z-50 m-auto h-[min(80dvh,calc(100dvh-1.5rem))] w-[min(85vw,1100px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-ms-border bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40 max-sm:h-[calc(100dvh-1rem)] max-sm:w-[calc(100vw-1rem)]"
         onClick={(e) => {
           if (e.target === dialogRef.current) closeDialog()
         }}
@@ -1128,7 +1128,7 @@ export function ExportPanel() {
                 type="button"
                 data-testid="btn-copy-css-dialog"
                 onClick={() => void copyCss('dialog')}
-                className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-slate-800"
+                className="rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white transition hover:bg-ms-primary-hover"
               >
                 {copiedDialog ? 'Copied' : 'Copy'}
               </button>
@@ -1136,7 +1136,7 @@ export function ExportPanel() {
                 type="button"
                 data-testid="btn-close-css-dialog"
                 onClick={closeDialog}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                className="rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Close
               </button>
@@ -1158,7 +1158,7 @@ export function ExportPanel() {
         ref={previewRef}
         data-testid="trigger-preview-dialog"
         aria-labelledby={previewTitleId}
-        className="fixed inset-0 z-50 m-auto h-[min(85dvh,calc(100dvh-1.5rem))] w-[min(90vw,960px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40"
+        className="fixed inset-0 z-50 m-auto h-[min(85dvh,calc(100dvh-1.5rem))] w-[min(90vw,960px)] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-ms-border bg-white p-0 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.2)] backdrop:bg-slate-900/40"
         onClose={() => setPreviewHtml(null)}
         onClick={(e) => {
           if (e.target === previewRef.current) closeTriggerPreview()
@@ -1176,7 +1176,7 @@ export function ExportPanel() {
               type="button"
               data-testid="btn-close-trigger-preview"
               onClick={closeTriggerPreview}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              className="rounded-lg border border-ms-border bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
             >
               Close
             </button>
@@ -1187,7 +1187,7 @@ export function ExportPanel() {
               data-testid="trigger-preview-frame"
               srcDoc={previewHtml}
               sandbox="allow-scripts allow-same-origin"
-              className="min-h-0 w-full flex-1 border-0 bg-[#f4f6fb]"
+              className="min-h-0 w-full flex-1 border-0 bg-ms-canvas"
             />
           )}
         </div>

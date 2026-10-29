@@ -1,15 +1,25 @@
 @import 'tailwindcss';
 
 :root {
-  /* Canvas-first chrome — restrained surfaces (Vibe Draw–inspired, own identity). */
-  --ms-ink: #0f172a;
-  --ms-muted: #64748b;
-  --ms-canvas: #eef1f5;
-  --ms-surface: rgb(255 255 255 / 0.82);
-  --ms-surface-strong: rgb(255 255 255 / 0.92);
-  --ms-border: rgb(15 23 42 / 0.08);
-  --ms-shadow: 0 2px 16px rgb(15 23 42 / 0.06);
-  --ms-shadow-sm: 0 1px 6px rgb(15 23 42 / 0.05);
+  /* Approved premium chrome palette — flat fills, restrained borders/shadows. */
+  --ms-primary: #3048b8;
+  --ms-primary-hover: #2539a0;
+  --ms-primary-pressed: #1e2f85;
+  --ms-canvas: #f8f9fc;
+  --ms-panel: #ffffff;
+  --ms-ink: #17213a;
+  --ms-muted: #647089;
+  --ms-selected: #ebefff;
+  --ms-border: #dfe4ee;
+  --ms-danger: #d93645;
+  --ms-danger-hover: #c22f3c;
+  --ms-success: #18794e;
+  --ms-success-surface: #ecf8f0;
+
+  --ms-surface: rgb(255 255 255 / 0.92);
+  --ms-surface-strong: #ffffff;
+  --ms-shadow: 0 2px 16px rgb(23 33 58 / 0.06);
+  --ms-shadow-sm: 0 1px 6px rgb(23 33 58 / 0.05);
   --ms-control-h: 2rem;
   --ms-radius: 0.75rem;
   --ms-radius-sm: 0.5rem;
@@ -28,6 +38,36 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tailwind theme bridge — reuse existing utility class patterns. */
+@theme {
+  --color-ms-primary: var(--ms-primary);
+  --color-ms-primary-hover: var(--ms-primary-hover);
+  --color-ms-primary-pressed: var(--ms-primary-pressed);
+  --color-ms-canvas: var(--ms-canvas);
+  --color-ms-panel: var(--ms-panel);
+  --color-ms-ink: var(--ms-ink);
+  --color-ms-muted: var(--ms-muted);
+  --color-ms-selected: var(--ms-selected);
+  --color-ms-border: var(--ms-border);
+  --color-ms-danger: var(--ms-danger);
+  --color-ms-danger-hover: var(--ms-danger-hover);
+  --color-ms-success: var(--ms-success);
+  --color-ms-success-surface: var(--ms-success-surface);
+
+  /* Neutral slate remapped toward approved ink / muted / border / canvas. */
+  --color-slate-950: #0f1629;
+  --color-slate-900: #17213a;
+  --color-slate-800: #243049;
+  --color-slate-700: #3a4660;
+  --color-slate-600: #4f5c75;
+  --color-slate-500: #647089;
+  --color-slate-400: #8b95a8;
+  --color-slate-300: #b8c0ce;
+  --color-slate-200: #dfe4ee;
+  --color-slate-100: #ebefff;
+  --color-slate-50: #f8f9fc;
 }
 
 * {
@@ -53,7 +93,7 @@ dialog {
 }
 
 dialog::backdrop {
-  background: rgb(15 23 42 / 0.32);
+  background: rgb(23 33 58 / 0.36);
 }
 
 dialog.confirm-dialog:not([open]) {
@@ -95,7 +135,7 @@ summary:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid rgb(15 23 42 / 0.28);
+  outline: 2px solid var(--ms-primary);
   outline-offset: 2px;
 }
 

@@ -44,7 +44,7 @@ export function PathHandles({
           data-sample-x={candidateSample.x}
           data-sample-y={candidateSample.y}
           aria-hidden
-          className="absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-teal-500 bg-teal-100/80"
+          className="absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-ms-primary bg-ms-selected/80"
           style={{
             left: `${candidateSample.x * 100}%`,
             top: `${candidateSample.y * 100}%`,
@@ -72,8 +72,8 @@ export function PathHandles({
             tabIndex={selected ? 0 : -1}
             className={`pointer-events-auto absolute size-3.5 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 shadow-sm transition ${
               selected
-                ? 'z-10 border-teal-900 bg-white ring-2 ring-teal-400 ring-offset-1 ring-offset-[#eef1f6]'
-                : 'border-teal-600 bg-white hover:border-teal-700'
+                ? 'z-10 border-ms-primary-pressed bg-white ring-2 ring-ms-primary/40 ring-offset-1 ring-offset-ms-canvas'
+                : 'border-ms-primary bg-white hover:border-ms-primary-hover'
             }`}
             style={{
               left: `${sample.x * 100}%`,

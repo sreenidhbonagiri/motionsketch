@@ -351,7 +351,7 @@ export function ClipTimeline() {
           aria-expanded={false}
           aria-controls="sequence-panel-body"
           onClick={() => setOpenPref(true)}
-          className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-slate-900/[0.08] bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white"
+          className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-ms-border bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white"
         >
           <span>Sequence</span>
           <span className="sr-only">Expand</span>
@@ -370,13 +370,13 @@ export function ClipTimeline() {
       // min-h-10 keeps the Collapse row fully inside the panel. overflow-clip
       // (not hidden) blocks scrollIntoView from shifting the header out of the
       // clip — otherwise hits fall through to the stage canvas underneath.
-      className="pointer-events-auto relative z-[1] flex w-full min-h-10 max-h-full flex-1 flex-col overflow-clip rounded-xl border border-slate-900/[0.08] bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      className="pointer-events-auto relative z-[1] flex w-full min-h-10 max-h-full flex-1 flex-col overflow-clip rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl"
       style={{ maxHeight: SEQUENCE_PANEL_MAX_HEIGHT }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div
         data-testid="sequence-header"
-        className="relative z-[1] flex shrink-0 items-stretch border-b border-slate-900/[0.05] bg-white/90"
+        className="relative z-[1] flex shrink-0 items-stretch border-b border-ms-border bg-white/90"
       >
         <button
           type="button"
@@ -411,7 +411,7 @@ export function ClipTimeline() {
           {!hintDismissed && (
             <div
               data-testid="sequence-first-use-hint"
-              className="flex items-start gap-2 rounded-lg border border-teal-200/80 bg-teal-50/90 px-2.5 py-1.5 text-xs text-teal-950"
+              className="flex items-start gap-2 rounded-lg border border-ms-success/25 bg-ms-success-surface px-2.5 py-1.5 text-xs text-ms-ink"
             >
               <p className="min-w-0 flex-1 leading-snug">
                 Drag a bar to change its start. Drag an edge to change its
@@ -422,7 +422,7 @@ export function ClipTimeline() {
                 data-testid="btn-dismiss-sequence-hint"
                 aria-label="Dismiss sequence hint"
                 onClick={dismissHint}
-                className="shrink-0 rounded px-1.5 py-0.5 font-medium text-teal-900 hover:bg-teal-100"
+                className="shrink-0 rounded px-1.5 py-0.5 font-medium text-ms-success hover:bg-ms-selected"
               >
                 ✕
               </button>
@@ -478,7 +478,9 @@ export function ClipTimeline() {
                   }
                   onKeyDown={(e) => onRowKeyDown(actor.id, e)}
                   className={`rounded-lg px-1.5 py-1 ${
-                    selectedRow ? 'bg-slate-900/5 ring-1 ring-slate-300' : ''
+                    selectedRow
+                      ? 'bg-ms-selected font-medium ring-1 ring-ms-primary/30'
+                      : ''
                   }`}
                 >
                   <div className="mb-0.5 flex items-center justify-between gap-2 text-xs text-slate-600">
@@ -508,7 +510,7 @@ export function ClipTimeline() {
                     className="relative h-6 w-full rounded-md bg-slate-100"
                   >
                     <div
-                      className="absolute inset-y-0 w-px bg-teal-600/70"
+                      className="absolute inset-y-0 w-px bg-ms-primary/70"
                       style={{ left: `${playbackHead * 100}%` }}
                       aria-hidden
                     />
@@ -520,7 +522,7 @@ export function ClipTimeline() {
                           : 'Drag to change start time'
                       }
                       className={`absolute top-0.5 bottom-0.5 touch-none rounded ${
-                        selectedRow ? 'bg-teal-600' : 'bg-slate-400'
+                        selectedRow ? 'bg-ms-primary' : 'bg-slate-400'
                       } ${stationary ? 'opacity-70' : ''}`}
                       style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
                       onPointerDown={(e) =>
@@ -593,7 +595,7 @@ export function ClipTimeline() {
                     onChange={(e) => markDraft(e.target.value, moveForDraft)}
                     onKeyDown={onDraftKeyDown}
                     onInvalid={suppressNativeInvalid}
-                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
+                    className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>
                 <label className="space-y-0.5">
@@ -613,7 +615,7 @@ export function ClipTimeline() {
                     onChange={(e) => markDraft(startDraft, e.target.value)}
                     onKeyDown={onDraftKeyDown}
                     onInvalid={suppressNativeInvalid}
-                    className="w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
+                    className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
                   />
                 </label>
               </div>
@@ -636,7 +638,7 @@ export function ClipTimeline() {
                   data-testid="btn-apply-clip-times"
                   disabled={busy || !draftDirty}
                   onClick={() => applyDraft()}
-                  className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-slate-800 disabled:opacity-40"
+                  className="rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
                 >
                   Apply
                 </button>
@@ -680,12 +682,12 @@ export function ClipTimeline() {
                     Before movement
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-ms-border bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-ms-primary/40 has-[:checked]:bg-ms-selected">
                       <input
                         type="radio"
                         name={`before-${selected.id}`}
                         data-testid="clip-show-before"
-                        className="accent-teal-700"
+                        className="accent-ms-primary"
                         checked={!selected.clip.hideBeforeStart}
                         disabled={busy}
                         onChange={() =>
@@ -694,12 +696,12 @@ export function ClipTimeline() {
                       />
                       Show starting pose
                     </label>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-ms-border bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-ms-primary/40 has-[:checked]:bg-ms-selected">
                       <input
                         type="radio"
                         name={`before-${selected.id}`}
                         data-testid="clip-hide-before"
-                        className="accent-teal-700"
+                        className="accent-ms-primary"
                         checked={!!selected.clip.hideBeforeStart}
                         disabled={busy}
                         onChange={() =>
@@ -721,12 +723,12 @@ export function ClipTimeline() {
                     After movement
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-ms-border bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-ms-primary/40 has-[:checked]:bg-ms-selected">
                       <input
                         type="radio"
                         name={`after-${selected.id}`}
                         data-testid="clip-hold-after"
-                        className="accent-teal-700"
+                        className="accent-ms-primary"
                         checked={!selected.clip.hideAfterEnd}
                         disabled={busy}
                         onChange={() =>
@@ -735,12 +737,12 @@ export function ClipTimeline() {
                       />
                       Hold final pose
                     </label>
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-slate-400 has-[:checked]:bg-slate-100">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-ms-border bg-white px-2 py-1 text-xs text-slate-700 has-[:checked]:border-ms-primary/40 has-[:checked]:bg-ms-selected">
                       <input
                         type="radio"
                         name={`after-${selected.id}`}
                         data-testid="clip-hide-after"
-                        className="accent-teal-700"
+                        className="accent-ms-primary"
                         checked={!!selected.clip.hideAfterEnd}
                         disabled={busy}
                         onChange={() =>
