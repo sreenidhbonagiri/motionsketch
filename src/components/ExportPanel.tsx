@@ -261,7 +261,7 @@ export function ExportPanel() {
         ? 'In <head>'
         : section === 'body'
           ? 'Body placement'
-          : 'Before </body>'
+          : 'Before </body> (after the scene markup)'
     announce(`${label} snippet copied.`)
   }
 
@@ -601,7 +601,7 @@ export function ExportPanel() {
             {triggerHelpText(trigger)}
             {triggerNeedsJavaScript(trigger)
               ? ' Download CSS is CSS-only — this trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
-              : ' Download CSS works alone for page-load.'}{' '}
+              : ' For page-load, CSS alone can start the motion when prefers-reduced-motion is off. The documented website integration still includes ms-trigger.js so Play/Replay and reduced-motion controls work; Download CSS alone skips that controller.'}{' '}
             Loop / alternate still apply after the scene starts.
           </p>
           <p
@@ -633,14 +633,15 @@ export function ExportPanel() {
             )}
             className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Preview trigger
+            Test playback behavior
           </button>
           <p
             id={previewTriggerHelpId}
+            data-testid="export-preview-trigger-help"
             className="text-[11px] leading-relaxed text-slate-500"
           >
-            Isolated export preview — does not change the editor playhead,
-            recording, or undo history.
+            Opens an isolated preview of the selected start setting. Does not
+            change the editor playhead, recording, or undo history.
           </p>
         </div>
 
@@ -664,13 +665,14 @@ export function ExportPanel() {
                 together as shown above.
               </li>
               <li>
-                Preview by opening <code>{WEB_PACKAGE_HTML_NAME}</code>, or copy
-                those files next to your page and paste the three sections
+                Open <code>{WEB_PACKAGE_HTML_NAME}</code> for a self-contained
+                preview page (layout and controls). To embed in an existing page,
+                copy those files beside your HTML and paste the three sections
                 below
                 {websiteIntegration?.ok
                   ? ` (stage aspect ${websiteIntegration.aspectCss})`
                   : ''}
-                .
+                — the snippets are the equivalent integration pieces.
               </li>
               <li>
                 <code>README.txt</code> is instructions;{' '}
@@ -691,6 +693,14 @@ export function ExportPanel() {
                 : ''}
               .
             </p>
+            <p
+              data-testid="export-html-paste-order"
+              className="text-[11px] leading-relaxed text-slate-500"
+            >
+              Paste each section where its label indicates, in the order shown.
+              Initialization goes after the scene markup, before{' '}
+              <code>{'</body>'}</code>.
+            </p>
             {websiteIntegration?.ok ? (
               (
                 [
@@ -702,7 +712,7 @@ export function ExportPanel() {
                   ],
                   [
                     'scripts',
-                    'Before </body>',
+                    'Before </body> (after the scene markup)',
                     websiteIntegration.sections.scripts,
                   ],
                 ] as const

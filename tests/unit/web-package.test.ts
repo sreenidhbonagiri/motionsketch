@@ -311,10 +311,23 @@ describe('web package export', () => {
 
     expect(readme).toContain('In <head>')
     expect(readme).toContain('Where you want the animation, inside <body>')
-    expect(readme).toContain('Before </body>')
+    expect(readme).toContain('Before </body> (after the scene markup)')
     expect(readme).toContain(guide.sections.head)
     expect(readme).toContain(guide.sections.body)
     expect(readme).toContain(guide.sections.scripts)
     expect(readme).toMatch(/neither is required to run the embedded animation/i)
+    expect(readme).toMatch(
+      /Paste each section where its label indicates, in the order shown/i,
+    )
+    expect(readme).toMatch(
+      /Initialization goes after the scene markup, before <\/body>/i,
+    )
+    expect(readme).toMatch(/self-contained preview page/i)
+    expect(readme).toMatch(
+      /CSS alone can start the motion when prefers-reduced-motion is\s+off/i,
+    )
+    expect(readme).toMatch(
+      /still includes\s+ms-trigger\.js[\s\S]*Play\/Replay/i,
+    )
   })
 })
