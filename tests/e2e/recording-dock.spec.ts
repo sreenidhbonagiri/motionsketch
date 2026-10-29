@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import {
   dragActor,
   ensureEditor,
+  openPanel,
   recordSimplePath,
 } from './helpers'
 
@@ -229,5 +230,34 @@ test.describe('recording dock UX', () => {
     await expect(page.getByTestId('reset-actor-confirm')).toBeVisible()
     await page.getByTestId('btn-reset-actor-cancel').click()
     await expect(page.getByTestId('btn-play')).toBeEnabled()
+  })
+
+  test('Project status is not stuck on Recording after take + Play', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await expect(page.getByTestId('action-live-region')).not.toHaveText(
+      'Recording',
+    )
+
+    await page.getByTestId('btn-play').click()
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    // Loop is off by default — wait until playback returns to idle Play.
+    await expect(page.getByTestId('btn-play')).toBeVisible({ timeout: 15000 })
+
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('project-panel')).toBeVisible()
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+    )
+    await expect(page.getByTestId('project-action-status')).toHaveCount(0)
+    await expect(page.getByTestId('project-panel')).not.toContainText(
+      'Recording',
+    )
+    await expect(page.getByTestId('action-live-region')).not.toHaveText(
+      'Recording',
+    )
   })
 })

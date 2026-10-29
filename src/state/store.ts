@@ -63,6 +63,8 @@ import {
 import {
   ARMED_ANNOUNCEMENT,
   ARMED_MISS_INSTRUCTION,
+  RECORDING_ANNOUNCEMENT,
+  RECORDING_CONTINUATION_ANNOUNCEMENT,
 } from '../lib/modeStatus'
 import { selectProcessedPathForActor } from './selectors'
 import {
@@ -879,7 +881,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           liveTrail: [position],
           playbackDirection: 1,
           stageHint: 'default',
-          actionAnnouncement: 'Recording continuation',
+          actionAnnouncement: RECORDING_CONTINUATION_ANNOUNCEMENT,
           ...clearPlacementHistory(state),
         })
         return
@@ -892,7 +894,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         playbackHead: 0,
         playbackDirection: 1,
         stageHint: 'default',
-        actionAnnouncement: 'Recording',
+        actionAnnouncement: RECORDING_ANNOUNCEMENT,
         recordingIntent: 'replace',
         ...clearEditState(),
         ...clearTransformEditState(),
@@ -944,6 +946,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           liveTrail: [],
           playbackHead: 0,
           recordingIntent: 'replace' as RecordingIntent,
+          // Drop "Recording" so Project / live region do not stay stuck after idle.
+          actionAnnouncement: null,
           ...clearEditState(),
           ...clearTransformEditState(),
           ...clearPlacementHistory(s),
