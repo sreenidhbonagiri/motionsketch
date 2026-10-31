@@ -211,6 +211,42 @@ test.describe('first-use tutorial', () => {
       'Open Export to see your download options.',
     )
 
+    // Strong Export highlight: white gap + cobalt outline + halo; Export stays hittable.
+    const exportHighlight = await page.evaluate(() => {
+      const ring = document.querySelector('[data-testid="tutorial-highlight"]')
+      const exportBtn = document.querySelector('[data-testid="btn-export"]')
+      if (!(ring instanceof HTMLElement) || !(exportBtn instanceof HTMLElement)) {
+        return { ok: false, reason: 'missing' }
+      }
+      if (ring.getAttribute('data-tutorial-highlight') !== 'export') {
+        return { ok: false, reason: 'not-export-variant' }
+      }
+      const shadow = getComputedStyle(ring).boxShadow
+      if (!shadow.includes('rgb(48, 72, 184)') && !shadow.includes('#3048b8')) {
+        // Browsers serialize #3048b8 as rgb(48, 72, 184).
+        if (!/48,\s*72,\s*184/.test(shadow)) {
+          return { ok: false, reason: `shadow:${shadow}` }
+        }
+      }
+      const r = exportBtn.getBoundingClientRect()
+      const top = document.elementFromPoint(
+        r.left + r.width / 2,
+        r.top + r.height / 2,
+      )
+      const hittable =
+        top instanceof Element &&
+        (top === exportBtn || exportBtn.contains(top))
+      return {
+        ok: hittable,
+        reason: hittable ? 'ok' : 'export-blocked',
+        shadow,
+      }
+    })
+    expect(exportHighlight, exportHighlight.reason).toMatchObject({
+      ok: true,
+      reason: 'ok',
+    })
+
     // Opening Export must not complete the tutorial.
     await page.getByTestId('btn-export').click()
     await expect(page.getByTestId('export-panel-root')).toBeVisible()
@@ -315,6 +351,94 @@ test.describe('first-use tutorial', () => {
     await page.getByTestId('btn-tutorial-skip').click()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
       'My real project',
+    )
+    const storedAfter = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedAfter).toBe(storedBefore)
+  })
+
+  test('Examples/New during tutorial cannot overwrite a saved project', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await skipTutorialIfPresent(page)
+    await ensureEditor(page, 'Saved before tutorial')
+    await recordSimplePath(page)
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await page.getByTestId('btn-close-project').click()
+
+    const storedBefore = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedBefore).toContain('Saved before tutorial')
+
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await expect(page.getByTestId('tutorial-coach')).toBeVisible()
+
+    // Examples → Orbit must be blocked while practice is active.
+    await page.getByTestId('btn-examples').click()
+    await expect(page.getByTestId('examples-gallery')).toBeVisible()
+    await page.getByTestId('btn-use-orbit').click()
+    await expect(page.getByTestId('tutorial-blocks-replace-confirm')).toBeVisible()
+    await expect(page.getByTestId('tutorial-blocks-replace-copy')).toContainText(
+      /Skip or finish the tutorial/i,
+    )
+    await page.getByTestId('btn-tutorial-blocks-replace-ok').click()
+    await expect(page.getByTestId('tutorial-blocks-replace-confirm')).toHaveCount(
+      0,
+    )
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await page.getByTestId('btn-close-examples').click()
+
+    let storedMid = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedMid).toBe(storedBefore)
+    expect(storedMid).not.toContain('"name": "Orbit"')
+
+    // Reload before Skip — original must still restore.
+    await page.reload()
+    await expect(page.getByTestId('app-shell')).toBeVisible()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Saved before tutorial',
+    )
+    storedMid = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedMid).toBe(storedBefore)
+
+    // Restart again; New project blocked; Skip restores; reload keeps original.
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await expect(page.getByTestId('tutorial-coach')).toBeVisible()
+    await openPanel(page, 'project')
+    await page.getByTestId('btn-new-project').click()
+    await expect(page.getByTestId('tutorial-blocks-replace-confirm')).toBeVisible()
+    await page.getByTestId('btn-tutorial-blocks-replace-back').click()
+    await expect(page.getByTestId('new-project-confirm')).toHaveCount(0)
+    const storedAfterBlock = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedAfterBlock).toBe(storedBefore)
+
+    await page.getByTestId('btn-close-project').click()
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Saved before tutorial',
+    )
+    await page.reload()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Saved before tutorial',
     )
     const storedAfter = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',

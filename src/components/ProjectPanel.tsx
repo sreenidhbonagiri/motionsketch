@@ -7,6 +7,7 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { isRecordingChromeAnnouncement } from '../lib/modeStatus'
+import { blockProjectReplaceDuringTutorial } from '../lib/tutorialGuard'
 import { useEditorStore } from '../state/store'
 import { StageSizeSection } from './StageSizeSection'
 
@@ -58,6 +59,10 @@ export function ProjectPanel() {
   }
 
   const handleNewProject = async () => {
+    if (await blockProjectReplaceDuringTutorial(confirm)) {
+      newProjectBtnRef.current?.focus()
+      return
+    }
     if (projectHasMeaningfulWork(project)) {
       const ok = await confirm({
         title: 'Start a new project?',
@@ -108,6 +113,8 @@ export function ProjectPanel() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+
+    if (await blockProjectReplaceDuringTutorial(confirm)) return
 
     let text: string
     try {

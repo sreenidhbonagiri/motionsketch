@@ -223,16 +223,27 @@ export function TutorialCoach({
       {rect && (
         <div
           data-testid="tutorial-highlight"
+          data-tutorial-highlight={
+            highlightTestId === 'btn-export' ? 'export' : 'default'
+          }
           aria-hidden
-          className="pointer-events-none absolute rounded-xl ring-2 ring-ms-primary ring-offset-2 ring-offset-ms-canvas"
+          className={
+            highlightTestId === 'btn-export'
+              ? 'pointer-events-none absolute rounded-xl'
+              : 'pointer-events-none absolute rounded-xl ring-2 ring-ms-primary ring-offset-2 ring-offset-ms-canvas'
+          }
           style={{
             top: rect.top,
             left: rect.left,
             width: rect.width,
             height: rect.height,
-            boxShadow: softHighlight
-              ? '0 0 0 2px rgb(48 72 184 / 0.35)'
-              : '0 0 0 9999px rgb(23 33 58 / 0.22)',
+            // Export: 3px white gap, 3px cobalt outline, restrained outer halo (no pulse).
+            boxShadow:
+              highlightTestId === 'btn-export'
+                ? '0 0 0 3px #ffffff, 0 0 0 6px #3048b8, 0 0 16px rgb(48 72 184 / 0.35)'
+                : softHighlight
+                  ? '0 0 0 2px rgb(48 72 184 / 0.35)'
+                  : '0 0 0 9999px rgb(23 33 58 / 0.22)',
           }}
         />
       )}

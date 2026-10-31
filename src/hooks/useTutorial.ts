@@ -153,6 +153,8 @@ export function useTutorial(opts: {
 
         if (keep) {
           previousRef.current = null
+          // Intentional exit: release isolation, then persist the practice flight.
+          controller.setAutosaveSuspended(false)
           controller.afterSuccessfulReplace()
           setStep(null)
           setHasPlayed(false)

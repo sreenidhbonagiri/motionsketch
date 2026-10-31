@@ -63,6 +63,12 @@ export const HELP_EXPORT_BLURB =
   'After a path exists, open Export to download a website preview package or other formats.'
 export const HELP_RESTART_TUTORIAL_LABEL = 'Restart tutorial'
 
+/** Shown when New / Open / Examples is attempted during an active tutorial. */
+export const TUTORIAL_BLOCKS_REPLACE_TITLE = 'Finish the tutorial first'
+export const TUTORIAL_BLOCKS_REPLACE_BODY =
+  'Skip or finish the tutorial before starting a new project, opening a file, or loading an example.'
+export const TUTORIAL_BLOCKS_REPLACE_CONFIRM = 'OK'
+
 export function tutorialTitleForStep(step: TutorialStep): string {
   if (step === 'draw') return TUTORIAL_DRAW_TITLE
   if (step === 'play') return TUTORIAL_PLAY_TITLE

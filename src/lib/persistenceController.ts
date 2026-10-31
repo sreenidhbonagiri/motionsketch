@@ -379,8 +379,13 @@ export function createPersistenceController(
       writeSlice(pickPersistable(useEditorStore.getState()))
     },
 
-    /** Clear the active save (e.g. after New project). Blank canvas stays unsaved. */
+    /**
+     * Clear the active save (e.g. after New project). Blank canvas stays unsaved.
+     * No-op while tutorial autosave is suspended — only an intentional tutorial
+     * exit may release that protection.
+     */
     discardStoredAndUnblock: () => {
+      if (autosaveSuspended) return
       clearActiveSaveKeepingCanvas()
       const state = useEditorStore.getState()
       if (projectHasMeaningfulWork(state.project)) {
@@ -388,12 +393,16 @@ export function createPersistenceController(
       }
     },
 
-    /** After open/example replace: persist when the loaded project has work. */
+    /**
+     * After open/example replace: persist when the loaded project has work.
+     * No-op while tutorial autosave is suspended — never clear storage or
+     * re-enable autosave during practice.
+     */
     afterSuccessfulReplace: () => {
+      if (autosaveSuspended) return
       dropPendingTimer()
       quarantineRaw = null
       saveBlocked = false
-      autosaveSuspended = false
       const state = useEditorStore.getState()
       if (projectHasMeaningfulWork(state.project)) {
         writeSlice(pickPersistable(state))
