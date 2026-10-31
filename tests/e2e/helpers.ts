@@ -7,13 +7,27 @@ export async function loadHtmlDocument(page: Page, html: string) {
 }
 
 /**
+ * Dismiss the first-use tutorial offer without starting practice
+ * (marks skipped in localStorage via Start creating).
+ */
+export async function dismissTutorialOfferIfPresent(page: Page) {
+  const start = page.getByTestId('btn-start-creating')
+  if (await start.isVisible().catch(() => false)) {
+    await start.click()
+    await expect(start).toHaveCount(0)
+  }
+}
+
+/**
  * Wait for the editor canvas. Optionally rename the project header.
  * No-ops the rename when the name already matches.
+ * Skips the tutorial offer so unrelated suites stay on a blank canvas.
  */
 export async function ensureEditor(page: Page, name?: string) {
   await expect(page.getByTestId('app-shell')).toBeVisible()
   await expect(page.getByTestId('welcome-screen')).toHaveCount(0)
   await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
+  await dismissTutorialOfferIfPresent(page)
   if (!name) return
   const renameBtn = page.getByTestId('btn-rename-project')
   const current = (await renameBtn.textContent())?.trim()
@@ -261,7 +275,12 @@ export async function selectActorByIndex(page: Page, index: number) {
   return ids[index]
 }
 
-export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
+export type ChromePanel =
+  | 'project'
+  | 'adjust'
+  | 'appearance'
+  | 'export'
+  | 'help'
 
 /** Close every floating chrome panel (Project / Adjust / Appearance / Export). */
 export async function closeOpenChromePanels(page: Page) {
@@ -460,11 +479,12 @@ export async function readExportedCss(page: Page): Promise<string> {
 
 /**
  * Record a short path and leave the editor idle with Play enabled.
- * Closes floating panels before/after so later steps (toast, Export, Adjust)
+ * Closes floating panels before/after so later steps (Export, Adjust)
  * are not blocked by leftover chrome from earlier helpers.
  */
 export async function recordSimplePath(page: Page) {
   await closeOpenChromePanels(page)
+  await dismissTutorialOfferIfPresent(page)
   await clickRecord(page)
   await dragActor(page, { x: 30, y: -20 }, { x: 160, y: 50 })
   await expect(page.getByTestId('btn-play')).toBeEnabled()

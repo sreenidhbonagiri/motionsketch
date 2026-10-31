@@ -83,8 +83,7 @@ test.describe('Sequence panel layout and timing inputs', () => {
     await loadProjectSnapshot(page, buildSequenceCrowdFixtureJson())
     await ensureEditor(page)
     await openSequence(page)
-    // Toast stays up — it is part of the demonstrated short-viewport pressure.
-    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
+    await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
     await assertInViewport(page, 'sequence-header')
     await assertInViewport(page, 'sequence-collapse-label')
     await assertInViewport(page, 'playback-dock')
@@ -92,41 +91,31 @@ test.describe('Sequence panel layout and timing inputs', () => {
     await page.getByTestId('clip-start-input').scrollIntoViewIfNeeded()
     await expect(page.getByTestId('clip-start-input')).toBeVisible()
     await assertInViewport(page, 'sequence-collapse-label')
-    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
 
-    // Collapse must remain hit-testable (not covered by dock / stage / toast).
+    // Collapse must remain hit-testable (not covered by dock / stage).
     const collapseHit = await page.evaluate(() => {
       const btn = document.querySelector(
         '[data-testid="btn-toggle-clip-timeline"]',
       )
-      const toast = document.querySelector(
-        '[data-testid="btn-dismiss-after-path-toast"]',
-      )
-      if (!(btn instanceof HTMLElement) || !(toast instanceof HTMLElement)) {
+      if (!(btn instanceof HTMLElement)) {
         return { ok: false, reason: 'missing' }
       }
-      const hit = (el: HTMLElement) => {
-        const r = el.getBoundingClientRect()
-        const top = document.elementFromPoint(
-          r.left + r.width / 2,
-          r.top + r.height / 2,
-        )
-        return (
-          top instanceof Element && (top === el || el.contains(top))
-        )
-      }
-      if (!hit(btn)) return { ok: false, reason: 'collapse-blocked' }
-      if (!hit(toast)) return { ok: false, reason: 'toast-dismiss-blocked' }
-      return { ok: true, reason: 'ok' }
+      const r = btn.getBoundingClientRect()
+      const top = document.elementFromPoint(
+        r.left + r.width / 2,
+        r.top + r.height / 2,
+      )
+      const ok =
+        top instanceof Element && (top === btn || btn.contains(top))
+      return { ok, reason: ok ? 'ok' : 'collapse-blocked' }
     })
-    expect(collapseHit, '640×360 Collapse / toast hit-test').toEqual({
+    expect(collapseHit, '640×360 Collapse hit-test').toEqual({
       ok: true,
       reason: 'ok',
     })
 
     await page.getByTestId('btn-toggle-clip-timeline').click()
     await expect(page.getByTestId('sequence-panel-body')).toHaveCount(0)
-    await expect(page.getByTestId('after-path-website-toast')).toBeVisible()
   })
 
   test('Start at 0.97 applies; step matches hundredths; invalid uses inline error', async ({
