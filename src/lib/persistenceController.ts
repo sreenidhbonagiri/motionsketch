@@ -291,9 +291,12 @@ export function createPersistenceController(
       if (suspended) {
         dropPendingTimer()
         autosaveSuspended = true
+        // Re-emit so save-status UI can swap to practice copy.
+        setStatus(status)
         return
       }
       autosaveSuspended = false
+      setStatus(status)
     },
 
     isAutosaveSuspended: () => autosaveSuspended,
@@ -307,10 +310,13 @@ export function createPersistenceController(
         lastWrittenFingerprint = fingerprint(slice)
         if (status !== 'save-error' && status !== 'restore-error') {
           setStatus('saved')
+        } else {
+          setStatus(status)
         }
       } else {
         lastWrittenFingerprint = ''
         if (!saveBlocked) setStatus('idle')
+        else setStatus(status)
       }
     },
 

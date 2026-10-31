@@ -26,6 +26,7 @@ export function ProjectPanel() {
 
   const {
     status,
+    practiceSuspended,
     hasQuarantine,
     discardStoredAndUnblock,
     afterSuccessfulReplace,
@@ -33,7 +34,7 @@ export function ProjectPanel() {
     downloadQuarantine,
   } = useProjectPersistence()
 
-  const label = statusLabel(status)
+  const label = statusLabel(status, { practice: practiceSuspended })
   const hasRecording = project.actors.some((a) => !!a.recording)
   const canDownloadProject = hasRecording || status === 'save-error'
   const saveFailed = status === 'save-error'
@@ -166,9 +167,9 @@ export function ProjectPanel() {
         <p
           data-testid="save-status"
           className={
-            status === 'saved'
-              ? 'text-[11px] text-slate-600'
-              : 'text-[11px] text-amber-800'
+            status === 'save-error' || status === 'restore-error'
+              ? 'text-[11px] text-amber-800'
+              : 'text-[11px] text-slate-600'
           }
         >
           {label}

@@ -106,12 +106,20 @@ function candidatesNearDockControl(
     },
     // To the left of control
     {
-      top: clamp(anchor.top + anchor.height / 2 - cardH / 2, MARGIN, vh - cardH - MARGIN),
+      top: clamp(
+        anchor.top + anchor.height / 2 - cardH / 2,
+        MARGIN,
+        vh - cardH - MARGIN,
+      ),
       left: anchor.left - cardW - GAP,
     },
     // To the right
     {
-      top: clamp(anchor.top + anchor.height / 2 - cardH / 2, MARGIN, vh - cardH - MARGIN),
+      top: clamp(
+        anchor.top + anchor.height / 2 - cardH / 2,
+        MARGIN,
+        vh - cardH - MARGIN,
+      ),
       left: anchor.right + GAP,
     },
     // Compact fallback under header / top
@@ -119,6 +127,10 @@ function candidatesNearDockControl(
   ]
 }
 
+/**
+ * Keep Export guidance associated with the Export control — never park under
+ * the left brand/header cluster as a generic fallback.
+ */
 function candidatesNearExportButton(
   anchor: Rect,
   cardW: number,
@@ -126,20 +138,35 @@ function candidatesNearExportButton(
   vw: number,
   vh: number,
 ): Array<{ top: number; left: number }> {
+  const maxLeft = Math.max(MARGIN, vw - cardW - MARGIN)
+  const rightAligned = clamp(anchor.right - cardW, MARGIN, maxLeft)
+  const atButtonLeft = clamp(anchor.left, MARGIN, maxLeft)
+  const leftOfButton = clamp(anchor.left - cardW - GAP, MARGIN, maxLeft)
+  // Stay in the right half even when dodging Fit/zoom.
+  const rightColumn = clamp(Math.max(vw * 0.52, leftOfButton), MARGIN, maxLeft)
+  const below = anchor.bottom + GAP
+  const belowClear = anchor.bottom + GAP + 44
+
   return [
-    {
-      top: anchor.bottom + GAP,
-      left: clamp(anchor.right - cardW, MARGIN, vw - cardW - MARGIN),
-    },
-    {
-      top: anchor.bottom + GAP,
-      left: clamp(anchor.left, MARGIN, vw - cardW - MARGIN),
-    },
+    { top: below, left: rightAligned },
+    { top: below, left: atButtonLeft },
+    { top: belowClear, left: rightAligned },
+    { top: belowClear, left: atButtonLeft },
     {
       top: clamp(anchor.top, MARGIN, vh - cardH - MARGIN),
-      left: clamp(anchor.left - cardW - GAP, MARGIN, vw - cardW - MARGIN),
+      left: leftOfButton,
     },
-    { top: MARGIN + 56, left: MARGIN },
+    {
+      top: clamp(anchor.bottom + 4, MARGIN, vh - cardH - MARGIN),
+      left: leftOfButton,
+    },
+    { top: below, left: rightColumn },
+    { top: belowClear, left: rightColumn },
+    // Last resort: still pinned to the Export/right column.
+    {
+      top: Math.max(MARGIN + 48, below),
+      left: rightAligned,
+    },
   ]
 }
 
@@ -165,19 +192,30 @@ function candidatesBesideExportPanel(
       },
     ]
   }
+  const maxLeft = Math.max(MARGIN, vw - cardW - MARGIN)
+  const beside = clamp(panel.left - cardW - GAP, MARGIN, maxLeft)
+  // Prefer staying close to the panel’s left edge (not the far brand column).
+  const nearPanel = clamp(
+    Math.max(beside, panel.left - cardW - 24),
+    MARGIN,
+    maxLeft,
+  )
   return [
-    // Left of panel, top-aligned (associated with Export sheet)
     {
       top: clamp(panel.top, MARGIN, vh - cardH - MARGIN),
-      left: clamp(panel.left - cardW - GAP, MARGIN, vw - cardW - MARGIN),
+      left: beside,
     },
     {
       top: clamp(panel.top + 40, MARGIN, vh - cardH - MARGIN),
-      left: clamp(panel.left - cardW - GAP, MARGIN, vw - cardW - MARGIN),
+      left: beside,
     },
     {
       top: clamp(panel.top, MARGIN, vh - cardH - MARGIN),
-      left: MARGIN,
+      left: nearPanel,
+    },
+    {
+      top: clamp(panel.top + 8, MARGIN, vh - cardH - MARGIN),
+      left: clamp(panel.left - cardW - GAP - 48, MARGIN, maxLeft),
     },
   ]
 }
@@ -190,6 +228,7 @@ function scorePlacement(
   vw: number,
   vh: number,
   avoid: Rect[],
+  opts?: { keepNearRight?: boolean },
 ): number {
   const box: Rect = {
     top,
@@ -205,7 +244,6 @@ function scorePlacement(
   for (const a of avoid) {
     if (overlaps(box, a, 4)) score -= 120
   }
-  // Prefer staying on-screen fully
   const onScreen =
     box.left >= 0 &&
     box.top >= 0 &&
@@ -219,7 +257,13 @@ function scorePlacement(
     const cx = left + cardW / 2
     const cy = top + cardH / 2
     const dist = Math.hypot(cx - ax, cy - ay)
-    score -= dist * 0.05
+    score -= dist * 0.08
+  }
+  // Export guidance must stay associated with the right-side Export chrome.
+  if (opts?.keepNearRight) {
+    const mid = left + cardW / 2
+    if (mid < vw * 0.42) score -= 160
+    if (mid > vw * 0.55) score += 30
   }
   return score
 }
@@ -245,8 +289,9 @@ export function placeTutorialCard(opts: {
   const avoid: Rect[] = [...(opts.avoidExtra ?? [])]
   if (opts.anchor) avoid.unshift(opts.anchor)
 
+  const exportStep = opts.step === 'export'
   let list: Array<{ top: number; left: number }>
-  if (opts.step === 'export' && opts.exportOpen && opts.panel) {
+  if (exportStep && opts.exportOpen && opts.panel) {
     list = candidatesBesideExportPanel(
       opts.panel,
       cardW,
@@ -256,7 +301,7 @@ export function placeTutorialCard(opts: {
       narrow,
     )
     avoid.unshift(opts.panel)
-  } else if (opts.step === 'export' && opts.anchor) {
+  } else if (exportStep && opts.anchor) {
     list = candidatesNearExportButton(
       opts.anchor,
       cardW,
@@ -285,7 +330,16 @@ export function placeTutorialCard(opts: {
       MARGIN,
       Math.max(MARGIN, opts.vw - cardW - MARGIN),
     )
-    const s = scorePlacement(top, left, cardW, cardH, opts.vw, opts.vh, avoid)
+    const s = scorePlacement(
+      top,
+      left,
+      cardW,
+      cardH,
+      opts.vw,
+      opts.vh,
+      avoid,
+      { keepNearRight: exportStep && !narrow },
+    )
     if (s > bestScore) {
       bestScore = s
       best = { top, left }

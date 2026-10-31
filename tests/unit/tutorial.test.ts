@@ -134,5 +134,57 @@ describe('tutorial placement', () => {
       ],
     })
     expect(placed.left + placed.width).toBeLessThanOrEqual(panel.left - 4)
+    expect(placed.left + placed.width / 2).toBeGreaterThan(1280 * 0.42)
+  })
+
+  it('keeps closed-Export card near Export at 1280×720 with Fit/zoom present', () => {
+    const exportBtn = {
+      top: 12,
+      left: 1180,
+      width: 88,
+      height: 28,
+      right: 1268,
+      bottom: 40,
+    }
+    const fit = {
+      top: 52,
+      left: 1160,
+      width: 72,
+      height: 28,
+      right: 1232,
+      bottom: 80,
+    }
+    const zoom = {
+      top: 52,
+      left: 1080,
+      width: 72,
+      height: 28,
+      right: 1152,
+      bottom: 80,
+    }
+    const placed = placeTutorialCard({
+      step: 'export',
+      exportOpen: false,
+      vw: 1280,
+      vh: 720,
+      cardHeight: 132,
+      anchor: exportBtn,
+      panel: null,
+      avoidExtra: [fit, zoom],
+    })
+    const cardMidX = placed.left + placed.width / 2
+    const exportMidX = exportBtn.left + exportBtn.width / 2
+    expect(cardMidX).toBeGreaterThan(1280 * 0.45)
+    expect(Math.abs(cardMidX - exportMidX)).toBeLessThan(360)
+    expect(placed.top).toBeGreaterThanOrEqual(exportBtn.bottom - 4)
+    // Must not cover Fit
+    expect(
+      !(
+        placed.left < fit.right - 2 &&
+        placed.left + placed.width > fit.left + 2 &&
+        placed.top < fit.bottom - 2 &&
+        placed.top + 132 > fit.top + 2
+      ),
+    ).toBe(true)
   })
 })

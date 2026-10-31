@@ -58,8 +58,8 @@ const headerCluster =
 export function EditorShell() {
   usePlaybackClock()
   useTransformShortcuts()
-  const { status } = useProjectPersistence()
-  const saveLabel = statusLabel(status)
+  const { status, practiceSuspended } = useProjectPersistence()
+  const saveLabel = statusLabel(status, { practice: practiceSuspended })
   const actionAnnouncement = useEditorStore((s) => s.actionAnnouncement)
   const hasRecording = useEditorStore((s) =>
     projectHasAnyRecording(s.project),
@@ -290,9 +290,9 @@ export function EditorShell() {
                   <p
                     data-testid="header-save-status"
                     className={
-                      status === 'saved'
-                        ? 'text-[10px] text-slate-500'
-                        : 'text-[10px] font-medium text-amber-800'
+                      status === 'save-error' || status === 'restore-error'
+                        ? 'text-[10px] font-medium text-amber-800'
+                        : 'text-[10px] text-slate-500'
                     }
                   >
                     {saveLabel}

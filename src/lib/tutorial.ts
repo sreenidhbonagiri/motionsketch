@@ -69,6 +69,10 @@ export const TUTORIAL_BLOCKS_REPLACE_BODY =
   'Skip or finish the tutorial before starting a new project, opening a file, or loading an example.'
 export const TUTORIAL_BLOCKS_REPLACE_CONFIRM = 'OK'
 
+/** Shown instead of the normal saved label while practice autosave is suspended. */
+export const TUTORIAL_PRACTICE_SAVE_STATUS =
+  'Practice animation. Choose Keep to save.'
+
 export function tutorialTitleForStep(step: TutorialStep): string {
   if (step === 'draw') return TUTORIAL_DRAW_TITLE
   if (step === 'play') return TUTORIAL_PLAY_TITLE

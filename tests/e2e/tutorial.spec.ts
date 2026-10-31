@@ -8,7 +8,10 @@ import {
   recordSimplePath,
   skipTutorialIfPresent,
 } from './helpers'
-import { TUTORIAL_PROGRESS_KEY } from '../../src/lib/tutorial'
+import {
+  TUTORIAL_PRACTICE_SAVE_STATUS,
+  TUTORIAL_PROGRESS_KEY,
+} from '../../src/lib/tutorial'
 
 const SHOT_DIR = join(process.cwd(), 'tmp/tutorial-verify')
 mkdirSync(SHOT_DIR, { recursive: true })
@@ -70,6 +73,9 @@ test.describe('first-use tutorial', () => {
     )
     await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
       'Click Record to start.',
+    )
+    await expect(page.getByTestId('header-save-status')).toHaveText(
+      TUTORIAL_PRACTICE_SAVE_STATUS,
     )
     await page.waitForTimeout(280)
     await page.screenshot({ path: join(SHOT_DIR, '01-auto-draw.png') })
@@ -247,6 +253,48 @@ test.describe('first-use tutorial', () => {
       reason: 'ok',
     })
 
+    const nearExportClosed = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="tutorial-coach-card"]')
+      const exportBtn = document.querySelector('[data-testid="btn-export"]')
+      const fit = document.querySelector('[data-testid="btn-fit-stage"]')
+      if (
+        !(card instanceof HTMLElement) ||
+        !(exportBtn instanceof HTMLElement) ||
+        !(fit instanceof HTMLElement)
+      ) {
+        return { ok: false, reason: 'missing' }
+      }
+      const cr = card.getBoundingClientRect()
+      const er = exportBtn.getBoundingClientRect()
+      const fr = fit.getBoundingClientRect()
+      const cx = cr.left + cr.width / 2
+      const ex = er.left + er.width / 2
+      const dist = Math.hypot(cx - ex, cr.top + cr.height / 2 - (er.top + er.height / 2))
+      const overlapFit =
+        cr.left < fr.right - 2 &&
+        cr.right > fr.left + 2 &&
+        cr.top < fr.bottom - 2 &&
+        cr.bottom > fr.top + 2
+      const leftHeader = cx < window.innerWidth * 0.42
+      return {
+        ok: dist < 420 && !overlapFit && !leftHeader,
+        reason: leftHeader
+          ? 'left-header-fallback'
+          : overlapFit
+            ? 'covers-fit'
+            : dist >= 420
+              ? `far:${Math.round(dist)}`
+              : 'ok',
+        dist: Math.round(dist),
+        cardLeft: Math.round(cr.left),
+      }
+    })
+    expect(nearExportClosed, nearExportClosed.reason).toMatchObject({
+      ok: true,
+      reason: 'ok',
+    })
+    await page.screenshot({ path: join(SHOT_DIR, '04-export-closed.png') })
+
     // Opening Export must not complete the tutorial.
     await page.getByTestId('btn-export').click()
     await expect(page.getByTestId('export-panel-root')).toBeVisible()
@@ -257,6 +305,29 @@ test.describe('first-use tutorial', () => {
     )
     await expect(page.getByTestId('btn-tutorial-finish')).toBeVisible()
     await expect(page.getByTestId('btn-tutorial-skip')).toBeVisible()
+
+    const nearExportOpen = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="tutorial-coach-card"]')
+      const panel = document.querySelector('[data-testid="export-panel-root"]')
+      if (!(card instanceof HTMLElement) || !(panel instanceof HTMLElement)) {
+        return { ok: false, reason: 'missing' }
+      }
+      const cr = card.getBoundingClientRect()
+      const pr = panel.getBoundingClientRect()
+      const cx = cr.left + cr.width / 2
+      const associated =
+        cx > window.innerWidth * 0.42 &&
+        Math.abs(cx - pr.left) < 360 &&
+        cr.right <= pr.left + 4
+      return {
+        ok: associated,
+        reason: associated ? 'ok' : `cardMid=${Math.round(cx)} panelLeft=${Math.round(pr.left)}`,
+      }
+    })
+    expect(nearExportOpen, nearExportOpen.reason).toMatchObject({
+      ok: true,
+      reason: 'ok',
+    })
     await page.screenshot({ path: join(SHOT_DIR, '04-export-open.png') })
 
     // Hit-test: Finish and a primary export control must be clickable.
@@ -348,9 +419,21 @@ test.describe('first-use tutorial', () => {
     )
     expect(storedMid).toBe(storedBefore)
 
+    await expect(page.getByTestId('header-save-status')).toHaveText(
+      TUTORIAL_PRACTICE_SAVE_STATUS,
+    )
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      TUTORIAL_PRACTICE_SAVE_STATUS,
+    )
+    await page.getByTestId('btn-close-project').click()
+
     await page.getByTestId('btn-tutorial-skip').click()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
       'My real project',
+    )
+    await expect(page.getByTestId('header-save-status')).toHaveText(
+      'Saved in this browser',
     )
     const storedAfter = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',
@@ -444,6 +527,124 @@ test.describe('first-use tutorial', () => {
       () => localStorage.getItem('motionsketch.project.v1') || '',
     )
     expect(storedAfter).toBe(storedBefore)
+  })
+
+  test('Export card stays near Export at 1280×720 closed and open', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await clearAppStorage(page)
+    await awaitAutoTutorial(page)
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 40, y: -20 }, { x: 160, y: 40 })
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'play',
+    )
+    await page.getByTestId('btn-play').click()
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await page.getByTestId('btn-pause').click()
+    await page.getByTestId('btn-tutorial-next').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'export',
+    )
+    await page.waitForTimeout(120)
+
+    const closed = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="tutorial-coach-card"]')
+      const exportBtn = document.querySelector('[data-testid="btn-export"]')
+      const fit = document.querySelector('[data-testid="btn-fit-stage"]')
+      if (
+        !(card instanceof HTMLElement) ||
+        !(exportBtn instanceof HTMLElement) ||
+        !(fit instanceof HTMLElement)
+      ) {
+        return { ok: false, reason: 'missing' }
+      }
+      const cr = card.getBoundingClientRect()
+      const er = exportBtn.getBoundingClientRect()
+      const fr = fit.getBoundingClientRect()
+      const cx = cr.left + cr.width / 2
+      const ex = er.left + er.width / 2
+      const dist = Math.hypot(cx - ex, cr.top + cr.height / 2 - (er.top + er.height / 2))
+      const overlapFit =
+        cr.left < fr.right - 2 &&
+        cr.right > fr.left + 2 &&
+        cr.top < fr.bottom - 2 &&
+        cr.bottom > fr.top + 2
+      const hitExport = (() => {
+        const top = document.elementFromPoint(
+          er.left + er.width / 2,
+          er.top + er.height / 2,
+        )
+        return (
+          top instanceof Element &&
+          (top === exportBtn || exportBtn.contains(top))
+        )
+      })()
+      return {
+        ok: dist < 400 && !overlapFit && cx > 1280 * 0.45 && hitExport,
+        reason:
+          cx <= 1280 * 0.45
+            ? 'left-header-fallback'
+            : overlapFit
+              ? 'covers-fit'
+              : !hitExport
+                ? 'export-blocked'
+                : dist >= 400
+                  ? `far:${Math.round(dist)}`
+                  : 'ok',
+        dist: Math.round(dist),
+        cardLeft: Math.round(cr.left),
+      }
+    })
+    expect(closed, closed.reason).toMatchObject({ ok: true, reason: 'ok' })
+    await page.screenshot({ path: join(SHOT_DIR, '07-export-1280x720-closed.png') })
+
+    await page.getByTestId('btn-export').click()
+    await expect(page.getByTestId('export-panel-root')).toBeVisible()
+    const opened = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="tutorial-coach-card"]')
+      const panel = document.querySelector('[data-testid="export-panel-root"]')
+      const download = document.querySelector(
+        '[data-testid="btn-download-web-package"]',
+      )
+      const close = document.querySelector('[data-testid="btn-close-export"]')
+      if (
+        !(card instanceof HTMLElement) ||
+        !(panel instanceof HTMLElement) ||
+        !(download instanceof HTMLElement) ||
+        !(close instanceof HTMLElement)
+      ) {
+        return { ok: false, reason: 'missing' }
+      }
+      const cr = card.getBoundingClientRect()
+      const pr = panel.getBoundingClientRect()
+      const cx = cr.left + cr.width / 2
+      const probe = (el: HTMLElement) => {
+        const r = el.getBoundingClientRect()
+        const top = document.elementFromPoint(
+          r.left + r.width / 2,
+          r.top + r.height / 2,
+        )
+        return top instanceof Element && (top === el || el.contains(top))
+      }
+      const nearPanel =
+        cx > 1280 * 0.42 && cr.right <= pr.left + 6 && Math.abs(cx - pr.left) < 380
+      return {
+        ok: nearPanel && probe(download) && probe(close),
+        reason: !nearPanel
+          ? `away-from-panel mid=${Math.round(cx)}`
+          : !probe(download)
+            ? 'download-blocked'
+            : !probe(close)
+              ? 'close-blocked'
+              : 'ok',
+      }
+    })
+    expect(opened, opened.reason).toMatchObject({ ok: true, reason: 'ok' })
+    await page.screenshot({ path: join(SHOT_DIR, '08-export-1280x720-open.png') })
   })
 
   test('Keep from Export preserves flight and leaves Export open', async ({
