@@ -251,6 +251,7 @@ export function EditorShell() {
       {tutorial.active && tutorial.step && (
         <TutorialCoach
           step={tutorial.step}
+          title={tutorial.coachTitle}
           body={tutorial.coachBody}
           highlightTestId={tutorial.highlightTestId}
           softHighlight={tutorial.softHighlight}

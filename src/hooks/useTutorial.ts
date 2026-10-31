@@ -16,7 +16,8 @@ import {
   type TutorialStep,
   TUTORIAL_DRAW_DRAG,
   TUTORIAL_DRAW_RECORD,
-  TUTORIAL_EXPORT,
+  TUTORIAL_EXPORT_INSIDE,
+  TUTORIAL_EXPORT_OPEN,
   TUTORIAL_KEEP_BODY_FRESH,
   TUTORIAL_KEEP_BODY_RESTORE,
   TUTORIAL_KEEP_CONFIRM,
@@ -24,12 +25,15 @@ import {
   TUTORIAL_KEEP_RESTORE,
   TUTORIAL_KEEP_TITLE,
   TUTORIAL_PLAY_IDLE,
+  TUTORIAL_PLAY_NEXT,
   TUTORIAL_PLAY_WATCHING,
+  tutorialTitleForStep,
 } from '../lib/tutorial'
 
 export type TutorialView = {
   step: TutorialStep | null
   drawPhase: TutorialDrawPhase
+  coachTitle: string
   coachBody: string
   highlightTestId: string | null
   softHighlight: boolean
@@ -204,6 +208,7 @@ export function useTutorial(opts: {
     setStep('draw')
   }, [applyPersistedSnapshot, closePanels])
 
+  let coachTitle = ''
   let coachBody = ''
   let highlightTestId: string | null = null
   let softHighlight = false
@@ -211,7 +216,11 @@ export function useTutorial(opts: {
   let nextIsFinish = false
 
   if (step === 'draw') {
+    coachTitle = tutorialTitleForStep('draw')
+    // Soft ring only — heavy dim hides the nearby coach card.
+    softHighlight = true
     if (drawPhase === 'drag') {
+      // Highlight the plane for the gesture; card stays near Record.
       coachBody = TUTORIAL_DRAW_DRAG
       highlightTestId = 'actor'
     } else {
@@ -219,20 +228,26 @@ export function useTutorial(opts: {
       highlightTestId = 'btn-record'
     }
   } else if (step === 'play') {
+    coachTitle = tutorialTitleForStep('play')
+    softHighlight = true
     if (mode === 'playing') {
       coachBody = TUTORIAL_PLAY_WATCHING
       highlightTestId = 'btn-pause'
-      softHighlight = true
+    } else if (hasPlayed) {
+      coachBody = TUTORIAL_PLAY_NEXT
+      highlightTestId = 'btn-play'
     } else {
       coachBody = TUTORIAL_PLAY_IDLE
       highlightTestId = 'btn-play'
     }
     showNext = hasPlayed && mode !== 'playing'
   } else if (step === 'export') {
-    coachBody = TUTORIAL_EXPORT
+    coachTitle = tutorialTitleForStep('export')
+    const exportOpen = opts.openPanel === 'export'
+    coachBody = exportOpen ? TUTORIAL_EXPORT_INSIDE : TUTORIAL_EXPORT_OPEN
     // Highlight Export chrome only while the panel is closed.
-    highlightTestId = opts.openPanel === 'export' ? null : 'btn-export'
-    softHighlight = opts.openPanel === 'export'
+    highlightTestId = exportOpen ? null : 'btn-export'
+    softHighlight = true
     showNext = true
     nextIsFinish = true
   }
@@ -240,6 +255,7 @@ export function useTutorial(opts: {
   const view: TutorialView = {
     step,
     drawPhase,
+    coachTitle,
     coachBody,
     highlightTestId,
     softHighlight,

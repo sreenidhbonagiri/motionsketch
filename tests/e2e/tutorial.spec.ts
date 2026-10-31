@@ -38,6 +38,10 @@ async function awaitAutoTutorial(page: Page) {
   await expect(page.getByTestId('btn-tutorial-skip')).toHaveAccessibleName(
     /Skip tutorial/i,
   )
+  await expect(page.getByTestId('tutorial-coach-card')).toHaveCSS(
+    'opacity',
+    '1',
+  )
 }
 
 /** Layout top/left from style — ignores entrance transform on the box. */
@@ -60,23 +64,67 @@ test.describe('first-use tutorial', () => {
     await awaitAutoTutorial(page)
     await expect(page.getByTestId('btn-try-tutorial')).toHaveCount(0)
     await expect(page.getByTestId('btn-start-creating')).toHaveCount(0)
-    await expect(page.getByTestId('tutorial-coach-body')).toContainText(
-      /Click Record.*plane/i,
+    await expect(page.getByTestId('tutorial-step-label')).toHaveText('1 of 3')
+    await expect(page.getByTestId('tutorial-coach-title')).toHaveText(
+      'Draw your flight',
     )
-    // Wait for entrance opacity so verification shots show the card.
+    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
+      'Click Record to start.',
+    )
     await page.waitForTimeout(280)
     await page.screenshot({ path: join(SHOT_DIR, '01-auto-draw.png') })
 
+    const nearRecord = await page.evaluate(() => {
+      const card = document.querySelector('[data-testid="tutorial-coach-card"]')
+      const record = document.querySelector('[data-testid="btn-record"]')
+      if (!(card instanceof HTMLElement) || !(record instanceof HTMLElement)) {
+        return { ok: false, reason: 'missing' }
+      }
+      const cr = card.getBoundingClientRect()
+      const rr = record.getBoundingClientRect()
+      const overlap =
+        cr.left < rr.right - 2 &&
+        cr.right > rr.left + 2 &&
+        cr.top < rr.bottom - 2 &&
+        cr.bottom > rr.top + 2
+      const cx = cr.left + cr.width / 2
+      const cy = cr.top + cr.height / 2
+      const rx = rr.left + rr.width / 2
+      const ry = rr.top + rr.height / 2
+      const dist = Math.hypot(cx - rx, cy - ry)
+      const hit = document.elementFromPoint(
+        rr.left + rr.width / 2,
+        rr.top + rr.height / 2,
+      )
+      const recordClear =
+        hit instanceof Element && (hit === record || record.contains(hit))
+      return {
+        ok: !overlap && dist < 320 && recordClear,
+        reason: overlap
+          ? 'covers-record'
+          : dist >= 320
+            ? `far-from-record:${Math.round(dist)}`
+            : !recordClear
+              ? 'record-blocked'
+              : 'ok',
+        dist: Math.round(dist),
+      }
+    })
+    expect(nearRecord, nearRecord.reason).toMatchObject({
+      ok: true,
+      reason: 'ok',
+    })
+
     const cardBefore = await readCardPlacement(page)
 
-    // Zero-motion / cancel must not advance.
+    // Zero-motion / cancel must not advance; card stays near Record.
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('dock-status')).toHaveAttribute(
       'data-mode-status',
       'armed',
     )
-    await expect(page.getByTestId('tutorial-coach-body')).toContainText(
-      /Drag the plane/i,
+    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
+      'Drag the plane to draw a path. Release to finish.',
     )
     const cardArmed = await readCardPlacement(page)
     expect(Math.abs(cardArmed.left - cardBefore.left)).toBeLessThanOrEqual(1)
@@ -118,35 +166,49 @@ test.describe('first-use tutorial', () => {
       'play',
       { timeout: 5000 },
     )
-    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
-      'Play your flight.',
+    await expect(page.getByTestId('tutorial-step-label')).toHaveText('2 of 3')
+    await expect(page.getByTestId('tutorial-coach-title')).toHaveText(
+      'Watch it move',
     )
-    // Placement stays fixed across draw → play (only resize/Export may move it).
+    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
+      'Click Play to watch your flight.',
+    )
     const cardPlay = await readCardPlacement(page)
-    expect(Math.abs(cardPlay.left - cardBefore.left)).toBeLessThanOrEqual(1)
-    expect(Math.abs(cardPlay.top - cardBefore.top)).toBeLessThanOrEqual(1)
     await page.screenshot({ path: join(SHOT_DIR, '02-play-idle.png') })
 
     const fitBefore = await page.getByTestId('btn-fit-stage').boundingBox()
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
-    await expect(page.getByTestId('tutorial-coach-body')).toContainText(
-      /Watch your flight/i,
+    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
+      'Your flight is playing.',
     )
     const cardWatching = await readCardPlacement(page)
-    expect(Math.abs(cardWatching.left - cardBefore.left)).toBeLessThanOrEqual(1)
-    expect(Math.abs(cardWatching.top - cardBefore.top)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cardWatching.left - cardPlay.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cardWatching.top - cardPlay.top)).toBeLessThanOrEqual(1)
     const fitDuring = await page.getByTestId('btn-fit-stage').boundingBox()
     expect(fitBefore).toBeTruthy()
     expect(fitDuring).toBeTruthy()
     expect(Math.abs(fitDuring!.y - fitBefore!.y)).toBeLessThanOrEqual(2)
     await page.screenshot({ path: join(SHOT_DIR, '03-play-watching.png') })
     await page.getByTestId('btn-pause').click()
+    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
+      'Select Next to export your flight.',
+    )
     await expect(page.getByTestId('btn-tutorial-next')).toBeVisible()
+    const cardAfterPause = await readCardPlacement(page)
+    expect(Math.abs(cardAfterPause.left - cardPlay.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cardAfterPause.top - cardPlay.top)).toBeLessThanOrEqual(1)
     await page.getByTestId('btn-tutorial-next').click()
     await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
       'data-tutorial-step',
       'export',
+    )
+    await expect(page.getByTestId('tutorial-step-label')).toHaveText('3 of 3')
+    await expect(page.getByTestId('tutorial-coach-title')).toHaveText(
+      'Use it on your website',
+    )
+    await expect(page.getByTestId('tutorial-coach-body')).toHaveText(
+      'Open Export to see your download options.',
     )
 
     // Opening Export must not complete the tutorial.
@@ -154,6 +216,9 @@ test.describe('first-use tutorial', () => {
     await expect(page.getByTestId('export-panel-root')).toBeVisible()
     await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
     await expect(page.getByTestId('tutorial-coach')).toBeVisible()
+    await expect(page.getByTestId('tutorial-coach-body')).toContainText(
+      /Choose HTML or React/i,
+    )
     await expect(page.getByTestId('btn-tutorial-finish')).toBeVisible()
     await expect(page.getByTestId('btn-tutorial-skip')).toBeVisible()
     await page.screenshot({ path: join(SHOT_DIR, '04-export-open.png') })
@@ -164,6 +229,10 @@ test.describe('first-use tutorial', () => {
       const download = document.querySelector(
         '[data-testid="btn-download-web-package"]',
       )
+      const tabs = document.querySelector(
+        '[data-testid="export-website-path-tabs"]',
+      )
+      const close = document.querySelector('[data-testid="btn-close-export"]')
       const probe = (el: Element | null) => {
         if (!(el instanceof HTMLElement)) return { ok: false, reason: 'missing' }
         const r = el.getBoundingClientRect()
@@ -180,10 +249,17 @@ test.describe('first-use tutorial', () => {
             : `blocked:${top instanceof Element ? top.getAttribute('data-testid') || top.tagName : 'null'}`,
         }
       }
-      return { finish: probe(finish), download: probe(download) }
+      return {
+        finish: probe(finish),
+        download: probe(download),
+        tabs: probe(tabs),
+        close: probe(close),
+      }
     })
     expect(finishHit.finish.ok, finishHit.finish.reason).toBe(true)
     expect(finishHit.download.ok, finishHit.download.reason).toBe(true)
+    expect(finishHit.tabs.ok, finishHit.tabs.reason).toBe(true)
+    expect(finishHit.close.ok, finishHit.close.reason).toBe(true)
 
     await page.getByTestId('btn-tutorial-finish').click()
     await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
@@ -228,6 +304,7 @@ test.describe('first-use tutorial', () => {
     await expect(page.getByTestId('help-recording-blurb')).toContainText(
       /Click Record, drag an element, then release to finish/i,
     )
+    await expect(page.getByTestId('help-recording-blurb')).not.toContainText('—')
     await page.getByTestId('btn-restart-tutorial').click()
     await expect(page.getByTestId('tutorial-coach')).toBeVisible()
     const storedMid = await page.evaluate(
@@ -279,6 +356,7 @@ test.describe('first-use tutorial', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await clearAppStorage(page)
     await awaitAutoTutorial(page)
+    await page.waitForTimeout(280)
     await page.screenshot({ path: join(SHOT_DIR, '05-mobile-draw.png') })
 
     const geometry = await page.evaluate(() => {
@@ -298,10 +376,7 @@ test.describe('first-use tutorial', () => {
       const fr = fit.getBoundingClientRect()
       const rr = record.getBoundingClientRect()
       const ar = actor.getBoundingClientRect()
-      const overlap = (
-        a: DOMRect,
-        b: DOMRect,
-      ) =>
+      const overlap = (a: DOMRect, b: DOMRect) =>
         a.left < b.right - 2 &&
         a.right > b.left + 2 &&
         a.top < b.bottom - 2 &&
@@ -313,6 +388,9 @@ test.describe('first-use tutorial', () => {
           r.top + r.height / 2,
         )
         return top instanceof Element && (top === el || el.contains(top))
+      }
+      if (cr.top < -1 || cr.bottom > 844 + 1 || cr.left < -1 || cr.right > 390 + 1) {
+        return { ok: false, reason: 'card-offscreen' }
       }
       if (overlap(cr, fr)) return { ok: false, reason: 'card-over-fit' }
       if (overlap(cr, rr)) return { ok: false, reason: 'card-over-record' }
@@ -327,7 +405,15 @@ test.describe('first-use tutorial', () => {
     })
     expect(geometry, geometry.reason).toMatchObject({ ok: true, reason: 'ok' })
 
+    const cardDraw = await readCardPlacement(page)
     await page.getByTestId('btn-record').click()
+    await expect(page.getByTestId('tutorial-coach-body')).toContainText(
+      /Drag the plane/i,
+    )
+    const cardArmed = await readCardPlacement(page)
+    expect(Math.abs(cardArmed.left - cardDraw.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cardArmed.top - cardDraw.top)).toBeLessThanOrEqual(1)
+
     await dragActor(page, { x: 30, y: -20 }, { x: 120, y: 40 })
     await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
       'data-tutorial-step',
@@ -335,7 +421,11 @@ test.describe('first-use tutorial', () => {
     )
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
+    const cardPlay = await readCardPlacement(page)
     await page.getByTestId('btn-pause').click()
+    const cardPaused = await readCardPlacement(page)
+    expect(Math.abs(cardPaused.left - cardPlay.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cardPaused.top - cardPlay.top)).toBeLessThanOrEqual(1)
     await page.getByTestId('btn-tutorial-next').click()
     await page.getByTestId('btn-export').click()
     await expect(page.getByTestId('export-panel-root')).toBeVisible()
@@ -344,6 +434,12 @@ test.describe('first-use tutorial', () => {
       const finish = document.querySelector('[data-testid="btn-tutorial-finish"]')
       const skip = document.querySelector('[data-testid="btn-tutorial-skip"]')
       const close = document.querySelector('[data-testid="btn-close-export"]')
+      const download = document.querySelector(
+        '[data-testid="btn-download-web-package"]',
+      )
+      const tabs = document.querySelector(
+        '[data-testid="export-website-path-tabs"]',
+      )
       const probe = (el: Element | null, label: string) => {
         if (!(el instanceof HTMLElement)) {
           return { ok: false, reason: `${label}-missing` }
@@ -365,12 +461,16 @@ test.describe('first-use tutorial', () => {
             : `${label}-blocked:${top instanceof Element ? top.getAttribute('data-testid') || top.tagName : 'null'}`,
         }
       }
-      const f = probe(finish, 'finish')
-      if (!f.ok) return f
-      const s = probe(skip, 'skip')
-      if (!s.ok) return s
-      const c = probe(close, 'close')
-      if (!c.ok) return c
+      for (const [el, label] of [
+        [finish, 'finish'],
+        [skip, 'skip'],
+        [close, 'close'],
+        [download, 'download'],
+        [tabs, 'tabs'],
+      ] as const) {
+        const p = probe(el, label)
+        if (!p.ok) return p
+      }
       return { ok: true, reason: 'ok' }
     })
     expect(exportHits, exportHits.reason).toEqual({ ok: true, reason: 'ok' })

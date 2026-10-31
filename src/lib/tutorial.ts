@@ -29,14 +29,20 @@ export type TutorialStep = 'draw' | 'play' | 'export'
 
 export type TutorialDrawPhase = 'record' | 'drag'
 
-export const TUTORIAL_DRAW_RECORD =
-  'Click Record, then drag the plane to draw its flight.'
-export const TUTORIAL_DRAW_DRAG = 'Drag the plane to draw its flight.'
-export const TUTORIAL_PLAY_IDLE = 'Play your flight.'
-export const TUTORIAL_PLAY_WATCHING =
-  'Watch your flight — pause anytime, or wait until it finishes.'
-export const TUTORIAL_EXPORT =
-  'Export lets you download a preview and files for your website. Look around — download is optional — then finish when you are ready.'
+export const TUTORIAL_DRAW_TITLE = 'Draw your flight'
+export const TUTORIAL_DRAW_RECORD = 'Click Record to start.'
+export const TUTORIAL_DRAW_DRAG =
+  'Drag the plane to draw a path. Release to finish.'
+
+export const TUTORIAL_PLAY_TITLE = 'Watch it move'
+export const TUTORIAL_PLAY_IDLE = 'Click Play to watch your flight.'
+export const TUTORIAL_PLAY_WATCHING = 'Your flight is playing.'
+export const TUTORIAL_PLAY_NEXT = 'Select Next to export your flight.'
+
+export const TUTORIAL_EXPORT_TITLE = 'Use it on your website'
+export const TUTORIAL_EXPORT_OPEN = 'Open Export to see your download options.'
+export const TUTORIAL_EXPORT_INSIDE =
+  'Choose HTML or React, then download the files for your website. You can finish without downloading.'
 
 export const TUTORIAL_SKIP_LABEL = 'Skip tutorial'
 export const TUTORIAL_NEXT_LABEL = 'Next'
@@ -52,10 +58,22 @@ export const TUTORIAL_KEEP_RESTORE = 'Restore previous project'
 export const TUTORIAL_KEEP_FRESH = 'Start fresh'
 
 export const HELP_RECORDING_BLURB =
-  'Click Record, drag an element, then release to finish. Short or zero-motion drags are ignored — try again.'
+  'Click Record, drag an element, then release to finish. Short or zero-motion drags are ignored. Try again.'
 export const HELP_EXPORT_BLURB =
-  'After a path exists, open Export to download a website preview package or other formats. Copy and download feedback stay in Export and Project.'
+  'After a path exists, open Export to download a website preview package or other formats.'
 export const HELP_RESTART_TUTORIAL_LABEL = 'Restart tutorial'
+
+export function tutorialTitleForStep(step: TutorialStep): string {
+  if (step === 'draw') return TUTORIAL_DRAW_TITLE
+  if (step === 'play') return TUTORIAL_PLAY_TITLE
+  return TUTORIAL_EXPORT_TITLE
+}
+
+export function tutorialProgressLabel(step: TutorialStep): string {
+  if (step === 'draw') return '1 of 3'
+  if (step === 'play') return '2 of 3'
+  return '3 of 3'
+}
 
 const TUTORIAL_STAGE = compositionSizeFromAspect(TUTORIAL_STAGE_ASPECT)
 

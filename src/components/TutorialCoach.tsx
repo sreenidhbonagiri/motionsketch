@@ -11,8 +11,14 @@ import {
   TUTORIAL_FINISH_LABEL,
   TUTORIAL_NEXT_LABEL,
   TUTORIAL_SKIP_LABEL,
+  tutorialProgressLabel,
   type TutorialStep,
 } from '../lib/tutorial'
+import {
+  placeTutorialCard,
+  readElementRect,
+  resolvePlacementAnchor,
+} from '../lib/tutorialPlacement'
 
 type HighlightRect = {
   top: number
@@ -23,11 +29,12 @@ type HighlightRect = {
 
 interface TutorialCoachProps {
   step: TutorialStep
+  title: string
   body: string
   highlightTestId: string | null
   /** When true, skip the heavy dim overlay so playback looks like the real scene. */
   softHighlight?: boolean
-  /** Export panel open — park the card clear of the sheet. */
+  /** Export panel open — associate the card with the panel, clear of its actions. */
   exportOpen?: boolean
   showNext: boolean
   nextIsFinish?: boolean
@@ -35,52 +42,13 @@ interface TutorialCoachProps {
   onNext?: () => void
 }
 
-const CARD_MAX = 320
-
-function placeCard(opts: {
-  vw: number
-  exportOpen: boolean
-  headerBottom: number
-}): CSSProperties {
-  const { vw, exportOpen, headerBottom } = opts
-  const width = Math.min(CARD_MAX, vw - 24)
-  // Prefer left column under the header — clear of Fit/zoom (top-right) and dock.
-  let top = Math.max(headerBottom + 8, 72)
-  let left = 12
-
-  if (vw < 640) {
-    if (exportOpen) {
-      // Narrow + Export sheet: pin under the header so Finish/Skip stay above the sheet body.
-      top = Math.max(headerBottom + 6, 8)
-      left = 12
-    } else {
-      // Narrow: under header — clears Fit (top-right) and leaves plane/Record free below.
-      top = Math.max(headerBottom + 8, 64)
-      left = 12
-    }
-  } else if (exportOpen) {
-    // Desktop + Export (right sheet): keep card on the left, below header.
-    top = Math.max(headerBottom + 8, 88)
-    left = 16
-  } else {
-    top = Math.max(headerBottom + 8, 88)
-    left = 16
-  }
-
-  return {
-    top,
-    left,
-    width,
-    maxWidth: width,
-  }
-}
-
 /**
- * Non-layout coach: stationary card + optional highlight ring.
- * Card placement is independent of the highlighted control (does not follow the plane).
+ * Spectrum-inspired contextual coach: compact card beside the relevant control.
+ * Placement updates on step / Export open / resize only — never follows the plane.
  */
 export function TutorialCoach({
   step,
+  title,
   body,
   highlightTestId,
   softHighlight = false,
@@ -93,39 +61,80 @@ export function TutorialCoach({
   const reducedMotion = usePrefersReducedMotion()
   const titleId = useId()
   const bodyId = useId()
+  const cardRef = useRef<HTMLDivElement>(null)
   const [rect, setRect] = useState<HighlightRect | null>(null)
-  const [cardStyle, setCardStyle] = useState<CSSProperties>(() =>
-    placeCard({
-      vw: typeof window !== 'undefined' ? window.innerWidth : 1280,
-      exportOpen: false,
-      headerBottom: 72,
-    }),
-  )
+  const [cardStyle, setCardStyle] = useState<CSSProperties>(() => ({
+    top: 88,
+    left: 16,
+    width: 280,
+    maxWidth: 280,
+  }))
   const [enterClass, setEnterClass] = useState(
     reducedMotion ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2',
   )
   const prevStepRef = useRef<TutorialStep | null>(null)
 
-  // Stationary card: remeasure only on viewport change or Export clearance.
+  // Contextual placement: step, Export panel, and viewport only.
   useLayoutEffect(() => {
     const update = () => {
-      const header = document.querySelector('header')
-      const headerBottom =
-        header instanceof HTMLElement
-          ? header.getBoundingClientRect().bottom
-          : 72
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const anchorEl = resolvePlacementAnchor(step, exportOpen)
+      const anchor = readElementRect(anchorEl)
+      const panelEl = exportOpen
+        ? document.querySelector('[data-testid="export-panel-root"]')
+        : null
+      const panel = readElementRect(panelEl)
+      const fit = readElementRect(
+        document.querySelector('[data-testid="btn-fit-stage"]'),
+      )
+      const zoom = readElementRect(
+        document.querySelector('[data-testid="workspace-camera-bar"]'),
+      )
+      const plane = readElementRect(
+        document.querySelector('[data-testid="actor"]'),
+      )
+      const avoidExtra = [fit, zoom, plane].filter(Boolean) as NonNullable<
+        ReturnType<typeof readElementRect>
+      >[]
+
+      if (exportOpen) {
+        for (const id of [
+          'btn-download-web-package',
+          'btn-download-react-package',
+          'export-website-path-tabs',
+          'btn-close-export',
+        ]) {
+          const r = readElementRect(
+            document.querySelector(`[data-testid="${id}"]`),
+          )
+          if (r) avoidExtra.push(r)
+        }
+      }
+
+      const measuredH = cardRef.current?.offsetHeight
       setCardStyle(
-        placeCard({
-          vw: window.innerWidth,
+        placeTutorialCard({
+          step,
           exportOpen,
-          headerBottom,
+          vw,
+          vh,
+          cardHeight: measuredH && measuredH > 40 ? measuredH : 132,
+          anchor,
+          panel,
+          avoidExtra,
         }),
       )
     }
     update()
+    // Remeasure once after layout so measured card height is accurate.
+    const raf = window.requestAnimationFrame(update)
     window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [exportOpen])
+    return () => {
+      window.cancelAnimationFrame(raf)
+      window.removeEventListener('resize', update)
+    }
+  }, [step, exportOpen])
 
   // Highlight ring only — does not move the card.
   useLayoutEffect(() => {
@@ -163,15 +172,23 @@ export function TutorialCoach({
   }, [highlightTestId])
 
   // Entrance only on first mount and real step changes — not body / playhead churn.
+  // Survive React Strict Mode: cancelled rAF must not leave the card at opacity 0.
   useEffect(() => {
-    const prev = prevStepRef.current
-    const stepChanged = prev !== step
-    prevStepRef.current = step
-    if (!stepChanged) return
     if (reducedMotion) {
+      prevStepRef.current = step
       setEnterClass('opacity-100 translate-y-0')
       return
     }
+    const prev = prevStepRef.current
+    if (prev === step) {
+      setEnterClass((current) =>
+        current.includes('opacity-0')
+          ? 'opacity-100 translate-y-0'
+          : current,
+      )
+      return
+    }
+    prevStepRef.current = step
     setEnterClass('opacity-0 translate-y-2')
     let inner = 0
     const outer = window.requestAnimationFrame(() => {
@@ -192,14 +209,7 @@ export function TutorialCoach({
     if (skip instanceof HTMLElement) skip.focus()
   }, [step])
 
-  const stepLabel =
-    step === 'draw'
-      ? 'Step 1 of 3'
-      : step === 'play'
-        ? 'Step 2 of 3'
-        : 'Step 3 of 3'
-
-  // Above chrome sheets (z-50) so Finish/Skip stay usable beside Export.
+  const progress = tutorialProgressLabel(step)
   const layerZ = exportOpen ? 'z-[55]' : 'z-[45]'
 
   return (
@@ -214,9 +224,7 @@ export function TutorialCoach({
         <div
           data-testid="tutorial-highlight"
           aria-hidden
-          className={`pointer-events-none absolute rounded-xl ring-2 ring-ms-primary ring-offset-2 ring-offset-ms-canvas ${
-            reducedMotion || softHighlight ? '' : 'animate-pulse'
-          }`}
+          className="pointer-events-none absolute rounded-xl ring-2 ring-ms-primary ring-offset-2 ring-offset-ms-canvas"
           style={{
             top: rect.top,
             left: rect.left,
@@ -230,6 +238,7 @@ export function TutorialCoach({
       )}
 
       <div
+        ref={cardRef}
         role="dialog"
         aria-modal="false"
         data-testid="tutorial-coach-card"
@@ -237,16 +246,22 @@ export function TutorialCoach({
         style={cardStyle}
       >
         <p
-          id={titleId}
           data-testid="tutorial-step-label"
-          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400"
+          className="text-[10px] font-medium tracking-wide text-slate-400"
         >
-          {stepLabel}
+          {progress}
+        </p>
+        <p
+          id={titleId}
+          data-testid="tutorial-coach-title"
+          className="mt-0.5 text-sm font-semibold leading-snug text-slate-900"
+        >
+          {title}
         </p>
         <p
           id={bodyId}
           data-testid="tutorial-coach-body"
-          className="mt-1 min-h-[2.75rem] text-sm leading-snug text-slate-800"
+          className="mt-1 min-h-[2.5rem] text-sm leading-snug text-slate-700"
         >
           {body}
         </p>
