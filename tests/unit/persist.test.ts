@@ -687,6 +687,62 @@ describe('persistence controller', () => {
     expect(controller.getStatus()).toBe('saved')
     controller.dispose()
   })
+
+  it('tutorial suspension blocks discard and replace from clearing storage', () => {
+    const original = makePersistProject()
+    original.name = 'Protected original'
+    const storage = createMemoryStorage({
+      [STORAGE_KEY]: serializeSnapshot(buildSnapshot(original, null)),
+    })
+    resetStore(original)
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    expect(controller.getStatus()).toBe('saved')
+    const before = storage.getItem(STORAGE_KEY)
+    expect(before).toContain('Protected original')
+
+    controller.setAutosaveSuspended(true)
+    expect(controller.isAutosaveSuspended()).toBe(true)
+
+    // Practice / example canvas must not autosave over the original.
+    const intruder = makePersistProject()
+    intruder.name = 'Orbit stand-in'
+    useEditorStore
+      .getState()
+      .applyPersistedSnapshot(buildSnapshot(intruder, null))
+    expect(storage.getItem(STORAGE_KEY)).toBe(before)
+
+    // afterSuccessfulReplace / discard must stay no-ops while suspended.
+    controller.afterSuccessfulReplace()
+    expect(controller.isAutosaveSuspended()).toBe(true)
+    expect(storage.getItem(STORAGE_KEY)).toBe(before)
+
+    useEditorStore.getState().newProject()
+    controller.discardStoredAndUnblock()
+    expect(controller.isAutosaveSuspended()).toBe(true)
+    expect(storage.getItem(STORAGE_KEY)).toBe(before)
+
+    // Restore-style exit: put the original back on canvas, resume without rewrite.
+    useEditorStore
+      .getState()
+      .applyPersistedSnapshot(buildSnapshot(original, null))
+    controller.resumeAutosavePreservingStorage()
+    expect(controller.isAutosaveSuspended()).toBe(false)
+    expect(storage.getItem(STORAGE_KEY)).toBe(before)
+
+    // Keep-style exit: release first, then replace may persist the kept project.
+    controller.setAutosaveSuspended(true)
+    const kept = makePersistProject()
+    kept.name = 'Kept practice'
+    useEditorStore.getState().applyPersistedSnapshot(buildSnapshot(kept, null))
+    expect(storage.getItem(STORAGE_KEY)).toBe(before)
+    controller.setAutosaveSuspended(false)
+    controller.afterSuccessfulReplace()
+    expect(controller.isAutosaveSuspended()).toBe(false)
+    expect(storage.getItem(STORAGE_KEY)).toContain('Kept practice')
+
+    controller.dispose()
+  })
 })
 
 describe('slider change detection', () => {

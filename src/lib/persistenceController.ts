@@ -111,6 +111,14 @@ export interface PersistenceController {
   getStatus: () => PersistenceStatus
   getQuarantineRaw: () => string | null
   isSaveBlocked: () => boolean
+  /** Tutorial practice canvas — never write tutorial work over stored projects. */
+  setAutosaveSuspended: (suspended: boolean) => void
+  isAutosaveSuspended: () => boolean
+  /**
+   * End a suspended session without rewriting storage (restore previous canvas
+   * that is already reflected in localStorage, or a blank board).
+   */
+  resumeAutosavePreservingStorage: () => void
   subscribe: (listener: PersistenceListener) => () => void
   restoreOnStartup: () => void
   saveNow: () => void
@@ -159,6 +167,8 @@ export function createPersistenceController(
   let status: PersistenceStatus = 'idle'
   let quarantineRaw: string | null = null
   let saveBlocked = false
+  /** Soft suspend for tutorial — distinct from quarantine saveBlocked. */
+  let autosaveSuspended = false
   let disposed = false
   let timer: ReturnType<typeof setTimeout> | null = null
   let lastWrittenFingerprint = ''
@@ -174,7 +184,7 @@ export function createPersistenceController(
     JSON.stringify({ project: slice.project })
 
   const writeSlice = (slice: PersistableSlice) => {
-    if (disposed || saveBlocked) return
+    if (disposed || saveBlocked || autosaveSuspended) return
     // Never persist an untouched blank untitled canvas.
     if (!projectHasMeaningfulWork(slice.project)) return
 
@@ -202,7 +212,7 @@ export function createPersistenceController(
     slice: PersistableSlice,
     mode: 'immediate' | 'debounce',
   ) => {
-    if (disposed || saveBlocked) return
+    if (disposed || saveBlocked || autosaveSuspended) return
     if (!projectHasMeaningfulWork(slice.project)) return
     if (timer) {
       clearTimeout(timer)
@@ -222,7 +232,16 @@ export function createPersistenceController(
     if (timer) {
       clearTimeout(timer)
       timer = null
-      writeSlice(pickPersistable(useEditorStore.getState()))
+      if (!autosaveSuspended) {
+        writeSlice(pickPersistable(useEditorStore.getState()))
+      }
+    }
+  }
+
+  const dropPendingTimer = () => {
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
     }
   }
 
@@ -255,6 +274,8 @@ export function createPersistenceController(
     // Untouched blank canvas: do not create a stored project.
     if (!projectHasMeaningfulWork(next.project)) return
 
+    if (autosaveSuspended) return
+
     if (fingerprint(next) === lastWrittenFingerprint) return
 
     const mode = isSliderOnlyChange(previous, next) ? 'debounce' : 'immediate'
@@ -265,6 +286,33 @@ export function createPersistenceController(
     getStatus: () => status,
     getQuarantineRaw: () => quarantineRaw,
     isSaveBlocked: () => saveBlocked,
+
+    setAutosaveSuspended: (suspended) => {
+      if (suspended) {
+        dropPendingTimer()
+        autosaveSuspended = true
+        return
+      }
+      autosaveSuspended = false
+    },
+
+    isAutosaveSuspended: () => autosaveSuspended,
+
+    resumeAutosavePreservingStorage: () => {
+      dropPendingTimer()
+      autosaveSuspended = false
+      const state = useEditorStore.getState()
+      const slice = pickPersistable(state)
+      if (projectHasMeaningfulWork(slice.project)) {
+        lastWrittenFingerprint = fingerprint(slice)
+        if (status !== 'save-error' && status !== 'restore-error') {
+          setStatus('saved')
+        }
+      } else {
+        lastWrittenFingerprint = ''
+        if (!saveBlocked) setStatus('idle')
+      }
+    },
 
     subscribe: (listener) => {
       listeners.add(listener)
@@ -331,8 +379,13 @@ export function createPersistenceController(
       writeSlice(pickPersistable(useEditorStore.getState()))
     },
 
-    /** Clear the active save (e.g. after New project). Blank canvas stays unsaved. */
+    /**
+     * Clear the active save (e.g. after New project). Blank canvas stays unsaved.
+     * No-op while tutorial autosave is suspended — only an intentional tutorial
+     * exit may release that protection.
+     */
     discardStoredAndUnblock: () => {
+      if (autosaveSuspended) return
       clearActiveSaveKeepingCanvas()
       const state = useEditorStore.getState()
       if (projectHasMeaningfulWork(state.project)) {
@@ -340,12 +393,14 @@ export function createPersistenceController(
       }
     },
 
-    /** After open/example replace: persist when the loaded project has work. */
+    /**
+     * After open/example replace: persist when the loaded project has work.
+     * No-op while tutorial autosave is suspended — never clear storage or
+     * re-enable autosave during practice.
+     */
     afterSuccessfulReplace: () => {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
+      if (autosaveSuspended) return
+      dropPendingTimer()
       quarantineRaw = null
       saveBlocked = false
       const state = useEditorStore.getState()

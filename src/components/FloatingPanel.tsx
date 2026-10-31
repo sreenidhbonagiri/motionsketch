@@ -1,7 +1,12 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { useEditorStore } from '../state/store'
 
-export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
+export type ChromePanel =
+  | 'project'
+  | 'adjust'
+  | 'appearance'
+  | 'export'
+  | 'help'
 
 /**
  * After a chrome panel unmounts, return-focus to the opener only when focus

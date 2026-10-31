@@ -276,7 +276,7 @@ test.describe('workspace layout', () => {
     )
   })
 
-  test('mobile: after-path toast clears Fit/zoom; both stay clickable', async ({
+  test('mobile: Play/Pause does not shift Fit/zoom; both stay clickable', async ({
     page,
   }) => {
     for (const width of [390, 320] as const) {
@@ -287,84 +287,42 @@ test.describe('workspace layout', () => {
       await ensureEditor(page)
       await recordSimplePath(page)
 
-      const toast = page.getByTestId('after-path-website-toast')
+      await expect(page.getByTestId('after-path-website-toast')).toHaveCount(0)
       const bar = page.getByTestId('workspace-camera-bar')
       const fit = page.getByTestId('btn-fit-stage')
-      const zoomIn = page.getByTestId('btn-zoom-in')
-      await expect(toast).toBeVisible()
       await expect(bar).toBeVisible()
       await expect(fit).toBeVisible()
 
-      const geometry = await page.evaluate(() => {
-        const toastEl = document.querySelector(
-          '[data-testid="after-path-website-toast"]',
-        )
-        const barEl = document.querySelector(
-          '[data-testid="workspace-camera-bar"]',
-        )
+      const before = await fit.boundingBox()
+      await page.getByTestId('btn-play').click()
+      await expect(page.getByTestId('btn-pause')).toBeVisible()
+      const during = await fit.boundingBox()
+      expect(before).toBeTruthy()
+      expect(during).toBeTruthy()
+      expect(Math.abs(during!.y - before!.y)).toBeLessThanOrEqual(2)
+      expect(Math.abs(during!.x - before!.x)).toBeLessThanOrEqual(2)
+
+      const hit = await page.evaluate(() => {
         const fitEl = document.querySelector('[data-testid="btn-fit-stage"]')
         const zoomEl = document.querySelector('[data-testid="btn-zoom-in"]')
-        const dismissEl = document.querySelector(
-          '[data-testid="btn-dismiss-after-path-toast"]',
-        )
-        if (
-          !(toastEl instanceof HTMLElement) ||
-          !(barEl instanceof HTMLElement) ||
-          !(fitEl instanceof HTMLElement) ||
-          !(zoomEl instanceof HTMLElement) ||
-          !(dismissEl instanceof HTMLElement)
-        ) {
+        if (!(fitEl instanceof HTMLElement) || !(zoomEl instanceof HTMLElement)) {
           return { ok: false, reason: 'missing' }
         }
-        const tr = toastEl.getBoundingClientRect()
-        const br = barEl.getBoundingClientRect()
-        const overlap =
-          tr.left < br.right - 1 &&
-          tr.right > br.left + 1 &&
-          tr.top < br.bottom - 1 &&
-          tr.bottom > br.top + 1
-        const hit = (el: HTMLElement) => {
+        const probe = (el: HTMLElement) => {
           const r = el.getBoundingClientRect()
           const top = document.elementFromPoint(
             r.left + r.width / 2,
             r.top + r.height / 2,
           )
-          const ok = top instanceof Element && (top === el || el.contains(top))
-          const blocker =
-            top instanceof Element
-              ? top.getAttribute('data-testid') || top.tagName
-              : 'null'
-          return { ok, blocker }
+          return top instanceof Element && (top === el || el.contains(top))
         }
-        const fitHit = hit(fitEl)
-        const zoomHit = hit(zoomEl)
-        const dismissHit = hit(dismissEl)
-        return {
-          ok: !overlap && fitHit.ok && zoomHit.ok && dismissHit.ok,
-          reason: overlap
-            ? 'overlap'
-            : !fitHit.ok
-              ? `fit-blocked:${fitHit.blocker}`
-              : !zoomHit.ok
-                ? `zoom-blocked:${zoomHit.blocker}`
-                : !dismissHit.ok
-                  ? `dismiss-blocked:${dismissHit.blocker}`
-                  : 'ok',
-          barBelowToast: br.top >= tr.bottom - 1,
-        }
+        return { ok: probe(fitEl) && probe(zoomEl), reason: 'ok' }
       })
-      expect(geometry, `${width}px toast vs camera`).toMatchObject({
-        ok: true,
-        reason: 'ok',
-        barBelowToast: true,
-      })
+      expect(hit, `${width}px Fit/zoom hit`).toMatchObject({ ok: true })
 
+      await page.getByTestId('btn-pause').click()
       await fit.click()
       await expect(page.getByTestId('zoom-percent')).toBeVisible()
-      await page.getByTestId('btn-dismiss-after-path-toast').click()
-      await expect(toast).toHaveCount(0)
-      await expect(bar).toBeVisible()
-      await expect(fit).toBeVisible()
     }
   })
 

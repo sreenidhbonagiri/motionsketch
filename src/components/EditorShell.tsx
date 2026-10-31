@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -13,16 +12,13 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { useTransformShortcuts } from '../hooks/useTransformShortcuts'
+import { useTutorial } from '../hooks/useTutorial'
 import {
-  AFTER_PATH_WEBSITE_HINT,
-  afterPathWebsiteHintProjectKey,
   EMPTY_BOARD_RECORD_HINT_COARSE,
   EMPTY_BOARD_RECORD_HINT_FINE,
   FIRST_USE_HEADLINE,
   FIRST_USE_NEXT_STEP_COARSE,
   FIRST_USE_NEXT_STEP_FINE,
-  readAfterPathWebsiteHintDismissedKeys,
-  writeAfterPathWebsiteHintDismissedKeys,
 } from '../lib/modeStatus'
 import { endDrag, isRecordingActive } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
@@ -32,6 +28,7 @@ import { CanvasStage } from './CanvasStage'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
 import { GlidePanel } from './GlidePanel'
+import { HelpPanel } from './HelpPanel'
 import { PresetPanel } from './PresetPanel'
 import { ProjectNameInput } from './ProjectNameInput'
 import {
@@ -43,6 +40,7 @@ import { ClipTimeline } from './ClipTimeline'
 import { PlaybackDock } from './PlaybackDock'
 import { PolishPanel } from './PolishPanel'
 import { ProjectPanel } from './ProjectPanel'
+import { TutorialCoach } from './TutorialCoach'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 
@@ -91,23 +89,29 @@ export function EditorShell() {
       return false
     }
   })
-  // Per-project dismissals for this browser tab session (see modeStatus helpers).
-  const [afterPathHintDismissedKeys, setAfterPathHintDismissedKeys] = useState(
-    () => readAfterPathWebsiteHintDismissedKeys(),
-  )
-  const afterPathToastTextId = useId()
   const headerRef = useRef<HTMLElement>(null)
   const toolbarSlotRef = useRef<HTMLDivElement>(null)
-  const afterPathToastRef = useRef<HTMLDivElement>(null)
-  // Toast top tracks measured header height so wrapped mobile chrome never overlaps.
-  const [toastTopPx, setToastTopPx] = useState(96)
-  // When the after-path toast is up, sheet/camera clearance includes its height.
-  const [afterPathToastHeightPx, setAfterPathToastHeightPx] = useState(0)
+  // Header clearance for sheets / camera — no toast offset (tutorial coach is overlay-only).
+  const [headerClearancePx, setHeaderClearancePx] = useState(96)
   // Actors panel sits above Sequence + dock; clearance tracks the live stack height.
   const [toolbarClearancePx, setToolbarClearancePx] = useState(96)
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
+  const closeChrome = useCallback(() => {
+    setOpenPanel(null)
+    setExamplesOpen(false)
+  }, [])
+  const ensureExportOpen = useCallback(() => {
+    setExamplesOpen(false)
+    setOpenPanel('export')
+  }, [])
+
+  const { view: tutorial, skipTutorial, goNext, restartTutorial } = useTutorial({
+    openPanel,
+    closePanels: closeChrome,
+    ensureExportOpen,
+  })
 
   const togglePanel = (id: ChromePanel) => {
     setExamplesOpen(false)
@@ -132,16 +136,6 @@ export function EditorShell() {
   const project = useEditorStore((s) => s.project)
   const projectName = project.name
   const renameProject = useEditorStore((s) => s.renameProject)
-  const afterPathProjectKey = afterPathWebsiteHintProjectKey(project)
-
-  const dismissAfterPathWebsiteHint = () => {
-    setAfterPathHintDismissedKeys((prev) => {
-      const next = new Set(prev)
-      next.add(afterPathProjectKey)
-      writeAfterPathWebsiteHintDismissedKeys(next)
-      return next
-    })
-  }
 
   useEffect(() => {
     const onHidden = () => {
@@ -158,7 +152,7 @@ export function EditorShell() {
     if (!el) return
     const gapPx = 8
     const update = () => {
-      setToastTopPx(Math.ceil(el.getBoundingClientRect().height) + gapPx)
+      setHeaderClearancePx(Math.ceil(el.getBoundingClientRect().height) + gapPx)
     }
     update()
     const ro = new ResizeObserver(update)
@@ -211,15 +205,17 @@ export function EditorShell() {
     mode !== 'idle' ||
     !!polishSession ||
     !!glideSession ||
-    !!presetSession
+    !!presetSession ||
+    tutorial.active
   const emptyBoardHelp = coarsePointer
     ? EMPTY_BOARD_RECORD_HINT_COARSE
     : EMPTY_BOARD_RECORD_HINT_FINE
   const firstUseNextStep = coarsePointer
     ? FIRST_USE_NEXT_STEP_COARSE
     : FIRST_USE_NEXT_STEP_FINE
-  // One dismissible intro on a fresh empty project (same session key as the old examples hint).
+  // After tutorial is done/skipped, keep a dismissible empty-board tip.
   const showFirstUseIntro =
+    !tutorial.active &&
     !tipBusy &&
     !hasRecording &&
     isEmptyProject &&
@@ -227,44 +223,16 @@ export function EditorShell() {
     !examplesOpen
   // After dismiss (or non-empty untitled board), keep a screen-reader target for Record/Play.
   const showEmptyBoardSrHint =
-    !tipBusy && !hasRecording && !showFirstUseIntro
-  // Top toast: after a path, idle only; dismissible per project for this tab session.
-  // Hide while a chrome panel is open — toast still competes for layout/hit-testing
-  // with Export/Adjust scroll bodies even when inert for keyboard.
-  const showAfterPathWebsiteToast =
-    !tipBusy &&
-    hasRecording &&
-    openPanel === null &&
-    !afterPathHintDismissedKeys.has(afterPathProjectKey)
+    !tipBusy && !hasRecording && !showFirstUseIntro && !tutorial.active
 
-  useLayoutEffect(() => {
-    if (!showAfterPathWebsiteToast) {
-      setAfterPathToastHeightPx(0)
-      return
-    }
-    const el = afterPathToastRef.current
-    if (!el) return
-    const gapPx = 8
-    const update = () => {
-      setAfterPathToastHeightPx(
-        Math.ceil(el.getBoundingClientRect().height) + gapPx,
-      )
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [showAfterPathWebsiteToast])
-
-  // Sheets + workspace zoom clear the header, and the after-path toast when present.
-  const sheetTopPx = toastTopPx + afterPathToastHeightPx
+  // Sheets + workspace zoom clear the measured header only (coach is overlay).
+  const sheetTopPx = headerClearancePx
 
   return (
     <div
       data-testid="app-shell"
       className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas)] text-ms-ink antialiased"
       style={{
-        // Mobile contextual sheets / camera bar clear header (+ toast when shown).
         ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
       }}
     >
@@ -280,40 +248,19 @@ export function EditorShell() {
       {/* Full-viewport interactive stage (only drawing surface) */}
       <CanvasStage />
 
-      {/*
-        Post-path website cue — top offset from measured header height (z-34 >
-        camera z-32, < header z-40) so Fit/zoom never steal dismiss hits.
-        Non-blocking; pointer events only on the toast itself.
-      */}
-      {showAfterPathWebsiteToast && (
-        <div
-          className="pointer-events-none absolute inset-x-0 z-[34] flex justify-center px-3 sm:px-4"
-          style={{ top: toastTopPx }}
-        >
-          <div
-            ref={afterPathToastRef}
-            role="status"
-            data-testid="after-path-website-toast"
-            aria-describedby={afterPathToastTextId}
-            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-ms-border bg-white/90 px-3 py-2 text-xs text-slate-700 shadow-[var(--ms-shadow)] backdrop-blur-xl"
-          >
-            <p
-              id={afterPathToastTextId}
-              className="min-w-0 flex-1 pt-0.5 leading-relaxed"
-            >
-              {AFTER_PATH_WEBSITE_HINT}
-            </p>
-            <button
-              type="button"
-              data-testid="btn-dismiss-after-path-toast"
-              onClick={dismissAfterPathWebsiteHint}
-              className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-              aria-label="Dismiss website export tip"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+      {tutorial.active && tutorial.step && (
+        <TutorialCoach
+          step={tutorial.step}
+          title={tutorial.coachTitle}
+          body={tutorial.coachBody}
+          highlightTestId={tutorial.highlightTestId}
+          softHighlight={tutorial.softHighlight}
+          exportOpen={openPanel === 'export'}
+          showNext={tutorial.showNext}
+          nextIsFinish={tutorial.nextIsFinish}
+          onSkip={skipTutorial}
+          onNext={goNext}
+        />
       )}
 
       {/* Slim cohesive header — stacks on narrow so clusters never clip horizontally.
@@ -383,6 +330,17 @@ export function EditorShell() {
             >
               Examples
             </button>
+
+            <button
+              type="button"
+              data-testid="btn-help"
+              aria-expanded={openPanel === 'help'}
+              aria-controls="help-panel-root"
+              onClick={() => togglePanel('help')}
+              className={headerBtn}
+            >
+              Help
+            </button>
           </div>
           <FloatingPanel
             id="project"
@@ -394,6 +352,20 @@ export function EditorShell() {
             <div data-testid="project-menu">
               <ProjectPanel />
             </div>
+          </FloatingPanel>
+          <FloatingPanel
+            id="help"
+            title="Help"
+            open={openPanel === 'help'}
+            onClose={closePanel}
+            align="left"
+          >
+            <HelpPanel
+              onRestartTutorial={() => {
+                closePanel()
+                restartTutorial()
+              }}
+            />
           </FloatingPanel>
         </div>
 
@@ -574,7 +546,7 @@ export function EditorShell() {
           editing ? 'z-[60]' : 'z-30'
         }`}
         style={{
-          // Never climb into the measured header (+ after-path toast when shown).
+          // Never climb into the measured header.
           maxHeight: `calc(100dvh - ${sheetTopPx}px)`,
         }}
         {...(sheetCoversChrome && !editing
