@@ -1,6 +1,6 @@
 # MotionSketch
 
-MotionSketch is a local browser editor for demonstrating motion. Drag an asset on the stage to record a path, refine timing and appearance, compose a multi-actor scene, then export a website package, scoped CSS, a React package, own-element wrappers, or a self-contained HTML demo you can open offline.
+MotionSketch is a local browser editor for demonstrating motion. Drag an asset on the stage to record a path, adjust timing and appearance, compose a multi-element scene, then export a website package, scoped CSS, a React package, own-element wrappers, or a self-contained HTML demo you can open offline.
 
 There is no hosted product URL in this repository. Run the app locally with the commands below.
 
@@ -33,24 +33,24 @@ npm run preview
 
 ## What you can do
 
-- **Record** pointer motion for the selected actor (shape, image, or text).
-- **Refine** per-actor smoothing and Steady Speed; edit the path with handles (add/remove controls on the baked path, drag/nudge to reshape); **Polish** geometry and **Glide** timing from the dock’s Refine motion menu; set shared Duration, Loop, and loop mode (repeat or alternate).
-- **Motion presets** — temporary Slide In / Pop In / Float / Attention Pulse previews under Adjust (Timing), with Start at / Move for; Apply commits to the selected actor (Undo restores).
-- **Sequence** when each actor moves (Start at / Move for on the shared Duration), with optional hide before/after movement.
+- **Record** pointer motion for the selected element (shape, image, or text).
+- **Motion tools** cover per-element smoothing and Steady Speed; edit the path with handles (add/remove controls on the baked path, drag/nudge to reshape); **Polish** geometry and **Glide** timing from the dock’s Motion tools menu; set shared Duration, Loop, and loop mode (repeat or alternate).
+- **Motion presets** — temporary Slide In / Pop In / Float / Attention Pulse previews under Adjust (Timing), with Start at / Move for; Apply commits to the selected element (Undo restores).
+- **Timing** when each element moves (Start at / Move for on the shared Duration), with optional hide before/after movement.
 - **Transform** with rotation/scale keyframes on the same clip-local progress.
-- **Compose** up to **8** actors (paint order = stacking); rename actors and the project.
+- **Compose** up to **8** elements (paint order = stacking); rename elements and the project.
 - **Appearances** — colored shapes, text labels, or PNG / JPEG / WebP / SVG images (see limits below).
 - **Examples** — load bundled starters: Logo entrance, Follow the leader, Orbit.
 - **Projects** — New / Open / Download JSON; one active project autosaves in this browser.
 - **Export** — website ZIP, scoped CSS, offline HTML demo, React package, and Animate your own element wrappers. Exports respect `prefers-reduced-motion` until an explicit Play opt-in.
 
-Confirmations (reset actor, replace recording, delete actor, new/open project, load example) use in-app dialogs, not the browser’s native `confirm`.
+Confirmations (reset element, replace recording, delete element, new/open project, load example) use in-app dialogs, not the browser’s native `confirm`.
 
 ## Recording and playback
 
-1. Select an actor, click **Record**, then drag on the stage (or on the actor).
+1. Select an element, click **Record**, then drag on the stage (or on the element).
 2. Short takes are rejected (need at least two samples and ~50 ms). Replacing an existing take asks for confirmation.
-3. **Play** advances a **shared** playhead for every actor. Duration, loop, and loop mode are project-wide; smoothing and Steady Speed are per actor.
+3. **Play** advances a **shared** playhead for every element. Duration, loop, and loop mode are project-wide; smoothing and Steady Speed are per element.
 4. Original sample timestamps stay on the recording. Smoothing / Steady Speed / path edit / clip remap only affect the derived path used for preview and export.
 
 ## Examples
@@ -75,15 +75,15 @@ Clearing site data for this origin removes the autosaved project. Keep downloads
 | --- | --- |
 | **Download for your website** (web package) | ZIP with `index.html`, `animation.css`, deduplicated `assets/`, trigger script when needed, `README.txt`, and `project.json` for offline preview and embedding. Primary export in the Export panel. |
 | **HTML demo** | Single-file offline preview; embeds scene CSS + Play control for reduced motion. Under Export → Other ways. |
-| **CSS** (copy / download / view) | Integrate into your own markup. Image actors are **not** inlined into the CSS — host the assets yourself and match the documented structure. Under Other ways. |
+| **CSS** (copy / download / view) | Integrate into your own markup. Image elements are **not** inlined into the CSS. Host the assets yourself and match the documented structure. Under Other ways. |
 | **React package** | ZIP with `MotionSketchScene.tsx`, scoped CSS, images, trigger script, and a Vite React README. Under Other ways. |
 | **Animate your own element** | Copy wrapper CSS plus HTML / React examples that nest *your* markup inside `.ms-actor` (path and timing only). Under Other ways. |
 
-CSS uses a scene root class (content fingerprint, optional `instancePrefix`), stage class `ms-stage`, and per-actor classes under that root. Keyframe names include the same fingerprint so multiple scenes can share a page. Details and markup example live in the CSS header comments and in [`docs/architecture.md`](docs/architecture.md).
+CSS uses a scene root class (content fingerprint, optional `instancePrefix`), stage class `ms-stage`, and per-element classes under that root. Keyframe names include the same fingerprint so multiple scenes can share a page. Details and markup example live in the CSS header comments and in [`docs/architecture.md`](docs/architecture.md).
 
 **Integration requirements (CSS):**
 
-- Wrap the stage in the exported root class; put actors inside `.ms-stage` (`position: relative; container-type: size`).
+- Wrap the stage in the exported root class; put elements inside `.ms-stage` (`position: relative; container-type: size`).
 - Prefer container query units (`cqw` / `cqh` / `cqmin`); a px fallback formula is in the export header.
 - Under `prefers-reduced-motion: reduce`, animations stay off until the root also has `ms-motion-ok` (the HTML demo’s Play button sets this).
 - For a second independently controlled copy of the same scene, re-export with an `instancePrefix` (e.g. `hero-`) or rename the root class and keyframe prefix together.
@@ -92,9 +92,9 @@ CSS uses a scene root class (content fingerprint, optional `instancePrefix`), st
 
 | Topic | Value / behavior |
 | --- | --- |
-| **Actors** | Max **8**; names up to 40 characters. |
+| **Elements** | Max **8**; names up to 40 characters. |
 | **Images** | Max **1.5 MB**; max decoded edge **2048 px**; MIME: PNG, JPEG, WebP, SVG. SVGs render only via `<img src="data:…">` (no markup injection); scripts / external refs / SMIL-style animation tags are rejected. |
-| **Actor size** | Longer box edge is **6%–40%** of the stage’s shorter side (`cqmin`). |
+| **Element size** | Longer box edge is **6%–40%** of the stage’s shorter side (`cqmin`). |
 | **Duration** | Shared playback **200–8000 ms**. |
 | **Project title** | Up to 60 characters. |
 | **Stage aspect** | Stored per project; resize does not rewrite samples. Editor may stretch vs. logical aspect; exports use stored aspect. See [`docs/stage-aspect.md`](docs/stage-aspect.md). |

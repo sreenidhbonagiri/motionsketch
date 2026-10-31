@@ -84,7 +84,7 @@ export function ActorNameInput({
       value={draft}
       maxLength={MAX_ACTOR_NAME_LENGTH}
       disabled={disabled}
-      aria-label="Actor name"
+      aria-label="Element name"
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={onKeyDown}
       onBlur={() => {

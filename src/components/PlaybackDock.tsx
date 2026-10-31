@@ -229,7 +229,7 @@ export function PlaybackDock() {
     ? `${formatSeconds(elapsedMs)} of ${formatSeconds(durationMs)}, backward`
     : `${formatSeconds(elapsedMs)} of ${formatSeconds(durationMs)}`
 
-  const actorLabel = selectedActor?.name?.trim() || 'the selected actor'
+  const actorLabel = selectedActor?.name?.trim() || 'the selected element'
 
   // Compact label + instruction in the dock. Empty-board Record guidance stays on
   // the stage tip (id=stage-empty-hint). Selected-point copy stays in
@@ -806,10 +806,10 @@ export function PlaybackDock() {
                     onClick={() => {
                       void (async () => {
                         if (recording) {
-                          const label = selectedActor?.name ?? 'this actor'
+                          const label = selectedActor?.name ?? 'this element'
                           const ok = await confirm({
                             title: `Re-record “${label}”?`,
-                            body: 'This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.',
+                            body: 'This replaces only that element’s path and transform keyframes. Shared Duration stays the same.',
                             confirmLabel: 'Replace recording',
                             testId: 'rerecord-confirm',
                             confirmTestId: 'btn-rerecord-confirm',
@@ -842,7 +842,7 @@ export function PlaybackDock() {
                       data-testid="btn-continue-path-spacer"
                       className={`${btnSecondary} pointer-events-none invisible`}
                     >
-                      Continue path
+                      Extend path
                     </span>
                   ) : (
                     <button
@@ -856,7 +856,7 @@ export function PlaybackDock() {
                       aria-describedby="continue-path-help"
                       className={btnSecondary}
                     >
-                      Continue path
+                      Extend path
                     </button>
                   ))}
               </div>
@@ -910,7 +910,7 @@ export function PlaybackDock() {
                 </span>
                 <span
                   className="inline-flex"
-                  title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                  title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                 >
                   <button
                     type="button"
@@ -919,14 +919,14 @@ export function PlaybackDock() {
                     disabled={isRecordingLike || actorEditOrder.length === 0}
                     className={btnIcon}
                     aria-label="Undo"
-                    title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                    title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                   >
                     <span aria-hidden>↶</span>
                   </button>
                 </span>
                 <span
                   className="inline-flex"
-                  title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                  title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                 >
                   <button
                     type="button"
@@ -935,7 +935,7 @@ export function PlaybackDock() {
                     disabled={isRecordingLike || actorEditRedoOrder.length === 0}
                     className={btnIcon}
                     aria-label="Redo"
-                    title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                    title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                   >
                     <span aria-hidden>↷</span>
                   </button>
@@ -975,11 +975,11 @@ export function PlaybackDock() {
                   aria-expanded={refineOpen}
                   aria-haspopup="dialog"
                   aria-controls={refinePanelId}
-                  title="Refine"
+                  title="Motion tools"
                   onClick={() => setRefineOpen((open) => !open)}
                   className={`${btnSecondary} min-h-8 px-2.5`}
                 >
-                  Refine
+                  Motion tools
                 </button>
                 {refineOpen &&
                   refinePopoverBox &&
@@ -990,7 +990,7 @@ export function PlaybackDock() {
                       data-testid="refine-motion-tools"
                       data-placement={refinePopoverBox.placement}
                       role="dialog"
-                      aria-label="Refine"
+                      aria-label="Motion tools"
                       tabIndex={-1}
                       className="pointer-events-auto fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
                       style={{
@@ -1115,10 +1115,10 @@ export function PlaybackDock() {
                 onClick={() => {
                   void (async () => {
                     if (recording) {
-                      const label = selectedActor?.name ?? 'this actor'
+                      const label = selectedActor?.name ?? 'this element'
                       const ok = await confirm({
                         title: `Reset motion for “${label}”?`,
-                        body: 'Clears this actor’s recorded path, path edits, and transform keyframes. Appearance, other actors, and project Duration / Loop stay the same.',
+                        body: 'Clears this element’s recorded path, path edits, and transform keyframes. Appearance, other elements, and project Duration / Loop stay the same.',
                         confirmLabel: 'Reset motion',
                         danger: true,
                         testId: 'reset-actor-confirm',
@@ -1238,7 +1238,7 @@ export function PlaybackDock() {
               {modeStatus.kind === 'armed' && modeStatus.instruction ? (
                 <>
                   <span aria-hidden="true" className="text-slate-500">
-                    {' — '}
+                    {'. '}
                   </span>
                   <span
                     data-testid="mode-status-instruction"
@@ -1266,7 +1266,7 @@ export function PlaybackDock() {
             on the stage, or focus it and use arrow keys to nudge. Hold Shift for
             a larger step. Escape or pointer cancel restores the baseline without
             an undo entry. Stage bounds keep every sample center on stage when
-            the path starts in bounds; the actor’s rotated or scaled appearance
+            the path starts in bounds; the element’s rotated or scaled appearance
             may still extend past the stage.
           </p>
           <p id="path-add-help" className="sr-only">

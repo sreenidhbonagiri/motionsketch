@@ -193,7 +193,7 @@ export function SvgPathImport() {
           <>
             Replace the path for{' '}
             <span className="font-medium text-slate-700">
-              {selectedActor?.name ?? 'the selected actor'}
+              {selectedActor?.name ?? 'the selected element'}
             </span>{' '}
             with one local SVG path. Preview on the stage, nudge if needed, then
             confirm. Keeps Duration and appearance; movement is even-speed by
@@ -203,7 +203,7 @@ export function SvgPathImport() {
           <>
             Set the path for{' '}
             <span className="font-medium text-slate-700">
-              {selectedActor?.name ?? 'the selected actor'}
+              {selectedActor?.name ?? 'the selected element'}
             </span>{' '}
             from one local SVG file. Preview on the stage, nudge if needed, then
             apply. Uses project Duration; appearance stays the same; movement is
@@ -263,7 +263,7 @@ export function SvgPathImport() {
                   data-testid="svg-path-closed-note"
                   className="text-[11px] text-slate-500"
                 >
-                  Closed loop detected — the take returns to the start point.
+                  Closed loop detected. The take returns to the start point.
                 </p>
               ) : null}
               <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
@@ -312,8 +312,8 @@ export function SvgPathImport() {
                   className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-950"
                 >
                   Confirming replaces the current take for{' '}
-                  {selectedActor?.name ?? 'this actor'} (path edits and
-                  transform keys on this actor are cleared). Duration and
+                  {selectedActor?.name ?? 'this element'} (path edits and
+                  transform keys on this element are cleared). Duration and
                   appearance stay the same.
                 </p>
               ) : null}

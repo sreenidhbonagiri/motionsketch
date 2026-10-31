@@ -134,7 +134,7 @@ export function ProjectPanel() {
     if (projectHasMeaningfulWork(project)) {
       const ok = await confirm({
         title: 'Open this project file?',
-        body: 'This replaces the current project, including actors, appearance, and motion.',
+        body: 'This replaces the current project, including elements, appearance, and motion.',
         confirmLabel: 'Open project',
         testId: 'open-project-confirm',
         confirmTestId: 'btn-open-project-confirm',
@@ -167,7 +167,7 @@ export function ProjectPanel() {
         <p
           data-testid="save-status"
           className={
-            status === 'save-error' || status === 'restore-error'
+            status === 'restore-error'
               ? 'text-[11px] text-amber-800'
               : 'text-[11px] text-slate-600'
           }

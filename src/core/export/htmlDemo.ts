@@ -185,7 +185,7 @@ function buildActorMarkup(
           ? resolveImageSrc(appearance.image)
           : appearance.image.dataUrl
         const safeSrc = src.replace(/"/g, '')
-        const alt = escapeHtmlText(appearance.image.label || 'Actor image')
+        const alt = escapeHtmlText(appearance.image.label || 'Element image')
         return `<img class="${cls}"${testId} src="${safeSrc}" alt="${alt}" />`
       }
       if (appearance.kind === 'text' && appearance.text) {

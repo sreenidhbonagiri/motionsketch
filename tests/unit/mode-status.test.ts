@@ -88,14 +88,14 @@ describe('resolveModeStatus', () => {
     }
   })
 
-  it('retains Ready — drag to draw path for armed mode', () => {
+  it('retains Ready. drag to record for armed mode', () => {
     const status = resolveModeStatus({ ...base, mode: 'armed' })
     expect(status).toEqual({
       kind: 'armed',
       label: 'Ready',
       instruction: ARMED_INSTRUCTION,
     })
-    expect(`${status!.label} — ${status!.instruction}`).toBe(ARMED_ANNOUNCEMENT)
+    expect(`${status!.label}. ${status!.instruction}`).toBe(ARMED_ANNOUNCEMENT)
   })
 
   it('shows Recording label and stop guidance', () => {

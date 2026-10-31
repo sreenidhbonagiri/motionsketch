@@ -95,6 +95,9 @@ export function EditorShell() {
   const [headerClearancePx, setHeaderClearancePx] = useState(96)
   // Actors panel sits above Sequence + dock; clearance tracks the live stack height.
   const [toolbarClearancePx, setToolbarClearancePx] = useState(96)
+  const [viewportHeightPx, setViewportHeightPx] = useState(() =>
+    typeof window === 'undefined' ? 800 : window.innerHeight,
+  )
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
@@ -170,6 +173,7 @@ export function EditorShell() {
       const top = stack.getBoundingClientRect().top
       const fromBottom = Math.max(0, window.innerHeight - top)
       setToolbarClearancePx(Math.ceil(fromBottom) + gapPx)
+      setViewportHeightPx(window.innerHeight)
     }
     update()
     const ro = new ResizeObserver(update)
@@ -227,6 +231,10 @@ export function EditorShell() {
 
   // Sheets + workspace zoom clear the measured header only (coach is overlay).
   const sheetTopPx = headerClearancePx
+  // Room between the header and the Sequence/dock stack. Below this, an in-slot
+  // list is crushed into the header; the open list floats instead (see ActorList).
+  const actorListCramped =
+    viewportHeightPx - sheetTopPx - toolbarClearancePx < 280
 
   return (
     <div
@@ -501,9 +509,8 @@ export function EditorShell() {
                   className="text-sm text-slate-500"
                 >
                   Create a path (Record, Import SVG, or a Motion preset) to add
-                  the animation to your website (HTML or React)
-                  — or open Advanced exports for CSS-only, your own HTML, and the
-                  project file.
+                  the animation to your website (HTML or React), or open Advanced
+                  exports for CSS-only, your own HTML, and the project file.
                 </p>
               )}
             </div>
@@ -514,8 +521,9 @@ export function EditorShell() {
       {/* Actor list — left, above Sequence + dock (clearance from live stack height).
           z-35 stacks above the toolbar (z-30) so the narrow Actors sheet is not
           covered by Sequence, and stays under the header (z-40).
-          On narrow, expanded Actors floats as a fixed sheet (see ActorList) so the
-          body is not crushed when Sequence owns the toolbar clearance.
+          On narrow, and on desktop when Timing leaves too little room, the open
+          list floats as a fixed sheet (see ActorList) so it is not crushed into
+          the header when Sequence owns the toolbar clearance.
           On narrow chrome sheets, inert the slot (prefs stay open). */}
       {!editing && (
         <div
@@ -531,7 +539,7 @@ export function EditorShell() {
             ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
             : {})}
         >
-          <ActorList />
+          <ActorList floatOpen={actorListCramped} />
         </div>
       )}
 

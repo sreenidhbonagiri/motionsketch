@@ -571,7 +571,7 @@ export function ExportPanel() {
         <div className="space-y-2" data-testid="export-playback-settings">
           <label className="block space-y-1">
             <span className="text-xs font-medium text-slate-800">
-              Playback trigger
+              When should it play?
             </span>
             <select
               data-testid="export-trigger-select"
@@ -588,7 +588,7 @@ export function ExportPanel() {
                       ? 'Click / tap'
                       : mode === 'hover'
                         ? 'Hover / focus'
-                        : 'Enter viewport'}
+                        : 'When it scrolls into view'}
                 </option>
               ))}
             </select>
@@ -600,7 +600,7 @@ export function ExportPanel() {
           >
             {triggerHelpText(trigger)}
             {triggerNeedsJavaScript(trigger)
-              ? ' Download CSS is CSS-only — this trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
+              ? ' Download CSS is CSS-only. This trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
               : ' For page-load, CSS alone can start the motion when prefers-reduced-motion is off. The documented website integration still includes ms-trigger.js so Play/Replay and reduced-motion controls work; Download CSS alone skips that controller.'}{' '}
             Loop / alternate still apply after the scene starts.
           </p>
@@ -871,7 +871,7 @@ export function ExportPanel() {
               >
                 Copy CSS and View CSS provide the same scoped scene code
                 {project.actors.length > 1
-                  ? ' (unique classes per actor inside the scene root).'
+                  ? ' (unique classes per element inside the scene root).'
                   : ' (wrap in the documented scene root).'}
               </p>
 
@@ -893,7 +893,7 @@ export function ExportPanel() {
                 data-testid="export-html-help"
                 className="text-[11px] leading-relaxed text-slate-500"
               >
-                Single-file offline preview — open in a browser; not for
+                Single-file offline preview. Open in a browser; not for
                 embedding in your site.
               </p>
             </div>
@@ -917,10 +917,10 @@ export function ExportPanel() {
           className="text-[11px] leading-relaxed text-slate-500"
         >
           {ownElement?.ok
-            ? `Motion wrapper for “${ownElement.actorName}” — path and timing only. Nest your HTML or React node inside .${ownElement.wrapperClass}; your child’s size, color, image, text, and transforms stay yours.`
+            ? `Motion wrapper for “${ownElement.actorName}”. Path and timing only. Nest your HTML or React node inside .${ownElement.wrapperClass}; your child’s size, color, image, text, and transforms stay yours.`
             : selectedActor
-              ? `Select an actor with a recording (currently “${selectedActor.name}” has no exportable path).`
-              : 'Select an actor with a recording to export a motion wrapper.'}
+              ? `Select an element with a recording (currently “${selectedActor.name}” has no exportable path).`
+              : 'Select an element with a recording to export a motion wrapper.'}
         </p>
         {ownElement?.ok ? (
           <>

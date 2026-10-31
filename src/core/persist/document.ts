@@ -331,7 +331,7 @@ function validateMultiActorProject(
     return { ok: false, error: 'project.actors must be an array.' }
   }
   if (value.actors.length === 0) {
-    return { ok: false, error: 'project.actors must contain at least one actor.' }
+    return { ok: false, error: 'project.actors must contain at least one element.' }
   }
   if (value.actors.length > MAX_ACTORS) {
     return {

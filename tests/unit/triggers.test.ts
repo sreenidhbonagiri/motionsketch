@@ -96,7 +96,7 @@ describe('playback triggers', () => {
       ...base,
       playback: { ...base.playback, trigger: 'page-load' },
     })
-    expect(pageLoad).toContain('Playback trigger: page-load')
+    expect(pageLoad).toContain('When should it play: page-load')
     expect(pageLoad).not.toContain(`.${MS_WAITING_CLASS}`)
 
     const clickCss = exportCssFromProject({

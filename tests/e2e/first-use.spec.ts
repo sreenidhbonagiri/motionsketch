@@ -23,7 +23,7 @@ test.describe('first-use guidance and export wording', () => {
       'Draw motion. Ship it to your website.',
     )
     await expect(page.getByTestId('first-use-next-step')).toHaveText(
-      'Click Record, then drag the actor.',
+      'Click Record, then drag the element.',
     )
     await expect(record).toHaveAttribute('aria-describedby', 'stage-empty-hint')
     await expect(page.getByTestId('btn-try-example')).toBeVisible()
@@ -41,7 +41,7 @@ test.describe('first-use guidance and export wording', () => {
       'Drag the element to record.',
     )
     await expect(page.getByTestId('action-live-region')).toHaveText(
-      'Ready — Drag the element to record.',
+      'Ready. Drag the element to record.',
     )
     await expect(page.getByTestId('btn-stop')).toHaveAccessibleName(
       'Cancel record',
@@ -69,7 +69,7 @@ test.describe('first-use guidance and export wording', () => {
       'Draw motion. Ship it to your website.',
     )
     await expect(page.getByTestId('first-use-next-step')).toHaveText(
-      'Click Record, then drag the actor.',
+      'Click Record, then drag the element.',
     )
     await expect(page.getByTestId('btn-try-example')).toBeVisible()
     await openPanel(page, 'export')
@@ -127,7 +127,7 @@ test.describe('first-use guidance and export wording', () => {
       'Draw motion. Ship it to your website.',
     )
     await expect(page.getByTestId('first-use-next-step')).toHaveText(
-      'Click Record, then drag the actor.',
+      'Click Record, then drag the element.',
     )
 
     await page.getByTestId('btn-record').click()
@@ -140,7 +140,7 @@ test.describe('first-use guidance and export wording', () => {
     await page.getByTestId('btn-stop').click()
     await expect(page.getByTestId('first-use-headline')).toBeVisible()
     await expect(page.getByTestId('first-use-next-step')).toHaveText(
-      'Click Record, then drag the actor.',
+      'Click Record, then drag the element.',
     )
 
     await recordSimplePath(page)
@@ -570,11 +570,11 @@ test.describe('first-use guidance and export wording', () => {
           const cs = getComputedStyle(el)
           return {
             bg: cs.backgroundColor,
-            hasWhiteClass: el.classList.contains('bg-white'),
+            hasPanelClass: el.classList.contains('bg-ms-panel'),
             hasRingClass: el.classList.contains('ring-1'),
           }
         })
-        expect(style.hasWhiteClass, `${id} bg-white`).toBe(selected)
+        expect(style.hasPanelClass, `${id} bg-ms-panel`).toBe(selected)
         expect(style.hasRingClass, `${id} ring`).toBe(selected)
         if (selected) {
           expect(style.bg).toMatch(/^rgb\(255,\s*255,\s*255\)$/)

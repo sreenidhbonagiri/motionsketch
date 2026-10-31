@@ -14,8 +14,12 @@ const panelSurface =
   'rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
 const togglePill =
   'pointer-events-auto inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-ms-border bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white'
+// Desktop open list when the header-to-toolbar gap cannot hold it. Mirrors the
+// narrow fixed sheet: below the header, above Sequence (z-35), internally scrolled.
+const desktopFloatSheet =
+  'sm:pointer-events-auto sm:fixed sm:top-[var(--ms-sheet-top,4.5rem)] sm:left-4 sm:z-[35] sm:h-auto sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-1rem))] sm:w-[min(16rem,calc(100vw-2rem))] sm:justify-start sm:gap-0 sm:overflow-hidden sm:rounded-xl sm:border sm:border-ms-border sm:bg-white/90 sm:shadow-[var(--ms-shadow)] sm:backdrop-blur-xl'
 
-export function ActorList() {
+export function ActorList({ floatOpen = false }: { floatOpen?: boolean }) {
   const actors = useEditorStore((s) => s.project.actors)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const playbackHead = useEditorStore((s) => s.playbackHead)
@@ -52,8 +56,11 @@ export function ActorList() {
       className={
         open
           ? // Narrow + open: float a bounded left sheet above Sequence so the
-            // body is not crushed by toolbar clearance. Desktop stays in-slot.
-            `pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5 max-sm:pointer-events-auto max-sm:fixed max-sm:left-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:z-[35] max-sm:w-[min(16rem,calc(100vw-1.5rem))] max-sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-7rem))] max-sm:justify-start max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border max-sm:border-ms-border max-sm:bg-white/90 max-sm:shadow-[var(--ms-shadow)] max-sm:backdrop-blur-xl`
+            // body is not crushed by toolbar clearance. Desktop stays in-slot
+            // unless Timing leaves too little room (floatOpen).
+            `pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5 max-sm:pointer-events-auto max-sm:fixed max-sm:left-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:z-[35] max-sm:w-[min(16rem,calc(100vw-1.5rem))] max-sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-7rem))] max-sm:justify-start max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border max-sm:border-ms-border max-sm:bg-white/90 max-sm:shadow-[var(--ms-shadow)] max-sm:backdrop-blur-xl${
+              floatOpen ? ` ${desktopFloatSheet}` : ''
+            }`
           : 'pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5'
       }
     >
@@ -61,14 +68,18 @@ export function ActorList() {
         <div
           id="actor-list-body"
           data-testid="actor-list-body"
-          className={`pointer-events-auto flex min-h-0 flex-1 flex-col overflow-hidden ${panelSurface} max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:shadow-none max-sm:backdrop-blur-none`}
+          className={`pointer-events-auto flex min-h-0 flex-1 flex-col overflow-hidden ${panelSurface} max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:shadow-none max-sm:backdrop-blur-none${
+            floatOpen
+              ? ' sm:rounded-none sm:border-0 sm:bg-transparent sm:shadow-none sm:backdrop-blur-none'
+              : ''
+          }`}
         >
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2.5 py-2 [overflow-anchor:none]">
             <ul
               data-testid="actor-list-items"
               className="max-h-36 space-y-1 overflow-auto"
               role="listbox"
-              aria-label="Actors"
+              aria-label="Elements"
             >
               {actors.map((actor, index) => {
                 const selectedRow = actor.id === selectedActorId
@@ -172,11 +183,11 @@ export function ActorList() {
                 aria-describedby="actor-list-help"
                 onClick={() => {
                   void (async () => {
-                    const label = selected?.name?.trim() || 'this actor'
+                    const label = selected?.name?.trim() || 'this element'
                     const ok = await confirm({
                       title: `Delete “${label}”?`,
                       body: 'Its path, transform keyframes, path edits, and appearance are removed. This cannot be undone.',
-                      confirmLabel: 'Delete actor',
+                      confirmLabel: 'Delete element',
                       danger: true,
                       testId: 'delete-actor-confirm',
                       confirmTestId: 'btn-delete-actor-confirm',
@@ -196,7 +207,7 @@ export function ActorList() {
                 disabled={busy}
                 onClick={() => moveSelectedActor(-1)}
                 className="inline-flex h-8 min-h-8 min-w-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
-                aria-label="Move actor earlier in stack"
+                aria-label="Move element earlier in stack"
               >
                 ↑
               </button>
@@ -206,7 +217,7 @@ export function ActorList() {
                 disabled={busy}
                 onClick={() => moveSelectedActor(1)}
                 className="inline-flex h-8 min-h-8 min-w-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
-                aria-label="Move actor later in stack"
+                aria-label="Move element later in stack"
               >
                 ↓
               </button>
@@ -217,12 +228,12 @@ export function ActorList() {
               className="text-[10px] leading-relaxed text-slate-500"
             >
               List order is stacking (later on top). Path and transform edits
-              apply to the selected actor only. Switching actors clears path and
-              transform undo history for the previous selection.
+              apply to the selected element only. Switching elements clears path
+              and transform undo history for the previous selection.
               {actors.length <= 1
-                ? ' Delete stays unavailable while only one actor remains.'
+                ? ' Delete stays unavailable while only one element remains.'
                 : busy
-                  ? ' Actor list actions pause while recording or editing a path.'
+                  ? ' Element list actions pause while recording or editing a path.'
                   : ''}
             </p>
           </div>
@@ -238,13 +249,17 @@ export function ActorList() {
         className={
           open
             ? // Sheet chrome on narrow (above the scroll body); pill under the
-              // body on desktop.
-              `${togglePill} shrink-0 max-sm:order-first max-sm:h-auto max-sm:min-h-8 max-sm:w-full max-sm:justify-between max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:border-ms-border max-sm:bg-transparent max-sm:px-3 max-sm:py-1.5 max-sm:shadow-none max-sm:backdrop-blur-none`
+              // body on desktop, unless the open list is floating.
+              `${togglePill} shrink-0 max-sm:order-first max-sm:h-auto max-sm:min-h-8 max-sm:w-full max-sm:justify-between max-sm:rounded-none max-sm:border-0 max-sm:border-b max-sm:border-ms-border max-sm:bg-transparent max-sm:px-3 max-sm:py-1.5 max-sm:shadow-none max-sm:backdrop-blur-none${
+                floatOpen
+                  ? ' sm:order-first sm:h-auto sm:min-h-8 sm:w-full sm:justify-between sm:rounded-none sm:border-0 sm:border-b sm:border-ms-border sm:bg-transparent sm:px-3 sm:py-1.5 sm:shadow-none sm:backdrop-blur-none'
+                  : ''
+              }`
             : `${togglePill} shrink-0`
         }
       >
         <span className="flex min-w-0 items-center gap-1.5">
-          <span>Actors</span>
+          <span>Elements</span>
           <span className="tabular-nums text-slate-500">
             {actors.length}/{MAX_ACTORS}
           </span>

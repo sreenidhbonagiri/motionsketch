@@ -66,7 +66,7 @@ export function WorkspaceCameraBar({
         type="button"
         data-testid="btn-fit-stage"
         aria-label="Fit stage"
-        title="Fit stage — center and show the full exported stage. Drag empty canvas to pan; hold Space to pan over actors."
+        title="Fit stage. Center and show the full exported stage. Drag empty canvas to pan; hold Space to pan over elements."
         onClick={fitStage}
         className={control}
       >

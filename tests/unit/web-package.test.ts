@@ -251,7 +251,7 @@ describe('web package export', () => {
     const readme = strFromU8(
       packed.files.find((f) => f.path === WEB_PACKAGE_README_NAME)!.bytes,
     )
-    expect(readme).toContain('Playback trigger: page-load')
+    expect(readme).toContain('When should it play: page-load')
     expect(readme).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
     expect(readme).toContain('MotionSketchTrigger.init')
     expect(readme).toContain('data-ms-demo-shell')

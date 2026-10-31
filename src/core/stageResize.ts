@@ -337,7 +337,7 @@ function appearanceWouldClamp(
     nextH < MIN_ACTOR_SIZE - 1e-12 ||
     nextH > MAX_ACTOR_SIZE + 1e-12
   ) {
-    return `That size would force actor “${actor.name}” outside the allowed artwork size range (${MIN_ACTOR_SIZE}–${MAX_ACTOR_SIZE} of the shorter stage side). Choose a closer size so proportions stay exact.`
+    return `That size would force element “${actor.name}” outside the allowed artwork size range (${MIN_ACTOR_SIZE}–${MAX_ACTOR_SIZE} of the shorter stage side). Choose a closer size so proportions stay exact.`
   }
   const text = actor.appearance.text
   if (text) {

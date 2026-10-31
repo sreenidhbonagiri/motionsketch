@@ -153,7 +153,7 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
       if (projectHasMeaningfulWork(project)) {
         const ok = await confirm({
           title: 'Load this example?',
-          body: 'It replaces your current project, including actors, appearance, and motion.',
+          body: 'It replaces your current project, including elements, appearance, and motion.',
           confirmLabel: 'Load example',
           testId: 'load-example-confirm',
           confirmTestId: 'btn-load-example-confirm',
