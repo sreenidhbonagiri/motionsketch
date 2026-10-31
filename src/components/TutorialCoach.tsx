@@ -88,15 +88,30 @@ export function TutorialCoach({
       const fit = readElementRect(
         document.querySelector('[data-testid="btn-fit-stage"]'),
       )
-      const zoom = readElementRect(
+      const cameraBar = readElementRect(
         document.querySelector('[data-testid="workspace-camera-bar"]'),
       )
       const plane = readElementRect(
         document.querySelector('[data-testid="actor"]'),
       )
-      const avoidExtra = [fit, zoom, plane].filter(Boolean) as NonNullable<
-        ReturnType<typeof readElementRect>
-      >[]
+      const adjust = readElementRect(
+        document.querySelector('[data-testid="btn-adjust"]'),
+      )
+      const appearance = readElementRect(
+        document.querySelector('[data-testid="btn-appearance"]'),
+      )
+      const exportBtn = readElementRect(
+        document.querySelector('[data-testid="btn-export"]'),
+      )
+      const header = readElementRect(document.querySelector('header'))
+      const avoidExtra = [
+        fit,
+        cameraBar,
+        plane,
+        adjust,
+        appearance,
+        exportBtn,
+      ].filter(Boolean) as NonNullable<ReturnType<typeof readElementRect>>[]
 
       if (exportOpen) {
         for (const id of [
@@ -112,6 +127,15 @@ export function TutorialCoach({
         }
       }
 
+      // Closed Export: clear the whole header row + camera bar (measured).
+      const chromeClearanceTop = Math.max(
+        header?.bottom ?? 0,
+        cameraBar?.bottom ?? 0,
+        adjust?.bottom ?? 0,
+        appearance?.bottom ?? 0,
+        exportBtn?.bottom ?? 0,
+      )
+
       const measuredH = cardRef.current?.offsetHeight
       setCardStyle(
         placeTutorialCard({
@@ -123,6 +147,8 @@ export function TutorialCoach({
           anchor,
           panel,
           avoidExtra,
+          chromeClearanceTop:
+            step === 'export' && !exportOpen ? chromeClearanceTop : undefined,
         }),
       )
     }

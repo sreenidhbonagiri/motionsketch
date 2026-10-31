@@ -554,49 +554,84 @@ test.describe('first-use tutorial', () => {
     const closed = await page.evaluate(() => {
       const card = document.querySelector('[data-testid="tutorial-coach-card"]')
       const exportBtn = document.querySelector('[data-testid="btn-export"]')
-      const fit = document.querySelector('[data-testid="btn-fit-stage"]')
+      const camera = document.querySelector(
+        '[data-testid="workspace-camera-bar"]',
+      )
+      const ids = [
+        'btn-adjust',
+        'btn-appearance',
+        'btn-export',
+        'btn-zoom-out',
+        'btn-zoom-in',
+        'btn-fit-stage',
+      ] as const
       if (
         !(card instanceof HTMLElement) ||
         !(exportBtn instanceof HTMLElement) ||
-        !(fit instanceof HTMLElement)
+        !(camera instanceof HTMLElement)
       ) {
         return { ok: false, reason: 'missing' }
       }
       const cr = card.getBoundingClientRect()
       const er = exportBtn.getBoundingClientRect()
-      const fr = fit.getBoundingClientRect()
+      const cam = camera.getBoundingClientRect()
       const cx = cr.left + cr.width / 2
       const ex = er.left + er.width / 2
-      const dist = Math.hypot(cx - ex, cr.top + cr.height / 2 - (er.top + er.height / 2))
-      const overlapFit =
-        cr.left < fr.right - 2 &&
-        cr.right > fr.left + 2 &&
-        cr.top < fr.bottom - 2 &&
-        cr.bottom > fr.top + 2
-      const hitExport = (() => {
+      const dist = Math.hypot(
+        cx - ex,
+        cr.top + cr.height / 2 - (er.top + er.height / 2),
+      )
+      const probe = (el: HTMLElement) => {
+        const r = el.getBoundingClientRect()
         const top = document.elementFromPoint(
-          er.left + er.width / 2,
-          er.top + er.height / 2,
+          r.left + r.width / 2,
+          r.top + r.height / 2,
         )
-        return (
-          top instanceof Element &&
-          (top === exportBtn || exportBtn.contains(top))
-        )
-      })()
+        const ok =
+          top instanceof Element && (top === el || el.contains(top))
+        return {
+          ok,
+          hit:
+            top instanceof Element
+              ? top.getAttribute('data-testid') || top.tagName
+              : 'null',
+        }
+      }
+      const hits: Record<string, { ok: boolean; hit: string }> = {}
+      for (const id of ids) {
+        const el = document.querySelector(`[data-testid="${id}"]`)
+        if (!(el instanceof HTMLElement)) {
+          return { ok: false, reason: `${id}-missing` }
+        }
+        const overlap =
+          cr.left < el.getBoundingClientRect().right - 2 &&
+          cr.right > el.getBoundingClientRect().left + 2 &&
+          cr.top < el.getBoundingClientRect().bottom - 2 &&
+          cr.bottom > el.getBoundingClientRect().top + 2
+        if (overlap) return { ok: false, reason: `covers-${id}` }
+        hits[id] = probe(el)
+        if (!hits[id].ok) {
+          return {
+            ok: false,
+            reason: `${id}-blocked:${hits[id].hit}`,
+          }
+        }
+      }
+      const clearsCamera = cr.top >= cam.bottom - 1
       return {
-        ok: dist < 400 && !overlapFit && cx > 1280 * 0.45 && hitExport,
+        ok: dist < 480 && cx > 1280 * 0.45 && clearsCamera,
         reason:
           cx <= 1280 * 0.45
             ? 'left-header-fallback'
-            : overlapFit
-              ? 'covers-fit'
-              : !hitExport
-                ? 'export-blocked'
-                : dist >= 400
-                  ? `far:${Math.round(dist)}`
-                  : 'ok',
+            : !clearsCamera
+              ? 'covers-camera'
+              : dist >= 480
+                ? `far:${Math.round(dist)}`
+                : 'ok',
         dist: Math.round(dist),
+        cardTop: Math.round(cr.top),
         cardLeft: Math.round(cr.left),
+        cameraBottom: Math.round(cam.bottom),
       }
     })
     expect(closed, closed.reason).toMatchObject({ ok: true, reason: 'ok' })

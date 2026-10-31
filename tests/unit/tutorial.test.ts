@@ -137,7 +137,7 @@ describe('tutorial placement', () => {
     expect(placed.left + placed.width / 2).toBeGreaterThan(1280 * 0.42)
   })
 
-  it('keeps closed-Export card near Export at 1280×720 with Fit/zoom present', () => {
+  it('keeps closed-Export card below camera/header chrome at 1280×720', () => {
     const exportBtn = {
       top: 12,
       left: 1180,
@@ -146,22 +146,44 @@ describe('tutorial placement', () => {
       right: 1268,
       bottom: 40,
     }
-    const fit = {
-      top: 52,
-      left: 1160,
-      width: 72,
-      height: 28,
-      right: 1232,
-      bottom: 80,
-    }
-    const zoom = {
-      top: 52,
+    const appearance = {
+      top: 12,
       left: 1080,
+      width: 96,
+      height: 28,
+      right: 1176,
+      bottom: 40,
+    }
+    const adjust = {
+      top: 12,
+      left: 980,
+      width: 88,
+      height: 28,
+      right: 1068,
+      bottom: 40,
+    }
+    const cameraBar = {
+      top: 52,
+      left: 1050,
+      width: 210,
+      height: 36,
+      right: 1260,
+      bottom: 88,
+    }
+    const fit = {
+      top: 56,
+      left: 1188,
       width: 72,
       height: 28,
-      right: 1152,
-      bottom: 80,
+      right: 1260,
+      bottom: 84,
     }
+    const chromeClearanceTop = Math.max(
+      exportBtn.bottom,
+      appearance.bottom,
+      adjust.bottom,
+      cameraBar.bottom,
+    )
     const placed = placeTutorialCard({
       step: 'export',
       exportOpen: false,
@@ -170,21 +192,21 @@ describe('tutorial placement', () => {
       cardHeight: 132,
       anchor: exportBtn,
       panel: null,
-      avoidExtra: [fit, zoom],
+      avoidExtra: [fit, cameraBar, appearance, adjust, exportBtn],
+      chromeClearanceTop,
     })
     const cardMidX = placed.left + placed.width / 2
     const exportMidX = exportBtn.left + exportBtn.width / 2
     expect(cardMidX).toBeGreaterThan(1280 * 0.45)
     expect(Math.abs(cardMidX - exportMidX)).toBeLessThan(360)
-    expect(placed.top).toBeGreaterThanOrEqual(exportBtn.bottom - 4)
-    // Must not cover Fit
-    expect(
-      !(
-        placed.left < fit.right - 2 &&
-        placed.left + placed.width > fit.left + 2 &&
-        placed.top < fit.bottom - 2 &&
-        placed.top + 132 > fit.top + 2
-      ),
-    ).toBe(true)
+    expect(placed.top).toBeGreaterThanOrEqual(chromeClearanceTop + 8)
+    for (const box of [fit, cameraBar, appearance, adjust]) {
+      const overlapsBox =
+        placed.left < box.right - 2 &&
+        placed.left + placed.width > box.left + 2 &&
+        placed.top < box.bottom - 2 &&
+        placed.top + 132 > box.top + 2
+      expect(overlapsBox).toBe(false)
+    }
   })
 })

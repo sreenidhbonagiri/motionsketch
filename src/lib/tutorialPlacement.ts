@@ -130,6 +130,7 @@ function candidatesNearDockControl(
 /**
  * Keep Export guidance associated with the Export control — never park under
  * the left brand/header cluster as a generic fallback.
+ * Prefer tops at/below measured chrome clearance (header cluster + camera bar).
  */
 function candidatesNearExportButton(
   anchor: Rect,
@@ -137,34 +138,37 @@ function candidatesNearExportButton(
   cardH: number,
   vw: number,
   vh: number,
+  chromeClearanceTop: number,
 ): Array<{ top: number; left: number }> {
   const maxLeft = Math.max(MARGIN, vw - cardW - MARGIN)
   const rightAligned = clamp(anchor.right - cardW, MARGIN, maxLeft)
   const atButtonLeft = clamp(anchor.left, MARGIN, maxLeft)
   const leftOfButton = clamp(anchor.left - cardW - GAP, MARGIN, maxLeft)
-  // Stay in the right half even when dodging Fit/zoom.
   const rightColumn = clamp(Math.max(vw * 0.52, leftOfButton), MARGIN, maxLeft)
-  const below = anchor.bottom + GAP
-  const belowClear = anchor.bottom + GAP + 44
+  // Clear header actions + camera bar using measured bottoms, not fixed offsets.
+  const belowChrome = Math.max(anchor.bottom + GAP, chromeClearanceTop + GAP)
+  const belowChromeMore = belowChrome + 28
 
   return [
-    { top: below, left: rightAligned },
-    { top: below, left: atButtonLeft },
-    { top: belowClear, left: rightAligned },
-    { top: belowClear, left: atButtonLeft },
+    // Primary: under the camera bar, still under/near Export horizontally.
+    { top: belowChrome, left: rightAligned },
+    { top: belowChrome, left: atButtonLeft },
+    { top: belowChrome, left: rightColumn },
+    { top: belowChromeMore, left: rightAligned },
+    { top: belowChromeMore, left: atButtonLeft },
+    { top: belowChromeMore, left: rightColumn },
+    // Side of Export only when it still clears measured chrome.
     {
-      top: clamp(anchor.top, MARGIN, vh - cardH - MARGIN),
+      top: clamp(
+        Math.max(anchor.top, chromeClearanceTop + GAP),
+        MARGIN,
+        vh - cardH - MARGIN,
+      ),
       left: leftOfButton,
     },
+    // Last resort: still right-column, below chrome.
     {
-      top: clamp(anchor.bottom + 4, MARGIN, vh - cardH - MARGIN),
-      left: leftOfButton,
-    },
-    { top: below, left: rightColumn },
-    { top: belowClear, left: rightColumn },
-    // Last resort: still pinned to the Export/right column.
-    {
-      top: Math.max(MARGIN + 48, below),
+      top: clamp(belowChrome, MARGIN, vh - cardH - MARGIN),
       left: rightAligned,
     },
   ]
@@ -282,6 +286,11 @@ export function placeTutorialCard(opts: {
   anchor: Rect | null
   panel: Rect | null
   avoidExtra?: Rect[]
+  /**
+   * Lowest bottom edge of header chrome + camera bar the closed-Export card
+   * must clear (measured). Ignored for open-Export / non-export steps.
+   */
+  chromeClearanceTop?: number
 }): CardPlacement {
   const cardW = Math.min(opts.cardWidth ?? CARD_MAX, opts.vw - MARGIN * 2)
   const cardH = opts.cardHeight ?? 132
@@ -308,6 +317,7 @@ export function placeTutorialCard(opts: {
       cardH,
       opts.vw,
       opts.vh,
+      opts.chromeClearanceTop ?? opts.anchor.bottom,
     )
   } else if (opts.anchor) {
     list = candidatesNearDockControl(
