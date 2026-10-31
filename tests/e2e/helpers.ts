@@ -7,27 +7,46 @@ export async function loadHtmlDocument(page: Page, html: string) {
 }
 
 /**
- * Dismiss the first-use tutorial offer without starting practice
- * (marks skipped in localStorage via Start creating).
+ * Skip an auto-started tutorial if the coach is visible (marks skipped locally).
+ * If a keep/restore dialog appears, choose Start fresh / Restore.
  */
-export async function dismissTutorialOfferIfPresent(page: Page) {
-  const start = page.getByTestId('btn-start-creating')
-  if (await start.isVisible().catch(() => false)) {
-    await start.click()
-    await expect(start).toHaveCount(0)
+export async function skipTutorialIfPresent(page: Page) {
+  const coach = page.getByTestId('tutorial-coach')
+  // Auto-start runs after hydrate — wait briefly for fresh visits.
+  try {
+    await coach.waitFor({ state: 'visible', timeout: 2000 })
+  } catch {
+    return
   }
+  await page.getByTestId('btn-tutorial-skip').click()
+  const keep = page.getByTestId('tutorial-keep-confirm')
+  if (await keep.isVisible().catch(() => false)) {
+    const fresh = page.getByTestId('btn-tutorial-start-fresh')
+    const restore = page.getByTestId('btn-tutorial-restore')
+    if (await fresh.isVisible().catch(() => false)) {
+      await fresh.click()
+    } else if (await restore.isVisible().catch(() => false)) {
+      await restore.click()
+    }
+  }
+  await expect(coach).toHaveCount(0)
+}
+
+/** @deprecated Prefer {@link skipTutorialIfPresent}. */
+export async function dismissTutorialOfferIfPresent(page: Page) {
+  await skipTutorialIfPresent(page)
 }
 
 /**
  * Wait for the editor canvas. Optionally rename the project header.
  * No-ops the rename when the name already matches.
- * Skips the tutorial offer so unrelated suites stay on a blank canvas.
+ * Skips an auto-started tutorial so unrelated suites stay on a blank canvas.
  */
 export async function ensureEditor(page: Page, name?: string) {
   await expect(page.getByTestId('app-shell')).toBeVisible()
   await expect(page.getByTestId('welcome-screen')).toHaveCount(0)
   await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
-  await dismissTutorialOfferIfPresent(page)
+  await skipTutorialIfPresent(page)
   if (!name) return
   const renameBtn = page.getByTestId('btn-rename-project')
   const current = (await renameBtn.textContent())?.trim()
@@ -484,7 +503,7 @@ export async function readExportedCss(page: Page): Promise<string> {
  */
 export async function recordSimplePath(page: Page) {
   await closeOpenChromePanels(page)
-  await dismissTutorialOfferIfPresent(page)
+  await skipTutorialIfPresent(page)
   await clickRecord(page)
   await dragActor(page, { x: 30, y: -20 }, { x: 160, y: 50 })
   await expect(page.getByTestId('btn-play')).toBeEnabled()

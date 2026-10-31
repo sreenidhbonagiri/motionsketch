@@ -1,7 +1,8 @@
 import {
   useEffect,
-  useLayoutEffect,
   useId,
+  useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
 } from 'react'
@@ -24,20 +25,66 @@ interface TutorialCoachProps {
   step: TutorialStep
   body: string
   highlightTestId: string | null
+  /** When true, skip the heavy dim overlay so playback looks like the real scene. */
+  softHighlight?: boolean
+  /** Export panel open — park the card clear of the sheet. */
+  exportOpen?: boolean
   showNext: boolean
   nextIsFinish?: boolean
   onSkip: () => void
   onNext?: () => void
 }
 
+const CARD_MAX = 320
+
+function placeCard(opts: {
+  vw: number
+  exportOpen: boolean
+  headerBottom: number
+}): CSSProperties {
+  const { vw, exportOpen, headerBottom } = opts
+  const width = Math.min(CARD_MAX, vw - 24)
+  // Prefer left column under the header — clear of Fit/zoom (top-right) and dock.
+  let top = Math.max(headerBottom + 8, 72)
+  let left = 12
+
+  if (vw < 640) {
+    if (exportOpen) {
+      // Narrow + Export sheet: pin under the header so Finish/Skip stay above the sheet body.
+      top = Math.max(headerBottom + 6, 8)
+      left = 12
+    } else {
+      // Narrow: under header — clears Fit (top-right) and leaves plane/Record free below.
+      top = Math.max(headerBottom + 8, 64)
+      left = 12
+    }
+  } else if (exportOpen) {
+    // Desktop + Export (right sheet): keep card on the left, below header.
+    top = Math.max(headerBottom + 8, 88)
+    left = 16
+  } else {
+    top = Math.max(headerBottom + 8, 88)
+    left = 16
+  }
+
+  return {
+    top,
+    left,
+    width,
+    maxWidth: width,
+  }
+}
+
 /**
- * Non-layout coach: fixed card + optional ring around a measured control.
- * Does not change --ms-sheet-top, dock, or Fit/zoom placement.
+ * Non-layout coach: stationary card + optional highlight ring.
+ * Card placement is independent of the highlighted control (does not follow the plane).
  */
 export function TutorialCoach({
   step,
   body,
   highlightTestId,
+  softHighlight = false,
+  exportOpen = false,
   showNext,
   nextIsFinish = false,
   onSkip,
@@ -47,13 +94,40 @@ export function TutorialCoach({
   const titleId = useId()
   const bodyId = useId()
   const [rect, setRect] = useState<HighlightRect | null>(null)
-  const [cardStyle, setCardStyle] = useState<CSSProperties>({
-    top: 96,
-    left: 16,
-    right: 16,
-    maxWidth: 360,
-  })
+  const [cardStyle, setCardStyle] = useState<CSSProperties>(() =>
+    placeCard({
+      vw: typeof window !== 'undefined' ? window.innerWidth : 1280,
+      exportOpen: false,
+      headerBottom: 72,
+    }),
+  )
+  const [enterClass, setEnterClass] = useState(
+    reducedMotion ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2',
+  )
+  const prevStepRef = useRef<TutorialStep | null>(null)
 
+  // Stationary card: remeasure only on viewport change or Export clearance.
+  useLayoutEffect(() => {
+    const update = () => {
+      const header = document.querySelector('header')
+      const headerBottom =
+        header instanceof HTMLElement
+          ? header.getBoundingClientRect().bottom
+          : 72
+      setCardStyle(
+        placeCard({
+          vw: window.innerWidth,
+          exportOpen,
+          headerBottom,
+        }),
+      )
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [exportOpen])
+
+  // Highlight ring only — does not move the card.
   useLayoutEffect(() => {
     if (!highlightTestId) {
       setRect(null)
@@ -62,9 +136,7 @@ export function TutorialCoach({
     let cancelled = false
     const measure = () => {
       if (cancelled) return
-      const el = document.querySelector(
-        `[data-testid="${highlightTestId}"]`,
-      )
+      const el = document.querySelector(`[data-testid="${highlightTestId}"]`)
       if (!(el instanceof HTMLElement)) {
         setRect(null)
         return
@@ -77,63 +149,64 @@ export function TutorialCoach({
         width: r.width + pad * 2,
         height: r.height + pad * 2,
       })
-
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const cardMax = Math.min(360, vw - 24)
-      const preferBelow = r.bottom + 12 + 140 < vh
-      const top = preferBelow
-        ? Math.min(r.bottom + 12, vh - 160)
-        : Math.max(12, r.top - 148)
-      let left = Math.min(
-        Math.max(12, r.left + r.width / 2 - cardMax / 2),
-        vw - cardMax - 12,
-      )
-      // Keep clear of the right edge on narrow screens.
-      if (vw < 420) {
-        left = 12
-      }
-      setCardStyle({
-        top,
-        left,
-        width: cardMax,
-        maxWidth: cardMax,
-      })
     }
     measure()
-    const ro = new ResizeObserver(measure)
     const el = document.querySelector(`[data-testid="${highlightTestId}"]`)
+    const ro = new ResizeObserver(measure)
     if (el instanceof HTMLElement) ro.observe(el)
     window.addEventListener('resize', measure)
-    window.addEventListener('scroll', measure, true)
-    const id = window.setInterval(measure, 250)
     return () => {
       cancelled = true
       ro.disconnect()
       window.removeEventListener('resize', measure)
-      window.removeEventListener('scroll', measure, true)
-      window.clearInterval(id)
     }
-  }, [highlightTestId, step, body])
+  }, [highlightTestId])
+
+  // Entrance only on first mount and real step changes — not body / playhead churn.
+  useEffect(() => {
+    const prev = prevStepRef.current
+    const stepChanged = prev !== step
+    prevStepRef.current = step
+    if (!stepChanged) return
+    if (reducedMotion) {
+      setEnterClass('opacity-100 translate-y-0')
+      return
+    }
+    setEnterClass('opacity-0 translate-y-2')
+    let inner = 0
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        setEnterClass(
+          'opacity-100 translate-y-0 transition-[opacity,transform] duration-200 ease-out',
+        )
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(outer)
+      window.cancelAnimationFrame(inner)
+    }
+  }, [step, reducedMotion])
 
   useEffect(() => {
-    const root = document.querySelector('[data-testid="tutorial-coach"]')
-    if (root instanceof HTMLElement) {
-      const skip = root.querySelector(
-        '[data-testid="btn-tutorial-skip"]',
-      )
-      if (skip instanceof HTMLElement) skip.focus()
-    }
+    const skip = document.querySelector('[data-testid="btn-tutorial-skip"]')
+    if (skip instanceof HTMLElement) skip.focus()
   }, [step])
 
   const stepLabel =
-    step === 'draw' ? 'Step 1 of 3' : step === 'play' ? 'Step 2 of 3' : 'Step 3 of 3'
+    step === 'draw'
+      ? 'Step 1 of 3'
+      : step === 'play'
+        ? 'Step 2 of 3'
+        : 'Step 3 of 3'
+
+  // Above chrome sheets (z-50) so Finish/Skip stay usable beside Export.
+  const layerZ = exportOpen ? 'z-[55]' : 'z-[45]'
 
   return (
     <div
       data-testid="tutorial-coach"
       data-tutorial-step={step}
-      className="pointer-events-none fixed inset-0 z-[45]"
+      className={`pointer-events-none fixed inset-0 ${layerZ}`}
       aria-labelledby={titleId}
       aria-describedby={bodyId}
     >
@@ -142,14 +215,16 @@ export function TutorialCoach({
           data-testid="tutorial-highlight"
           aria-hidden
           className={`pointer-events-none absolute rounded-xl ring-2 ring-ms-primary ring-offset-2 ring-offset-ms-canvas ${
-            reducedMotion ? '' : 'motion-safe:animate-pulse'
+            reducedMotion || softHighlight ? '' : 'animate-pulse'
           }`}
           style={{
             top: rect.top,
             left: rect.left,
             width: rect.width,
             height: rect.height,
-            boxShadow: '0 0 0 9999px rgb(23 33 58 / 0.28)',
+            boxShadow: softHighlight
+              ? '0 0 0 2px rgb(48 72 184 / 0.35)'
+              : '0 0 0 9999px rgb(23 33 58 / 0.22)',
           }}
         />
       )}
@@ -157,7 +232,8 @@ export function TutorialCoach({
       <div
         role="dialog"
         aria-modal="false"
-        className="pointer-events-auto absolute rounded-xl border border-ms-border bg-white/95 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+        data-testid="tutorial-coach-card"
+        className={`pointer-events-auto absolute rounded-xl border border-ms-border bg-white/95 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl ${enterClass}`}
         style={cardStyle}
       >
         <p
@@ -170,7 +246,7 @@ export function TutorialCoach({
         <p
           id={bodyId}
           data-testid="tutorial-coach-body"
-          className="mt-1 text-sm leading-snug text-slate-800"
+          className="mt-1 min-h-[2.75rem] text-sm leading-snug text-slate-800"
         >
           {body}
         </p>
@@ -186,7 +262,9 @@ export function TutorialCoach({
           {showNext && onNext && (
             <button
               type="button"
-              data-testid="btn-tutorial-next"
+              data-testid={
+                nextIsFinish ? 'btn-tutorial-finish' : 'btn-tutorial-next'
+              }
               onClick={onNext}
               className="rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white transition hover:bg-ms-primary-hover active:bg-ms-primary-pressed"
             >

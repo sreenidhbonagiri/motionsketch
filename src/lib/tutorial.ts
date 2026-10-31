@@ -2,6 +2,7 @@ import {
   buildSnapshot,
   parseSnapshotJson,
   serializeSnapshot,
+  STORAGE_KEY,
   type PersistedSnapshot,
 } from '../core/persist/document'
 import { createSceneActor } from '../core/sceneActor'
@@ -10,6 +11,7 @@ import type { Project } from '../core/types'
 import { createPaperPlaneImage } from '../examples/assets'
 import { compositionSizeFromAspect } from '../core/stageResize'
 import { cloneExampleProject } from '../examples/load'
+import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 
 /** Match bundled example stage aspect without importing scene builders. */
 const TUTORIAL_STAGE_ASPECT = 16 / 10
@@ -27,34 +29,30 @@ export type TutorialStep = 'draw' | 'play' | 'export'
 
 export type TutorialDrawPhase = 'record' | 'drag'
 
-export const TUTORIAL_OFFER_HEADLINE = 'Draw motion. Ship it to your website.'
-
-export const TUTORIAL_OFFER_BODY =
-  'A one-minute practice flight with the notebook paper plane — or jump straight in.'
-
-export const TUTORIAL_TRY_LABEL = 'Try a quick tutorial'
-export const TUTORIAL_START_CREATING_LABEL = 'Start creating'
-
 export const TUTORIAL_DRAW_RECORD =
   'Click Record, then drag the plane to draw its flight.'
 export const TUTORIAL_DRAW_DRAG = 'Drag the plane to draw its flight.'
-export const TUTORIAL_PLAY =
-  'Press Play to watch your flight. Then continue when you are ready.'
+export const TUTORIAL_PLAY_IDLE = 'Play your flight.'
+export const TUTORIAL_PLAY_WATCHING =
+  'Watch your flight — pause anytime, or wait until it finishes.'
 export const TUTORIAL_EXPORT =
-  'Open Export to download a preview and files for your website. You do not need to download to finish.'
+  'Export lets you download a preview and files for your website. Look around — download is optional — then finish when you are ready.'
 
-export const TUTORIAL_SKIP_LABEL = 'Skip'
+export const TUTORIAL_SKIP_LABEL = 'Skip tutorial'
 export const TUTORIAL_NEXT_LABEL = 'Next'
-export const TUTORIAL_FINISH_LABEL = 'Finish'
+export const TUTORIAL_FINISH_LABEL = 'Finish tutorial'
 
 export const TUTORIAL_KEEP_TITLE = 'Keep this animation?'
-export const TUTORIAL_KEEP_BODY =
+export const TUTORIAL_KEEP_BODY_RESTORE =
   'Keep the practice flight as your project, or restore what you had before the tutorial.'
+export const TUTORIAL_KEEP_BODY_FRESH =
+  'Keep the practice flight as your project, or start fresh without it.'
 export const TUTORIAL_KEEP_CONFIRM = 'Keep this animation'
 export const TUTORIAL_KEEP_RESTORE = 'Restore previous project'
+export const TUTORIAL_KEEP_FRESH = 'Start fresh'
 
 export const HELP_RECORDING_BLURB =
-  'Click Record, then drag an actor on the stage to draw a path. Cancel while armed restores idle without a take. Short or zero-motion drags are ignored — try again.'
+  'Click Record, drag an element, then release to finish. Short or zero-motion drags are ignored — try again.'
 export const HELP_EXPORT_BLURB =
   'After a path exists, open Export to download a website preview package or other formats. Copy and download feedback stay in Export and Project.'
 export const HELP_RESTART_TUTORIAL_LABEL = 'Restart tutorial'
@@ -143,7 +141,7 @@ export function writeTutorialProgress(status: TutorialProgressStatus): void {
       JSON.stringify({ status } satisfies TutorialProgress),
     )
   } catch {
-    // quota / private mode — offer may reappear
+    // quota / private mode
   }
 }
 
@@ -155,8 +153,23 @@ export function clearTutorialProgress(): void {
   }
 }
 
-export function shouldOfferTutorial(): boolean {
-  return readTutorialProgress() === null
+/** True when localStorage already holds a project blob (returning visitor). */
+export function hasSavedProjectInStorage(): boolean {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return typeof raw === 'string' && raw.length > 0
+  } catch {
+    // Fail closed — never auto-start if storage is unreadable.
+    return true
+  }
+}
+
+/**
+ * Auto-start once for a genuine first visit: no tutorial preference yet and no
+ * saved project in storage. Never replaces a returning user’s project.
+ */
+export function shouldAutoStartTutorial(): boolean {
+  return readTutorialProgress() === null && !hasSavedProjectInStorage()
 }
 
 /** Snapshot of the live editor project for restore-after-tutorial. */
@@ -166,4 +179,9 @@ export function snapshotCurrentProject(project: Project): PersistedSnapshot {
 
 export function tutorialProjectHasFlight(project: Project): boolean {
   return projectHasAnyRecording(project)
+}
+
+export function snapshotIsEmptyStarter(snapshot: PersistedSnapshot | null): boolean {
+  if (!snapshot) return true
+  return !projectHasMeaningfulWork(snapshot.project)
 }

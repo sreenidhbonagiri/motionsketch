@@ -20,12 +20,6 @@ import {
   FIRST_USE_NEXT_STEP_COARSE,
   FIRST_USE_NEXT_STEP_FINE,
 } from '../lib/modeStatus'
-import {
-  TUTORIAL_OFFER_BODY,
-  TUTORIAL_OFFER_HEADLINE,
-  TUTORIAL_START_CREATING_LABEL,
-  TUTORIAL_TRY_LABEL,
-} from '../lib/tutorial'
 import { endDrag, isRecordingActive } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
 import { AdjustPanel } from './AdjustPanel'
@@ -108,16 +102,16 @@ export function EditorShell() {
     setOpenPanel(null)
     setExamplesOpen(false)
   }, [])
+  const ensureExportOpen = useCallback(() => {
+    setExamplesOpen(false)
+    setOpenPanel('export')
+  }, [])
 
-  const {
-    view: tutorial,
-    offerOpen: tutorialOfferOpen,
-    beginPractice,
-    dismissOffer,
-    skipTutorial,
-    goNext,
-    restartTutorial,
-  } = useTutorial({ openPanel, closePanels: closeChrome })
+  const { view: tutorial, skipTutorial, goNext, restartTutorial } = useTutorial({
+    openPanel,
+    closePanels: closeChrome,
+    ensureExportOpen,
+  })
 
   const togglePanel = (id: ChromePanel) => {
     setExamplesOpen(false)
@@ -219,15 +213,8 @@ export function EditorShell() {
   const firstUseNextStep = coarsePointer
     ? FIRST_USE_NEXT_STEP_COARSE
     : FIRST_USE_NEXT_STEP_FINE
-  const showTutorialOffer =
-    tutorialOfferOpen &&
-    !tipBusy &&
-    !hasRecording &&
-    isEmptyProject &&
-    !examplesOpen
-  // After tutorial offer is settled, keep a dismissible empty-board tip.
+  // After tutorial is done/skipped, keep a dismissible empty-board tip.
   const showFirstUseIntro =
-    !tutorialOfferOpen &&
     !tutorial.active &&
     !tipBusy &&
     !hasRecording &&
@@ -236,11 +223,7 @@ export function EditorShell() {
     !examplesOpen
   // After dismiss (or non-empty untitled board), keep a screen-reader target for Record/Play.
   const showEmptyBoardSrHint =
-    !tipBusy &&
-    !hasRecording &&
-    !showFirstUseIntro &&
-    !showTutorialOffer &&
-    !tutorial.active
+    !tipBusy && !hasRecording && !showFirstUseIntro && !tutorial.active
 
   // Sheets + workspace zoom clear the measured header only (coach is overlay).
   const sheetTopPx = headerClearancePx
@@ -270,6 +253,8 @@ export function EditorShell() {
           step={tutorial.step}
           body={tutorial.coachBody}
           highlightTestId={tutorial.highlightTestId}
+          softHighlight={tutorial.softHighlight}
+          exportOpen={openPanel === 'export'}
           showNext={tutorial.showNext}
           nextIsFinish={tutorial.nextIsFinish}
           onSkip={skipTutorial}
@@ -379,7 +364,6 @@ export function EditorShell() {
                 closePanel()
                 restartTutorial()
               }}
-              restartDisabled={tutorial.active}
             />
           </FloatingPanel>
         </div>
@@ -577,47 +561,6 @@ export function EditorShell() {
           {glideSession && <GlidePanel />}
           {presetSession && <PresetPanel />}
           <PlaybackDock />
-          {showTutorialOffer && (
-            <div
-              id="stage-empty-hint"
-              data-testid="stage-empty-hint"
-              className="pointer-events-auto flex w-full max-w-sm flex-col gap-1.5 rounded-xl border border-ms-border bg-white/90 px-3.5 py-2.5 text-center shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
-            >
-              <p
-                data-testid="first-use-headline"
-                className="text-sm font-semibold tracking-tight text-slate-900"
-              >
-                {TUTORIAL_OFFER_HEADLINE}
-              </p>
-              <p
-                data-testid="tutorial-offer-body"
-                className="text-xs leading-snug text-slate-600"
-              >
-                {TUTORIAL_OFFER_BODY}
-              </p>
-              <p data-testid="first-use-next-step" className="sr-only">
-                {firstUseNextStep}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-                <button
-                  type="button"
-                  data-testid="btn-try-tutorial"
-                  onClick={beginPractice}
-                  className="rounded-lg bg-ms-primary px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover active:bg-ms-primary-pressed"
-                >
-                  {TUTORIAL_TRY_LABEL}
-                </button>
-                <button
-                  type="button"
-                  data-testid="btn-start-creating"
-                  onClick={dismissOffer}
-                  className="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-900/[0.05]"
-                >
-                  {TUTORIAL_START_CREATING_LABEL}
-                </button>
-              </div>
-            </div>
-          )}
           {showFirstUseIntro && (
             <div
               id="stage-empty-hint"

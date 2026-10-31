@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { STORAGE_KEY } from '../../src/core/persist/document'
 import {
   buildTutorialPracticeProject,
   clearTutorialProgress,
+  hasSavedProjectInStorage,
   loadTutorialPracticeSnapshot,
   readTutorialProgress,
-  shouldOfferTutorial,
+  shouldAutoStartTutorial,
   TUTORIAL_PROGRESS_KEY,
   writeTutorialProgress,
 } from '../../src/lib/tutorial'
@@ -28,19 +30,26 @@ describe('tutorial practice project', () => {
   })
 })
 
-describe('tutorial progress storage', () => {
+describe('tutorial progress + auto-start', () => {
   beforeEach(() => {
     clearTutorialProgress()
+    localStorage.removeItem(STORAGE_KEY)
   })
 
-  it('offers until completed or skipped', () => {
-    expect(shouldOfferTutorial()).toBe(true)
+  it('auto-starts only with empty storage and no preference', () => {
+    expect(hasSavedProjectInStorage()).toBe(false)
+    expect(shouldAutoStartTutorial()).toBe(true)
     writeTutorialProgress('skipped')
-    expect(shouldOfferTutorial()).toBe(false)
-    expect(readTutorialProgress()).toEqual({ status: 'skipped' })
+    expect(shouldAutoStartTutorial()).toBe(false)
     clearTutorialProgress()
+    localStorage.setItem(STORAGE_KEY, '{"formatVersion":14}')
+    expect(hasSavedProjectInStorage()).toBe(true)
+    expect(shouldAutoStartTutorial()).toBe(false)
+  })
+
+  it('remembers completed and skipped', () => {
     writeTutorialProgress('completed')
+    expect(readTutorialProgress()).toEqual({ status: 'completed' })
     expect(localStorage.getItem(TUTORIAL_PROGRESS_KEY)).toContain('completed')
-    expect(shouldOfferTutorial()).toBe(false)
   })
 })
