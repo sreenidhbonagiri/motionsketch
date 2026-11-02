@@ -412,7 +412,7 @@ export function EditorShell() {
         <div className="pointer-events-auto relative w-full min-w-0 sm:max-w-[min(100%,28rem)]">
           <div className={`${headerCluster} w-full`}>
             <div className="flex min-w-0 flex-1 flex-col justify-center px-1.5 py-0.5">
-              <span className="hidden text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:block">
+              <span className="hidden text-xs font-semibold uppercase tracking-wide text-ms-muted sm:block">
                 MotionSketch
               </span>
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
@@ -425,8 +425,8 @@ export function EditorShell() {
                     data-testid="header-save-status"
                     className={
                       status === 'save-error' || status === 'restore-error'
-                        ? 'text-[10px] font-medium text-amber-800'
-                        : 'text-[10px] text-slate-500'
+                        ? 'text-xs font-medium text-amber-800'
+                        : 'text-xs text-ms-muted'
                     }
                   >
                     {saveLabel}
@@ -520,7 +520,7 @@ export function EditorShell() {
               {hasRecording && (
                 <span
                   data-testid="adjust-summary"
-                  className="rounded-md bg-slate-900/[0.06] px-1 py-px text-[10px] font-medium tabular-nums text-slate-600"
+                  className="rounded-md bg-slate-900/[0.06] px-1 py-px text-xs font-medium tabular-nums text-ms-ink"
                 >
                   {(durationMs / 1000).toFixed(1)}s
                 </span>
@@ -719,7 +719,7 @@ export function EditorShell() {
               </p>
               <p
                 data-testid="first-use-next-step"
-                className="text-xs leading-snug text-slate-600"
+                className="text-sm leading-snug text-ms-ink"
               >
                 {firstUseNextStep}
               </p>

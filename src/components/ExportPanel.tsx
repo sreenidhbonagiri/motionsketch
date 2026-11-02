@@ -351,18 +351,18 @@ export function ExportPanel() {
           role="status"
           className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"
         >
-          <p className="text-[11px] font-medium text-amber-950">
+          <p className="text-sm font-medium text-amber-950">
             Facing export fidelity
           </p>
           {facingFidelityWarnings.map((notice) => (
             <p
               key={`${notice.actorName}-${notice.maxErrDeg.toFixed(3)}`}
-              className="text-[11px] leading-relaxed text-amber-900/90"
+              className="text-sm leading-relaxed text-amber-900/90"
             >
               {notice.plainMessage}
             </p>
           ))}
-          <p className="text-[11px] leading-relaxed text-amber-800/90">
+          <p className="text-sm leading-relaxed text-amber-800/90">
             Applies to Copy CSS, View CSS, Download CSS, HTML demo, web package,
             React package, and Animate your own element. Export still proceeds;
             the CSS also includes a matching comment.
@@ -393,7 +393,7 @@ export function ExportPanel() {
           <p
             id={websiteLimitsId}
             data-testid="export-website-limits"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             Needs access to your site’s code. Does not install into WordPress or
             Webflow, and downloading does not publish anything.
@@ -414,13 +414,13 @@ export function ExportPanel() {
           >
             <p
               data-testid="export-download-success-title"
-              className="text-[11px] font-medium text-ms-success"
+              className="text-sm font-medium text-ms-success"
             >
               Website package download started.
             </p>
             <p
               data-testid="export-download-success-hint"
-              className="text-[11px] leading-relaxed text-ms-success"
+              className="text-sm leading-relaxed text-ms-success"
             >
               Unzip the folder and open index.html to preview.
             </p>
@@ -511,7 +511,7 @@ export function ExportPanel() {
             <p
               id="export-html-download-blurb"
               data-testid="export-html-download-blurb"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               ZIP with a working <code>{WEB_PACKAGE_HTML_NAME}</code> preview
               plus <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
@@ -525,7 +525,7 @@ export function ExportPanel() {
             {websiteIntegration?.ok ? (
               <pre
                 data-testid="export-html-folder-layout"
-                className="overflow-x-auto rounded-md border border-slate-100 bg-slate-50 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-slate-700 whitespace-pre"
+                className="overflow-x-auto rounded-md border border-slate-100 bg-slate-50 px-2.5 py-2 font-mono text-sm leading-relaxed text-ms-ink whitespace-pre-wrap"
               >
                 {websiteIntegration.folderLayout}
               </pre>
@@ -559,7 +559,7 @@ export function ExportPanel() {
             <p
               id={reactPackageStatusId}
               data-testid="export-react-package-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images,
               trigger script, and a Vite React README. Same motion as the HTML
@@ -596,7 +596,7 @@ export function ExportPanel() {
           <p
             id={triggerHelpId}
             data-testid="export-trigger-help"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             {triggerHelpText(trigger)}
             {triggerNeedsJavaScript(trigger)
@@ -607,7 +607,7 @@ export function ExportPanel() {
           <p
             id={triggerRegenHelpId}
             data-testid="export-trigger-regen-help"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             Changing the trigger updates the generated embed code below.
             Copy the sections again (and download a fresh ZIP if you need the
@@ -617,7 +617,7 @@ export function ExportPanel() {
             <p
               id={playButtonHelpId}
               data-testid="export-play-button-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               {websiteIntegration.playButtonHelp}
             </p>
@@ -638,7 +638,7 @@ export function ExportPanel() {
           <p
             id={previewTriggerHelpId}
             data-testid="export-preview-trigger-help"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             Opens an isolated preview of the selected start setting. Does not
             change the editor playhead, recording, or undo history.
@@ -652,7 +652,7 @@ export function ExportPanel() {
           >
             <ol
               data-testid="export-html-steps"
-              className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600"
+              className="list-decimal space-y-1.5 pl-4 text-sm leading-relaxed text-ms-muted"
             >
               <li>
                 Unzip the package. Keep <code>{WEB_PACKAGE_HTML_NAME}</code>,{' '}
@@ -682,7 +682,7 @@ export function ExportPanel() {
             </ol>
             <p
               data-testid="export-html-required-files"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Required to run:{' '}
               <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
@@ -695,7 +695,7 @@ export function ExportPanel() {
             </p>
             <p
               data-testid="export-html-paste-order"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Paste each section where its label indicates, in the order shown.
               Initialization goes after the scene markup, before{' '}
@@ -723,7 +723,7 @@ export function ExportPanel() {
                   className="space-y-1.5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-medium text-slate-800">
+                    <p className="text-sm font-medium text-ms-ink">
                       {label}
                     </p>
                     <button
@@ -742,12 +742,12 @@ export function ExportPanel() {
                     wrap="off"
                     value={value}
                     aria-label={label}
-                    className="h-28 w-full resize-y rounded-md border border-ms-border bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
+                    className="h-28 w-full resize-y rounded-md border border-ms-border bg-slate-50 p-2 font-mono text-sm leading-relaxed text-ms-ink outline-none"
                   />
                 </div>
               ))
             ) : websiteIntegration && !websiteIntegration.ok ? (
-              <p className="text-[11px] text-amber-800">
+              <p className="text-sm text-amber-800">
                 {websiteIntegration.error}
               </p>
             ) : null}
@@ -757,7 +757,7 @@ export function ExportPanel() {
         {websitePath === 'react' && (
           <ol
             data-testid="export-react-steps"
-            className="list-decimal space-y-1.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 pl-6 text-[11px] leading-relaxed text-slate-600"
+            className="list-decimal space-y-1.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 pl-6 text-sm leading-relaxed text-ms-muted"
           >
             <li>
               Unzip <strong>all</strong> files into a folder in your Vite React
@@ -812,7 +812,7 @@ export function ExportPanel() {
               <p
                 id={advancedHelpId}
                 data-testid="export-embed-advanced-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 When you already have markup, or only need a single-file preview.
               </p>
@@ -833,7 +833,7 @@ export function ExportPanel() {
               <p
                 id={cssFileHelpId}
                 data-testid="export-css-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 Scoped CSS only (scene root + keyframes). You supply the HTML.
                 Image assets are separate. See the header comments for reduced
@@ -867,7 +867,7 @@ export function ExportPanel() {
               <p
                 id={cssCodeHelpId}
                 data-testid="export-css-code-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 Copy CSS and View CSS provide the same scoped scene code
                 {project.actors.length > 1
@@ -891,7 +891,7 @@ export function ExportPanel() {
               <p
                 id={htmlDemoHelpId}
                 data-testid="export-html-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 Single-file offline preview. Open in a browser; not for
                 embedding in your site.
@@ -914,7 +914,7 @@ export function ExportPanel() {
         <p
           id={ownElementHelpId}
           data-testid="export-own-element-help"
-          className="text-[11px] leading-relaxed text-slate-500"
+          className="text-sm leading-relaxed text-ms-muted"
         >
           {ownElement?.ok
             ? `Motion wrapper for “${ownElement.actorName}”. Path and timing only. Nest your HTML or React node inside .${ownElement.wrapperClass}; your child’s size, color, image, text, and transforms stay yours.`
@@ -929,8 +929,8 @@ export function ExportPanel() {
               data-testid="export-own-element-trigger"
               className={
                 ownElement.requiresTriggerJs
-                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-950'
-                  : 'text-[11px] leading-relaxed text-slate-500'
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-sm leading-relaxed text-amber-950'
+                  : 'text-sm leading-relaxed text-ms-muted'
               }
               role={ownElement.requiresTriggerJs ? 'status' : undefined}
             >
@@ -990,7 +990,7 @@ export function ExportPanel() {
             </div>
             <p
               data-testid="export-own-element-setup"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               HTML example is a complete host page (links{' '}
               <code>motion-wrapper.css</code>, sizes <code>.ms-stage</code>).
@@ -1006,7 +1006,7 @@ export function ExportPanel() {
             {ownElement.requiresTriggerJs ? (
               <p
                 data-testid="export-own-element-trigger-save"
-                className="text-[11px] leading-relaxed text-amber-950/90"
+                className="text-sm leading-relaxed text-amber-950/90"
               >
                 Save the copied script as <code>ms-trigger.js</code> in the same
                 folder as your HTML or React example (beside{' '}
@@ -1015,7 +1015,7 @@ export function ExportPanel() {
             ) : null}
             <ul
               data-testid="export-own-element-limits"
-              className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-500"
+              className="list-disc space-y-1 pl-4 text-sm leading-relaxed text-ms-muted"
             >
               {ownElement.limitations.map((line) => (
                 <li key={line}>{line}</li>
@@ -1070,7 +1070,7 @@ export function ExportPanel() {
             <p
               id={projectHelpId}
               data-testid="export-project-goal-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Save a MotionSketch project file you can reopen later or on another
               machine.
@@ -1091,7 +1091,7 @@ export function ExportPanel() {
             <p
               id={projectActionHelpId}
               data-testid="export-project-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Reopen and edit in MotionSketch. Also available under Project.
             </p>
@@ -1103,7 +1103,7 @@ export function ExportPanel() {
         <p
           data-testid="export-action-status"
           role="status"
-          className="text-[11px] text-slate-600"
+          className="text-sm text-ms-muted"
         >
           {actionStatus}
         </p>

@@ -284,7 +284,7 @@ export function TutorialCoach({
       >
         <p
           data-testid="tutorial-step-label"
-          className="text-[10px] font-medium tracking-wide text-slate-400"
+          className="text-sm font-medium text-ms-muted"
         >
           {progress}
         </p>
@@ -298,7 +298,7 @@ export function TutorialCoach({
         <p
           id={bodyId}
           data-testid="tutorial-coach-body"
-          className="mt-1 min-h-[2.5rem] text-sm leading-snug text-slate-700"
+          className="mt-1 min-h-[2.5rem] text-sm leading-snug text-ms-ink"
         >
           {body}
         </p>

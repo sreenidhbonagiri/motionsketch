@@ -1242,7 +1242,7 @@ export function PlaybackDock() {
                   </span>
                   <span
                     data-testid="mode-status-instruction"
-                    className="text-slate-500"
+                    className="text-sm text-ms-ink"
                   >
                     {modeStatus.instruction}
                   </span>
@@ -1250,7 +1250,7 @@ export function PlaybackDock() {
               ) : modeStatus.instruction ? (
                 <span
                   data-testid="mode-status-instruction"
-                  className="text-slate-500"
+                  className="text-sm text-ms-ink"
                 >
                   {modeStatus.instruction}
                 </span>

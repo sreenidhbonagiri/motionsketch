@@ -121,7 +121,7 @@ export function ActorList({
                       <span className="min-w-0 flex-1 truncate">
                         {actor.name}
                       </span>
-                      <span className="shrink-0 text-[10px] opacity-70">
+                      <span className="shrink-0 text-xs text-ms-muted">
                         {index + 1}
                         {actor.recording ? ' · path' : ''}
                         {hiddenNow ? ' · hidden' : ''}
@@ -232,7 +232,7 @@ export function ActorList({
             <p
               id="actor-list-help"
               data-testid="actor-list-help"
-              className="text-[10px] leading-relaxed text-slate-500"
+              className="text-[13px] leading-snug text-ms-muted"
             >
               List order is stacking (later on top). Path and transform edits
               apply to the selected element only. Switching elements clears path
