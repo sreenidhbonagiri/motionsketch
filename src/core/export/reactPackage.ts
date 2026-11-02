@@ -294,6 +294,23 @@ export default MotionSketchScene
 `
 }
 
+/** Import from a component in `src/`, beside the unzipped `src/motionsketch/` folder. */
+export const REACT_HOST_IMPORT_SPECIFIER = './motionsketch/MotionSketchScene.tsx'
+
+/**
+ * Two insertion points for an existing component file directly in `src/`.
+ * Named export matches MotionSketchScene.tsx. The path includes `.tsx`.
+ */
+export function buildReactHostExample(): string {
+  return `// At the top of an existing component file directly in src/.
+// A file deeper than src/ needs an adjusted relative path.
+import { MotionSketchScene } from '${REACT_HOST_IMPORT_SPECIFIER}'
+
+// Inside that component's returned JSX:
+<MotionSketchScene />
+`
+}
+
 function buildReactPackageReadme(args: {
   project: Project
   scope: ExportScope
@@ -335,23 +352,16 @@ ${assetLines}
    files from this ZIP into that directory**. The archive is flat (no wrapper
    folder) — do not leave \`MotionSketchScene.tsx\` at your project root.
 2. Ensure \`react\` and \`react-dom\` are installed (Vite React template is enough).
-   You can ignore or delete the template \`App.tsx\` / \`App.css\` if you mount
-   the scene from \`main.tsx\` instead.
-3. Import and render (example replaces \`src/main.tsx\`):
+3. Add the import at the top of an existing component file directly in \`src/\`
+   (next to \`src/motionsketch/\`). Put \`<MotionSketchScene />\` inside that
+   component’s returned JSX. This path assumes that file is directly in \`src/\`;
+   a deeper file needs an adjusted relative path.
 
 \`\`\`tsx
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { MotionSketchScene } from './motionsketch/MotionSketchScene'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <MotionSketchScene />
-  </StrictMode>,
-)
+${buildReactHostExample().trim()}
 \`\`\`
 
-Or mount from \`App.tsx\`, or more than once (each instance gets a unique
+You can render it more than once in that component (each instance gets a unique
 \`data-ms-scene\`):
 
 \`\`\`tsx

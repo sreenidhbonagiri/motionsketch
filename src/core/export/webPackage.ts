@@ -312,12 +312,19 @@ function formatInitOptionsLiteral(ctlOpts: TriggerControllerOptions): string {
 }
 
 function buildFolderLayoutText(assetHrefs: string[]): string {
-  const hasAssets = assetHrefs.length > 0
-  return `  ${WEB_PACKAGE_HTML_NAME}       optional local preview (or use your own page)
-  ${WEB_PACKAGE_CSS_NAME}
-  ${WEB_PACKAGE_TRIGGER_JS_NAME}
-${hasAssets ? '  assets/           image files used by the scene\n' : ''}  ${WEB_PACKAGE_README_NAME}       instructions only — not required to run
-  ${WEB_PACKAGE_PROJECT_NAME}    reopen in MotionSketch — not required to run`
+  const lines = [
+    `${WEB_PACKAGE_HTML_NAME} — optional preview (or use your own page)`,
+    `${WEB_PACKAGE_CSS_NAME} — required for the animation`,
+    `${WEB_PACKAGE_TRIGGER_JS_NAME} — required for Play, Replay, and reduced motion`,
+  ]
+  if (assetHrefs.length > 0) {
+    lines.push('assets/ — required image files used by the scene')
+  }
+  lines.push(
+    `${WEB_PACKAGE_README_NAME} — instructions only, not required to run`,
+    `${WEB_PACKAGE_PROJECT_NAME} — editable project data to reopen in MotionSketch, not required to run`,
+  )
+  return lines.join('\n')
 }
 
 function buildPlayButtonHelp(): string {
