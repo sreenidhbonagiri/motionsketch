@@ -1,0 +1,19 @@
+{
+  "prod": "https://motionsketch.vercel.app",
+  "merge": "e4dbc70ec260fe37ce995b0342ae4afb08a1013f",
+  "previewLabel": "Test playback behavior",
+  "previewHelp": "Opens an isolated preview of the selected start setting. Does not change the editor playhead, recording, or undo history.",
+  "pasteOrder": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>.",
+  "scriptsLabel": "Before </body> (after the scene markup)",
+  "triggerHelpHasCssAlone": true,
+  "triggerHelpHasMsTrigger": true,
+  "readme": {
+    "pasteOrder": true,
+    "initAfterMarkup": true,
+    "scriptsHeading": true,
+    "previewPage": true,
+    "cssAlone": true,
+    "msTrigger": true
+  },
+  "ok": true
+}

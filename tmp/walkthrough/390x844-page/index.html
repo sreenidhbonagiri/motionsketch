@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Existing page</title>
+<link rel="stylesheet" href="animation.css">
+<style>
+  /* Host sizing — required. Aspect matches the MotionSketch project. */
+  .ms-embed-frame {
+    width: min(100%, 40rem);
+  }
+  .ms-embed-frame .ms-stage {
+    width: 100%;
+    aspect-ratio: 0.4620 / 1;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Existing page</h1>
+    <p>This paragraph was already on the page.</p>
+  </header>
+  <div data-ms-demo-shell class="ms-embed">
+  <div class="ms-embed-frame">
+    <div class="ms-scene-783b9583" data-ms-scene="783b9583">
+      <div class="ms-stage">
+        <div class="ms-actor"></div>
+      </div>
+    </div>
+  </div>
+  <button type="button" data-ms-play>Play animation</button>
+</div>
+  <script src="ms-trigger.js"></script>
+<script>
+(function () {
+  var api = window.MotionSketchTrigger;
+  if (!api || typeof api.init !== 'function') return;
+  var root = document.querySelector('[data-ms-scene="783b9583"]');
+  if (!root) return;
+  api.init(root, {
+    mode: "page-load",
+    loop: false,
+    durationMs: 2405,
+    motionOkClass: "ms-motion-ok",
+    waitingClass: "ms-waiting",
+    viewportThreshold: 0.35,
+    actorSelector: "[class^=\"ms-actor\"]",
+    offerPause: false
+  });
+})();
+</script>
+</body>
+</html>

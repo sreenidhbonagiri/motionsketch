@@ -1,0 +1,342 @@
+[
+  {
+    "viewport": "desktop",
+    "phase": "armed-empty-drag",
+    "miss": {
+      "stillArmed": true,
+      "modeAfterMiss": "armed",
+      "camBefore": "translate(64px, 40px) scale(1)",
+      "camAfter": "translate(154px, 80px) scale(1)",
+      "cameraChanged": true,
+      "statusText": "Ready\n—\nDrag the actor to draw its path."
+    },
+    "armed": {
+      "label": "armed",
+      "mode": "armed",
+      "dock": {
+        "x": 304,
+        "y": 713.5,
+        "w": 672,
+        "h": 70.5,
+        "top": 713.5,
+        "bottom": 784
+      },
+      "play": {
+        "x": 624,
+        "y": 722.5,
+        "w": 32,
+        "h": 32,
+        "top": 722.5,
+        "bottom": 754.5
+      },
+      "record": {
+        "x": 315,
+        "y": 722.5,
+        "w": 69.8,
+        "h": 32,
+        "top": 722.5,
+        "bottom": 754.5
+      },
+      "status": {
+        "box": {
+          "x": 315,
+          "y": 758.5,
+          "w": 650,
+          "h": 16.5,
+          "top": 758.5,
+          "bottom": 775
+        },
+        "kind": "armed",
+        "text": "Ready — Drag the actor to draw its path."
+      },
+      "hasEditing": false,
+      "hasTimeline": false,
+      "restart": {
+        "disabled": true,
+        "title": "Restart from the beginning",
+        "ariaLabel": "Restart",
+        "ariaDescribedBy": "dock-status",
+        "text": "↻"
+      },
+      "undo": {
+        "disabled": true,
+        "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Undo",
+        "ariaDescribedBy": null,
+        "text": "↶"
+      },
+      "redo": {
+        "disabled": true,
+        "title": "Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Redo",
+        "ariaDescribedBy": null,
+        "text": "↷"
+      },
+      "reset": null,
+      "camera": null
+    }
+  },
+  {
+    "viewport": "desktop",
+    "phase": "undo-after-first-recording",
+    "undoAfterFirst": {
+      "undoDisabled": true,
+      "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+      "ariaLabel": "Undo"
+    }
+  },
+  {
+    "viewport": "desktop",
+    "phase": "reset-confirm",
+    "resetVisible": true
+  },
+  {
+    "viewport": "desktop",
+    "phase": "undo-after-replace",
+    "undoAfterReplace": {
+      "undoDisabled": true,
+      "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+    }
+  },
+  {
+    "viewport": "desktop",
+    "phase": "dock-movement",
+    "idleEmpty": {
+      "x": 304,
+      "y": 734,
+      "w": 672,
+      "h": 50,
+      "top": 734,
+      "bottom": 784
+    },
+    "armed": {
+      "x": 304,
+      "y": 713.5,
+      "w": 672,
+      "h": 70.5,
+      "top": 713.5,
+      "bottom": 784
+    },
+    "recorded": {
+      "x": 304,
+      "y": 659.5,
+      "w": 672,
+      "h": 124.5,
+      "top": 659.5,
+      "bottom": 784
+    },
+    "playing": {
+      "x": 304,
+      "y": 659.5,
+      "w": 672,
+      "h": 124.5,
+      "top": 659.5,
+      "bottom": 784
+    },
+    "playX": {
+      "idle": 624,
+      "armed": 624,
+      "recorded": 624,
+      "playing": 624
+    },
+    "dockHeight": {
+      "idle": 50,
+      "armed": 70.5,
+      "recorded": 124.5,
+      "playing": 124.5
+    },
+    "iconTooltips": {
+      "restart": {
+        "disabled": false,
+        "title": "Restart from the beginning",
+        "ariaLabel": "Restart",
+        "ariaDescribedBy": null,
+        "text": "↻"
+      },
+      "undo": {
+        "disabled": true,
+        "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Undo",
+        "ariaDescribedBy": null,
+        "text": "↶"
+      },
+      "redo": {
+        "disabled": true,
+        "title": "Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Redo",
+        "ariaDescribedBy": null,
+        "text": "↷"
+      }
+    }
+  },
+  {
+    "viewport": "mobile",
+    "phase": "armed-empty-drag",
+    "miss": {
+      "stillArmed": true,
+      "modeAfterMiss": "armed",
+      "camBefore": "translate(19.5px, 42.2px) scale(1)",
+      "camAfter": "translate(109.5px, 82.2px) scale(1)",
+      "cameraChanged": true,
+      "statusText": "Ready\n—\nDrag the actor to draw its path."
+    },
+    "armed": {
+      "label": "armed",
+      "mode": "armed",
+      "dock": {
+        "x": 12,
+        "y": 729.5,
+        "w": 366,
+        "h": 102.5,
+        "top": 729.5,
+        "bottom": 832
+      },
+      "play": {
+        "x": 179,
+        "y": 772.5,
+        "w": 32,
+        "h": 32,
+        "top": 772.5,
+        "bottom": 804.5
+      },
+      "record": {
+        "x": 160.1,
+        "y": 736.5,
+        "w": 69.8,
+        "h": 32,
+        "top": 736.5,
+        "bottom": 768.5
+      },
+      "status": {
+        "box": {
+          "x": 21,
+          "y": 808.5,
+          "w": 348,
+          "h": 16.5,
+          "top": 808.5,
+          "bottom": 825
+        },
+        "kind": "armed",
+        "text": "Ready — Drag the actor to draw its path."
+      },
+      "hasEditing": false,
+      "hasTimeline": false,
+      "restart": {
+        "disabled": true,
+        "title": "Restart from the beginning",
+        "ariaLabel": "Restart",
+        "ariaDescribedBy": "dock-status",
+        "text": "↻"
+      },
+      "undo": {
+        "disabled": true,
+        "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Undo",
+        "ariaDescribedBy": null,
+        "text": "↶"
+      },
+      "redo": {
+        "disabled": true,
+        "title": "Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Redo",
+        "ariaDescribedBy": null,
+        "text": "↷"
+      },
+      "reset": null,
+      "camera": null
+    }
+  },
+  {
+    "viewport": "mobile",
+    "phase": "undo-after-first-recording",
+    "undoAfterFirst": {
+      "undoDisabled": true,
+      "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+      "ariaLabel": "Undo"
+    }
+  },
+  {
+    "viewport": "mobile",
+    "phase": "reset-confirm",
+    "resetVisible": true
+  },
+  {
+    "viewport": "mobile",
+    "phase": "undo-after-replace",
+    "undoAfterReplace": {
+      "undoDisabled": true,
+      "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+    }
+  },
+  {
+    "viewport": "mobile",
+    "phase": "dock-movement",
+    "idleEmpty": {
+      "x": 12,
+      "y": 750,
+      "w": 366,
+      "h": 82,
+      "top": 750,
+      "bottom": 832
+    },
+    "armed": {
+      "x": 12,
+      "y": 729.5,
+      "w": 366,
+      "h": 102.5,
+      "top": 729.5,
+      "bottom": 832
+    },
+    "recorded": {
+      "x": 12,
+      "y": 675.5,
+      "w": 366,
+      "h": 156.5,
+      "top": 675.5,
+      "bottom": 832
+    },
+    "playing": {
+      "x": 12,
+      "y": 675.5,
+      "w": 366,
+      "h": 156.5,
+      "top": 675.5,
+      "bottom": 832
+    },
+    "playX": {
+      "idle": 179,
+      "armed": 179,
+      "recorded": 179,
+      "playing": 179
+    },
+    "dockHeight": {
+      "idle": 82,
+      "armed": 102.5,
+      "recorded": 156.5,
+      "playing": 156.5
+    },
+    "iconTooltips": {
+      "restart": {
+        "disabled": false,
+        "title": "Restart from the beginning",
+        "ariaLabel": "Restart",
+        "ariaDescribedBy": null,
+        "text": "↻"
+      },
+      "undo": {
+        "disabled": true,
+        "title": "Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Undo",
+        "ariaDescribedBy": null,
+        "text": "↶"
+      },
+      "redo": {
+        "disabled": true,
+        "title": "Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset",
+        "ariaLabel": "Redo",
+        "ariaDescribedBy": null,
+        "text": "↷"
+      }
+    }
+  }
+]

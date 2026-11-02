@@ -1,0 +1,39 @@
+{
+  "prod": "https://motionsketch.vercel.app",
+  "merge": "55f3b88344f612a161248f20abeb31acf5b11e0a",
+  "armedNoPan": true,
+  "dockStable": true,
+  "projectNotRecording": true,
+  "dockDeltas": {
+    "armedH": 0,
+    "armedY": 0,
+    "recordingH": 0,
+    "pausedH": 0,
+    "playingH": 0
+  },
+  "playCenterDeltas": {
+    "idle": 0,
+    "armed": 0,
+    "recording": 0,
+    "paused": 0,
+    "playing": 0
+  },
+  "ok": true,
+  "camera": {
+    "before": {
+      "panX": 64,
+      "panY": 40,
+      "zoom": 1
+    },
+    "after": {
+      "panX": 64,
+      "panY": 40,
+      "zoom": 1
+    },
+    "panDx": 0,
+    "panDy": 0
+  },
+  "saveStatus": "Saved in this browser",
+  "projectActionStatusCount": 0,
+  "projectContainsRecording": false
+}

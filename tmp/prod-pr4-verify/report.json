@@ -1,0 +1,41 @@
+{
+  "prod": "https://motionsketch.vercel.app",
+  "merge": "37fe0e9677ab53fdbb5907f6fbb3f3d7b83c3435",
+  "tabs": {
+    "html": 1,
+    "react": 1,
+    "files": 0
+  },
+  "labels": {
+    "headLabel": "In <head>",
+    "bodyLabel": "Where you want the animation, inside <body>",
+    "scriptsLabel": "Before </body>"
+  },
+  "order": {
+    "downloadY": 274.625,
+    "triggerY": 528.5,
+    "headY": 1150.25
+  },
+  "regenHelp": "Changing the trigger updates the generated embed code below. Copy the sections again (and download a fresh ZIP if you need the package files) after you change it.",
+  "panelMatchesLocal": {
+    "head": true,
+    "body": true,
+    "scripts": true
+  },
+  "readme": {
+    "hasInHead": true,
+    "hasBody": true,
+    "hasScripts": true,
+    "hasPanelHead": true,
+    "hasPanelBody": true,
+    "hasPanelScripts": true,
+    "neitherRequired": true,
+    "aspect": true
+  },
+  "reactOnly": {
+    "reactGuide": true,
+    "htmlGuide": true,
+    "files": true
+  },
+  "ok": true
+}

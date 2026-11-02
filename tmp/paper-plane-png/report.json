@@ -1,0 +1,163 @@
+{
+  "desktop": {
+    "start": {
+      "rotateDeg": -11.2279,
+      "transform": "translate(-50%, -50%) rotate(-11.2279deg) scale(1)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(15, 23, 42, 0.35) 0px 0px 0px 2px, rgba(15, 23, 42, 0.18) 0px 12px 28px 0px",
+      "overflow": "clip",
+      "rect": {
+        "x": 108.92280578613281,
+        "y": 509.2942810058594,
+        "w": 140.52938842773438,
+        "h": 127.00521850585938
+      },
+      "clippedByStage": {
+        "left": true,
+        "right": true,
+        "top": true,
+        "bottom": true
+      },
+      "img": null
+    },
+    "mid": {
+      "rotateDeg": 26.2867,
+      "transform": "translate(-50%, -50%) rotate(26.2867deg) scale(1)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(15, 23, 42, 0.35) 0px 0px 0px 2px, rgba(15, 23, 42, 0.18) 0px 12px 28px 0px",
+      "overflow": "clip",
+      "rect": {
+        "x": 504.90362548828125,
+        "y": 193.30638122558594,
+        "w": 156.3177490234375,
+        "h": 148.51222229003906
+      },
+      "clippedByStage": {
+        "left": true,
+        "right": true,
+        "top": true,
+        "bottom": true
+      },
+      "img": null
+    },
+    "end": {
+      "rotateDeg": 58.4387,
+      "transform": "translate(-50%, -50%) rotate(58.4387deg) scale(1)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(15, 23, 42, 0.35) 0px 0px 0px 2px, rgba(15, 23, 42, 0.18) 0px 12px 28px 0px",
+      "overflow": "clip",
+      "rect": {
+        "x": 1000.9056396484375,
+        "y": 205.1254119873047,
+        "w": 153.688720703125,
+        "h": 159.34291076660156
+      },
+      "clippedByStage": {
+        "left": true,
+        "right": true,
+        "top": true,
+        "bottom": true
+      },
+      "img": null
+    }
+  },
+  "mobile": {
+    "start": {
+      "rotateDeg": -11.2279,
+      "transform": "translate(-50%, -50%) rotate(-11.2279deg) scale(1)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(15, 23, 42, 0.35) 0px 0px 0px 2px, rgba(15, 23, 42, 0.18) 0px 12px 28px 0px",
+      "overflow": "clip",
+      "rect": {
+        "x": 33.22667694091797,
+        "y": 455.3310546875,
+        "w": 42.73414611816406,
+        "h": 38.619140625
+      },
+      "clippedByStage": {
+        "left": true,
+        "right": true,
+        "top": true,
+        "bottom": true
+      },
+      "img": null
+    },
+    "mid": {
+      "rotateDeg": 26.2867,
+      "transform": "translate(-50%, -50%) rotate(26.2867deg) scale(1)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(15, 23, 42, 0.35) 0px 0px 0px 2px, rgba(15, 23, 42, 0.18) 0px 12px 28px 0px",
+      "overflow": "clip",
+      "rect": {
+        "x": 153.87330627441406,
+        "y": 359.060791015625,
+        "w": 47.534637451171875,
+        "h": 45.15966796875
+      },
+      "clippedByStage": {
+        "left": true,
+        "right": true,
+        "top": true,
+        "bottom": true
+      },
+      "img": null
+    },
+    "end": {
+      "rotateDeg": 58.4387,
+      "transform": "translate(-50%, -50%) rotate(58.4387deg) scale(1)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "boxShadow": "rgba(15, 23, 42, 0.35) 0px 0px 0px 2px, rgba(15, 23, 42, 0.18) 0px 12px 28px 0px",
+      "overflow": "clip",
+      "rect": {
+        "x": 305.0080261230469,
+        "y": 362.6634521484375,
+        "w": 46.73394775390625,
+        "h": 48.454345703125
+      },
+      "clippedByStage": {
+        "left": true,
+        "right": true,
+        "top": true,
+        "bottom": true
+      },
+      "img": null
+    }
+  },
+  "htmlHasPng": true,
+  "htmlHasSvgPlane": false,
+  "export": {
+    "start": {
+      "rotateDeg": 0,
+      "transform": "none",
+      "bg": "rgb(248, 250, 252)",
+      "imgSrcPrefix": "data:image/png;base64,iVBORw0KGgoAAAANSU",
+      "imgNatural": {
+        "w": 640,
+        "h": 550
+      },
+      "transparentBg": false
+    },
+    "mid": {
+      "rotateDeg": 0,
+      "transform": "none",
+      "bg": "rgb(248, 250, 252)",
+      "imgSrcPrefix": "data:image/png;base64,iVBORw0KGgoAAAANSU",
+      "imgNatural": {
+        "w": 640,
+        "h": 550
+      },
+      "transparentBg": false
+    },
+    "end": {
+      "rotateDeg": 0,
+      "transform": "none",
+      "bg": "rgb(248, 250, 252)",
+      "imgSrcPrefix": "data:image/png;base64,iVBORw0KGgoAAAANSU",
+      "imgNatural": {
+        "w": 640,
+        "h": 550
+      },
+      "transparentBg": false
+    }
+  }
+}

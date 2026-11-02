@@ -1,0 +1,106 @@
+{
+  "formatVersion": 14,
+  "savedAt": "2026-11-02T04:26:36.705Z",
+  "project": {
+    "version": 1,
+    "name": "Untitled project",
+    "actors": [
+      {
+        "id": "actor-mvyrbfuh-2",
+        "name": "Actor 1",
+        "appearance": {
+          "kind": "shape",
+          "width": 0.12,
+          "height": 0.12,
+          "borderRadius": 0.28,
+          "color": "#4f46e5",
+          "image": null,
+          "text": null
+        },
+        "recording": {
+          "recordedDurationMs": 134.60000002384186,
+          "samples": [
+            {
+              "t": 0,
+              "x": 0.35,
+              "y": 0.5
+            },
+            {
+              "t": 9.600000023841858,
+              "x": 0.3555474175347222,
+              "y": 0.4867120050161578
+            },
+            {
+              "t": 19,
+              "x": 0.3610948350694444,
+              "y": 0.47342401003231566
+            },
+            {
+              "t": 35,
+              "x": 0.3666422526041666,
+              "y": 0.46013601504847346
+            },
+            {
+              "t": 51.5,
+              "x": 0.3721896701388888,
+              "y": 0.44684802006463126
+            },
+            {
+              "t": 68.40000003576279,
+              "x": 0.3777370876736111,
+              "y": 0.43356002508078906
+            },
+            {
+              "t": 84.69999998807907,
+              "x": 0.3832845052083333,
+              "y": 0.4202720300969469
+            },
+            {
+              "t": 101.40000003576279,
+              "x": 0.3888319227430555,
+              "y": 0.4069840351131047
+            },
+            {
+              "t": 119,
+              "x": 0.3943793402777777,
+              "y": 0.3936960401292625
+            },
+            {
+              "t": 134.60000002384186,
+              "x": 0.3943793402777777,
+              "y": 0.3936960401292625
+            }
+          ]
+        },
+        "restPosition": {
+          "x": 0.35,
+          "y": 0.5
+        },
+        "smoothing": 0.35,
+        "steadySpeed": 0,
+        "glide": 0,
+        "transform": {
+          "keyframes": []
+        },
+        "geometryEdit": null,
+        "clip": {
+          "start": 0,
+          "end": 1,
+          "hideBeforeStart": false,
+          "hideAfterEnd": false
+        },
+        "faceAlongPath": false,
+        "directionOffsetDeg": 0
+      }
+    ],
+    "playback": {
+      "durationMs": 1200,
+      "loop": false,
+      "loopMode": "repeat",
+      "trigger": "page-load"
+    },
+    "stageAspect": 1.778,
+    "stageWidth": 1778,
+    "stageHeight": 1000
+  }
+}

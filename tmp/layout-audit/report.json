@@ -1,0 +1,769 @@
+{
+  "viewports": [
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "panels": {
+        "project": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-project"
+          },
+          "scroll": {
+            "overflow": 213,
+            "clientHeight": 473,
+            "scrolled": true,
+            "from": 0,
+            "to": 213
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-project",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-20261101-1939.json"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-project"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "adjust": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-adjust"
+          },
+          "scroll": {
+            "overflow": 515,
+            "clientHeight": 455,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "loop-toggle",
+            "clicked": true,
+            "owned": true,
+            "before": false,
+            "mid": true,
+            "after": false,
+            "toggledAndRestored": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-adjust"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "appearance": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-appearance"
+          },
+          "scroll": {
+            "overflow": 790,
+            "clientHeight": 453,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "kind-shape",
+            "clicked": true,
+            "owned": true,
+            "checked": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-appearance"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "export": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-export"
+          },
+          "scroll": {
+            "overflow": 1329,
+            "clientHeight": 455,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-website",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-web-20261101-1939.zip"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-export"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        }
+      },
+      "inner": [
+        1280,
+        720
+      ]
+    },
+    {
+      "viewport": [
+        850,
+        650
+      ],
+      "panels": {
+        "project": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-project"
+          },
+          "scroll": {
+            "overflow": 267,
+            "clientHeight": 419,
+            "scrolled": true,
+            "from": 0,
+            "to": 267
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-project",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-20261101-1939.json"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-project"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "adjust": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-adjust"
+          },
+          "scroll": {
+            "overflow": 569,
+            "clientHeight": 401,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "loop-toggle",
+            "clicked": true,
+            "owned": true,
+            "before": false,
+            "mid": true,
+            "after": false,
+            "toggledAndRestored": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-adjust"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "appearance": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-appearance"
+          },
+          "scroll": {
+            "overflow": 844,
+            "clientHeight": 399,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "kind-shape",
+            "clicked": true,
+            "owned": true,
+            "checked": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-appearance"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "export": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-export"
+          },
+          "scroll": {
+            "overflow": 1383,
+            "clientHeight": 401,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-website",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-web-20261101-1939.zip"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-export"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        }
+      },
+      "inner": [
+        850,
+        650
+      ]
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "panels": {
+        "project": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-project"
+          },
+          "scroll": {
+            "ok": true,
+            "overflow": 0,
+            "x": 195,
+            "y": 491,
+            "top": 0,
+            "clientHeight": 680,
+            "scrolled": false,
+            "reason": "content fits"
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-project",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-20261101-1939.json"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-project"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "adjust": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-adjust"
+          },
+          "scroll": {
+            "overflow": 289,
+            "clientHeight": 662,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "loop-toggle",
+            "clicked": true,
+            "owned": true,
+            "before": false,
+            "mid": true,
+            "after": false,
+            "toggledAndRestored": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-adjust"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "appearance": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-appearance"
+          },
+          "scroll": {
+            "overflow": 564,
+            "clientHeight": 660,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "kind-shape",
+            "clicked": true,
+            "owned": true,
+            "checked": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-appearance"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "export": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-export"
+          },
+          "scroll": {
+            "overflow": 1015,
+            "clientHeight": 662,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-website",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-web-20261101-1939.zip"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-export"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        }
+      },
+      "inner": [
+        390,
+        844
+      ]
+    },
+    {
+      "viewport": [
+        390,
+        560
+      ],
+      "panels": {
+        "project": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-project"
+          },
+          "scroll": {
+            "overflow": 256,
+            "clientHeight": 396,
+            "scrolled": true,
+            "from": 0,
+            "to": 256
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-project",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-20261101-1939.json"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-project"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "adjust": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-adjust"
+          },
+          "scroll": {
+            "overflow": 573,
+            "clientHeight": 378,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "loop-toggle",
+            "clicked": true,
+            "owned": true,
+            "before": false,
+            "mid": true,
+            "after": false,
+            "toggledAndRestored": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-adjust"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "appearance": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-appearance"
+          },
+          "scroll": {
+            "overflow": 848,
+            "clientHeight": 376,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "kind-shape",
+            "clicked": true,
+            "owned": true,
+            "checked": true
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-appearance"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        },
+        "export": {
+          "open": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-export"
+          },
+          "scroll": {
+            "overflow": 1299,
+            "clientHeight": 378,
+            "scrolled": true,
+            "from": 0,
+            "to": 280
+          },
+          "blocked": [],
+          "primary": {
+            "action": "download-website",
+            "clicked": true,
+            "owned": true,
+            "filename": "untitled-project-web-20261101-1939.zip"
+          },
+          "close": {
+            "clicked": true,
+            "owned": true,
+            "hit": "btn-close-export"
+          },
+          "projectUnchanged": true,
+          "prefsUnchanged": true,
+          "prefs": {
+            "actors": "1",
+            "sequence": "1"
+          },
+          "access": {
+            "btn-toggle-actor-list": "owned",
+            "btn-toggle-clip-timeline": "owned",
+            "btn-record": "owned",
+            "btn-play": "owned",
+            "playback-scrubber": "owned",
+            "btn-zoom-out": "owned",
+            "btn-zoom-in": "owned",
+            "btn-fit-stage": "owned"
+          }
+        }
+      },
+      "inner": [
+        390,
+        560
+      ]
+    }
+  ],
+  "timing": [
+    {
+      "elementsOpen": true,
+      "metrics": {
+        "bodyH": 18,
+        "bodyScroll": 514,
+        "panelH": 49
+      },
+      "reached": false,
+      "lastHit": {
+        "owned": false,
+        "hit": "btn-adjust"
+      },
+      "usable": false
+    },
+    {
+      "elementsOpen": false,
+      "metrics": {
+        "bodyH": 165,
+        "bodyScroll": 367,
+        "panelH": 204
+      },
+      "reached": false,
+      "lastHit": {
+        "owned": false,
+        "hit": "btn-adjust"
+      },
+      "usable": false
+    }
+  ]
+}

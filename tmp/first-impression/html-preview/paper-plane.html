@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper plane</title>
+<style>
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #f4f6fb;
+  color: #0f172a;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.demo-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.demo-frame {
+  width: min(100%, calc((100dvh - 5.5rem) * 1.6));
+  max-height: calc(100dvh - 5.5rem);
+}
+
+.demo-frame .ms-stage {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.1);
+}
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.demo-replay,
+.demo-pause,
+.demo-hover-tap {
+  appearance: none;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-replay:hover,
+.demo-pause:hover,
+.demo-hover-tap:hover {
+  background: #f8fafc;
+}
+
+.demo-replay:focus-visible,
+.demo-pause:focus-visible,
+.demo-hover-tap:focus-visible,
+.ms-scene-a8192e5c:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.demo-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+  max-width: 28rem;
+}
+</style>
+<style>
+/* MotionSketch scoped scene export
+ *
+ * Scene isolation:
+ * - Wrap markup in <div class="ms-scene-a8192e5c"> so rules never touch host .stage/.actor.
+ * - Keyframe names include a content fingerprint (a8192e5c); project title alone is not used.
+ * - For a second independently controlled copy of the same scene, re-export with
+ *   instancePrefix (e.g. "hero-") or rename the root class + keyframe prefix together.
+ * - This stylesheet does not reset host page styles outside .ms-scene-a8192e5c.
+ *
+ * Reduced motion:
+ * - Under prefers-reduced-motion: reduce, animations stay off until the scene root
+ *   also has class "ms-motion-ok" (set by an explicit Play control).
+ * - Automatic triggers never override reduced-motion; Play opts in.
+ * - The static pose uses each actor’s base transform (clip-start / rest) and forces
+ *   visibility so hide-before/hide-after cannot blank the scene.
+ *
+ * Playback trigger:
+ * Playback trigger: page-load (CSS starts immediately; no controller required).
+ *
+ * Looping scenes keep running after a trigger until paused or restarted.
+ * Embedding API (when JS is included): MotionSketchTrigger.init(root, options),
+ *   .play() / .pause() / .resume() / .restart() / .destroy().
+ *
+ * Positioning:
+ * - Place actors inside .ms-stage (position: relative; container-type: size).
+ * - Shared Duration / loop / loopMode drive every actor’s animation together.
+ * - Per-actor clips remap motion onto a start–end interval; outside that range the actor holds its first/last pose.
+ * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
+ *   At an exact step-end keyframe time, Firefox still shows the previous value and
+ *   jumps immediately afterward; Chromium/WebKit apply the new value at that time.
+ *   Editor JS stays inclusive at start / hidden at end. Continuous playback hides
+ *   the mismatch; pausing CSS/WAAPI on the exact boundary in Firefox can disagree.
+ * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
+ * - Actor size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
+ * - Motion uses transform with linear timing; visibility is orthogonal (visibility + step-*).
+ * - Transform order: translate → center → rotate → scale.
+ * Loop: off (plays once, forwards) — shared by every actor.
+ *
+ * Image actor (.ms-actor-1): CSS alone does NOT embed the image bytes.
+ * Host the file yourself (or use the HTML demo export, which embeds data URLs).
+ * Use an <img class="ms-actor-1"> with the same intrinsic aspect ratio as in the editor.
+ *
+ * Text actor (.ms-actor-2): CSS alone does NOT include the copy.
+ * Put the text inside a matching element, e.g. <div class="ms-actor-2">Your text here</div>
+ * Use real text (not an image). Newlines and wrapping follow white-space: pre-wrap.
+ * System font stacks are self-contained; glyph shapes can vary by device.
+ * HTML demo / web package exports embed the escaped copy; this CSS file does not.
+ *
+ * Browser support: container query units (cqw/cqh/cqmin).
+ * Fallback for a fixed-size stage (replace the cq* lengths with px):
+ *   Ncqw  → (N / 100) * stageWidth
+ *   Ncqh  → (N / 100) * stageHeight
+ *   Ncqmin → (N / 100) * min(stageWidth, stageHeight)
+ *
+ * Example HTML:
+ * <div class="ms-scene-a8192e5c" data-ms-scene="a8192e5c">
+ *   <div class="ms-stage">
+ *     <img class="ms-actor-1" src="your-image.png" alt="Actor image" />
+ *     <div class="ms-actor-2">Your text here</div>
+ *   </div>
+ * </div>
+ */
+.ms-scene-a8192e5c .ms-stage {
+  position: relative;
+  container-type: size;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+
+.ms-scene-a8192e5c .ms-actor-1 {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 13.00cqmin;
+  height: auto;
+  aspect-ratio: 1.4000 / 1;
+  object-fit: contain;
+  background: transparent;
+  border: none;
+  padding: 0;
+  transform: translate3d(10.000cqw, 74.000cqh, 0) translate(-50%, -50%) rotate(-54.228deg) scale(1);
+  animation: ms-a8192e5c-a1 2400ms linear forwards;
+  will-change: transform;
+  display: block;
+  box-sizing: border-box;
+  z-index: 1;
+  /* Face along path: heading + direction offset + transform track (additive). Alternate retraces poses without turning to face reverse travel. Sampled angular export check: ≤3° over 800 probe times (not a continuous bound). */
+}
+
+@keyframes ms-a8192e5c-a1 {
+  0% { transform: translate3d(10.000cqw, 74.000cqh, 0) translate(-50%, -50%) rotate(-54.228deg) scale(1); }
+  5.88% { transform: translate3d(13.469cqw, 66.560cqh, 0) translate(-50%, -50%) rotate(-51.511deg) scale(1); }
+  11.76% { transform: translate3d(17.131cqw, 59.749cqh, 0) translate(-50%, -50%) rotate(-47.388deg) scale(1); }
+  17.65% { transform: translate3d(20.979cqw, 53.586cqh, 0) translate(-50%, -50%) rotate(-43.01deg) scale(1); }
+  23.53% { transform: translate3d(25.008cqw, 48.087cqh, 0) translate(-50%, -50%) rotate(-38.73deg) scale(1); }
+  29.41% { transform: translate3d(29.207cqw, 43.256cqh, 0) translate(-50%, -50%) rotate(-33.913deg) scale(1); }
+  35.29% { transform: translate3d(33.564cqw, 39.096cqh, 0) translate(-50%, -50%) rotate(-28.971deg) scale(1); }
+  42.86% { transform: translate3d(39.374cqw, 34.722cqh, 0) translate(-50%, -50%) rotate(-22.654deg) scale(1); }
+  48.74% { transform: translate3d(44.040cqw, 32.073cqh, 0) translate(-50%, -50%) rotate(-17.699deg) scale(1); }
+  54.62% { transform: translate3d(48.820cqw, 30.078cqh, 0) translate(-50%, -50%) rotate(-12.869deg) scale(1); }
+  60.50% { transform: translate3d(53.699cqw, 28.715cqh, 0) translate(-50%, -50%) rotate(-8.227deg) scale(1); }
+  68.07% { transform: translate3d(60.091cqw, 27.847cqh, 0) translate(-50%, -50%) rotate(-2.724deg) scale(1); }
+  73.95% { transform: translate3d(65.139cqw, 27.829cqh, 0) translate(-50%, -50%) rotate(1.333deg) scale(1); }
+  79.83% { transform: translate3d(70.241cqw, 28.362cqh, 0) translate(-50%, -50%) rotate(5.103deg) scale(1); }
+  85.71% { transform: translate3d(75.387cqw, 29.422cqh, 0) translate(-50%, -50%) rotate(8.589deg) scale(1); }
+  91.60% { transform: translate3d(80.565cqw, 30.979cqh, 0) translate(-50%, -50%) rotate(11.799deg) scale(1); }
+  100% { transform: translate3d(88.000cqw, 34.000cqh, 0) translate(-50%, -50%) rotate(15.439deg) scale(1); }
+}
+
+.ms-scene-a8192e5c .ms-actor-2 {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40.00cqmin;
+  height: auto;
+  background: transparent;
+  color: #0f172a;
+  font-size: 7.00cqmin;
+  font-weight: 700;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.25;
+  box-sizing: border-box;
+  transform: translate3d(40.000cqw, 58.000cqh, 0) translate(-50%, -50%);
+  display: block;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-scene-a8192e5c:not(.ms-motion-ok) [class^="ms-actor"] {
+    animation: none !important;
+    /* Keep a meaningful static pose visible (base transform); ignore clip hide flags. */
+    visibility: visible !important;
+  }
+}
+
+</style>
+</head>
+<body>
+  <div class="demo-shell" data-ms-demo-shell data-testid="demo-shell">
+    <div class="demo-frame">
+      <div class="ms-scene-a8192e5c" data-ms-scene="a8192e5c" data-testid="demo-scene" data-ms-trigger="page-load">
+        <div class="ms-stage" data-testid="demo-stage">
+          <img class="ms-actor-1" data-testid="demo-actor" src="data:image/svg+xml;charset=utf-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%3F%3E%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22112%22%20height%3D%2280%22%20viewBox%3D%220%200%20112%2080%22%20role%3D%22img%22%20aria-label%3D%22Paper%20plane%22%3E%0A%20%20%3Cpath%20fill%3D%22%230f766e%22%20d%3D%22M4%2040%20L108%208%20L64%2040%20L108%2072%20Z%22%2F%3E%0A%20%20%3Cpath%20fill%3D%22%23115e59%22%20d%3D%22M4%2040%20L64%2040%20L40%2054%20Z%22%2F%3E%0A%20%20%3Cpath%20fill%3D%22%2314b8a6%22%20fill-opacity%3D%220.92%22%20d%3D%22M64%2040%20L108%208%20L86%2040%20Z%22%2F%3E%0A%3C%2Fsvg%3E" alt="Paper plane" />
+          <div class="ms-actor-2">Ship the motion.</div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-controls" data-ms-chrome data-testid="demo-controls">
+      <button type="button" class="demo-replay" data-testid="demo-replay" data-ms-play data-ms-chrome>Play animation</button>
+      
+      
+    </div>
+    <p class="demo-hint" data-testid="demo-trigger-hint">Plays on page load. Prefer reduced motion? Use Play animation.</p>
+  </div>
+<script>
+/* MotionSketch scene trigger controller
+ * CSS owns keyframes; this script only activates / pauses / restarts them.
+ * Offline-friendly — no network. Scope one controller per scene root.
+ */
+(function (global) {
+  'use strict';
+  var API_NAME = "MotionSketchTrigger";
+  var STORE = API_NAME + '$$map';
+
+  function map() {
+    if (!global[STORE]) global[STORE] = new WeakMap();
+    return global[STORE];
+  }
+
+  function actors(root, selector) {
+    return Array.prototype.slice.call(root.querySelectorAll(selector));
+  }
+
+  function reducedMotion() {
+    return (
+      typeof global.matchMedia === 'function' &&
+      global.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  }
+
+  function isCssAnimation(anim) {
+    if (!anim) return false;
+    if (typeof CSSAnimation !== 'undefined' && anim instanceof CSSAnimation) {
+      return true;
+    }
+    // jsdom / older engines: treat named CSS animations as owned.
+    return typeof anim.animationName === 'string' && anim.animationName !== '' && anim.animationName !== 'none';
+  }
+
+  function restartAnimations(root, selector) {
+    actors(root, selector).forEach(function (el) {
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.removeProperty('animation');
+    });
+  }
+
+  function stopOwnedActorAnimations(root, selector) {
+    actors(root, selector).forEach(function (el) {
+      if (typeof el.getAnimations === 'function') {
+        el.getAnimations().forEach(function (anim) {
+          if (!isCssAnimation(anim)) return;
+          try {
+            anim.cancel();
+          } catch (e) {}
+        });
+      }
+      el.style.removeProperty('animation-play-state');
+      el.style.removeProperty('animation');
+    });
+  }
+
+  function createController(root, options) {
+    var mode = options.mode || 'page-load';
+    var motionOk = options.motionOkClass || 'ms-motion-ok';
+    var waiting = options.waitingClass || 'ms-waiting';
+    var actorSel = options.actorSelector || '[class^="ms-actor"]';
+    var threshold =
+      typeof options.viewportThreshold === 'number'
+        ? options.viewportThreshold
+        : 0.35;
+    var destroyed = false;
+    var started = false;
+    var paused = false;
+    var hoverArmed = true;
+    /** True while the pointer is inside the scene root (hover mode). */
+    var pointerInside = false;
+    var io = null;
+    var mq = null;
+    var armTimer = null;
+    var tapBtn = null;
+    var pauseBtn = null;
+    var playBtn = null;
+    var onPlayClick = null;
+    var onPlayPointerUp = null;
+    var onPauseClick = null;
+    var onTapClick = null;
+    /** Dedupes pointerup + click on engines that fire both for one gesture. */
+    var playActivateLock = false;
+    // Track mutations the controller owns so destroy() can restore the host.
+    var owned = {
+      waitingAdded: false,
+      waitingRemoved: false,
+      motionOkAdded: false,
+      tabindexAdded: false,
+      roleAdded: false,
+      ariaLabelAdded: false,
+    };
+
+    function setWaiting(on) {
+      if (on) {
+        if (!root.classList.contains(waiting)) {
+          root.classList.add(waiting);
+          owned.waitingAdded = true;
+        }
+      } else if (root.classList.contains(waiting)) {
+        root.classList.remove(waiting);
+        owned.waitingRemoved = true;
+      }
+    }
+
+    function canAutoAnimate() {
+      return !reducedMotion() || root.classList.contains(motionOk);
+    }
+
+    function clearArmTimer() {
+      if (armTimer != null) {
+        clearTimeout(armTimer);
+        armTimer = null;
+      }
+    }
+
+    function scheduleArmRefresh() {
+      clearArmTimer();
+      armTimer = setTimeout(function () {
+        armTimer = null;
+        refreshHoverArm();
+      }, 0);
+    }
+
+    function syncChrome() {
+      if (playBtn) {
+        var needOptIn = reducedMotion() && !root.classList.contains(motionOk);
+        playBtn.hidden = false;
+        playBtn.textContent = needOptIn
+          ? 'Play animation'
+          : started
+            ? 'Replay'
+            : 'Play animation';
+      }
+      if (pauseBtn) {
+        var showPause = !!options.offerPause && started && canAutoAnimate();
+        pauseBtn.hidden = !showPause;
+        pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+        pauseBtn.setAttribute('aria-pressed', paused ? 'true' : 'false');
+      }
+      if (tapBtn) {
+        tapBtn.hidden = mode !== 'hover';
+      }
+    }
+
+    /**
+     * @param opts.optInReducedMotion  Explicit Play / click / Enter / Space / tap.
+     *   Hover and focus never set this — they must not override reduced-motion.
+     */
+    function beginPlayback(opts) {
+      if (destroyed) return false;
+      var force = opts && opts.force;
+      var optIn = opts && opts.optInReducedMotion;
+      if (reducedMotion() && !root.classList.contains(motionOk)) {
+        if (!optIn) {
+          syncChrome();
+          return false;
+        }
+        root.classList.add(motionOk);
+        owned.motionOkAdded = true;
+      }
+      if (!canAutoAnimate() && !force) {
+        syncChrome();
+        return false;
+      }
+      setWaiting(false);
+      restartAnimations(root, actorSel);
+      started = true;
+      paused = false;
+      actors(root, actorSel).forEach(function (el) {
+        el.style.removeProperty('animation-play-state');
+      });
+      syncChrome();
+      return true;
+    }
+
+    function pausePlayback() {
+      if (destroyed || !started) return;
+      paused = true;
+      actors(root, actorSel).forEach(function (el) {
+        el.style.animationPlayState = 'paused';
+      });
+      syncChrome();
+    }
+
+    function resumePlayback() {
+      if (destroyed || !started) return;
+      if (reducedMotion() && !root.classList.contains(motionOk)) {
+        syncChrome();
+        return;
+      }
+      paused = false;
+      actors(root, actorSel).forEach(function (el) {
+        el.style.removeProperty('animation-play-state');
+      });
+      syncChrome();
+    }
+
+    function restartPlayback() {
+      beginPlayback({ force: true, optInReducedMotion: true });
+    }
+
+    function rootHasPointer() {
+      try {
+        return root.matches(':hover');
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function rootHasFocus() {
+      var ae = document.activeElement;
+      return !!(ae && root.contains(ae));
+    }
+
+    function refreshHoverArm() {
+      if (!rootHasPointer() && !rootHasFocus()) {
+        hoverArmed = true;
+        syncChrome();
+      }
+    }
+
+    function onClickActivate(event) {
+      if (destroyed) return;
+      if (event.target && event.target.closest && event.target.closest('[data-ms-chrome]')) {
+        return;
+      }
+      beginPlayback({ optInReducedMotion: true });
+    }
+
+    function onKeyActivate(event) {
+      if (destroyed) return;
+      if (event.target !== root) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      beginPlayback({ optInReducedMotion: true });
+    }
+
+    function tryHoverFocusStart() {
+      if (reducedMotion() && !root.classList.contains(motionOk)) {
+        // Do not consume the arm — wait for explicit Play / tap.
+        syncChrome();
+        return;
+      }
+      if (!hoverArmed) return;
+      hoverArmed = false;
+      beginPlayback({ optInReducedMotion: false });
+    }
+
+    function onPointerEnter() {
+      if (destroyed || mode !== 'hover') return;
+      // If focus already left before this enter (blur + re-hover in one turn),
+      // re-arm synchronously — do not wait for a deferred focusout timer.
+      if (!pointerInside && !rootHasFocus()) {
+        hoverArmed = true;
+      }
+      pointerInside = true;
+      tryHoverFocusStart();
+    }
+
+    function onFocusIn() {
+      if (destroyed || mode !== 'hover') return;
+      // Focus that arrives while the pointer is already inside is the same
+      // pointer session (e.g. click-to-focus), not a fresh hover/focus arm.
+      if (pointerInside) return;
+      tryHoverFocusStart();
+    }
+
+    function onPointerLeave() {
+      if (mode !== 'hover') return;
+      pointerInside = false;
+      scheduleArmRefresh();
+    }
+
+    function onFocusOut(event) {
+      if (mode !== 'hover') return;
+      // Child→child focus stays inside the scene — never re-arm mid-transfer.
+      var next = event && event.relatedTarget;
+      if (next && root.contains(next)) return;
+      scheduleArmRefresh();
+    }
+
+    function ensureAttr(name, value, flag) {
+      if (!root.hasAttribute(name)) {
+        root.setAttribute(name, value);
+        owned[flag] = true;
+      }
+    }
+
+    function bindChrome() {
+      playBtn = root.parentElement
+        ? root.parentElement.querySelector('[data-ms-play]')
+        : null;
+      if (!playBtn && root.ownerDocument) {
+        var shell = root.closest('[data-ms-demo-shell]');
+        if (shell) playBtn = shell.querySelector('[data-ms-play]');
+      }
+      pauseBtn = null;
+      tapBtn = null;
+      var shellEl = root.closest('[data-ms-demo-shell]') || root.parentElement;
+      if (shellEl) {
+        pauseBtn = shellEl.querySelector('[data-ms-pause]');
+        tapBtn = shellEl.querySelector('[data-ms-hover-tap]');
+      }
+
+      if (playBtn) {
+        function activatePlayFromControl() {
+          if (playActivateLock) return;
+          playActivateLock = true;
+          beginPlayback({ optInReducedMotion: true });
+          setTimeout(function () {
+            playActivateLock = false;
+          }, 0);
+        }
+        onPlayClick = function () {
+          activatePlayFromControl();
+        };
+        // WebKit (Playwright): when a tabindex scene held focus, trusted
+        // pointerdown/up reach Play but click is suppressed. pointerup keeps
+        // reduced-motion opt-in reachable with a real pointer gesture.
+        onPlayPointerUp = function (event) {
+          if (typeof event.button === 'number' && event.button !== 0) return;
+          activatePlayFromControl();
+        };
+        playBtn.addEventListener('click', onPlayClick);
+        playBtn.addEventListener('pointerup', onPlayPointerUp);
+      }
+      if (pauseBtn) {
+        onPauseClick = function () {
+          if (paused) resumePlayback();
+          else pausePlayback();
+        };
+        pauseBtn.addEventListener('click', onPauseClick);
+      }
+      if (tapBtn) {
+        onTapClick = function () {
+          hoverArmed = false;
+          beginPlayback({ optInReducedMotion: true });
+        };
+        tapBtn.addEventListener('click', onTapClick);
+      }
+    }
+
+    function bindMode() {
+      // Clear leftover inline play-state from a prior instance before arming.
+      actors(root, actorSel).forEach(function (el) {
+        el.style.removeProperty('animation-play-state');
+        el.style.removeProperty('animation');
+      });
+
+      if (mode === 'page-load') {
+        if (canAutoAnimate()) {
+          setWaiting(false);
+          restartAnimations(root, actorSel);
+          started = true;
+          paused = false;
+        } else {
+          setWaiting(false);
+          started = false;
+          paused = false;
+        }
+        return;
+      }
+
+      setWaiting(true);
+      started = false;
+      paused = false;
+      hoverArmed = true;
+      pointerInside = false;
+
+      if (mode === 'click') {
+        ensureAttr('tabindex', '0', 'tabindexAdded');
+        ensureAttr('role', 'button', 'roleAdded');
+        ensureAttr('aria-label', 'Play animation', 'ariaLabelAdded');
+        root.addEventListener('click', onClickActivate);
+        root.addEventListener('keydown', onKeyActivate);
+      }
+
+      if (mode === 'hover') {
+        // mouseenter/mouseleave do not fire when moving among descendants.
+        root.addEventListener('mouseenter', onPointerEnter);
+        root.addEventListener('mouseleave', onPointerLeave);
+        root.addEventListener('focusin', onFocusIn);
+        root.addEventListener('focusout', onFocusOut);
+        ensureAttr('tabindex', '0', 'tabindexAdded');
+      }
+
+      if (mode === 'viewport') {
+        if (typeof IntersectionObserver === 'function') {
+          io = new IntersectionObserver(
+            function (entries) {
+              for (var i = 0; i < entries.length; i++) {
+                if (entries[i].isIntersecting && !started) {
+                  if (canAutoAnimate()) {
+                    beginPlayback({ optInReducedMotion: false });
+                  }
+                  if (io) {
+                    io.disconnect();
+                    io = null;
+                  }
+                  break;
+                }
+              }
+            },
+            { threshold: threshold },
+          );
+          io.observe(root);
+        }
+        // Fallback: stay waiting until explicit Play (no silent autoplay).
+      }
+    }
+
+    function onMqChange() {
+      if (destroyed) return;
+      if (!reducedMotion()) {
+        if (owned.motionOkAdded) {
+          root.classList.remove(motionOk);
+          owned.motionOkAdded = false;
+        } else {
+          root.classList.remove(motionOk);
+        }
+        if (mode === 'page-load') {
+          restartAnimations(root, actorSel);
+          started = true;
+          paused = false;
+        }
+      } else if (!root.classList.contains(motionOk)) {
+        // Preference engaged: freeze to static presentation.
+        stopOwnedActorAnimations(root, actorSel);
+        if (mode !== 'page-load') {
+          setWaiting(true);
+          started = false;
+          hoverArmed = true;
+        } else {
+          started = false;
+        }
+        paused = false;
+      }
+      syncChrome();
+    }
+
+    function restoreOwnedRootState() {
+      if (owned.motionOkAdded) root.classList.remove(motionOk);
+      if (owned.waitingAdded) root.classList.remove(waiting);
+      if (owned.waitingRemoved) root.classList.add(waiting);
+      if (owned.tabindexAdded) root.removeAttribute('tabindex');
+      if (owned.roleAdded) root.removeAttribute('role');
+      if (owned.ariaLabelAdded) root.removeAttribute('aria-label');
+    }
+
+    bindChrome();
+    bindMode();
+
+    if (typeof global.matchMedia === 'function') {
+      mq = global.matchMedia('(prefers-reduced-motion: reduce)');
+      if (typeof mq.addEventListener === 'function') {
+        mq.addEventListener('change', onMqChange);
+      } else if (typeof mq.addListener === 'function') {
+        mq.addListener(onMqChange);
+      }
+    }
+    syncChrome();
+
+    return {
+      play: function () {
+        beginPlayback({ optInReducedMotion: true });
+      },
+      pause: pausePlayback,
+      resume: resumePlayback,
+      restart: restartPlayback,
+      destroy: function () {
+        if (destroyed) return;
+        destroyed = true;
+        clearArmTimer();
+        root.removeEventListener('click', onClickActivate);
+        root.removeEventListener('keydown', onKeyActivate);
+        root.removeEventListener('mouseenter', onPointerEnter);
+        root.removeEventListener('mouseleave', onPointerLeave);
+        root.removeEventListener('focusin', onFocusIn);
+        root.removeEventListener('focusout', onFocusOut);
+        if (io) {
+          io.disconnect();
+          io = null;
+        }
+        if (mq) {
+          if (typeof mq.removeEventListener === 'function') {
+            mq.removeEventListener('change', onMqChange);
+          } else if (typeof mq.removeListener === 'function') {
+            mq.removeListener(onMqChange);
+          }
+        }
+        if (playBtn && onPlayClick) {
+          playBtn.removeEventListener('click', onPlayClick);
+        }
+        if (playBtn && onPlayPointerUp) {
+          playBtn.removeEventListener('pointerup', onPlayPointerUp);
+        }
+        if (pauseBtn && onPauseClick) {
+          pauseBtn.removeEventListener('click', onPauseClick);
+        }
+        if (tapBtn && onTapClick) {
+          tapBtn.removeEventListener('click', onTapClick);
+        }
+        stopOwnedActorAnimations(root, actorSel);
+        restoreOwnedRootState();
+        map().delete(root);
+      },
+      get started() {
+        return started;
+      },
+      get paused() {
+        return paused;
+      },
+      get mode() {
+        return mode;
+      },
+    };
+  }
+
+  var api = {
+    init: function (root, options) {
+      if (!root) throw new Error('MotionSketchTrigger.init requires a root element');
+      var existing = map().get(root);
+      if (existing) {
+        existing.destroy();
+      }
+      var ctl = createController(root, options || {});
+      map().set(root, ctl);
+      return ctl;
+    },
+    get: function (root) {
+      return map().get(root) || null;
+    },
+    destroy: function (root) {
+      var ctl = map().get(root);
+      if (ctl) ctl.destroy();
+    },
+    needsJavaScript: function (t) {
+      return t !== 'page-load';
+    },
+  };
+
+  global[API_NAME] = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>
+(function () {
+  var api = window.MotionSketchTrigger;
+  if (!api || typeof api.init !== 'function') return;
+  var root = document.querySelector('[data-ms-scene="a8192e5c"]');
+  if (!root) return;
+  api.init(root, {"mode":"page-load","loop":false,"durationMs":2400,"motionOkClass":"ms-motion-ok","waitingClass":"ms-waiting","viewportThreshold":0.35,"actorSelector":"[class^=\"ms-actor\"]","offerPause":false});
+})();
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "canvasBg": "rgb(248, 249, 252)",
+  "ink": "rgb(23, 33, 58)",
+  "exportBg": "rgb(46, 69, 180)",
+  "exportColor": "rgb(255, 255, 255)",
+  "dockBg": "oklab(0.999994 0.0000455678 0.0000200868 / 0.9)",
+  "statusColor": null,
+  "focusOutline": {
+    "outline": "rgb(58, 70, 96) solid 2px",
+    "outlineColor": "rgb(58, 70, 96)",
+    "outlineWidth": "2px"
+  }
+}

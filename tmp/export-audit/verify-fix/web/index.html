@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Untitled project</title>
+<style>
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #f4f6fb;
+  color: #0f172a;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.demo-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+.demo-frame {
+  width: min(100%, calc((100dvh - 5.5rem) * 1.778));
+  max-height: calc(100dvh - 5.5rem);
+}
+
+.demo-frame .ms-stage {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.1);
+}
+
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.demo-replay,
+.demo-pause,
+.demo-hover-tap {
+  appearance: none;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-replay:hover,
+.demo-pause:hover,
+.demo-hover-tap:hover {
+  background: #f8fafc;
+}
+
+.demo-replay:focus-visible,
+.demo-pause:focus-visible,
+.demo-hover-tap:focus-visible,
+.ms-scene-8cb53c72:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.demo-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+  max-width: 28rem;
+}
+</style>
+<link rel="stylesheet" href="animation.css">
+</head>
+<body>
+  <div class="demo-shell" data-ms-demo-shell data-testid="demo-shell">
+    <div class="demo-frame">
+      <div class="ms-scene-8cb53c72" data-ms-scene="8cb53c72" data-testid="demo-scene" data-ms-trigger="page-load">
+        <div class="ms-stage" data-testid="demo-stage">
+          <div class="ms-actor" data-testid="demo-actor"></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-controls" data-ms-chrome data-testid="demo-controls">
+      <button type="button" class="demo-replay" data-testid="demo-replay" data-ms-play data-ms-chrome>Play animation</button>
+      
+      
+    </div>
+    <p class="demo-hint" data-testid="demo-trigger-hint">Plays on page load. Prefer reduced motion? Use Play animation.</p>
+  </div>
+<script src="ms-trigger.js"></script>
+  <script>
+(function () {
+  var api = window.MotionSketchTrigger;
+  if (!api || typeof api.init !== 'function') return;
+  var root = document.querySelector('[data-ms-scene="8cb53c72"]');
+  if (!root) return;
+  api.init(root, {"mode":"page-load","loop":false,"durationMs":1200,"motionOkClass":"ms-motion-ok","waitingClass":"ms-waiting","viewportThreshold":0.35,"actorSelector":"[class^=\"ms-actor\"]","offerPause":false});
+})();
+  </script>
+</body>
+</html>

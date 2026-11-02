@@ -1,0 +1,1900 @@
+[
+  {
+    "requested": [
+      1280,
+      720
+    ],
+    "actual": {
+      "w": 1280,
+      "h": 720,
+      "dpr": 1
+    },
+    "bothOpen": [
+      {
+        "id": "btn-toggle-actor-list",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "actors-collapse-label",
+        "blocked": true,
+        "y": 475,
+        "h": 32
+      }
+    ],
+    "allBoth": [
+      {
+        "id": "btn-toggle-clip-timeline",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-toggle-clip-timeline",
+        "blocked": false,
+        "y": 112,
+        "h": 36
+      },
+      {
+        "id": "btn-toggle-actor-list",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "actors-collapse-label",
+        "blocked": true,
+        "y": 475,
+        "h": 32
+      },
+      {
+        "id": "btn-add-actor",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-add-actor",
+        "blocked": false,
+        "y": 303,
+        "h": 32
+      },
+      {
+        "id": "btn-record",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-record",
+        "blocked": false,
+        "y": 603,
+        "h": 32
+      },
+      {
+        "id": "btn-play",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-play",
+        "blocked": false,
+        "y": 603,
+        "h": 32
+      },
+      {
+        "id": "playback-scrubber",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "playback-scrubber",
+        "blocked": false,
+        "y": 583,
+        "h": 16
+      },
+      {
+        "id": "btn-zoom-out",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-out",
+        "blocked": false,
+        "y": 90,
+        "h": 32
+      },
+      {
+        "id": "btn-zoom-in",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-in",
+        "blocked": false,
+        "y": 90,
+        "h": 32
+      },
+      {
+        "id": "btn-fit-stage",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-fit-stage",
+        "blocked": false,
+        "y": 90,
+        "h": 32
+      },
+      {
+        "id": "btn-project",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-project",
+        "blocked": false,
+        "y": 31,
+        "h": 28
+      },
+      {
+        "id": "btn-adjust",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-adjust",
+        "blocked": false,
+        "y": 17,
+        "h": 28
+      },
+      {
+        "id": "btn-appearance",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-appearance",
+        "blocked": false,
+        "y": 17,
+        "h": 28
+      },
+      {
+        "id": "btn-export",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-export",
+        "blocked": false,
+        "y": 17,
+        "h": 28
+      }
+    ],
+    "panels": [
+      {
+        "id": "project",
+        "panel": {
+          "x": 12,
+          "y": 85,
+          "w": 320,
+          "h": 512,
+          "b": 597
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "project-panel-root",
+            "blocked": true,
+            "y": 88,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "project-panel",
+            "blocked": true,
+            "y": 243,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "adjust",
+        "panel": {
+          "x": 948,
+          "y": 56,
+          "w": 320,
+          "h": 512,
+          "b": 568
+        },
+        "blocked": [
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "appearance",
+        "panel": {
+          "x": 948,
+          "y": 56,
+          "w": 320,
+          "h": 512,
+          "b": 568
+        },
+        "blocked": [
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "export",
+        "panel": {
+          "x": 948,
+          "y": 56,
+          "w": 320,
+          "h": 512,
+          "b": 568
+        },
+        "blocked": [
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      }
+    ]
+  },
+  {
+    "requested": [
+      850,
+      650
+    ],
+    "actual": {
+      "w": 850,
+      "h": 650,
+      "dpr": 1
+    },
+    "bothOpen": [
+      {
+        "id": "btn-toggle-actor-list",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "actors-collapse-label",
+        "blocked": true,
+        "y": 405,
+        "h": 32
+      }
+    ],
+    "allBoth": [
+      {
+        "id": "btn-toggle-clip-timeline",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-toggle-clip-timeline",
+        "blocked": false,
+        "y": 112,
+        "h": 36
+      },
+      {
+        "id": "btn-toggle-actor-list",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "actors-collapse-label",
+        "blocked": true,
+        "y": 405,
+        "h": 32
+      },
+      {
+        "id": "btn-add-actor",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-add-actor",
+        "blocked": false,
+        "y": 233,
+        "h": 32
+      },
+      {
+        "id": "btn-record",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-record",
+        "blocked": false,
+        "y": 533,
+        "h": 32
+      },
+      {
+        "id": "btn-play",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-play",
+        "blocked": false,
+        "y": 533,
+        "h": 32
+      },
+      {
+        "id": "playback-scrubber",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "playback-scrubber",
+        "blocked": false,
+        "y": 513,
+        "h": 16
+      },
+      {
+        "id": "btn-zoom-out",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-out",
+        "blocked": false,
+        "y": 90,
+        "h": 32
+      },
+      {
+        "id": "btn-zoom-in",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-in",
+        "blocked": false,
+        "y": 90,
+        "h": 32
+      },
+      {
+        "id": "btn-fit-stage",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-fit-stage",
+        "blocked": false,
+        "y": 90,
+        "h": 32
+      },
+      {
+        "id": "btn-project",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-project",
+        "blocked": false,
+        "y": 31,
+        "h": 28
+      },
+      {
+        "id": "btn-adjust",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-adjust",
+        "blocked": false,
+        "y": 17,
+        "h": 28
+      },
+      {
+        "id": "btn-appearance",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-appearance",
+        "blocked": false,
+        "y": 17,
+        "h": 28
+      },
+      {
+        "id": "btn-export",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-export",
+        "blocked": false,
+        "y": 17,
+        "h": 28
+      }
+    ],
+    "panels": [
+      {
+        "id": "project",
+        "panel": {
+          "x": 12,
+          "y": 85,
+          "w": 320,
+          "h": 458,
+          "b": 543
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "project-panel-root",
+            "blocked": true,
+            "y": 88,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "project-panel",
+            "blocked": true,
+            "y": 243,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "adjust",
+        "panel": {
+          "x": 518,
+          "y": 56,
+          "w": 320,
+          "h": 458,
+          "b": 514
+        },
+        "blocked": [
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "appearance",
+        "panel": {
+          "x": 518,
+          "y": 56,
+          "w": 320,
+          "h": 458,
+          "b": 514
+        },
+        "blocked": [
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "export",
+        "panel": {
+          "x": 518,
+          "y": 56,
+          "w": 320,
+          "h": 458,
+          "b": 514
+        },
+        "blocked": [
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 90,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      }
+    ]
+  },
+  {
+    "requested": [
+      390,
+      844
+    ],
+    "actual": {
+      "w": 390,
+      "h": 844,
+      "dpr": 1
+    },
+    "bothOpen": [],
+    "allBoth": [
+      {
+        "id": "btn-toggle-clip-timeline",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-toggle-clip-timeline",
+        "blocked": false,
+        "y": 342,
+        "h": 36
+      },
+      {
+        "id": "btn-toggle-actor-list",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-toggle-actor-list",
+        "blocked": false,
+        "y": 114,
+        "h": 37
+      },
+      {
+        "id": "btn-add-actor",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-add-actor",
+        "blocked": false,
+        "y": 269,
+        "h": 32
+      },
+      {
+        "id": "btn-record",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-record",
+        "blocked": false,
+        "y": 697,
+        "h": 32
+      },
+      {
+        "id": "btn-play",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-play",
+        "blocked": false,
+        "y": 733,
+        "h": 32
+      },
+      {
+        "id": "playback-scrubber",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "playback-scrubber",
+        "blocked": false,
+        "y": 677,
+        "h": 16
+      },
+      {
+        "id": "btn-zoom-out",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-out",
+        "blocked": false,
+        "y": 116,
+        "h": 32
+      },
+      {
+        "id": "btn-zoom-in",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-in",
+        "blocked": false,
+        "y": 116,
+        "h": 32
+      },
+      {
+        "id": "btn-fit-stage",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-fit-stage",
+        "blocked": false,
+        "y": 116,
+        "h": 32
+      },
+      {
+        "id": "btn-project",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-project",
+        "blocked": false,
+        "y": 21,
+        "h": 28
+      },
+      {
+        "id": "btn-adjust",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-adjust",
+        "blocked": false,
+        "y": 72,
+        "h": 28
+      },
+      {
+        "id": "btn-appearance",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-appearance",
+        "blocked": false,
+        "y": 72,
+        "h": 28
+      },
+      {
+        "id": "btn-export",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-export",
+        "blocked": false,
+        "y": 72,
+        "h": 28
+      }
+    ],
+    "panels": [
+      {
+        "id": "project",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 719,
+          "b": 832
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "project-panel",
+            "blocked": true,
+            "y": 342,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "project-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "project-panel",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "stage-size-section",
+            "blocked": true,
+            "y": 697,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "stage-size-section",
+            "blocked": true,
+            "y": 733,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "stage-size-section",
+            "blocked": true,
+            "y": 677,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "project-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-project",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-project",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "adjust",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 719,
+          "b": 832
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "motion-presets",
+            "blocked": true,
+            "y": 342,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "svg-path-import-help",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "duration-help",
+            "blocked": true,
+            "y": 697,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "duration-help",
+            "blocked": true,
+            "y": 733,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "adjust-panel",
+            "blocked": true,
+            "y": 677,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-adjust",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-adjust",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "appearance",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 719,
+          "b": 832
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-image-type-help",
+            "blocked": true,
+            "y": 342,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-kind-fieldset",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-image-section",
+            "blocked": true,
+            "y": 697,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-image-section",
+            "blocked": true,
+            "y": 733,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-panel",
+            "blocked": true,
+            "y": 677,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-appearance",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-appearance",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "export",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 719,
+          "b": 832
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-guide-html",
+            "blocked": true,
+            "y": 342,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "btn-export-path-html",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-trigger-regen-help",
+            "blocked": true,
+            "y": 697,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-trigger-regen-help",
+            "blocked": true,
+            "y": 733,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-trigger-help",
+            "blocked": true,
+            "y": 677,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-export",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-export",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      }
+    ]
+  },
+  {
+    "requested": [
+      390,
+      560
+    ],
+    "actual": {
+      "w": 390,
+      "h": 560,
+      "dpr": 1
+    },
+    "bothOpen": [],
+    "allBoth": [
+      {
+        "id": "btn-toggle-clip-timeline",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-toggle-clip-timeline",
+        "blocked": false,
+        "y": 312,
+        "h": 36
+      },
+      {
+        "id": "btn-toggle-actor-list",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-toggle-actor-list",
+        "blocked": false,
+        "y": 114,
+        "h": 37
+      },
+      {
+        "id": "btn-add-actor",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-add-actor",
+        "blocked": false,
+        "y": 269,
+        "h": 32
+      },
+      {
+        "id": "btn-record",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-record",
+        "blocked": false,
+        "y": 413,
+        "h": 32
+      },
+      {
+        "id": "btn-play",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-play",
+        "blocked": false,
+        "y": 449,
+        "h": 32
+      },
+      {
+        "id": "playback-scrubber",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "playback-scrubber",
+        "blocked": false,
+        "y": 393,
+        "h": 16
+      },
+      {
+        "id": "btn-zoom-out",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-out",
+        "blocked": false,
+        "y": 116,
+        "h": 32
+      },
+      {
+        "id": "btn-zoom-in",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-zoom-in",
+        "blocked": false,
+        "y": 116,
+        "h": 32
+      },
+      {
+        "id": "btn-fit-stage",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-fit-stage",
+        "blocked": false,
+        "y": 116,
+        "h": 32
+      },
+      {
+        "id": "btn-project",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-project",
+        "blocked": false,
+        "y": 21,
+        "h": 28
+      },
+      {
+        "id": "btn-adjust",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-adjust",
+        "blocked": false,
+        "y": 72,
+        "h": 28
+      },
+      {
+        "id": "btn-appearance",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-appearance",
+        "blocked": false,
+        "y": 72,
+        "h": 28
+      },
+      {
+        "id": "btn-export",
+        "visible": true,
+        "centerInView": true,
+        "inert": false,
+        "hit": "btn-export",
+        "blocked": false,
+        "y": 72,
+        "h": 28
+      }
+    ],
+    "panels": [
+      {
+        "id": "project",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 435,
+          "b": 548
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "project-panel",
+            "blocked": true,
+            "y": 312,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "project-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "project-panel",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "stage-size-section",
+            "blocked": true,
+            "y": 413,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "stage-size-section",
+            "blocked": true,
+            "y": 449,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "stage-size-section",
+            "blocked": true,
+            "y": 393,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "project-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-project",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-project",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "adjust",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 435,
+          "b": 548
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "svg-path-import-help",
+            "blocked": true,
+            "y": 312,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "svg-path-import-help",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "motion-preset-slide-in",
+            "blocked": true,
+            "y": 413,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "motion-preset-pop-in",
+            "blocked": true,
+            "y": 449,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "motion-preset-slide-in",
+            "blocked": true,
+            "y": 393,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "adjust-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-adjust",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-adjust",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "appearance",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 435,
+          "b": 548
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-kind-fieldset",
+            "blocked": true,
+            "y": 312,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-kind-fieldset",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-size-slider",
+            "blocked": true,
+            "y": 413,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-size-help",
+            "blocked": true,
+            "y": 449,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "actor-panel",
+            "blocked": true,
+            "y": 393,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "appearance-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-appearance",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-appearance",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      },
+      {
+        "id": "export",
+        "panel": {
+          "x": 12,
+          "y": 113,
+          "w": 366,
+          "h": 435,
+          "b": 548
+        },
+        "blocked": [
+          {
+            "id": "btn-toggle-clip-timeline",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "btn-download-web-package",
+            "blocked": true,
+            "y": 312,
+            "h": 36
+          },
+          {
+            "id": "btn-toggle-actor-list",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 114,
+            "h": 37
+          },
+          {
+            "id": "btn-add-actor",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "btn-export-path-html",
+            "blocked": true,
+            "y": 269,
+            "h": 32
+          },
+          {
+            "id": "btn-record",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-html-folder-layout",
+            "blocked": true,
+            "y": 413,
+            "h": 32
+          },
+          {
+            "id": "btn-play",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-html-folder-layout",
+            "blocked": true,
+            "y": 449,
+            "h": 32
+          },
+          {
+            "id": "playback-scrubber",
+            "visible": true,
+            "centerInView": true,
+            "inert": true,
+            "hit": "export-guide-html",
+            "blocked": true,
+            "y": 393,
+            "h": 16
+          },
+          {
+            "id": "btn-zoom-out",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "export-panel-root",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-zoom-in",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-export",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          },
+          {
+            "id": "btn-fit-stage",
+            "visible": true,
+            "centerInView": true,
+            "inert": false,
+            "hit": "btn-close-export",
+            "blocked": true,
+            "y": 116,
+            "h": 32
+          }
+        ],
+        "prefsChanged": false,
+        "geomChanged": false,
+        "beforePrefs": {
+          "actors": "1",
+          "sequence": "1"
+        },
+        "afterPrefs": {
+          "actors": "1",
+          "sequence": "1"
+        }
+      }
+    ]
+  }
+]

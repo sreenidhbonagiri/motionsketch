@@ -1,0 +1,44 @@
+{
+  "prod": "https://motionsketch.vercel.app",
+  "merge": "9b05825497ad9d5d8b5e6e0842253a761ac9eb3f",
+  "palette": {
+    "--ms-primary": "#3048b8",
+    "--ms-selected": "#ebefff",
+    "--ms-ink": "#17213a",
+    "--ms-muted": "#647089",
+    "--ms-danger": "#d93645",
+    "--ms-canvas": "#f8f9fc"
+  },
+  "armedNoPan": true,
+  "dockStable": true,
+  "projectNotRecording": true,
+  "presetContrast": 5.87,
+  "ok": true,
+  "presetDescColor": "rgb(79, 92, 117)",
+  "presetBg": "rgb(235, 239, 255)",
+  "presetFgHex": "#4F5C75",
+  "presetBgHex": "#EBEFFF",
+  "camera": {
+    "before": {
+      "panX": 64,
+      "panY": 40,
+      "zoom": 1
+    },
+    "after": {
+      "panX": 64,
+      "panY": 40,
+      "zoom": 1
+    },
+    "panDx": 0,
+    "panDy": 0
+  },
+  "dockDeltas": {
+    "armedH": 0,
+    "armedY": 0,
+    "recordingH": 0,
+    "pausedH": 0,
+    "playingH": 0
+  },
+  "projectActionStatusCount": 0,
+  "projectContainsRecording": false
+}

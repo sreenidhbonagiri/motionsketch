@@ -1,0 +1,20 @@
+{
+  "prod": "https://motionsketch.vercel.app",
+  "expectedAspect": "16 / 9",
+  "merge": "8550e6b973f7e32489f0f07f188fad1367036d1a",
+  "zip": {
+    "files": [
+      "README.txt",
+      "animation.css",
+      "index.html",
+      "ms-trigger.js",
+      "project.json"
+    ],
+    "cssAspect": "16 / 9",
+    "expectedAspect": "16 / 9",
+    "readmeHas": true,
+    "readmeBadDefault": false,
+    "cssMatches": true
+  },
+  "ok": true
+}

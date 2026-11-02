@@ -1,0 +1,102 @@
+/* MotionSketch scoped scene export
+ *
+ * Scene isolation:
+ * - Wrap markup in <div class="ms-scene-c6a8b02f"> so rules never touch host .stage/.actor.
+ * - Keyframe names include a content fingerprint (c6a8b02f); project title alone is not used.
+ * - For a second independently controlled copy of the same scene, re-export with
+ *   instancePrefix (e.g. "hero-") or rename the root class + keyframe prefix together.
+ * - This stylesheet does not reset host page styles outside .ms-scene-c6a8b02f.
+ *
+ * Reduced motion:
+ * - Under prefers-reduced-motion: reduce, animations stay off until the scene root
+ *   also has class "ms-motion-ok" (set by an explicit Play control).
+ * - Automatic triggers never override reduced-motion; Play opts in.
+ * - The static pose uses each element’s base transform (clip-start / rest) and forces
+ *   visibility so hide-before/hide-after cannot blank the scene.
+ *
+ * When should it play:
+ * When should it play: page-load (CSS starts immediately; no controller required).
+ *
+ * Looping scenes keep running after a trigger until paused or restarted.
+ * Embedding API (when JS is included): MotionSketchTrigger.init(root, options),
+ *   .play() / .pause() / .resume() / .restart() / .destroy().
+ *
+ * Positioning:
+ * - Place elements inside .ms-stage (position: relative; container-type: size).
+ * - Shared Duration / loop / loopMode drive every element’s animation together.
+ * - Per-element Timing remaps motion onto a start–end interval; outside that range the element holds its first/last pose.
+ * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
+ *   At an exact step-end keyframe time, Firefox still shows the previous value and
+ *   jumps immediately afterward; Chromium/WebKit apply the new value at that time.
+ *   Editor JS stays inclusive at start / hidden at end. Continuous playback hides
+ *   the mismatch; pausing CSS/WAAPI on the exact boundary in Firefox can disagree.
+ * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
+ * - Element size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
+ * - Motion uses transform with linear timing; visibility is orthogonal (visibility + step-*).
+ * - Transform order: translate → center → rotate → scale.
+ * Loop: off (plays once, forwards). Shared by every element.
+ *
+ * Browser support: container query units (cqw/cqh/cqmin).
+ * Fallback for a fixed-size stage (replace the cq* lengths with px):
+ *   Ncqw  → (N / 100) * stageWidth
+ *   Ncqh  → (N / 100) * stageHeight
+ *   Ncqmin → (N / 100) * min(stageWidth, stageHeight)
+ *
+ * Example HTML:
+ * <div class="ms-scene-c6a8b02f" data-ms-scene="c6a8b02f">
+ *   <div class="ms-stage">
+ *     <div class="ms-actor"></div>
+ *   </div>
+ * </div>
+ */
+.ms-scene-c6a8b02f .ms-stage {
+  position: relative;
+  container-type: size;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.ms-scene-c6a8b02f .ms-actor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12.00cqmin;
+  aspect-ratio: 1;
+  border-radius: 14.00%;
+  background: #4f46e5;
+  transform: translate3d(35.003cqw, 49.994cqh, 0) translate(-50%, -50%);
+  animation: ms-c6a8b02f 2396ms linear forwards;
+  will-change: transform;
+  display: block;
+  box-sizing: border-box;
+  z-index: 1;
+  /* Clip 0.0%–100.0% of shared timeline (holds outside). */
+}
+
+@keyframes ms-c6a8b02f {
+  0% { transform: translate3d(35.003cqw, 49.994cqh, 0) translate(-50%, -50%); }
+  0.84% { transform: translate3d(35.765cqw, 48.828cqh, 0) translate(-50%, -50%); }
+  2.10% { transform: translate3d(37.462cqw, 45.982cqh, 0) translate(-50%, -50%); }
+  5.47% { transform: translate3d(38.432cqw, 44.402cqh, 0) translate(-50%, -50%); }
+  7.58% { transform: translate3d(38.786cqw, 43.934cqh, 0) translate(-50%, -50%); }
+  9.68% { transform: translate3d(38.711cqw, 44.301cqh, 0) translate(-50%, -50%); }
+  13.89% { transform: translate3d(37.661cqw, 46.795cqh, 0) translate(-50%, -50%); }
+  15.99% { transform: translate3d(37.427cqw, 47.487cqh, 0) translate(-50%, -50%); }
+  37.88% { transform: translate3d(40.051cqw, 44.869cqh, 0) translate(-50%, -50%); }
+  50.08% { transform: translate3d(41.076cqw, 43.826cqh, 0) translate(-50%, -50%); }
+  54.91% { transform: translate3d(41.655cqw, 44.727cqh, 0) translate(-50%, -50%); }
+  91.86% { transform: translate3d(44.259cqw, 48.778cqh, 0) translate(-50%, -50%); }
+  96.04% { transform: translate3d(44.549cqw, 49.228cqh, 0) translate(-50%, -50%); }
+  99.97% { transform: translate3d(44.549cqw, 49.228cqh, 0) translate(-50%, -50%); }
+  100% { transform: translate3d(44.549cqw, 49.228cqh, 0) translate(-50%, -50%); }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-scene-c6a8b02f:not(.ms-motion-ok) [class^="ms-actor"] {
+    animation: none !important;
+    /* Keep a meaningful static pose visible (base transform); ignore clip hide flags. */
+    visibility: visible !important;
+  }
+}

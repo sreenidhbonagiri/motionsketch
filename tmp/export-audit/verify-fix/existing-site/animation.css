@@ -1,0 +1,92 @@
+/* MotionSketch scoped scene export
+ *
+ * Scene isolation:
+ * - Wrap markup in <div class="ms-scene-8cb53c72"> so rules never touch host .stage/.actor.
+ * - Keyframe names include a content fingerprint (8cb53c72); project title alone is not used.
+ * - For a second independently controlled copy of the same scene, re-export with
+ *   instancePrefix (e.g. "hero-") or rename the root class + keyframe prefix together.
+ * - This stylesheet does not reset host page styles outside .ms-scene-8cb53c72.
+ *
+ * Reduced motion:
+ * - Under prefers-reduced-motion: reduce, animations stay off until the scene root
+ *   also has class "ms-motion-ok" (set by an explicit Play control).
+ * - Automatic triggers never override reduced-motion; Play opts in.
+ * - The static pose uses each element’s base transform (clip-start / rest) and forces
+ *   visibility so hide-before/hide-after cannot blank the scene.
+ *
+ * When should it play:
+ * When should it play: page-load (CSS starts immediately; no controller required).
+ *
+ * Looping scenes keep running after a trigger until paused or restarted.
+ * Embedding API (when JS is included): MotionSketchTrigger.init(root, options),
+ *   .play() / .pause() / .resume() / .restart() / .destroy().
+ *
+ * Positioning:
+ * - Place elements inside .ms-stage (position: relative; container-type: size).
+ * - Shared Duration / loop / loopMode drive every element’s animation together.
+ * - Per-element Timing remaps motion onto a start–end interval; outside that range the element holds its first/last pose.
+ * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
+ *   At an exact step-end keyframe time, Firefox still shows the previous value and
+ *   jumps immediately afterward; Chromium/WebKit apply the new value at that time.
+ *   Editor JS stays inclusive at start / hidden at end. Continuous playback hides
+ *   the mismatch; pausing CSS/WAAPI on the exact boundary in Firefox can disagree.
+ * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
+ * - Element size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
+ * - Motion uses transform with linear timing; visibility is orthogonal (visibility + step-*).
+ * - Transform order: translate → center → rotate → scale.
+ * Loop: off (plays once, forwards). Shared by every element.
+ *
+ * Browser support: container query units (cqw/cqh/cqmin).
+ * Fallback for a fixed-size stage (replace the cq* lengths with px):
+ *   Ncqw  → (N / 100) * stageWidth
+ *   Ncqh  → (N / 100) * stageHeight
+ *   Ncqmin → (N / 100) * min(stageWidth, stageHeight)
+ *
+ * Example HTML:
+ * <div class="ms-scene-8cb53c72" data-ms-scene="8cb53c72">
+ *   <div class="ms-stage">
+ *     <div class="ms-actor"></div>
+ *   </div>
+ * </div>
+ */
+.ms-scene-8cb53c72 .ms-stage {
+  position: relative;
+  container-type: size;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.ms-scene-8cb53c72 .ms-actor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12.00cqmin;
+  aspect-ratio: 1;
+  border-radius: 14.00%;
+  background: #4f46e5;
+  transform: translate3d(35.000cqw, 50.000cqh, 0) translate(-50%, -50%);
+  animation: ms-8cb53c72 1200ms linear forwards;
+  will-change: transform;
+  display: block;
+  box-sizing: border-box;
+  z-index: 1;
+}
+
+@keyframes ms-8cb53c72 {
+  0% { transform: translate3d(35.000cqw, 50.000cqh, 0) translate(-50%, -50%); }
+  7.56% { transform: translate3d(35.852cqw, 47.958cqh, 0) translate(-50%, -50%); }
+  26.05% { transform: translate3d(36.526cqw, 46.345cqh, 0) translate(-50%, -50%); }
+  63.03% { transform: translate3d(38.294cqw, 42.109cqh, 0) translate(-50%, -50%); }
+  75.63% { transform: translate3d(38.766cqw, 40.979cqh, 0) translate(-50%, -50%); }
+  100% { transform: translate3d(39.438cqw, 39.370cqh, 0) translate(-50%, -50%); }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-scene-8cb53c72:not(.ms-motion-ok) [class^="ms-actor"] {
+    animation: none !important;
+    /* Keep a meaningful static pose visible (base transform); ignore clip hide flags. */
+    visibility: visible !important;
+  }
+}

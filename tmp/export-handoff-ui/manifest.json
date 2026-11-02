@@ -1,0 +1,17 @@
+{
+  "desktop": [
+    "desktop-html.png",
+    "desktop-react.png",
+    "desktop-files.png",
+    "desktop-success.png",
+    "desktop-advanced.png"
+  ],
+  "mobile": [
+    "mobile-html.png",
+    "mobile-react.png",
+    "mobile-files.png",
+    "mobile-success.png",
+    "mobile-advanced.png"
+  ],
+  "host": "/Users/sreenidhbonagiri/Desktop/ms-export-handoff-verify/verify"
+}

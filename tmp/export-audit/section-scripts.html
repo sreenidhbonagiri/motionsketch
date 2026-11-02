@@ -1,0 +1,19 @@
+<script src="ms-trigger.js"></script>
+<script>
+(function () {
+  var api = window.MotionSketchTrigger;
+  if (!api || typeof api.init !== 'function') return;
+  var root = document.querySelector('[data-ms-scene="6d617ccb"]');
+  if (!root) return;
+  api.init(root, {
+    mode: "page-load",
+    loop: false,
+    durationMs: 1200,
+    motionOkClass: "ms-motion-ok",
+    waitingClass: "ms-waiting",
+    viewportThreshold: 0.35,
+    actorSelector: "[class^=\"ms-actor\"]",
+    offerPause: false
+  });
+})();
+</script>

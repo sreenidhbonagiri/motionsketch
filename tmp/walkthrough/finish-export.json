@@ -1,0 +1,118 @@
+{
+  "hosts": {
+    "1280x720": {
+      "heading": "Existing page",
+      "missing": false,
+      "moved": true,
+      "start": {
+        "x": 210.42544555664062,
+        "y": 272.2596435546875,
+        "w": 43.1875,
+        "h": 43.1875
+      },
+      "end": {
+        "x": 214.4593963623047,
+        "y": 268.78753662109375,
+        "w": 43.18751525878906,
+        "h": 43.1875
+      },
+      "anims": [
+        "running"
+      ],
+      "button": "Replay",
+      "afterReplay": {
+        "heading": "Existing page",
+        "missing": false,
+        "moved": true,
+        "start": {
+          "x": 210.42544555664062,
+          "y": 272.2596435546875,
+          "w": 43.1875,
+          "h": 43.1875
+        },
+        "end": {
+          "x": 214.46861267089844,
+          "y": 268.77960205078125,
+          "w": 43.18751525878906,
+          "h": 43.1875
+        },
+        "anims": [
+          "running"
+        ],
+        "button": "Replay"
+      }
+    },
+    "390x844": {
+      "heading": "Existing page",
+      "missing": false,
+      "moved": true,
+      "start": {
+        "x": 116.48867797851562,
+        "y": 496.1629333496094,
+        "w": 44.875,
+        "h": 44.875030517578125
+      },
+      "end": {
+        "x": 124.16905212402344,
+        "y": 489.5828552246094,
+        "w": 44.875,
+        "h": 44.875030517578125
+      },
+      "anims": [
+        "running"
+      ],
+      "button": "Replay",
+      "afterReplay": {
+        "heading": "Existing page",
+        "missing": false,
+        "moved": true,
+        "start": {
+          "x": 116.48867797851562,
+          "y": 388.1629333496094,
+          "w": 44.875,
+          "h": 44.875
+        },
+        "end": {
+          "x": 124.1248779296875,
+          "y": 381.6207275390625,
+          "w": 44.875,
+          "h": 44.875
+        },
+        "anims": [
+          "running"
+        ],
+        "button": "Replay"
+      }
+    }
+  },
+  "react": {
+    "1280x720": {
+      "wheels": 31,
+      "tabBox": {
+        "x": 1110,
+        "y": 116.25,
+        "width": 142,
+        "height": 36
+      },
+      "example": "// At the top of an existing component file directly in src/.\n// A file deeper than src/ needs an adjusted relative path.\nimport { MotionSketchScene } from './motionsketch/MotionSketchScene.tsx'\n\n// Inside that component's returned JSX:\n<MotionSketchScene />\n",
+      "steps": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files beside the component. Add the import at the top of an existing component file directly in src/ (next to src/motionsketch/). Put <MotionSketchScene /> inside that component’s returned JSX. This path assumes that file is directly in src/; a deeper file needs an adjusted relative path.",
+      "success": "React package download started. Unzip all files into src/motionsketch/, then render MotionSketchScene inside an existing component. Dismiss",
+      "htmlSuccess": 0,
+      "zipPath": "/Users/sreenidhbonagiri/Desktop/motionsketch/tmp/walkthrough/1280x720-react.zip"
+    },
+    "390x844": {
+      "wheels": 29,
+      "tabBox": {
+        "x": 197,
+        "y": 191.25,
+        "width": 165,
+        "height": 36
+      },
+      "example": "// At the top of an existing component file directly in src/.\n// A file deeper than src/ needs an adjusted relative path.\nimport { MotionSketchScene } from './motionsketch/MotionSketchScene.tsx'\n\n// Inside that component's returned JSX:\n<MotionSketchScene />\n",
+      "steps": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files beside the component. Add the import at the top of an existing component file directly in src/ (next to src/motionsketch/). Put <MotionSketchScene /> inside that component’s returned JSX. This path assumes that file is directly in src/; a deeper file needs an adjusted relative path.",
+      "success": "React package download started. Unzip all files into src/motionsketch/, then render MotionSketchScene inside an existing component. Dismiss",
+      "htmlSuccess": 0,
+      "zipPath": "/Users/sreenidhbonagiri/Desktop/motionsketch/tmp/walkthrough/390x844-react.zip"
+    }
+  }
+}

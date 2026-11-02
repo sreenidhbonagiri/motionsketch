@@ -1,0 +1,1058 @@
+{
+  "desktopInitial": {
+    "scrollerH": 455,
+    "scrollTop": 0,
+    "scrollH": 2393,
+    "btn-download-web-package": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download for your website"
+    },
+    "btn-download-react-package": null,
+    "btn-export-path-html": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": {
+      "fully": false,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 268,
+      "text": "index.html optional local preview (or use your own page) animation.css ms-trigger.js README.txt instructions only — not required to run project.json reopen in MotionSketch — not required to run"
+    },
+    "export-html-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 331,
+      "text": "Unzip the package. Keep index.html, animation.css, ms-trigger.js together as shown above. Open index.html for a self-contained preview page (layout and controls). To embed in an existing page, copy those files beside you"
+    },
+    "export-html-paste-order": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 91,
+      "text": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>."
+    },
+    "btn-copy-html-section-head": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-body": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-scripts": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "export-html-section-head-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 255,
+      "h": 112,
+      "text": "<link rel=\"stylesheet\" href=\"animation.css\"> <style> /* Host sizing — required. Aspect matches the MotionSketch project. */ .ms-embed-frame { width: min(100%, 40rem); } .ms-embed-frame .ms-stage { width: 100%; aspect-rat"
+    },
+    "export-html-section-body-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 217,
+      "h": 112,
+      "text": "<div data-ms-demo-shell class=\"ms-embed\"> <div class=\"ms-embed-frame\"> <div class=\"ms-scene-6d617ccb\" data-ms-scene=\"6d617ccb\"> <div class=\"ms-stage\"> <div class=\"ms-actor\"></div> </div> </div> </div> <button type=\"butto"
+    },
+    "export-html-section-scripts-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 230,
+      "h": 112,
+      "text": "<script src=\"ms-trigger.js\"></script> <script> (function () { var api = window.MotionSketchTrigger; if (!api || typeof api.init !== 'function') return; var root = document.querySelector('[data-ms-scene=\"6d617ccb\"]'); if "
+    },
+    "export-react-steps": null,
+    "export-download-success": null,
+    "export-action-status": null,
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "desktopLayout": {
+    "scrollerH": 455,
+    "scrollTop": 294,
+    "scrollH": 2393,
+    "btn-download-web-package": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download for your website"
+    },
+    "btn-download-react-package": null,
+    "btn-export-path-html": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 268,
+      "text": "index.html optional local preview (or use your own page) animation.css ms-trigger.js README.txt instructions only — not required to run project.json reopen in MotionSketch — not required to run"
+    },
+    "export-html-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 331,
+      "text": "Unzip the package. Keep index.html, animation.css, ms-trigger.js together as shown above. Open index.html for a self-contained preview page (layout and controls). To embed in an existing page, copy those files beside you"
+    },
+    "export-html-paste-order": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 91,
+      "text": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>."
+    },
+    "btn-copy-html-section-head": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-body": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-scripts": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "export-html-section-head-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 255,
+      "h": 112,
+      "text": "<link rel=\"stylesheet\" href=\"animation.css\"> <style> /* Host sizing — required. Aspect matches the MotionSketch project. */ .ms-embed-frame { width: min(100%, 40rem); } .ms-embed-frame .ms-stage { width: 100%; aspect-rat"
+    },
+    "export-html-section-body-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 217,
+      "h": 112,
+      "text": "<div data-ms-demo-shell class=\"ms-embed\"> <div class=\"ms-embed-frame\"> <div class=\"ms-scene-6d617ccb\" data-ms-scene=\"6d617ccb\"> <div class=\"ms-stage\"> <div class=\"ms-actor\"></div> </div> </div> </div> <button type=\"butto"
+    },
+    "export-html-section-scripts-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 230,
+      "h": 112,
+      "text": "<script src=\"ms-trigger.js\"></script> <script> (function () { var api = window.MotionSketchTrigger; if (!api || typeof api.init !== 'function') return; var root = document.querySelector('[data-ms-scene=\"6d617ccb\"]'); if "
+    },
+    "export-react-steps": null,
+    "export-download-success": null,
+    "export-action-status": null,
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "desktopCopy": {
+    "scrollerH": 455,
+    "scrollTop": 1796,
+    "scrollH": 2393,
+    "btn-download-web-package": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download for your website"
+    },
+    "btn-download-react-package": null,
+    "btn-export-path-html": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 268,
+      "text": "index.html optional local preview (or use your own page) animation.css ms-trigger.js README.txt instructions only — not required to run project.json reopen in MotionSketch — not required to run"
+    },
+    "export-html-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 331,
+      "text": "Unzip the package. Keep index.html, animation.css, ms-trigger.js together as shown above. Open index.html for a self-contained preview page (layout and controls). To embed in an existing page, copy those files beside you"
+    },
+    "export-html-paste-order": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 91,
+      "text": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>."
+    },
+    "btn-copy-html-section-head": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-body": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-scripts": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "export-html-section-head-code": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 255,
+      "h": 112,
+      "text": "<link rel=\"stylesheet\" href=\"animation.css\"> <style> /* Host sizing — required. Aspect matches the MotionSketch project. */ .ms-embed-frame { width: min(100%, 40rem); } .ms-embed-frame .ms-stage { width: 100%; aspect-rat"
+    },
+    "export-html-section-body-code": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 217,
+      "h": 112,
+      "text": "<div data-ms-demo-shell class=\"ms-embed\"> <div class=\"ms-embed-frame\"> <div class=\"ms-scene-6d617ccb\" data-ms-scene=\"6d617ccb\"> <div class=\"ms-stage\"> <div class=\"ms-actor\"></div> </div> </div> </div> <button type=\"butto"
+    },
+    "export-html-section-scripts-code": {
+      "fully": false,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 230,
+      "h": 112,
+      "text": "<script src=\"ms-trigger.js\"></script> <script> (function () { var api = window.MotionSketchTrigger; if (!api || typeof api.init !== 'function') return; var root = document.querySelector('[data-ms-scene=\"6d617ccb\"]'); if "
+    },
+    "export-react-steps": null,
+    "export-download-success": null,
+    "export-action-status": null,
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "desktopCopied": "Copied",
+  "desktopAfterDownload": {
+    "scrollerH": 455,
+    "scrollTop": 114,
+    "scrollH": 2578,
+    "btn-download-web-package": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download for your website"
+    },
+    "btn-download-react-package": null,
+    "btn-export-path-html": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": {
+      "fully": false,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 268,
+      "text": "index.html optional local preview (or use your own page) animation.css ms-trigger.js README.txt instructions only — not required to run project.json reopen in MotionSketch — not required to run"
+    },
+    "export-html-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 331,
+      "text": "Unzip the package. Keep index.html, animation.css, ms-trigger.js together as shown above. Open index.html for a self-contained preview page (layout and controls). To embed in an existing page, copy those files beside you"
+    },
+    "export-html-paste-order": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 91,
+      "text": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>."
+    },
+    "btn-copy-html-section-head": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copied"
+    },
+    "btn-copy-html-section-body": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-scripts": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "export-html-section-head-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 255,
+      "h": 112,
+      "text": "<link rel=\"stylesheet\" href=\"animation.css\"> <style> /* Host sizing — required. Aspect matches the MotionSketch project. */ .ms-embed-frame { width: min(100%, 40rem); } .ms-embed-frame .ms-stage { width: 100%; aspect-rat"
+    },
+    "export-html-section-body-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 217,
+      "h": 112,
+      "text": "<div data-ms-demo-shell class=\"ms-embed\"> <div class=\"ms-embed-frame\"> <div class=\"ms-scene-6d617ccb\" data-ms-scene=\"6d617ccb\"> <div class=\"ms-stage\"> <div class=\"ms-actor\"></div> </div> </div> </div> <button type=\"butto"
+    },
+    "export-html-section-scripts-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 230,
+      "h": 112,
+      "text": "<script src=\"ms-trigger.js\"></script> <script> (function () { var api = window.MotionSketchTrigger; if (!api || typeof api.init !== 'function') return; var root = document.querySelector('[data-ms-scene=\"6d617ccb\"]'); if "
+    },
+    "export-react-steps": null,
+    "export-download-success": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 174,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": null,
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "desktopReactTop": {
+    "scrollerH": 455,
+    "scrollTop": 0,
+    "scrollH": 1449,
+    "btn-download-web-package": null,
+    "btn-download-react-package": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download React package"
+    },
+    "btn-export-path-html": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": null,
+    "export-html-steps": null,
+    "export-html-paste-order": null,
+    "btn-copy-html-section-head": null,
+    "btn-copy-html-section-body": null,
+    "btn-copy-html-section-scripts": null,
+    "export-html-section-head-code": null,
+    "export-html-section-body-code": null,
+    "export-html-section-scripts-code": null,
+    "export-react-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 349,
+      "text": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files"
+    },
+    "export-download-success": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 174,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": null,
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "desktopReactSteps": {
+    "scrollerH": 455,
+    "scrollTop": 994,
+    "scrollH": 1449,
+    "btn-download-web-package": null,
+    "btn-download-react-package": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download React package"
+    },
+    "btn-export-path-html": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": null,
+    "export-html-steps": null,
+    "export-html-paste-order": null,
+    "btn-copy-html-section-head": null,
+    "btn-copy-html-section-body": null,
+    "btn-copy-html-section-scripts": null,
+    "export-html-section-head-code": null,
+    "export-html-section-body-code": null,
+    "export-html-section-scripts-code": null,
+    "export-react-steps": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 349,
+      "text": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files"
+    },
+    "export-download-success": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 174,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": null,
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "desktopReactStatus": {
+    "scrollerH": 455,
+    "scrollTop": 355,
+    "scrollH": 1485,
+    "btn-download-web-package": null,
+    "btn-download-react-package": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download React package"
+    },
+    "btn-export-path-html": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": null,
+    "export-html-steps": null,
+    "export-html-paste-order": null,
+    "btn-copy-html-section-head": null,
+    "btn-copy-html-section-body": null,
+    "btn-copy-html-section-scripts": null,
+    "export-html-section-head-code": null,
+    "export-html-section-body-code": null,
+    "export-html-section-scripts-code": null,
+    "export-react-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 349,
+      "text": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files"
+    },
+    "export-download-success": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 174,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 20,
+      "text": "React package download started."
+    },
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "phoneInitial": {
+    "scrollerH": 661,
+    "scrollTop": 0,
+    "scrollH": 2347,
+    "btn-download-web-package": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download for your website"
+    },
+    "btn-download-react-package": null,
+    "btn-export-path-html": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 200,
+      "text": "index.html optional local preview (or use your own page) animation.css ms-trigger.js README.txt instructions only — not required to run project.json reopen in MotionSketch — not required to run"
+    },
+    "export-html-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 285,
+      "text": "Unzip the package. Keep index.html, animation.css, ms-trigger.js together as shown above. Open index.html for a self-contained preview page (layout and controls). To embed in an existing page, copy those files beside you"
+    },
+    "export-html-paste-order": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 68,
+      "text": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>."
+    },
+    "btn-copy-html-section-head": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copied"
+    },
+    "btn-copy-html-section-body": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-scripts": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "export-html-section-head-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 209,
+      "h": 112,
+      "text": "<link rel=\"stylesheet\" href=\"animation.css\"> <style> /* Host sizing — required. Aspect matches the MotionSketch project. */ .ms-embed-frame { width: min(100%, 40rem); } .ms-embed-frame .ms-stage { width: 100%; aspect-rat"
+    },
+    "export-html-section-body-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 171,
+      "h": 112,
+      "text": "<div data-ms-demo-shell class=\"ms-embed\"> <div class=\"ms-embed-frame\"> <div class=\"ms-scene-6d617ccb\" data-ms-scene=\"6d617ccb\"> <div class=\"ms-stage\"> <div class=\"ms-actor\"></div> </div> </div> </div> <button type=\"butto"
+    },
+    "export-html-section-scripts-code": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 184,
+      "h": 112,
+      "text": "<script src=\"ms-trigger.js\"></script> <script> (function () { var api = window.MotionSketchTrigger; if (!api || typeof api.init !== 'function') return; var root = document.querySelector('[data-ms-scene=\"6d617ccb\"]'); if "
+    },
+    "export-react-steps": null,
+    "export-download-success": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 111,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 20,
+      "text": "React package download started."
+    },
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "phoneCopy": {
+    "scrollerH": 661,
+    "scrollTop": 1686,
+    "scrollH": 2347,
+    "btn-download-web-package": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download for your website"
+    },
+    "btn-download-react-package": null,
+    "btn-export-path-html": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 200,
+      "text": "index.html optional local preview (or use your own page) animation.css ms-trigger.js README.txt instructions only — not required to run project.json reopen in MotionSketch — not required to run"
+    },
+    "export-html-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 285,
+      "text": "Unzip the package. Keep index.html, animation.css, ms-trigger.js together as shown above. Open index.html for a self-contained preview page (layout and controls). To embed in an existing page, copy those files beside you"
+    },
+    "export-html-paste-order": {
+      "fully": false,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 68,
+      "text": "Paste each section where its label indicates, in the order shown. Initialization goes after the scene markup, before </body>."
+    },
+    "btn-copy-html-section-head": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copied"
+    },
+    "btn-copy-html-section-body": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "btn-copy-html-section-scripts": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 34,
+      "text": "Copy"
+    },
+    "export-html-section-head-code": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 209,
+      "h": 112,
+      "text": "<link rel=\"stylesheet\" href=\"animation.css\"> <style> /* Host sizing — required. Aspect matches the MotionSketch project. */ .ms-embed-frame { width: min(100%, 40rem); } .ms-embed-frame .ms-stage { width: 100%; aspect-rat"
+    },
+    "export-html-section-body-code": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 171,
+      "h": 112,
+      "text": "<div data-ms-demo-shell class=\"ms-embed\"> <div class=\"ms-embed-frame\"> <div class=\"ms-scene-6d617ccb\" data-ms-scene=\"6d617ccb\"> <div class=\"ms-stage\"> <div class=\"ms-actor\"></div> </div> </div> </div> <button type=\"butto"
+    },
+    "export-html-section-scripts-code": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 184,
+      "h": 112,
+      "text": "<script src=\"ms-trigger.js\"></script> <script> (function () { var api = window.MotionSketchTrigger; if (!api || typeof api.init !== 'function') return; var root = document.querySelector('[data-ms-scene=\"6d617ccb\"]'); if "
+    },
+    "export-react-steps": null,
+    "export-download-success": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 111,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 20,
+      "text": "React package download started."
+    },
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "phoneCopied": "Copied",
+  "phoneReactTop": {
+    "scrollerH": 661,
+    "scrollTop": 0,
+    "scrollH": 1286,
+    "btn-download-web-package": null,
+    "btn-download-react-package": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download React package"
+    },
+    "btn-export-path-html": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": null,
+    "export-html-steps": null,
+    "export-html-paste-order": null,
+    "btn-copy-html-section-head": null,
+    "btn-copy-html-section-body": null,
+    "btn-copy-html-section-scripts": null,
+    "export-html-section-head-code": null,
+    "export-html-section-body-code": null,
+    "export-html-section-scripts-code": null,
+    "export-react-steps": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 258,
+      "text": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files"
+    },
+    "export-download-success": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 111,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 20,
+      "text": "Body placement snippet copied."
+    },
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  },
+  "phoneReactSteps": {
+    "scrollerH": 661,
+    "scrollTop": 625,
+    "scrollH": 1286,
+    "btn-download-web-package": null,
+    "btn-download-react-package": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 40,
+      "text": "Download React package"
+    },
+    "btn-export-path-html": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "HTML website"
+    },
+    "btn-export-path-react": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 36,
+      "text": "React"
+    },
+    "export-html-folder-layout": null,
+    "export-html-steps": null,
+    "export-html-paste-order": null,
+    "btn-copy-html-section-head": null,
+    "btn-copy-html-section-body": null,
+    "btn-copy-html-section-scripts": null,
+    "export-html-section-head-code": null,
+    "export-html-section-body-code": null,
+    "export-html-section-scripts-code": null,
+    "export-react-steps": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 258,
+      "text": "Unzip all files into a folder in your Vite React app (for example src/motionsketch/). The archive is flat — do not leave MotionSketchScene.tsx at the project root. Keep animation.css, ms-trigger.js, and any assets/ files"
+    },
+    "export-download-success": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 111,
+      "text": "Website package download started. Unzip the folder and open index.html to preview. View integration instructions Dismiss"
+    },
+    "export-action-status": {
+      "fully": true,
+      "partial": true,
+      "fontSize": "14px",
+      "overflowX": 0,
+      "h": 20,
+      "text": "Body placement snippet copied."
+    },
+    "btn-close-export": {
+      "fully": false,
+      "partial": false,
+      "fontSize": "16px",
+      "overflowX": 0,
+      "h": 28,
+      "text": "Close"
+    }
+  }
+}
