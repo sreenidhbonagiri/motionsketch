@@ -118,7 +118,7 @@ export function collectPackageAssets(project: Project): CollectAssetsResult {
     if (!decoded.ok) {
       return {
         ok: false,
-        error: `${decoded.error} (actor “${project.actors[i].name || i + 1}”).`,
+        error: `${decoded.error} (element “${project.actors[i].name || i + 1}”).`,
       }
     }
     if (decoded.mimeType !== image.mimeType) {

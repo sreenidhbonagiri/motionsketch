@@ -21,6 +21,7 @@ import {
 import {
   coercePlaybackTrigger,
   MS_WAITING_CLASS,
+  playbackTriggerLabel,
   triggerNeedsJavaScript,
 } from './triggers'
 import {
@@ -67,7 +68,7 @@ function buildActorElementsJsx(
         const href =
           hrefByDataUrl.get(appearance.image.dataUrl) ?? 'assets/asset-01.png'
         const varName = importNameByHref.get(href) ?? 'asset01'
-        const alt = appearance.image.label || 'Actor image'
+        const alt = appearance.image.label || 'Element image'
         return `        <img
           className=${JSON.stringify(cls)}
           src={${varName}}
@@ -293,6 +294,23 @@ export default MotionSketchScene
 `
 }
 
+/** Import from a component in `src/`, beside the unzipped `src/motionsketch/` folder. */
+export const REACT_HOST_IMPORT_SPECIFIER = './motionsketch/MotionSketchScene.tsx'
+
+/**
+ * Two insertion points for an existing component file directly in `src/`.
+ * Named export matches MotionSketchScene.tsx. The path includes `.tsx`.
+ */
+export function buildReactHostExample(): string {
+  return `// At the top of an existing component file directly in src/.
+// A file deeper than src/ needs an adjusted relative path.
+import { MotionSketchScene } from '${REACT_HOST_IMPORT_SPECIFIER}'
+
+// Inside that component's returned JSX:
+<MotionSketchScene />
+`
+}
+
 function buildReactPackageReadme(args: {
   project: Project
   scope: ExportScope
@@ -315,7 +333,7 @@ Project: **${title}**
 Scene root class: \`${scope.rootClass}\`  
 Scene id base: \`${scope.sceneId}\`  
 Stage class: \`${scope.stageClass}\`  
-Playback trigger: \`${trigger}\`
+When should it play: \`${playbackTriggerLabel(trigger)}\`
 
 Self-contained folder for a **Vite + React** app. Same scoped CSS and trigger
 controller as the HTML / web package exports — animation timing and poses match.
@@ -334,23 +352,16 @@ ${assetLines}
    files from this ZIP into that directory**. The archive is flat (no wrapper
    folder) — do not leave \`MotionSketchScene.tsx\` at your project root.
 2. Ensure \`react\` and \`react-dom\` are installed (Vite React template is enough).
-   You can ignore or delete the template \`App.tsx\` / \`App.css\` if you mount
-   the scene from \`main.tsx\` instead.
-3. Import and render (example replaces \`src/main.tsx\`):
+3. Add the import at the top of an existing component file directly in \`src/\`
+   (next to \`src/motionsketch/\`). Put \`<MotionSketchScene />\` inside that
+   component’s returned JSX. This path assumes that file is directly in \`src/\`;
+   a deeper file needs an adjusted relative path.
 
 \`\`\`tsx
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { MotionSketchScene } from './motionsketch/MotionSketchScene'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <MotionSketchScene />
-  </StrictMode>,
-)
+${buildReactHostExample().trim()}
 \`\`\`
 
-Or mount from \`App.tsx\`, or more than once (each instance gets a unique
+You can render it more than once in that component (each instance gets a unique
 \`data-ms-scene\`):
 
 \`\`\`tsx
@@ -363,7 +374,7 @@ Or mount from \`App.tsx\`, or more than once (each instance gets a unique
 ## How it works
 
 - \`animation.css\` — identical scoped stylesheet to Download CSS / web package.
-- \`${REACT_PACKAGE_COMPONENT_NAME}\` — React tree with actor classes; **text is a
+- \`${REACT_PACKAGE_COMPONENT_NAME}\` — React tree of the scene elements; **text is a
   React text child** (not \`dangerouslySetInnerHTML\`).
 - Images use Vite \`import\` URLs under \`assets/\` (offline, no CDN). At build
   time Vite may inline small images as \`data:\` URLs; that is still offline.
@@ -372,7 +383,7 @@ Or mount from \`App.tsx\`, or more than once (each instance gets a unique
   \`destroy\` on unmount (Strict Mode safe).
 ${
   needsJs
-    ? `- This scene starts with \`.${MS_WAITING_CLASS}\` until click / hover / viewport / Play.`
+    ? `- This scene starts with \`.${MS_WAITING_CLASS}\` until click, hover, when it scrolls into view, or Play.`
     : `- Page-load scenes start without \`.${MS_WAITING_CLASS}\`; Play still opts into motion under \`prefers-reduced-motion\`.`
 }
 
@@ -392,7 +403,7 @@ until the scene root also has \`.${MS_MOTION_OK_CLASS}\` (Play / explicit activa
 
 ## Differences from the editor / web package
 
-- No editor chrome (grid, actors list, record dock). The stage fills the host
+- No editor chrome (grid, elements list, record dock). The stage fills the host
   width with \`aspect-ratio\` from the project; resize the window to scale it.
 - No standalone \`index.html\` preview or \`project.json\`.
 - Host app supplies React; this package is a component, not a double-click demo.

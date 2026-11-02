@@ -26,6 +26,7 @@ import {
 import {
   coercePlaybackTrigger,
   MS_WAITING_CLASS,
+  playbackTriggerLabel,
   triggerNeedsJavaScript,
   VIEWPORT_TRIGGER_THRESHOLD,
   type TriggerControllerOptions,
@@ -99,7 +100,7 @@ function embedMarkupExample(
       if (appearance.kind === 'image' && appearance.image) {
         const href =
           hrefByDataUrl.get(appearance.image.dataUrl) ?? 'assets/asset-01.png'
-        const alt = escapeHtmlText(appearance.image.label || 'Actor image')
+        const alt = escapeHtmlText(appearance.image.label || 'Element image')
         return `    <img class="${cls}" src="${href}" alt="${alt}" />`
       }
       if (appearance.kind === 'text' && appearance.text) {
@@ -151,13 +152,14 @@ function buildPackageReadme(args: {
   const folderLayout = buildFolderLayoutText(assetHrefs)
   const playButtonHelp = buildPlayButtonHelp()
 
+  const triggerLabel = playbackTriggerLabel(trigger)
   const triggerSection = needsJs
-    ? `Playback trigger: ${trigger}
--------------------
+    ? `When should it play: ${triggerLabel}
+-----------------------
 This scene waits with class "${MS_WAITING_CLASS}" until activated.
 Include ${WEB_PACKAGE_TRIGGER_JS_NAME} and call MotionSketchTrigger.init (see
-Embed sections below). Changing the trigger in MotionSketch updates the
-generated markup and init options — copy or download again after you change it.
+Embed sections below). Changing the setting in MotionSketch updates the
+generated markup and init options. Copy or download again after you change it.
 
 API: play(), pause(), resume(), restart(), destroy(), get(root).
 init() twice on the same root replaces the previous instance (no duplicate
@@ -165,17 +167,17 @@ listeners). destroy() removes listeners, observers, and the registry entry.
 Loop/alternate settings still apply after the scene starts; a looping scene
 keeps running until pause() or restart().
 ${pauseNote}
-Viewport mode plays once when ~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% of the
+When it scrolls into view plays once when ~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% of the
 root is visible; without IntersectionObserver it waits for Play.
 `
-    : `Playback trigger: page-load
------------------------
+    : `When should it play: page-load
+---------------------------
 For page-load, CSS alone can start the motion when prefers-reduced-motion is
 off. The documented website integration still includes
 ${WEB_PACKAGE_TRIGGER_JS_NAME} and MotionSketchTrigger.init so Play/Replay,
 reduced-motion Play (adds "${MS_MOTION_OK_CLASS}"), and pause()/resume() work
 on host pages. Download CSS alone skips that controller.
-Changing the trigger in MotionSketch updates the generated code — copy or
+Changing the setting in MotionSketch updates the generated code. Copy or
 download again afterward.
 ${pauseNote}
 `
@@ -195,9 +197,9 @@ or network access.
 
 What the export includes
 ------------------------
-Actors, motion, and (when present) image files under assets/. It does not
+Elements, motion, and (when present) image files under assets/. It does not
 include the editor path overlay, stage grid, selection chrome, or playback
-dock — those stay in MotionSketch only.
+dock. Those stay in MotionSketch only.
 
 Folder layout (keep relative paths)
 -----------------------------------
@@ -310,12 +312,19 @@ function formatInitOptionsLiteral(ctlOpts: TriggerControllerOptions): string {
 }
 
 function buildFolderLayoutText(assetHrefs: string[]): string {
-  const hasAssets = assetHrefs.length > 0
-  return `  ${WEB_PACKAGE_HTML_NAME}       optional local preview (or use your own page)
-  ${WEB_PACKAGE_CSS_NAME}
-  ${WEB_PACKAGE_TRIGGER_JS_NAME}
-${hasAssets ? '  assets/           image files used by the scene\n' : ''}  ${WEB_PACKAGE_README_NAME}       instructions only — not required to run
-  ${WEB_PACKAGE_PROJECT_NAME}    reopen in MotionSketch — not required to run`
+  const lines = [
+    `${WEB_PACKAGE_HTML_NAME} — optional preview (or use your own page)`,
+    `${WEB_PACKAGE_CSS_NAME} — required for the animation`,
+    `${WEB_PACKAGE_TRIGGER_JS_NAME} — required for Play, Replay, and reduced motion`,
+  ]
+  if (assetHrefs.length > 0) {
+    lines.push('assets/ — required image files used by the scene')
+  }
+  lines.push(
+    `${WEB_PACKAGE_README_NAME} — instructions only, not required to run`,
+    `${WEB_PACKAGE_PROJECT_NAME} — editable project data to reopen in MotionSketch, not required to run`,
+  )
+  return lines.join('\n')
 }
 
 function buildPlayButtonHelp(): string {
@@ -479,7 +488,7 @@ export function buildWebPackage(
       resolveImageSrc: (image) => {
         const href = collected.hrefByDataUrl.get(image.dataUrl)
         if (!href) {
-          throw new Error('Missing packaged asset for an image actor.')
+          throw new Error('Missing packaged asset for an image element.')
         }
         return href
       },

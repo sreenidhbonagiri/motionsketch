@@ -82,10 +82,10 @@ export function Actor({
 
   const label =
     actor.kind === 'image' && actor.image
-      ? `Actor ${name}: ${actor.image.label}`
+      ? `Element ${name}: ${actor.image.label}`
       : actor.kind === 'text' && actor.text
-        ? `Actor ${name}: text`
-        : `Actor ${name}`
+        ? `Element ${name}: text`
+        : `Element ${name}`
   const ariaLabel = editingPreview
     ? `${label} (editing preview)`
     : armed

@@ -87,7 +87,7 @@ test.describe('editor workflow polish', () => {
 
     await expect(page.getByTestId('steady-speed-slider')).toBeDisabled()
     await expect(page.getByTestId('steady-speed-help')).toContainText(
-      'Create a path for this actor',
+      'Create a path for this element',
     )
     await expect(page.getByTestId('duration-slider')).toBeEnabled()
     await expect(page.getByTestId('loop-toggle')).toBeEnabled()
@@ -129,10 +129,10 @@ test.describe('editor workflow polish', () => {
 
     await openClipTimeline(page)
     await expect(page.getByTestId('btn-toggle-clip-timeline')).toContainText(
-      'Sequence',
+      'Timing',
     )
     await expect(page.getByTestId('clip-timeline-help')).toContainText(
-      /Choose when each actor moves/i,
+      /Choose when each element moves/i,
     )
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')

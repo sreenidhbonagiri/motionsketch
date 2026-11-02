@@ -18,6 +18,7 @@ import {
 import {
   coercePlaybackTrigger,
   MS_WAITING_CLASS,
+  playbackTriggerLabel,
   triggerNeedsJavaScript,
   type PlaybackTrigger,
 } from './triggers'
@@ -64,16 +65,16 @@ function buildLimitations(args: {
   hasClip: boolean
 }): string[] {
   const lines = [
-    'Only the selected actor’s path and timing are included (not other actors).',
+    'Only the selected element’s path and timing are included (not other elements).',
     'The stage keeps this project’s aspect ratio; give .ms-stage a width in your layout.',
-    'Motion (translate / rotate / scale / visibility) is on the outer .ms-actor wrapper — nest your element inside so its CSS and transforms stay local.',
-    'Editor fill, corner radius, image, text, font, and actor size are omitted on purpose.',
+    'Motion (translate / rotate / scale / visibility) is on the outer .ms-actor wrapper. Nest your element inside so its CSS and transforms stay local.',
+    'Editor fill, corner radius, image, text, font, and element size are omitted on purpose.',
     'Path coordinates stay stage-normalized (cqw/cqh); resize the stage to scale motion.',
     'Examples include an accessible Play control so reduced-motion users can explicitly start motion.',
   ]
   if (args.requiresTriggerJs) {
     lines.push(
-      `Playback trigger needs ${WEB_PACKAGE_TRIGGER_JS_NAME} + ${TRIGGER_CONTROLLER_GLOBAL}.init — CSS alone will stay paused at 0%.`,
+      `When should it play needs ${WEB_PACKAGE_TRIGGER_JS_NAME} + ${TRIGGER_CONTROLLER_GLOBAL}.init. CSS alone will stay paused at 0%.`,
     )
   } else {
     lines.push(
@@ -290,7 +291,7 @@ export function AnimatedOwnElement() {
 
   return (
     <div className="ms-own-shell" data-ms-demo-shell>
-      {/* Trigger: ${trigger}. Play opts into reduced motion; scene click/hover/viewport still apply. */}
+      {/* When should it play: ${playbackTriggerLabel(trigger)}. Play opts into reduced motion. Click, hover, and when it scrolls into view still apply. */}
       <div
         ref={rootRef}
         className="${scope.rootClass} ${MS_WAITING_CLASS}"
@@ -327,12 +328,12 @@ export function buildOwnElementExport(
 ): OwnElementExportResult {
   const actor = findActor(project.actors, actorId)
   if (!actor) {
-    return { ok: false, error: 'Select an actor to animate your own element.' }
+    return { ok: false, error: 'Select an element to animate your own element.' }
   }
 
   const sliced = sliceProjectForActor(project, actorId)
   if (!sliced) {
-    return { ok: false, error: 'Select an actor to animate your own element.' }
+    return { ok: false, error: 'Select an element to animate your own element.' }
   }
 
   const { css, facingFidelityWarnings } = buildMotionWrapperCssExport(
@@ -345,7 +346,7 @@ export function buildOwnElementExport(
   ) {
     return {
       ok: false,
-      error: 'Record motion for the selected actor before exporting a wrapper.',
+      error: 'Record motion for the selected element before exporting a wrapper.',
     }
   }
 
@@ -370,7 +371,7 @@ export function buildOwnElementExport(
   )
 
   const triggerRequirement = requiresTriggerJs
-    ? `This project’s trigger (${trigger}) requires ${WEB_PACKAGE_TRIGGER_JS_NAME}. Use Copy trigger script, save the file as ${WEB_PACKAGE_TRIGGER_JS_NAME} in the same folder as the HTML/React example (beside motion-wrapper.css), then keep the example’s script src / import. The copied examples include Play for reduced motion; click/hover/viewport still follow this trigger.`
+    ? `This project’s setting (${playbackTriggerLabel(trigger)}) requires ${WEB_PACKAGE_TRIGGER_JS_NAME}. Use Copy trigger script, save the file as ${WEB_PACKAGE_TRIGGER_JS_NAME} in the same folder as the HTML/React example (beside motion-wrapper.css), then keep the example’s script src / import. The copied examples include Play for reduced motion. Click, hover, and when it scrolls into view still follow this setting.`
     : `Page-load: CSS autoplays when reduced motion is off. The copied examples include an accessible Play button that explicitly starts motion under prefers-reduced-motion (no ${WEB_PACKAGE_TRIGGER_JS_NAME} required).`
 
   return {

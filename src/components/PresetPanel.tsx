@@ -217,9 +217,9 @@ export function PresetPanel() {
         data-testid="preset-timing-help"
         className="mt-1 text-xs leading-relaxed text-slate-500"
       >
-        Start at and Move for match Sequence for this actor — not the project
+        Start at and Move for match Timing for this element, not the project
         Duration in Timing. Entrance presets turn on Hide before Start, so the
-        actor stays hidden until Start at. Values stay shared when you switch
+        element stays hidden until Start at. Values stay shared when you switch
         presets.
       </p>
 
@@ -239,7 +239,7 @@ export function PresetPanel() {
           title={
             comparingOriginal
               ? `Applies “${label}” (the selected preset), not the original motion on screen`
-              : `Apply “${label}” to the selected actor`
+              : `Apply “${label}” to the selected element`
           }
           className="rounded-lg bg-ms-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-ms-primary-hover"
         >

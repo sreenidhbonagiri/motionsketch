@@ -141,7 +141,7 @@ test.describe('web package export', () => {
       'Website package download started.',
     )
     await expect(page.getByTestId('export-download-success-hint')).toHaveText(
-      'Unzip the folder and open index.html to preview.',
+      'Unzip the folder and open index.html to preview. Paste the three sections into an existing page.',
     )
     await expect(page.getByTestId('btn-export-view-integration')).toBeVisible()
     await expect(page.getByTestId('action-live-region')).toContainText(

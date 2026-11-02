@@ -1,8 +1,17 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import { buildProjectCssExport } from '../core/export/css'
 import { buildHtmlDemoFromProject } from '../core/export/htmlDemo'
 import { buildOwnElementExport } from '../core/export/ownElement'
 import {
+  buildReactHostExample,
   buildReactPackage,
   REACT_PACKAGE_COMPONENT_NAME,
   REACT_PACKAGE_CSS_NAME,
@@ -36,6 +45,97 @@ type OwnCopyKind = 'css' | 'html' | 'react' | 'trigger'
 type WebsitePath = 'html' | 'react'
 type HtmlSectionCopy = 'head' | 'body' | 'scripts'
 
+const WEB_DOWNLOAD_SUCCESS_TITLE = 'Website package download started.'
+const WEB_DOWNLOAD_SUCCESS_HINT =
+  'Unzip the folder and open index.html to preview. Paste the three sections into an existing page.'
+const REACT_DOWNLOAD_SUCCESS_TITLE = 'React package download started.'
+const REACT_DOWNLOAD_SUCCESS_HINT =
+  'Unzip all files into src/motionsketch/, then render MotionSketchScene inside an existing component.'
+
+function DownloadSuccessNotice({
+  id,
+  testId,
+  titleTestId,
+  hintTestId,
+  title,
+  hint,
+  noticeRef,
+  children,
+}: {
+  id: string
+  testId: string
+  titleTestId: string
+  hintTestId: string
+  title: string
+  hint: string
+  noticeRef?: Ref<HTMLDivElement>
+  children?: ReactNode
+}) {
+  return (
+    <div
+      ref={noticeRef}
+      id={id}
+      data-testid={testId}
+      role="status"
+      className="space-y-2 rounded-lg border border-ms-success/25 bg-ms-success-surface px-2.5 py-2"
+    >
+      <p data-testid={titleTestId} className="text-sm font-medium text-ms-success">
+        {title}
+      </p>
+      <p
+        data-testid={hintTestId}
+        className="text-sm leading-relaxed text-ms-success"
+      >
+        {hint}
+      </p>
+      {children}
+    </div>
+  )
+}
+
+function IntegrationSnippet({
+  sectionTestId,
+  label,
+  value,
+  copied,
+  onCopy,
+  copyTestId,
+  codeTestId,
+}: {
+  sectionTestId: string
+  label: string
+  value: string
+  copied: boolean
+  onCopy: () => void
+  copyTestId: string
+  codeTestId: string
+}) {
+  return (
+    <div data-testid={sectionTestId} className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-ms-ink">{label}</p>
+        <button
+          type="button"
+          data-testid={copyTestId}
+          onClick={onCopy}
+          className="shrink-0 rounded-md border border-ms-border bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <textarea
+        data-testid={codeTestId}
+        readOnly
+        spellCheck={false}
+        wrap="soft"
+        value={value}
+        aria-label={label}
+        className="h-28 w-full resize-y rounded-md border border-ms-border bg-slate-50 p-2 font-mono text-sm leading-relaxed text-ms-ink outline-none"
+      />
+    </div>
+  )
+}
+
 export function ExportPanel() {
   const project = useEditorStore((s) => s.project)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
@@ -51,16 +151,19 @@ export function ExportPanel() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [websitePath, setWebsitePath] = useState<WebsitePath>('html')
   const [webDownloadSuccess, setWebDownloadSuccess] = useState(false)
+  const [reactDownloadSuccess, setReactDownloadSuccess] = useState(false)
   const [htmlSectionCopied, setHtmlSectionCopied] =
     useState<HtmlSectionCopy | null>(null)
+  const [reactExampleCopied, setReactExampleCopied] = useState(false)
   const triggerRegenHelpId = useId()
   const playButtonHelpId = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const previewRef = useRef<HTMLDialogElement>(null)
   const viewBtnRef = useRef<HTMLButtonElement>(null)
   const codeRef = useRef<HTMLTextAreaElement>(null)
-  const htmlGuideRef = useRef<HTMLDivElement>(null)
+  const htmlIntegrationRef = useRef<HTMLDivElement>(null)
   const downloadSuccessRef = useRef<HTMLDivElement>(null)
+  const reactDownloadSuccessRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const packageStatusId = useId()
   const reactPackageStatusId = useId()
@@ -82,14 +185,21 @@ export function ExportPanel() {
   const packagingHelpId = useId()
   const ownElementTriggerHelpId = useId()
   const downloadSuccessId = useId()
+  const reactDownloadSuccessId = useId()
 
   useEffect(() => {
     if (!webDownloadSuccess) return
     downloadSuccessRef.current?.scrollIntoView({
       block: 'nearest',
-      behavior: 'smooth',
     })
   }, [webDownloadSuccess])
+
+  useEffect(() => {
+    if (!reactDownloadSuccess) return
+    reactDownloadSuccessRef.current?.scrollIntoView({
+      block: 'nearest',
+    })
+  }, [reactDownloadSuccess])
 
   const describedBy = (...ids: Array<string | false | null | undefined>) => {
     const list = ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -226,9 +336,9 @@ export function ExportPanel() {
         if (ok) {
           setWebDownloadSuccess(true)
           setActionStatus(null)
-          const message =
-            'Website package download started. Unzip the folder and open index.html to preview.'
-          announceAction(message)
+          announceAction(
+            `${WEB_DOWNLOAD_SUCCESS_TITLE} ${WEB_DOWNLOAD_SUCCESS_HINT}`,
+          )
           return
         }
         setWebDownloadSuccess(false)
@@ -245,7 +355,7 @@ export function ExportPanel() {
   const showHtmlIntegration = () => {
     setWebsitePath('html')
     requestAnimationFrame(() => {
-      htmlGuideRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      htmlIntegrationRef.current?.scrollIntoView({ block: 'start' })
     })
   }
 
@@ -265,14 +375,24 @@ export function ExportPanel() {
     announce(`${label} snippet copied.`)
   }
 
+  const copyReactExample = async () => {
+    const ok = await copyText(buildReactHostExample())
+    if (!ok) return
+    setReactExampleCopied(true)
+    window.setTimeout(() => setReactExampleCopied(false), 1500)
+    announce('React example copied.')
+  }
+
   const downloadReactPackage = () => {
     if (packaging) return
     setPackaging('react')
+    setReactDownloadSuccess(false)
     setActionStatus('Building React package…')
     window.setTimeout(() => {
       try {
         const result = buildReactPackage(project)
         if (!result.ok) {
+          setReactDownloadSuccess(false)
           announce(result.error)
           return
         }
@@ -284,11 +404,17 @@ export function ExportPanel() {
           stampProjectFilename(`${project.name}-react`, 'zip'),
         )
         if (ok) {
-          announce('React package download started.')
+          setReactDownloadSuccess(true)
+          setActionStatus(null)
+          announceAction(
+            `${REACT_DOWNLOAD_SUCCESS_TITLE} ${REACT_DOWNLOAD_SUCCESS_HINT}`,
+          )
           return
         }
+        setReactDownloadSuccess(false)
         announce('Could not download the React package.')
       } catch {
+        setReactDownloadSuccess(false)
         announce('Couldn’t build the React package.')
       } finally {
         setPackaging(null)
@@ -351,18 +477,18 @@ export function ExportPanel() {
           role="status"
           className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"
         >
-          <p className="text-[11px] font-medium text-amber-950">
+          <p className="text-sm font-medium text-amber-950">
             Facing export fidelity
           </p>
           {facingFidelityWarnings.map((notice) => (
             <p
               key={`${notice.actorName}-${notice.maxErrDeg.toFixed(3)}`}
-              className="text-[11px] leading-relaxed text-amber-900/90"
+              className="text-sm leading-relaxed text-amber-900/90"
             >
               {notice.plainMessage}
             </p>
           ))}
-          <p className="text-[11px] leading-relaxed text-amber-800/90">
+          <p className="text-sm leading-relaxed text-amber-800/90">
             Applies to Copy CSS, View CSS, Download CSS, HTML demo, web package,
             React package, and Animate your own element. Export still proceeds;
             the CSS also includes a matching comment.
@@ -393,7 +519,7 @@ export function ExportPanel() {
           <p
             id={websiteLimitsId}
             data-testid="export-website-limits"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             Needs access to your site’s code. Does not install into WordPress or
             Webflow, and downloading does not publish anything.
@@ -403,47 +529,6 @@ export function ExportPanel() {
             to your site. Downloading does not publish anything.
           </p>
         </div>
-
-        {webDownloadSuccess ? (
-          <div
-            ref={downloadSuccessRef}
-            id={downloadSuccessId}
-            data-testid="export-download-success"
-            role="status"
-            className="space-y-2 rounded-lg border border-ms-success/25 bg-ms-success-surface px-2.5 py-2"
-          >
-            <p
-              data-testid="export-download-success-title"
-              className="text-[11px] font-medium text-ms-success"
-            >
-              Website package download started.
-            </p>
-            <p
-              data-testid="export-download-success-hint"
-              className="text-[11px] leading-relaxed text-ms-success"
-            >
-              Unzip the folder and open index.html to preview.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                data-testid="btn-export-view-integration"
-                onClick={showHtmlIntegration}
-                className="rounded-md bg-ms-primary px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-ms-primary-hover"
-              >
-                View integration instructions
-              </button>
-              <button
-                type="button"
-                data-testid="btn-dismiss-download-success"
-                onClick={() => setWebDownloadSuccess(false)}
-                className="rounded-md border border-ms-border bg-ms-panel px-2.5 py-1 text-[11px] font-medium text-ms-success transition hover:bg-ms-selected"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        ) : null}
 
         <div
           role="tablist"
@@ -484,7 +569,6 @@ export function ExportPanel() {
 
         {websitePath === 'html' && (
           <div
-            ref={htmlGuideRef}
             id="export-guide-html"
             role="tabpanel"
             data-testid="export-guide-html"
@@ -508,10 +592,40 @@ export function ExportPanel() {
                 ? 'Building website package…'
                 : 'Download for your website'}
             </button>
+            {webDownloadSuccess ? (
+              <DownloadSuccessNotice
+                noticeRef={downloadSuccessRef}
+                id={downloadSuccessId}
+                testId="export-download-success"
+                titleTestId="export-download-success-title"
+                hintTestId="export-download-success-hint"
+                title={WEB_DOWNLOAD_SUCCESS_TITLE}
+                hint={WEB_DOWNLOAD_SUCCESS_HINT}
+              >
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    data-testid="btn-export-view-integration"
+                    onClick={showHtmlIntegration}
+                    className="rounded-md bg-ms-primary px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-ms-primary-hover"
+                  >
+                    View integration instructions
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="btn-dismiss-download-success"
+                    onClick={() => setWebDownloadSuccess(false)}
+                    className="rounded-md border border-ms-border bg-ms-panel px-2.5 py-1 text-[11px] font-medium text-ms-success transition hover:bg-ms-selected"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </DownloadSuccessNotice>
+            ) : null}
             <p
               id="export-html-download-blurb"
               data-testid="export-html-download-blurb"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               ZIP with a working <code>{WEB_PACKAGE_HTML_NAME}</code> preview
               plus <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
@@ -525,7 +639,7 @@ export function ExportPanel() {
             {websiteIntegration?.ok ? (
               <pre
                 data-testid="export-html-folder-layout"
-                className="overflow-x-auto rounded-md border border-slate-100 bg-slate-50 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-slate-700 whitespace-pre"
+                className="overflow-x-auto rounded-md border border-slate-100 bg-slate-50 px-2.5 py-2 font-mono text-sm leading-relaxed text-ms-ink whitespace-pre-wrap"
               >
                 {websiteIntegration.folderLayout}
               </pre>
@@ -548,6 +662,7 @@ export function ExportPanel() {
               aria-busy={packaging === 'react'}
               aria-describedby={describedBy(
                 reactPackageStatusId,
+                reactDownloadSuccess && reactDownloadSuccessId,
                 busy && packagingHelpId,
               )}
               className="w-full rounded-lg bg-ms-primary px-2.5 py-2 text-left text-xs font-medium text-white transition hover:bg-ms-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
@@ -556,10 +671,30 @@ export function ExportPanel() {
                 ? 'Building React package…'
                 : 'Download React package'}
             </button>
+            {reactDownloadSuccess ? (
+              <DownloadSuccessNotice
+                noticeRef={reactDownloadSuccessRef}
+                id={reactDownloadSuccessId}
+                testId="export-react-download-success"
+                titleTestId="export-react-download-success-title"
+                hintTestId="export-react-download-success-hint"
+                title={REACT_DOWNLOAD_SUCCESS_TITLE}
+                hint={REACT_DOWNLOAD_SUCCESS_HINT}
+              >
+                <button
+                  type="button"
+                  data-testid="btn-dismiss-react-download-success"
+                  onClick={() => setReactDownloadSuccess(false)}
+                  className="rounded-md border border-ms-border bg-ms-panel px-2.5 py-1 text-[11px] font-medium text-ms-success transition hover:bg-ms-selected"
+                >
+                  Dismiss
+                </button>
+              </DownloadSuccessNotice>
+            ) : null}
             <p
               id={reactPackageStatusId}
               data-testid="export-react-package-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images,
               trigger script, and a Vite React README. Same motion as the HTML
@@ -571,7 +706,7 @@ export function ExportPanel() {
         <div className="space-y-2" data-testid="export-playback-settings">
           <label className="block space-y-1">
             <span className="text-xs font-medium text-slate-800">
-              Playback trigger
+              When should it play?
             </span>
             <select
               data-testid="export-trigger-select"
@@ -588,7 +723,7 @@ export function ExportPanel() {
                       ? 'Click / tap'
                       : mode === 'hover'
                         ? 'Hover / focus'
-                        : 'Enter viewport'}
+                        : 'When it scrolls into view'}
                 </option>
               ))}
             </select>
@@ -596,18 +731,18 @@ export function ExportPanel() {
           <p
             id={triggerHelpId}
             data-testid="export-trigger-help"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             {triggerHelpText(trigger)}
             {triggerNeedsJavaScript(trigger)
-              ? ' Download CSS is CSS-only — this trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
+              ? ' Download CSS is CSS-only. This trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
               : ' For page-load, CSS alone can start the motion when prefers-reduced-motion is off. The documented website integration still includes ms-trigger.js so Play/Replay and reduced-motion controls work; Download CSS alone skips that controller.'}{' '}
             Loop / alternate still apply after the scene starts.
           </p>
           <p
             id={triggerRegenHelpId}
             data-testid="export-trigger-regen-help"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             Changing the trigger updates the generated embed code below.
             Copy the sections again (and download a fresh ZIP if you need the
@@ -617,7 +752,7 @@ export function ExportPanel() {
             <p
               id={playButtonHelpId}
               data-testid="export-play-button-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               {websiteIntegration.playButtonHelp}
             </p>
@@ -638,7 +773,7 @@ export function ExportPanel() {
           <p
             id={previewTriggerHelpId}
             data-testid="export-preview-trigger-help"
-            className="text-[11px] leading-relaxed text-slate-500"
+            className="text-sm leading-relaxed text-ms-muted"
           >
             Opens an isolated preview of the selected start setting. Does not
             change the editor playhead, recording, or undo history.
@@ -647,12 +782,13 @@ export function ExportPanel() {
 
         {websitePath === 'html' && (
           <div
+            ref={htmlIntegrationRef}
             data-testid="export-html-integration"
             className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
             <ol
               data-testid="export-html-steps"
-              className="list-decimal space-y-1.5 pl-4 text-[11px] leading-relaxed text-slate-600"
+              className="list-decimal space-y-1.5 pl-4 text-sm leading-relaxed text-ms-muted"
             >
               <li>
                 Unzip the package. Keep <code>{WEB_PACKAGE_HTML_NAME}</code>,{' '}
@@ -682,7 +818,7 @@ export function ExportPanel() {
             </ol>
             <p
               data-testid="export-html-required-files"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Required to run:{' '}
               <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
@@ -695,7 +831,7 @@ export function ExportPanel() {
             </p>
             <p
               data-testid="export-html-paste-order"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Paste each section where its label indicates, in the order shown.
               Initialization goes after the scene markup, before{' '}
@@ -717,37 +853,19 @@ export function ExportPanel() {
                   ],
                 ] as const
               ).map(([id, label, value]) => (
-                <div
+                <IntegrationSnippet
                   key={id}
-                  data-testid={`export-html-section-${id}`}
-                  className="space-y-1.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-medium text-slate-800">
-                      {label}
-                    </p>
-                    <button
-                      type="button"
-                      data-testid={`btn-copy-html-section-${id}`}
-                      onClick={() => void copyHtmlSection(id)}
-                      className="rounded-md border border-ms-border bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                      {htmlSectionCopied === id ? 'Copied' : 'Copy'}
-                    </button>
-                  </div>
-                  <textarea
-                    data-testid={`export-html-section-${id}-code`}
-                    readOnly
-                    spellCheck={false}
-                    wrap="off"
-                    value={value}
-                    aria-label={label}
-                    className="h-28 w-full resize-y rounded-md border border-ms-border bg-slate-50 p-2 font-mono text-[10px] leading-relaxed text-slate-700 outline-none"
-                  />
-                </div>
+                  sectionTestId={`export-html-section-${id}`}
+                  label={label}
+                  value={value}
+                  copied={htmlSectionCopied === id}
+                  onCopy={() => void copyHtmlSection(id)}
+                  copyTestId={`btn-copy-html-section-${id}`}
+                  codeTestId={`export-html-section-${id}-code`}
+                />
               ))
             ) : websiteIntegration && !websiteIntegration.ok ? (
-              <p className="text-[11px] text-amber-800">
+              <p className="text-sm text-amber-800">
                 {websiteIntegration.error}
               </p>
             ) : null}
@@ -755,27 +873,44 @@ export function ExportPanel() {
         )}
 
         {websitePath === 'react' && (
-          <ol
-            data-testid="export-react-steps"
-            className="list-decimal space-y-1.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 pl-6 text-[11px] leading-relaxed text-slate-600"
+          <div
+            data-testid="export-react-integration"
+            className="space-y-2 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
           >
-            <li>
-              Unzip <strong>all</strong> files into a folder in your Vite React
-              app (for example <code>src/motionsketch/</code>). The archive is
-              flat — do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code> at
-              the project root.
-            </li>
-            <li>
-              Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
-              <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
-              <code>assets/</code> files beside the component.
-            </li>
-            <li>
-              Import and render <code>{`{ MotionSketchScene }`}</code> from{' '}
-              <code>{REACT_PACKAGE_COMPONENT_NAME}</code> (see the package{' '}
-              <code>README.md</code> for a full <code>main.tsx</code> example).
-            </li>
-          </ol>
+            <ol
+              data-testid="export-react-steps"
+              className="list-decimal space-y-1.5 pl-4 text-sm leading-relaxed text-ms-muted"
+            >
+              <li>
+                Unzip <strong>all</strong> files into a folder in your Vite React
+                app (for example <code>src/motionsketch/</code>). The archive is
+                flat — do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code>{' '}
+                at the project root.
+              </li>
+              <li>
+                Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
+                <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
+                <code>assets/</code> files beside the component.
+              </li>
+              <li>
+                Add the import at the top of an existing component file directly
+                in <code>src/</code> (next to <code>src/motionsketch/</code>).
+                Put <code>{'<MotionSketchScene />'}</code> inside that
+                component’s returned JSX. This path assumes that file is
+                directly in <code>src/</code>; a deeper file needs an adjusted
+                relative path.
+              </li>
+            </ol>
+            <IntegrationSnippet
+              sectionTestId="export-react-example"
+              label="In an existing component"
+              value={buildReactHostExample()}
+              copied={reactExampleCopied}
+              onCopy={() => void copyReactExample()}
+              copyTestId="btn-copy-react-example"
+              codeTestId="export-react-example-code"
+            />
+          </div>
         )}
 
       </section>
@@ -812,7 +947,7 @@ export function ExportPanel() {
               <p
                 id={advancedHelpId}
                 data-testid="export-embed-advanced-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 When you already have markup, or only need a single-file preview.
               </p>
@@ -833,7 +968,7 @@ export function ExportPanel() {
               <p
                 id={cssFileHelpId}
                 data-testid="export-css-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 Scoped CSS only (scene root + keyframes). You supply the HTML.
                 Image assets are separate. See the header comments for reduced
@@ -867,11 +1002,11 @@ export function ExportPanel() {
               <p
                 id={cssCodeHelpId}
                 data-testid="export-css-code-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
                 Copy CSS and View CSS provide the same scoped scene code
                 {project.actors.length > 1
-                  ? ' (unique classes per actor inside the scene root).'
+                  ? ' (unique classes per element inside the scene root).'
                   : ' (wrap in the documented scene root).'}
               </p>
 
@@ -891,9 +1026,9 @@ export function ExportPanel() {
               <p
                 id={htmlDemoHelpId}
                 data-testid="export-html-help"
-                className="text-[11px] leading-relaxed text-slate-500"
+                className="text-sm leading-relaxed text-ms-muted"
               >
-                Single-file offline preview — open in a browser; not for
+                Single-file offline preview. Open in a browser; not for
                 embedding in your site.
               </p>
             </div>
@@ -914,13 +1049,13 @@ export function ExportPanel() {
         <p
           id={ownElementHelpId}
           data-testid="export-own-element-help"
-          className="text-[11px] leading-relaxed text-slate-500"
+          className="text-sm leading-relaxed text-ms-muted"
         >
           {ownElement?.ok
-            ? `Motion wrapper for “${ownElement.actorName}” — path and timing only. Nest your HTML or React node inside .${ownElement.wrapperClass}; your child’s size, color, image, text, and transforms stay yours.`
+            ? `Motion wrapper for “${ownElement.actorName}”. Path and timing only. Nest your HTML or React node inside .${ownElement.wrapperClass}; your child’s size, color, image, text, and transforms stay yours.`
             : selectedActor
-              ? `Select an actor with a recording (currently “${selectedActor.name}” has no exportable path).`
-              : 'Select an actor with a recording to export a motion wrapper.'}
+              ? `Select an element with a recording (currently “${selectedActor.name}” has no exportable path).`
+              : 'Select an element with a recording to export a motion wrapper.'}
         </p>
         {ownElement?.ok ? (
           <>
@@ -929,8 +1064,8 @@ export function ExportPanel() {
               data-testid="export-own-element-trigger"
               className={
                 ownElement.requiresTriggerJs
-                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-950'
-                  : 'text-[11px] leading-relaxed text-slate-500'
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-sm leading-relaxed text-amber-950'
+                  : 'text-sm leading-relaxed text-ms-muted'
               }
               role={ownElement.requiresTriggerJs ? 'status' : undefined}
             >
@@ -990,7 +1125,7 @@ export function ExportPanel() {
             </div>
             <p
               data-testid="export-own-element-setup"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               HTML example is a complete host page (links{' '}
               <code>motion-wrapper.css</code>, sizes <code>.ms-stage</code>).
@@ -1006,7 +1141,7 @@ export function ExportPanel() {
             {ownElement.requiresTriggerJs ? (
               <p
                 data-testid="export-own-element-trigger-save"
-                className="text-[11px] leading-relaxed text-amber-950/90"
+                className="text-sm leading-relaxed text-amber-950/90"
               >
                 Save the copied script as <code>ms-trigger.js</code> in the same
                 folder as your HTML or React example (beside{' '}
@@ -1015,7 +1150,7 @@ export function ExportPanel() {
             ) : null}
             <ul
               data-testid="export-own-element-limits"
-              className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-500"
+              className="list-disc space-y-1 pl-4 text-sm leading-relaxed text-ms-muted"
             >
               {ownElement.limitations.map((line) => (
                 <li key={line}>{line}</li>
@@ -1070,7 +1205,7 @@ export function ExportPanel() {
             <p
               id={projectHelpId}
               data-testid="export-project-goal-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Save a MotionSketch project file you can reopen later or on another
               machine.
@@ -1091,7 +1226,7 @@ export function ExportPanel() {
             <p
               id={projectActionHelpId}
               data-testid="export-project-help"
-              className="text-[11px] leading-relaxed text-slate-500"
+              className="text-sm leading-relaxed text-ms-muted"
             >
               Reopen and edit in MotionSketch. Also available under Project.
             </p>
@@ -1103,7 +1238,7 @@ export function ExportPanel() {
         <p
           data-testid="export-action-status"
           role="status"
-          className="text-[11px] text-slate-600"
+          className="text-sm text-ms-muted"
         >
           {actionStatus}
         </p>

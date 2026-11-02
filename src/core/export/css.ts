@@ -247,8 +247,8 @@ function actorBoxRules(
   border: none;
   padding: 0;`,
       // Placeholder alt only — never interpolate the user label into the CSS header.
-      htmlExample: `<img class="${className}" src="your-image.png" alt="Actor image" />`,
-      imageNote: ` * Image actor (.${className}): CSS alone does NOT embed the image bytes.
+      htmlExample: `<img class="${className}" src="your-image.png" alt="Element image" />`,
+      imageNote: ` * Image element (.${className}): CSS alone does NOT embed the image bytes.
  * Host the file yourself (or use the HTML demo export, which embeds data URLs).
  * Use an <img class="${className}"> with the same intrinsic aspect ratio as in the editor.`,
     }
@@ -271,7 +271,7 @@ function actorBoxRules(
   box-sizing: border-box;`,
       // Placeholder only — never interpolate authored copy into the CSS file header.
       htmlExample: `<div class="${className}">Your text here</div>`,
-      imageNote: ` * Text actor (.${className}): CSS alone does NOT include the copy.
+      imageNote: ` * Text element (.${className}): CSS alone does NOT include the copy.
  * Put the text inside a matching element, e.g. <div class="${className}">Your text here</div>
  * Use real text (not an image). Newlines and wrapping follow white-space: pre-wrap.
  * System font stacks are self-contained; glyph shapes can vary by device.
@@ -615,21 +615,21 @@ export function buildProjectCssExport(
   }
 
   const loopNote = !loop
-    ? ' * Loop: off (plays once, forwards) — shared by every actor.'
+    ? ' * Loop: off (plays once, forwards). Shared by every element.'
     : loopMode === 'alternate'
       ? ' * Loop: back and forth (animation-direction: alternate). Duration is one way; a full cycle is 2×. Shared timeline.'
-      : ' * Loop: repeat (infinite). Shared timeline for every actor. End and start may jump if they differ — no bridging segment is added.'
+      : ' * Loop: repeat (infinite). Shared timeline for every element. End and start may jump if they differ. No bridging segment is added.'
 
   const triggerNote = (() => {
     switch (trigger) {
       case 'page-load':
-        return ' * Playback trigger: page-load (CSS starts immediately; no controller required).'
+        return ' * When should it play: page-load (CSS starts immediately; no controller required).'
       case 'click':
-        return ` * Playback trigger: click/tap — requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS} (paused at 0%).`
+        return ` * When should it play: click/tap. Requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS} (paused at 0%).`
       case 'hover':
-        return ` * Playback trigger: hover/focus — requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+        return ` * When should it play: hover/focus. Requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
       case 'viewport':
-        return ` * Playback trigger: enter-viewport (~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% visible, once) — requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+        return ` * When should it play: when it scrolls into view (~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% visible, once). Requires MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
       default:
         return ''
     }
@@ -718,10 +718,10 @@ export function buildProjectCssExport(
  * - Under prefers-reduced-motion: reduce, animations stay off until the scene root
  *   also has class "${MS_MOTION_OK_CLASS}" (set by an explicit Play control).
  * - Automatic triggers never override reduced-motion; Play opts in.
- * - The static pose uses each actor’s base transform (clip-start / rest) and forces
+ * - The static pose uses each element’s base transform (clip-start / rest) and forces
  *   visibility so hide-before/hide-after cannot blank the scene.
  *
- * Playback trigger:
+ * When should it play:
 ${triggerNote}
 ${jsNote}
  * Looping scenes keep running after a trigger until paused or restarted.
@@ -729,16 +729,16 @@ ${jsNote}
  *   .play() / .pause() / .resume() / .restart() / .destroy().
  *
  * Positioning:
- * - Place actors inside .${scope.stageClass} (position: relative; container-type: size).
- * - Shared Duration / loop / loopMode drive every actor’s animation together.
- * - Per-actor clips remap motion onto a start–end interval; outside that range the actor holds its first/last pose.
+ * - Place elements inside .${scope.stageClass} (position: relative; container-type: size).
+ * - Shared Duration / loop / loopMode drive every element’s animation together.
+ * - Per-element Timing remaps motion onto a start–end interval; outside that range the element holds its first/last pose.
  * - Optional hide-before/hide-after use a separate discrete visibility animation (step timing; no fades).
  *   At an exact step-end keyframe time, Firefox still shows the previous value and
  *   jumps immediately afterward; Chromium/WebKit apply the new value at that time.
  *   Editor JS stays inclusive at start / hidden at end. Continuous playback hides
  *   the mismatch; pausing CSS/WAAPI on the exact boundary in Firefox can disagree.
  * - Coordinates are normalized stage fractions: x→cqw, y→cqh (works for non-square stages).
- * - Actor size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
+ * - Element size uses cqmin (fraction of the stage's shorter axis) for the longer box edge.
  * - Motion uses transform with linear timing; visibility is orthogonal (visibility + step-*).
  * - Transform order: translate → center → rotate → scale.
 ${loopNote}
@@ -917,7 +917,7 @@ export function buildMotionWrapperCssExport(
 ): ProjectCssExport {
   if (project.actors.length !== 1) {
     return {
-      css: '/* Motion wrapper export expects exactly one actor. */\n',
+      css: '/* Motion wrapper export expects exactly one element. */\n',
       facingFidelityWarnings: [],
     }
   }
@@ -937,7 +937,7 @@ export function buildMotionWrapperCssExport(
   })
   if (processed.length < 2) {
     return {
-      css: '/* No motion path to wrap — record this actor first. */\n',
+      css: '/* No motion path to wrap. Record this element first. */\n',
       facingFidelityWarnings: [],
     }
   }
@@ -946,18 +946,18 @@ export function buildMotionWrapperCssExport(
     ? ' * Loop: off (plays once, forwards).'
     : loopMode === 'alternate'
       ? ' * Loop: back and forth (animation-direction: alternate). Duration is one way; a full cycle is 2×.'
-      : ' * Loop: repeat (infinite). End and start may jump if they differ — no bridging segment is added.'
+      : ' * Loop: repeat (infinite). End and start may jump if they differ. No bridging segment is added.'
 
   const triggerNote = (() => {
     switch (trigger) {
       case 'page-load':
-        return ' * Playback trigger: page-load (CSS starts immediately; no controller required).'
+        return ' * When should it play: page-load (CSS starts immediately; no controller required).'
       case 'click':
-        return ` * Playback trigger: click/tap — REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+        return ` * When should it play: click/tap. REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
       case 'hover':
-        return ` * Playback trigger: hover/focus — REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+        return ` * When should it play: hover/focus. REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
       case 'viewport':
-        return ` * Playback trigger: enter-viewport (~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% visible, once) — REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
+        return ` * When should it play: when it scrolls into view (~${Math.round(VIEWPORT_TRIGGER_THRESHOLD * 100)}% visible, once). REQUIRES MotionSketchTrigger JS. Root starts with .${MS_WAITING_CLASS}.`
       default:
         return ''
     }
@@ -1002,9 +1002,9 @@ export function buildMotionWrapperCssExport(
 }
 `
 
-  const css = `/* MotionSketch — animate your own element
+  const css = `/* MotionSketch: animate your own element
  *
- * Motion wrapper for one actor’s path and timing. Put your HTML / React node
+ * Motion wrapper for one element’s path and timing. Put your HTML / React node
  * inside .${wrapperClass}; do not put the motion class on your styled element
  * (keeps your size, color, image, text, and transforms intact on the child).
  *
@@ -1016,13 +1016,13 @@ export function buildMotionWrapperCssExport(
  * - Under prefers-reduced-motion: reduce, animations stay off until the root
  *   also has class "${MS_MOTION_OK_CLASS}" (explicit Play / activate).
  *
- * Playback trigger:
+ * When should it play:
 ${triggerNote}
 ${jsNote}
  * Positioning: .${scope.stageClass} is position:relative; container-type:size.
  * Path uses translate3d(cqw, cqh) + translate(-50%, -50%) on the wrapper.
  * Clips, hide-before/after, Glide, face-along, rotate/scale tracks match the
- * full scene export for this actor.
+ * full scene export for this element.
 ${loopNote}
  *
  * Example:

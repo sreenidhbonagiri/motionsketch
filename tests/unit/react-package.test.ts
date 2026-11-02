@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest'
 import { exportCssFromProject } from '../../src/core/export/css'
 import { isSafeCssForEmbed } from '../../src/core/export/htmlDemo'
 import {
+  buildReactHostExample,
   buildReactPackage,
+  REACT_HOST_IMPORT_SPECIFIER,
   REACT_PACKAGE_COMPONENT_NAME,
   REACT_PACKAGE_CSS_NAME,
   REACT_PACKAGE_README_NAME,
@@ -130,6 +132,19 @@ describe('react package export', () => {
     expect(readme).toContain('MotionSketchScene')
     expect(readme).toMatch(/archive is flat/i)
     expect(readme).toMatch(/unzip/i)
+    expect(readme).toContain(buildReactHostExample().trim())
+    expect(readme).toContain(`from '${REACT_HOST_IMPORT_SPECIFIER}'`)
+    expect(readme).toContain('<MotionSketchScene />')
+    expect(buildReactHostExample()).toMatch(
+      /top of an existing component file directly in src\//,
+    )
+    expect(buildReactHostExample()).toMatch(/returned JSX/)
+    expect(buildReactHostExample()).toMatch(/adjusted relative path/)
+    expect(readme).toMatch(/existing component/i)
+    expect(readme).toMatch(/returned JSX/)
+    expect(readme).toMatch(/adjusted relative path/)
+    expect(readme).not.toMatch(/main\.tsx/)
+    expect(readme).not.toMatch(/replace/i)
 
     const unzipped = unzipSync(result.zip)
     expect(Object.keys(unzipped)).toContain(REACT_PACKAGE_COMPONENT_NAME)

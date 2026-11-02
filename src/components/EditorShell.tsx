@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -13,16 +12,13 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { useTransformShortcuts } from '../hooks/useTransformShortcuts'
+import { useTutorial } from '../hooks/useTutorial'
 import {
-  AFTER_PATH_WEBSITE_HINT,
-  afterPathWebsiteHintProjectKey,
   EMPTY_BOARD_RECORD_HINT_COARSE,
   EMPTY_BOARD_RECORD_HINT_FINE,
   FIRST_USE_HEADLINE,
   FIRST_USE_NEXT_STEP_COARSE,
   FIRST_USE_NEXT_STEP_FINE,
-  readAfterPathWebsiteHintDismissedKeys,
-  writeAfterPathWebsiteHintDismissedKeys,
 } from '../lib/modeStatus'
 import { endDrag, isRecordingActive } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
@@ -32,6 +28,7 @@ import { CanvasStage } from './CanvasStage'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
 import { GlidePanel } from './GlidePanel'
+import { HelpPanel } from './HelpPanel'
 import { PresetPanel } from './PresetPanel'
 import { ProjectNameInput } from './ProjectNameInput'
 import {
@@ -43,10 +40,34 @@ import { ClipTimeline } from './ClipTimeline'
 import { PlaybackDock } from './PlaybackDock'
 import { PolishPanel } from './PolishPanel'
 import { ProjectPanel } from './ProjectPanel'
+import { TutorialCoach } from './TutorialCoach'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
+import {
+  ACTORS_PANEL_OPEN_KEY,
+  readPanelOpenPref,
+  SEQUENCE_PANEL_OPEN_KEY,
+} from '../lib/panelOpenPref'
 
 const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
+// Open Elements sheet on a narrow viewport: preferred body, and the smallest
+// band that still keeps the collapse row. The toolbar keeps the dock, the
+// Timing header, and its own padding. When Timing is expanded too, also keep
+// a body tall enough that Start at, Move for, and Apply can scroll into view.
+const NARROW_ACTORS_PREFERRED_PX = 208
+const NARROW_ACTORS_MIN_PX = 120
+const TIMING_HEADER_PX = 44
+// Leaves the narrow Elements sheet about 108px on a 560px phone: Collapse,
+// plus a scrollport tall enough for Add. Timing's body stays near 80px, so
+// Start at / Move for / Apply fit when scrolled into it.
+const TIMING_BODY_MIN_PX = 72
+const TOOLBAR_CHROME_PX = 36
+const PANEL_GAP_PX = 8
+const ACTORS_SHEET_LEFT_PX = 12
+// Desktop Elements sheet: sm:left-4 + 16rem. Timing column is max-w-2xl.
+const DESKTOP_ACTORS_RIGHT_PX = 16 + 256
+const TIMING_MAX_PX = 672
+const SLOT_PAD_X_PX = 12
 
 /** Quiet control inside the slim header clusters. */
 const headerBtn =
@@ -60,8 +81,8 @@ const headerCluster =
 export function EditorShell() {
   usePlaybackClock()
   useTransformShortcuts()
-  const { status } = useProjectPersistence()
-  const saveLabel = statusLabel(status)
+  const { status, practiceSuspended } = useProjectPersistence()
+  const saveLabel = statusLabel(status, { practice: practiceSuspended })
   const actionAnnouncement = useEditorStore((s) => s.actionAnnouncement)
   const hasRecording = useEditorStore((s) =>
     projectHasAnyRecording(s.project),
@@ -91,23 +112,52 @@ export function EditorShell() {
       return false
     }
   })
-  // Per-project dismissals for this browser tab session (see modeStatus helpers).
-  const [afterPathHintDismissedKeys, setAfterPathHintDismissedKeys] = useState(
-    () => readAfterPathWebsiteHintDismissedKeys(),
-  )
-  const afterPathToastTextId = useId()
   const headerRef = useRef<HTMLElement>(null)
   const toolbarSlotRef = useRef<HTMLDivElement>(null)
-  const afterPathToastRef = useRef<HTMLDivElement>(null)
-  // Toast top tracks measured header height so wrapped mobile chrome never overlaps.
-  const [toastTopPx, setToastTopPx] = useState(96)
-  // When the after-path toast is up, sheet/camera clearance includes its height.
-  const [afterPathToastHeightPx, setAfterPathToastHeightPx] = useState(0)
+  // Header clearance for sheets / camera — no toast offset (tutorial coach is overlay-only).
+  const [headerClearancePx, setHeaderClearancePx] = useState(96)
   // Actors panel sits above Sequence + dock; clearance tracks the live stack height.
   const [toolbarClearancePx, setToolbarClearancePx] = useState(96)
+  const [viewportHeightPx, setViewportHeightPx] = useState(() =>
+    typeof window === 'undefined' ? 800 : window.innerHeight,
+  )
+  const [viewportWidthPx, setViewportWidthPx] = useState(() =>
+    typeof window === 'undefined' ? 1280 : window.innerWidth,
+  )
+  const [dockHeightPx, setDockHeightPx] = useState(176)
+  const [cameraLeftPx, setCameraLeftPx] = useState(() =>
+    typeof window === 'undefined' ? 1024 : window.innerWidth,
+  )
+  const [cameraBottomPx, setCameraBottomPx] = useState(0)
+  const [actorsOpen, setActorsOpen] = useState(() =>
+    readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, false),
+  )
+  const [sequenceOpen, setSequenceOpen] = useState(() =>
+    readPanelOpenPref(SEQUENCE_PANEL_OPEN_KEY, false),
+  )
+  const onActorsOpenChange = useCallback((open: boolean) => {
+    setActorsOpen(open)
+  }, [])
+  const onSequenceOpenChange = useCallback((open: boolean) => {
+    setSequenceOpen(open)
+  }, [])
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
+  const closeChrome = useCallback(() => {
+    setOpenPanel(null)
+    setExamplesOpen(false)
+  }, [])
+  const ensureExportOpen = useCallback(() => {
+    setExamplesOpen(false)
+    setOpenPanel('export')
+  }, [])
+
+  const { view: tutorial, skipTutorial, goNext, restartTutorial } = useTutorial({
+    openPanel,
+    closePanels: closeChrome,
+    ensureExportOpen,
+  })
 
   const togglePanel = (id: ChromePanel) => {
     setExamplesOpen(false)
@@ -132,16 +182,6 @@ export function EditorShell() {
   const project = useEditorStore((s) => s.project)
   const projectName = project.name
   const renameProject = useEditorStore((s) => s.renameProject)
-  const afterPathProjectKey = afterPathWebsiteHintProjectKey(project)
-
-  const dismissAfterPathWebsiteHint = () => {
-    setAfterPathHintDismissedKeys((prev) => {
-      const next = new Set(prev)
-      next.add(afterPathProjectKey)
-      writeAfterPathWebsiteHintDismissedKeys(next)
-      return next
-    })
-  }
 
   useEffect(() => {
     const onHidden = () => {
@@ -154,11 +194,29 @@ export function EditorShell() {
   }, [])
 
   useLayoutEffect(() => {
+    const bar = document.querySelector('[data-testid="workspace-camera-bar"]')
+    if (!(bar instanceof HTMLElement)) return
+    const update = () => {
+      const rect = bar.getBoundingClientRect()
+      setCameraLeftPx(Math.floor(rect.left))
+      setCameraBottomPx(Math.ceil(rect.bottom))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(bar)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
     const el = headerRef.current
     if (!el) return
     const gapPx = 8
     const update = () => {
-      setToastTopPx(Math.ceil(el.getBoundingClientRect().height) + gapPx)
+      setHeaderClearancePx(Math.ceil(el.getBoundingClientRect().height) + gapPx)
     }
     update()
     const ro = new ResizeObserver(update)
@@ -176,6 +234,12 @@ export function EditorShell() {
       const top = stack.getBoundingClientRect().top
       const fromBottom = Math.max(0, window.innerHeight - top)
       setToolbarClearancePx(Math.ceil(fromBottom) + gapPx)
+      setViewportHeightPx(window.innerHeight)
+      setViewportWidthPx(window.innerWidth)
+      const dock = slot.querySelector('[data-testid="playback-dock"]')
+      if (dock instanceof HTMLElement) {
+        setDockHeightPx(Math.ceil(dock.getBoundingClientRect().height))
+      }
     }
     update()
     const ro = new ResizeObserver(update)
@@ -211,15 +275,17 @@ export function EditorShell() {
     mode !== 'idle' ||
     !!polishSession ||
     !!glideSession ||
-    !!presetSession
+    !!presetSession ||
+    tutorial.active
   const emptyBoardHelp = coarsePointer
     ? EMPTY_BOARD_RECORD_HINT_COARSE
     : EMPTY_BOARD_RECORD_HINT_FINE
   const firstUseNextStep = coarsePointer
     ? FIRST_USE_NEXT_STEP_COARSE
     : FIRST_USE_NEXT_STEP_FINE
-  // One dismissible intro on a fresh empty project (same session key as the old examples hint).
+  // After tutorial is done/skipped, keep a dismissible empty-board tip.
   const showFirstUseIntro =
+    !tutorial.active &&
     !tipBusy &&
     !hasRecording &&
     isEmptyProject &&
@@ -227,45 +293,81 @@ export function EditorShell() {
     !examplesOpen
   // After dismiss (or non-empty untitled board), keep a screen-reader target for Record/Play.
   const showEmptyBoardSrHint =
-    !tipBusy && !hasRecording && !showFirstUseIntro
-  // Top toast: after a path, idle only; dismissible per project for this tab session.
-  // Hide while a chrome panel is open — toast still competes for layout/hit-testing
-  // with Export/Adjust scroll bodies even when inert for keyboard.
-  const showAfterPathWebsiteToast =
-    !tipBusy &&
-    hasRecording &&
-    openPanel === null &&
-    !afterPathHintDismissedKeys.has(afterPathProjectKey)
+    !tipBusy && !hasRecording && !showFirstUseIntro && !tutorial.active
 
-  useLayoutEffect(() => {
-    if (!showAfterPathWebsiteToast) {
-      setAfterPathToastHeightPx(0)
-      return
-    }
-    const el = afterPathToastRef.current
-    if (!el) return
-    const gapPx = 8
-    const update = () => {
-      setAfterPathToastHeightPx(
-        Math.ceil(el.getBoundingClientRect().height) + gapPx,
+  // Sheets + workspace zoom clear the measured header only (coach is overlay).
+  const sheetTopPx = headerClearancePx
+  // Room between the header and the Sequence/dock stack. Below this, an in-slot
+  // list is crushed into the header; the open list floats instead (see ActorList).
+  const actorListCramped =
+    viewportHeightPx - sheetTopPx - toolbarClearancePx < 280
+  // Narrow open Elements shares the column with Timing. Reserve a band under
+  // the header and stop the sheet before the whole camera bar (zoom + Fit).
+  const reserveActorsBand = narrowViewport && actorsOpen && !editing
+  // Only while Timing is expanded. A collapsed Timing pill does not take a body,
+  // so Elements keeps the full preferred band.
+  const timingBodyReservePx =
+    reserveActorsBand && sequenceOpen && hasRecording ? TIMING_BODY_MIN_PX : 0
+  const actorsRoomPx = Math.max(
+    0,
+    viewportHeightPx -
+      sheetTopPx -
+      dockHeightPx -
+      TIMING_HEADER_PX -
+      timingBodyReservePx -
+      TOOLBAR_CHROME_PX -
+      PANEL_GAP_PX,
+  )
+  const actorsReservePx = reserveActorsBand
+    ? Math.min(
+        NARROW_ACTORS_PREFERRED_PX,
+        actorsRoomPx >= NARROW_ACTORS_MIN_PX
+          ? actorsRoomPx
+          : Math.max(44, actorsRoomPx),
       )
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [showAfterPathWebsiteToast])
-
-  // Sheets + workspace zoom clear the header, and the after-path toast when present.
-  const sheetTopPx = toastTopPx + afterPathToastHeightPx
+    : 0
+  const actorsInsetPx = reserveActorsBand ? actorsReservePx + PANEL_GAP_PX : 0
+  const actorsMaxWidthPx = Math.min(
+    256,
+    Math.max(0, cameraLeftPx - ACTORS_SHEET_LEFT_PX - PANEL_GAP_PX),
+  )
+  // Centered Timing (max-w-2xl) inside the toolbar slot after an optional left inset.
+  const timingSpan = (padLeft: number) => {
+    const inner = Math.max(0, viewportWidthPx - padLeft - SLOT_PAD_X_PX)
+    const width = Math.min(TIMING_MAX_PX, inner)
+    const left = padLeft + Math.max(0, (inner - width) / 2)
+    return { left, right: left + width }
+  }
+  const actorsOpenDesktop = !narrowViewport && actorsOpen && !editing
+  const bareTiming = timingSpan(0)
+  const timingOverlapsActors =
+    actorsOpenDesktop &&
+    bareTiming.left < DESKTOP_ACTORS_RIGHT_PX + PANEL_GAP_PX
+  const toolbarPadLeftPx = timingOverlapsActors
+    ? DESKTOP_ACTORS_RIGHT_PX + PANEL_GAP_PX
+    : 0
+  const placedTiming = timingSpan(toolbarPadLeftPx)
+  const timingReachesCamera =
+    cameraBottomPx > 0 &&
+    placedTiming.right > cameraLeftPx + 1 &&
+    placedTiming.left < viewportWidthPx
+  const stackTopPx = sheetTopPx + actorsInsetPx
+  const cameraFloorPx = cameraBottomPx + PANEL_GAP_PX
+  // Drop the stack under the whole camera bar only when Timing would run
+  // through it. Wide layouts whose Timing column stays left of the bar are unchanged.
+  const topLimitPx =
+    timingReachesCamera && cameraFloorPx > stackTopPx ? cameraFloorPx : stackTopPx
 
   return (
     <div
       data-testid="app-shell"
       className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas)] text-ms-ink antialiased"
       style={{
-        // Mobile contextual sheets / camera bar clear header (+ toast when shown).
         ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
+        ['--ms-actors-max-w' as string]: `${actorsMaxWidthPx}px`,
+        ...(actorsReservePx > 0
+          ? { ['--ms-actors-reserve' as string]: `${actorsReservePx}px` }
+          : {}),
       }}
     >
       <div
@@ -280,40 +382,19 @@ export function EditorShell() {
       {/* Full-viewport interactive stage (only drawing surface) */}
       <CanvasStage />
 
-      {/*
-        Post-path website cue — top offset from measured header height (z-34 >
-        camera z-32, < header z-40) so Fit/zoom never steal dismiss hits.
-        Non-blocking; pointer events only on the toast itself.
-      */}
-      {showAfterPathWebsiteToast && (
-        <div
-          className="pointer-events-none absolute inset-x-0 z-[34] flex justify-center px-3 sm:px-4"
-          style={{ top: toastTopPx }}
-        >
-          <div
-            ref={afterPathToastRef}
-            role="status"
-            data-testid="after-path-website-toast"
-            aria-describedby={afterPathToastTextId}
-            className="pointer-events-auto flex max-w-md items-start gap-2 rounded-xl border border-ms-border bg-white/90 px-3 py-2 text-xs text-slate-700 shadow-[var(--ms-shadow)] backdrop-blur-xl"
-          >
-            <p
-              id={afterPathToastTextId}
-              className="min-w-0 flex-1 pt-0.5 leading-relaxed"
-            >
-              {AFTER_PATH_WEBSITE_HINT}
-            </p>
-            <button
-              type="button"
-              data-testid="btn-dismiss-after-path-toast"
-              onClick={dismissAfterPathWebsiteHint}
-              className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-              aria-label="Dismiss website export tip"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+      {tutorial.active && tutorial.step && (
+        <TutorialCoach
+          step={tutorial.step}
+          title={tutorial.coachTitle}
+          body={tutorial.coachBody}
+          highlightTestId={tutorial.highlightTestId}
+          softHighlight={tutorial.softHighlight}
+          exportOpen={openPanel === 'export'}
+          showNext={tutorial.showNext}
+          nextIsFinish={tutorial.nextIsFinish}
+          onSkip={skipTutorial}
+          onNext={goNext}
+        />
       )}
 
       {/* Slim cohesive header — stacks on narrow so clusters never clip horizontally.
@@ -331,7 +412,7 @@ export function EditorShell() {
         <div className="pointer-events-auto relative w-full min-w-0 sm:max-w-[min(100%,28rem)]">
           <div className={`${headerCluster} w-full`}>
             <div className="flex min-w-0 flex-1 flex-col justify-center px-1.5 py-0.5">
-              <span className="hidden text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:block">
+              <span className="hidden text-xs font-semibold uppercase tracking-wide text-ms-muted sm:block">
                 MotionSketch
               </span>
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
@@ -343,9 +424,9 @@ export function EditorShell() {
                   <p
                     data-testid="header-save-status"
                     className={
-                      status === 'saved'
-                        ? 'text-[10px] text-slate-500'
-                        : 'text-[10px] font-medium text-amber-800'
+                      status === 'save-error' || status === 'restore-error'
+                        ? 'text-xs font-medium text-amber-800'
+                        : 'text-xs text-ms-muted'
                     }
                   >
                     {saveLabel}
@@ -383,6 +464,17 @@ export function EditorShell() {
             >
               Examples
             </button>
+
+            <button
+              type="button"
+              data-testid="btn-help"
+              aria-expanded={openPanel === 'help'}
+              aria-controls="help-panel-root"
+              onClick={() => togglePanel('help')}
+              className={headerBtn}
+            >
+              Help
+            </button>
           </div>
           <FloatingPanel
             id="project"
@@ -394,6 +486,20 @@ export function EditorShell() {
             <div data-testid="project-menu">
               <ProjectPanel />
             </div>
+          </FloatingPanel>
+          <FloatingPanel
+            id="help"
+            title="Help"
+            open={openPanel === 'help'}
+            onClose={closePanel}
+            align="left"
+          >
+            <HelpPanel
+              onRestartTutorial={() => {
+                closePanel()
+                restartTutorial()
+              }}
+            />
           </FloatingPanel>
         </div>
 
@@ -414,7 +520,7 @@ export function EditorShell() {
               {hasRecording && (
                 <span
                   data-testid="adjust-summary"
-                  className="rounded-md bg-slate-900/[0.06] px-1 py-px text-[10px] font-medium tabular-nums text-slate-600"
+                  className="rounded-md bg-slate-900/[0.06] px-1 py-px text-xs font-medium tabular-nums text-ms-ink"
                 >
                   {(durationMs / 1000).toFixed(1)}s
                 </span>
@@ -529,9 +635,8 @@ export function EditorShell() {
                   className="text-sm text-slate-500"
                 >
                   Create a path (Record, Import SVG, or a Motion preset) to add
-                  the animation to your website (HTML or React)
-                  — or open Advanced exports for CSS-only, your own HTML, and the
-                  project file.
+                  the animation to your website (HTML or React), or open Advanced
+                  exports for CSS-only, your own HTML, and the project file.
                 </p>
               )}
             </div>
@@ -542,8 +647,9 @@ export function EditorShell() {
       {/* Actor list — left, above Sequence + dock (clearance from live stack height).
           z-35 stacks above the toolbar (z-30) so the narrow Actors sheet is not
           covered by Sequence, and stays under the header (z-40).
-          On narrow, expanded Actors floats as a fixed sheet (see ActorList) so the
-          body is not crushed when Sequence owns the toolbar clearance.
+          On narrow, and on desktop when Timing leaves too little room, the open
+          list floats as a fixed sheet (see ActorList) so it is not crushed into
+          the header when Sequence owns the toolbar clearance.
           On narrow chrome sheets, inert the slot (prefs stay open). */}
       {!editing && (
         <div
@@ -559,7 +665,10 @@ export function EditorShell() {
             ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
             : {})}
         >
-          <ActorList />
+          <ActorList
+            floatOpen={actorListCramped}
+            onOpenChange={onActorsOpenChange}
+          />
         </div>
       )}
 
@@ -574,8 +683,12 @@ export function EditorShell() {
           editing ? 'z-[60]' : 'z-30'
         }`}
         style={{
-          // Never climb into the measured header (+ after-path toast when shown).
-          maxHeight: `calc(100dvh - ${sheetTopPx}px)`,
+          // Never climb into the measured header. Narrow open Elements keeps
+          // its reserved band. When Timing would cross the Elements sheet or
+          // the camera bar, inset or drop the stack so those controls stay
+          // clickable on their own.
+          maxHeight: `calc(100dvh - ${topLimitPx}px)`,
+          ...(toolbarPadLeftPx > 0 ? { paddingLeft: `${toolbarPadLeftPx}px` } : {}),
         }}
         {...(sheetCoversChrome && !editing
           ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
@@ -585,7 +698,9 @@ export function EditorShell() {
           {!editing &&
             !polishSession &&
             !glideSession &&
-            !presetSession && <ClipTimeline />}
+            !presetSession && (
+              <ClipTimeline onOpenChange={onSequenceOpenChange} />
+            )}
           {polishSession && <PolishPanel />}
           {glideSession && <GlidePanel />}
           {presetSession && <PresetPanel />}
@@ -604,7 +719,7 @@ export function EditorShell() {
               </p>
               <p
                 data-testid="first-use-next-step"
-                className="text-xs leading-snug text-slate-600"
+                className="text-sm leading-snug text-ms-ink"
               >
                 {firstUseNextStep}
               </p>

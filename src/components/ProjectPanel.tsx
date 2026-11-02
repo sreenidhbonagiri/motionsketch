@@ -7,6 +7,7 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { isRecordingChromeAnnouncement } from '../lib/modeStatus'
+import { blockProjectReplaceDuringTutorial } from '../lib/tutorialGuard'
 import { useEditorStore } from '../state/store'
 import { StageSizeSection } from './StageSizeSection'
 
@@ -25,6 +26,7 @@ export function ProjectPanel() {
 
   const {
     status,
+    practiceSuspended,
     hasQuarantine,
     discardStoredAndUnblock,
     afterSuccessfulReplace,
@@ -32,7 +34,7 @@ export function ProjectPanel() {
     downloadQuarantine,
   } = useProjectPersistence()
 
-  const label = statusLabel(status)
+  const label = statusLabel(status, { practice: practiceSuspended })
   const hasRecording = project.actors.some((a) => !!a.recording)
   const canDownloadProject = hasRecording || status === 'save-error'
   const saveFailed = status === 'save-error'
@@ -58,6 +60,10 @@ export function ProjectPanel() {
   }
 
   const handleNewProject = async () => {
+    if (await blockProjectReplaceDuringTutorial(confirm)) {
+      newProjectBtnRef.current?.focus()
+      return
+    }
     if (projectHasMeaningfulWork(project)) {
       const ok = await confirm({
         title: 'Start a new project?',
@@ -109,6 +115,8 @@ export function ProjectPanel() {
     event.target.value = ''
     if (!file) return
 
+    if (await blockProjectReplaceDuringTutorial(confirm)) return
+
     let text: string
     try {
       text = await file.text()
@@ -126,7 +134,7 @@ export function ProjectPanel() {
     if (projectHasMeaningfulWork(project)) {
       const ok = await confirm({
         title: 'Open this project file?',
-        body: 'This replaces the current project, including actors, appearance, and motion.',
+        body: 'This replaces the current project, including elements, appearance, and motion.',
         confirmLabel: 'Open project',
         testId: 'open-project-confirm',
         confirmTestId: 'btn-open-project-confirm',
@@ -159,9 +167,9 @@ export function ProjectPanel() {
         <p
           data-testid="save-status"
           className={
-            status === 'saved'
-              ? 'text-[11px] text-slate-600'
-              : 'text-[11px] text-amber-800'
+            status === 'restore-error'
+              ? 'text-[11px] text-amber-800'
+              : 'text-[11px] text-slate-600'
           }
         >
           {label}

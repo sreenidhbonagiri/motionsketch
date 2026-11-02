@@ -38,7 +38,7 @@ export function AppearancePanel() {
   })
   const selectedName = useEditorStore((s) => {
     const id = s.selectedActorId
-    return s.project.actors.find((a) => a.id === id)?.name ?? 'Actor'
+    return s.project.actors.find((a) => a.id === id)?.name ?? 'Element'
   })
   const setActorColor = useEditorStore((s) => s.setActorColor)
   const setActorSize = useEditorStore((s) => s.setActorSize)
@@ -61,7 +61,7 @@ export function AppearancePanel() {
   if (!actor) {
     return (
       <div data-testid="appearance-panel" className="p-3 text-sm text-slate-500">
-        No actor selected.
+        No element selected.
       </div>
     )
   }
@@ -92,7 +92,7 @@ export function AppearancePanel() {
         Editing <span className="font-medium text-slate-700">{selectedName}</span>
       </p>
       <fieldset data-testid="actor-kind-fieldset" className="space-y-2">
-        <legend className="text-sm font-medium text-slate-800">Actor type</legend>
+        <legend className="text-sm font-medium text-slate-800">Element type</legend>
         <div className="flex flex-wrap gap-3">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
             <input
@@ -189,7 +189,7 @@ export function AppearancePanel() {
           >
             {actor.kind === 'text'
               ? 'Width of the text wrap box, as a fraction of the stage’s shorter side. Height follows your lines. Center stays fixed.'
-              : 'Longer edge of the actor box, as a fraction of the stage’s shorter side. Images keep their proportions inside that box. Center stays fixed.'}
+              : 'Longer edge of the element box, as a fraction of the stage’s shorter side. Images keep their proportions inside that box. Center stays fixed.'}
           </p>
         </div>
 

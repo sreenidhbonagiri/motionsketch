@@ -34,7 +34,7 @@ describe('isRecordingChromeAnnouncement', () => {
       isRecordingChromeAnnouncement('Could not download the project file.'),
     ).toBe(false)
     expect(
-      isRecordingChromeAnnouncement('Path continued. Existing smoothing is now part of the continued path.'),
+      isRecordingChromeAnnouncement('Path extended. Existing smoothing is now part of the extended path.'),
     ).toBe(false)
   })
 })

@@ -307,12 +307,12 @@ export function planContinuePathCommit(args: {
 }): ContinueCommitPlan | { error: string } {
   const actor = args.project.actors.find((a) => a.id === args.actorId)
   if (!actor?.recording) {
-    return { error: 'Select an actor with a path before continuing.' }
+    return { error: 'Select an element with a path before extending it.' }
   }
   if (actor.faceAlongPath) {
     return {
       error:
-        'Continue path is unavailable while Face along path is on. Facing uses the whole stroke, so continuing would change earlier facing.',
+        'Extend path is unavailable while Face along path is on. Facing uses the whole stroke, so extending would change earlier facing.',
     }
   }
   if (!additionHasMotion(args.addition)) {
@@ -321,7 +321,7 @@ export function planContinuePathCommit(args: {
 
   const baseSamples = displayedPathSamples(actor, args.project.stageAspect)
   if (baseSamples.length < 2) {
-    return { error: 'Select an actor with a path before continuing.' }
+    return { error: 'Select an element with a path before extending it.' }
   }
 
   const joined = joinPathSamples(baseSamples, args.addition.samples)
@@ -374,7 +374,7 @@ export function planContinuePathCommit(args: {
 
   if (newDuration > MAX_PLAYBACK_DURATION_MS + 1e-9) {
     return {
-      error: `Continuing would need more than ${MAX_PLAYBACK_DURATION_MS / 1000}s of project Duration. Shorten the path or Sequence, or Reset motion.`,
+      error: `Extending would need more than ${MAX_PLAYBACK_DURATION_MS / 1000}s of project Duration. Shorten the path or Timing, or Reset motion.`,
     }
   }
 
@@ -390,7 +390,7 @@ export function planContinuePathCommit(args: {
     if (contEnd - contStart < MIN_CLIP_SPAN - 1e-9) {
       return {
         error:
-          'Not enough Sequence room to continue at the current speed. Lengthen Duration or shorten this actor’s clip.',
+          'Not enough Timing room to extend at the current speed. Lengthen Duration or shorten this element’s clip.',
       }
     }
   }
@@ -445,7 +445,7 @@ export function continuePathAvailability(args: {
   if (!actor?.recording || actor.recording.samples.length < 2) {
     return {
       enabled: false,
-      reason: 'Record a path for this actor before continuing.',
+      reason: 'Record a path for this element before extending it.',
     }
   }
   if (
@@ -456,38 +456,38 @@ export function continuePathAvailability(args: {
   ) {
     return {
       enabled: false,
-      reason: 'Finish or cancel the current mode before continuing the path.',
+      reason: 'Finish or cancel the current mode before extending the path.',
     }
   }
   if (args.polishSession) {
     return {
       enabled: false,
-      reason: 'Apply or cancel Polish before continuing the path.',
+      reason: 'Apply or cancel Polish before extending the path.',
     }
   }
   if (args.glideSession) {
     return {
       enabled: false,
-      reason: 'Apply or cancel Glide before continuing the path.',
+      reason: 'Apply or cancel Glide before extending the path.',
     }
   }
   if (args.presetSession) {
     return {
       enabled: false,
-      reason: 'Apply or cancel the motion preset before continuing the path.',
+      reason: 'Apply or cancel the motion preset before extending the path.',
     }
   }
   if (args.pathGestureActive) {
     return {
       enabled: false,
-      reason: 'Finish the path gesture before continuing.',
+      reason: 'Finish the path gesture before extending.',
     }
   }
 
   if (!pathEndpoint(committedPathSamples(actor))) {
     return {
       enabled: false,
-      reason: 'This path has no endpoint to continue from.',
+      reason: 'This path has no endpoint to extend from.',
     }
   }
 
@@ -495,24 +495,24 @@ export function continuePathAvailability(args: {
     return {
       enabled: false,
       reason:
-        'Continue path is unavailable while Face along path is on. Facing uses the whole stroke, so continuing would change earlier facing.',
+        'Extend path is unavailable while Face along path is on. Facing uses the whole stroke, so extending would change earlier facing.',
     }
   }
 
   return { enabled: true, reason: null }
 }
 
-/** Default title / help when Continue is available. */
+/** Default title / help when Extend path is available. */
 export const CONTINUE_PATH_HELP =
-  'Add another stroke from the path’s end. Existing smoothing, Steady Speed, and Glide become part of the continued path so earlier motion stays the same. Extends Sequence and Duration to keep prior speed.'
+  'Add another stroke from the path’s end. Existing smoothing, Steady Speed, and Glide become part of the extended path so earlier motion stays the same. Extends Timing and Duration to keep prior speed.'
 
 export const CONTINUE_PATH_BAKE_NOTE =
-  'Continues from the path you see — smoothing and timing become part of the stroke.'
+  'Extends from the path you see. Smoothing and timing become part of the stroke.'
 
 export const RESTORE_RECORDED_PATH_HELP =
-  'Removes every continuation and path edit for this actor and returns to the original recording, including its Steady Speed and Glide settings.'
+  'Removes every extension and path edit for this element and returns to the original recording, including its Steady Speed and Glide settings.'
 
 export const CONTINUE_PATH_INSTRUCTION =
-  'Drag the actor to continue its path.'
+  'Drag the element to extend its path.'
 
-export const CONTINUE_PATH_ANNOUNCEMENT = `Ready — ${CONTINUE_PATH_INSTRUCTION}`
+export const CONTINUE_PATH_ANNOUNCEMENT = `Ready. ${CONTINUE_PATH_INSTRUCTION}`

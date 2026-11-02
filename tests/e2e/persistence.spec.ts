@@ -151,7 +151,7 @@ test.describe('project persistence', () => {
       'Draw motion. Ship it to your website.',
     )
     await expect(page.getByTestId('first-use-next-step')).toHaveText(
-      'Click Record, then drag the actor.',
+      'Click Record, then drag the element.',
     )
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
@@ -209,7 +209,7 @@ test.describe('project persistence', () => {
       'Reset motion for “Actor 1”',
     )
     await expect(page.getByTestId('reset-actor-confirm-copy')).toContainText(
-      /Appearance, other actors, and project Duration \/ Loop stay the same/,
+      /Appearance, other elements, and project Duration \/ Loop stay the same/,
     )
     await expect(page.getByTestId('btn-reset-actor-confirm')).toHaveText(
       'Reset motion',
@@ -251,7 +251,7 @@ test.describe('project persistence', () => {
       'Draw motion. Ship it to your website.',
     )
     await expect(page.getByTestId('first-use-next-step')).toHaveText(
-      'Click Record, then drag the actor.',
+      'Click Record, then drag the element.',
     )
   })
 

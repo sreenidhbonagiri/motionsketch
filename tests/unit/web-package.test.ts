@@ -166,6 +166,9 @@ describe('web package export', () => {
     expect(css).toContain('linear infinite alternate')
 
     expect(readme).toContain(result.scope.rootClass)
+    expect(readme).toContain(
+      'assets/ — required image files used by the scene',
+    )
     expect(readme).toContain('assets/asset-01.png')
     expect(readme).toContain('assets/asset-02.svg')
     expect(readme).toContain('MotionSketchTrigger.init')
@@ -251,7 +254,7 @@ describe('web package export', () => {
     const readme = strFromU8(
       packed.files.find((f) => f.path === WEB_PACKAGE_README_NAME)!.bytes,
     )
-    expect(readme).toContain('Playback trigger: page-load')
+    expect(readme).toContain('When should it play: page-load')
     expect(readme).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
     expect(readme).toContain('MotionSketchTrigger.init')
     expect(readme).toContain('data-ms-demo-shell')
@@ -300,11 +303,15 @@ describe('web package export', () => {
     expect(guide.completeExample).toBe(
       `${guide.sections.head}\n\n${guide.sections.body}\n\n${guide.sections.scripts}`,
     )
-    expect(guide.folderLayout).toContain(WEB_PACKAGE_HTML_NAME)
-    expect(guide.folderLayout).toContain(WEB_PACKAGE_CSS_NAME)
-    expect(guide.folderLayout).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)
-    expect(guide.folderLayout).toMatch(/README\.txt.*instructions only/i)
-    expect(guide.folderLayout).toMatch(/project\.json.*reopen/i)
+    expect(guide.folderLayout).toBe(
+      [
+        `${WEB_PACKAGE_HTML_NAME} — optional preview (or use your own page)`,
+        `${WEB_PACKAGE_CSS_NAME} — required for the animation`,
+        `${WEB_PACKAGE_TRIGGER_JS_NAME} — required for Play, Replay, and reduced motion`,
+        `${WEB_PACKAGE_README_NAME} — instructions only, not required to run`,
+        `${WEB_PACKAGE_PROJECT_NAME} — editable project data to reopen in MotionSketch, not required to run`,
+      ].join('\n'),
+    )
     expect(guide.playButtonHelp).toMatch(/Replay/)
     expect(guide.requiredFiles).toContain(WEB_PACKAGE_CSS_NAME)
     expect(guide.requiredFiles).toContain(WEB_PACKAGE_TRIGGER_JS_NAME)

@@ -53,6 +53,90 @@ async function motionTime(frame: Frame): Promise<number> {
   })
 }
 
+/**
+ * Arm a one-shot listener for the next motion animationstart on the preview scene.
+ * Call it before the gesture. An earlier event, a visibility track, or a missing
+ * clock does not fill the sample.
+ */
+async function captureNextRestartTime(frame: Frame) {
+  await frame.evaluate(() => {
+    const scene = document.querySelector('[data-testid="demo-scene"]')
+    const actor = scene?.querySelector('[data-testid="demo-actor"]') as
+      | HTMLElement
+      | null
+    if (!scene || !actor) throw new Error('demo scene actor missing')
+    const running = actor.getAnimations().find((anim) => {
+      return (
+        'animationName' in anim &&
+        typeof (anim as CSSAnimation).animationName === 'string' &&
+        !(anim as CSSAnimation).animationName.includes('-vis') &&
+        typeof anim.startTime === 'number'
+      )
+    }) as CSSAnimation | undefined
+    if (!running || typeof running.animationName !== 'string') {
+      throw new Error('motion animation missing before restart')
+    }
+    const motionName = running.animationName
+    const previousStart = Number(running.startTime)
+    if (typeof running.currentTime !== 'number') {
+      throw new Error('motion animation has no current time')
+    }
+    const previousCurrent = Number(running.currentTime)
+    const host = window as unknown as {
+      __msRestartTime: number | null
+      __msRestartListener?: (event: AnimationEvent) => void
+    }
+    host.__msRestartTime = null
+    if (host.__msRestartListener) {
+      actor.removeEventListener('animationstart', host.__msRestartListener)
+      delete host.__msRestartListener
+    }
+    const publish = () => {
+      const candidates = actor.getAnimations().filter((anim) => {
+        return (
+          'animationName' in anim &&
+          (anim as CSSAnimation).animationName === motionName &&
+          anim.playState === 'running' &&
+          typeof anim.currentTime === 'number'
+        )
+      }) as CSSAnimation[]
+      const started =
+        candidates.find(
+          (anim) =>
+            typeof anim.startTime === 'number' && Number(anim.startTime) > previousStart,
+        ) ??
+        candidates.find((anim) => Number(anim.currentTime) < previousCurrent)
+      if (!started) return false
+      host.__msRestartTime = Number(started.currentTime)
+      return true
+    }
+    const listener = (event: AnimationEvent) => {
+      if (event.target !== actor) return
+      if (event.animationName !== motionName) return
+      const finish = () => {
+        if (!publish()) return
+        actor.removeEventListener('animationstart', listener)
+        if (host.__msRestartListener === listener) delete host.__msRestartListener
+      }
+      if (publish()) {
+        finish()
+        return
+      }
+      requestAnimationFrame(finish)
+    }
+    host.__msRestartListener = listener
+    actor.addEventListener('animationstart', listener)
+  })
+}
+
+async function readRestartTime(frame: Frame): Promise<number | null> {
+  return frame.evaluate(
+    () =>
+      (window as unknown as { __msRestartTime?: number | null }).__msRestartTime ??
+      null,
+  )
+}
+
 /** Click the scene root and return motion currentTime in the same turn. */
 async function clickSceneReadTime(frame: Frame): Promise<number> {
   return frame.evaluate(() => {
@@ -295,8 +379,13 @@ test.describe('export playback triggers', () => {
       const ae = document.activeElement as HTMLElement | null
       ae?.blur()
     })
+    const beforeReentry = await motionTime(hoverFrame)
+    expect(beforeReentry).toBeGreaterThan(40)
+    await captureNextRestartTime(hoverFrame)
     await enterSceneWithPointer(page, hoverScene)
-    await expect.poll(() => motionTime(hoverFrame)).toBeLessThan(40)
+    await expect.poll(() => readRestartTime(hoverFrame)).not.toBeNull()
+    // Sampled at animationstart. Must be earlier than the clock that was already running.
+    expect(await readRestartTime(hoverFrame)).toBeLessThan(beforeReentry)
 
     await expect.poll(() => motionTime(hoverFrame)).toBeGreaterThan(20)
     await page.mouse.move(8, 8)
@@ -304,8 +393,12 @@ test.describe('export playback triggers', () => {
       const ae = document.activeElement as HTMLElement | null
       ae?.blur()
     })
+    const beforeTap = await motionTime(hoverFrame)
+    expect(beforeTap).toBeGreaterThan(20)
+    await captureNextRestartTime(hoverFrame)
     await hoverFrame.getByTestId('demo-hover-tap').click()
-    await expect.poll(() => motionTime(hoverFrame)).toBeLessThan(40)
+    await expect.poll(() => readRestartTime(hoverFrame)).not.toBeNull()
+    expect(await readRestartTime(hoverFrame)).toBeLessThan(beforeTap)
 
     await page.getByTestId('btn-close-trigger-preview').click()
   })

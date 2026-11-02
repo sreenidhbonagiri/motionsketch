@@ -96,7 +96,7 @@ async function continuePathStroke(
 ) {
   await clickContinuePath(page)
   await expect(page.getByTestId('dock-status')).toContainText(
-    /Drag the actor to continue its path/i,
+    /Drag the element to extend its path/i,
   )
   await dragActor(page, { x: 4, y: 2 }, delta)
   await expect(page.getByTestId('btn-play')).toBeEnabled()
@@ -175,7 +175,7 @@ test.describe('Continue path', () => {
 
     await clickContinuePath(page)
     await expect(page.getByTestId('dock-status')).toContainText(
-      /continue its path/i,
+      /extend its path/i,
     )
 
     const actor = page.getByTestId('actor')
@@ -220,7 +220,7 @@ test.describe('Continue path', () => {
 
     await clickContinuePath(page)
     await expect(page.getByTestId('dock-status')).toContainText(
-      /continue its path/i,
+      /extend its path/i,
     )
 
     const actor = page.getByTestId('actor')
@@ -382,7 +382,7 @@ test.describe('Continue path', () => {
     ).toHaveCount(0)
     await continueBtn.click()
     await expect(page.getByTestId('dock-status')).toContainText(
-      /continue its path/i,
+      /extend its path/i,
     )
     await page.getByTestId('btn-stop').click()
   })
@@ -716,7 +716,7 @@ test.describe('Continue path', () => {
     await continuePathStroke(page, { x: 50, y: -20 })
     await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('restore-path-help')).toContainText(
-      /Removes every continuation/i,
+      /Removes every extension/i,
     )
     await page.getByTestId('btn-restore-path').click()
     await expect(page.getByTestId('restore-path-confirm')).toBeVisible()
