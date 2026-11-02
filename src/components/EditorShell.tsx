@@ -43,8 +43,31 @@ import { ProjectPanel } from './ProjectPanel'
 import { TutorialCoach } from './TutorialCoach'
 import { projectHasAnyRecording } from '../core/sceneActor'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
+import {
+  ACTORS_PANEL_OPEN_KEY,
+  readPanelOpenPref,
+  SEQUENCE_PANEL_OPEN_KEY,
+} from '../lib/panelOpenPref'
 
 const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
+// Open Elements sheet on a narrow viewport: preferred body, and the smallest
+// band that still keeps the collapse row. The toolbar keeps the dock, the
+// Timing header, and its own padding. When Timing is expanded too, also keep
+// a body tall enough that Start at, Move for, and Apply can scroll into view.
+const NARROW_ACTORS_PREFERRED_PX = 208
+const NARROW_ACTORS_MIN_PX = 120
+const TIMING_HEADER_PX = 44
+// Leaves the narrow Elements sheet about 108px on a 560px phone: Collapse,
+// plus a scrollport tall enough for Add. Timing's body stays near 80px, so
+// Start at / Move for / Apply fit when scrolled into it.
+const TIMING_BODY_MIN_PX = 72
+const TOOLBAR_CHROME_PX = 36
+const PANEL_GAP_PX = 8
+const ACTORS_SHEET_LEFT_PX = 12
+// Desktop Elements sheet: sm:left-4 + 16rem. Timing column is max-w-2xl.
+const DESKTOP_ACTORS_RIGHT_PX = 16 + 256
+const TIMING_MAX_PX = 672
+const SLOT_PAD_X_PX = 12
 
 /** Quiet control inside the slim header clusters. */
 const headerBtn =
@@ -98,6 +121,26 @@ export function EditorShell() {
   const [viewportHeightPx, setViewportHeightPx] = useState(() =>
     typeof window === 'undefined' ? 800 : window.innerHeight,
   )
+  const [viewportWidthPx, setViewportWidthPx] = useState(() =>
+    typeof window === 'undefined' ? 1280 : window.innerWidth,
+  )
+  const [dockHeightPx, setDockHeightPx] = useState(176)
+  const [cameraLeftPx, setCameraLeftPx] = useState(() =>
+    typeof window === 'undefined' ? 1024 : window.innerWidth,
+  )
+  const [cameraBottomPx, setCameraBottomPx] = useState(0)
+  const [actorsOpen, setActorsOpen] = useState(() =>
+    readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, false),
+  )
+  const [sequenceOpen, setSequenceOpen] = useState(() =>
+    readPanelOpenPref(SEQUENCE_PANEL_OPEN_KEY, false),
+  )
+  const onActorsOpenChange = useCallback((open: boolean) => {
+    setActorsOpen(open)
+  }, [])
+  const onSequenceOpenChange = useCallback((open: boolean) => {
+    setSequenceOpen(open)
+  }, [])
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
@@ -151,6 +194,24 @@ export function EditorShell() {
   }, [])
 
   useLayoutEffect(() => {
+    const bar = document.querySelector('[data-testid="workspace-camera-bar"]')
+    if (!(bar instanceof HTMLElement)) return
+    const update = () => {
+      const rect = bar.getBoundingClientRect()
+      setCameraLeftPx(Math.floor(rect.left))
+      setCameraBottomPx(Math.ceil(rect.bottom))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(bar)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
     const el = headerRef.current
     if (!el) return
     const gapPx = 8
@@ -174,6 +235,11 @@ export function EditorShell() {
       const fromBottom = Math.max(0, window.innerHeight - top)
       setToolbarClearancePx(Math.ceil(fromBottom) + gapPx)
       setViewportHeightPx(window.innerHeight)
+      setViewportWidthPx(window.innerWidth)
+      const dock = slot.querySelector('[data-testid="playback-dock"]')
+      if (dock instanceof HTMLElement) {
+        setDockHeightPx(Math.ceil(dock.getBoundingClientRect().height))
+      }
     }
     update()
     const ro = new ResizeObserver(update)
@@ -235,6 +301,62 @@ export function EditorShell() {
   // list is crushed into the header; the open list floats instead (see ActorList).
   const actorListCramped =
     viewportHeightPx - sheetTopPx - toolbarClearancePx < 280
+  // Narrow open Elements shares the column with Timing. Reserve a band under
+  // the header and stop the sheet before the whole camera bar (zoom + Fit).
+  const reserveActorsBand = narrowViewport && actorsOpen && !editing
+  // Only while Timing is expanded. A collapsed Timing pill does not take a body,
+  // so Elements keeps the full preferred band.
+  const timingBodyReservePx =
+    reserveActorsBand && sequenceOpen && hasRecording ? TIMING_BODY_MIN_PX : 0
+  const actorsRoomPx = Math.max(
+    0,
+    viewportHeightPx -
+      sheetTopPx -
+      dockHeightPx -
+      TIMING_HEADER_PX -
+      timingBodyReservePx -
+      TOOLBAR_CHROME_PX -
+      PANEL_GAP_PX,
+  )
+  const actorsReservePx = reserveActorsBand
+    ? Math.min(
+        NARROW_ACTORS_PREFERRED_PX,
+        actorsRoomPx >= NARROW_ACTORS_MIN_PX
+          ? actorsRoomPx
+          : Math.max(44, actorsRoomPx),
+      )
+    : 0
+  const actorsInsetPx = reserveActorsBand ? actorsReservePx + PANEL_GAP_PX : 0
+  const actorsMaxWidthPx = Math.min(
+    256,
+    Math.max(0, cameraLeftPx - ACTORS_SHEET_LEFT_PX - PANEL_GAP_PX),
+  )
+  // Centered Timing (max-w-2xl) inside the toolbar slot after an optional left inset.
+  const timingSpan = (padLeft: number) => {
+    const inner = Math.max(0, viewportWidthPx - padLeft - SLOT_PAD_X_PX)
+    const width = Math.min(TIMING_MAX_PX, inner)
+    const left = padLeft + Math.max(0, (inner - width) / 2)
+    return { left, right: left + width }
+  }
+  const actorsOpenDesktop = !narrowViewport && actorsOpen && !editing
+  const bareTiming = timingSpan(0)
+  const timingOverlapsActors =
+    actorsOpenDesktop &&
+    bareTiming.left < DESKTOP_ACTORS_RIGHT_PX + PANEL_GAP_PX
+  const toolbarPadLeftPx = timingOverlapsActors
+    ? DESKTOP_ACTORS_RIGHT_PX + PANEL_GAP_PX
+    : 0
+  const placedTiming = timingSpan(toolbarPadLeftPx)
+  const timingReachesCamera =
+    cameraBottomPx > 0 &&
+    placedTiming.right > cameraLeftPx + 1 &&
+    placedTiming.left < viewportWidthPx
+  const stackTopPx = sheetTopPx + actorsInsetPx
+  const cameraFloorPx = cameraBottomPx + PANEL_GAP_PX
+  // Drop the stack under the whole camera bar only when Timing would run
+  // through it. Wide layouts whose Timing column stays left of the bar are unchanged.
+  const topLimitPx =
+    timingReachesCamera && cameraFloorPx > stackTopPx ? cameraFloorPx : stackTopPx
 
   return (
     <div
@@ -242,6 +364,10 @@ export function EditorShell() {
       className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas)] text-ms-ink antialiased"
       style={{
         ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
+        ['--ms-actors-max-w' as string]: `${actorsMaxWidthPx}px`,
+        ...(actorsReservePx > 0
+          ? { ['--ms-actors-reserve' as string]: `${actorsReservePx}px` }
+          : {}),
       }}
     >
       <div
@@ -539,7 +665,10 @@ export function EditorShell() {
             ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
             : {})}
         >
-          <ActorList floatOpen={actorListCramped} />
+          <ActorList
+            floatOpen={actorListCramped}
+            onOpenChange={onActorsOpenChange}
+          />
         </div>
       )}
 
@@ -554,8 +683,12 @@ export function EditorShell() {
           editing ? 'z-[60]' : 'z-30'
         }`}
         style={{
-          // Never climb into the measured header.
-          maxHeight: `calc(100dvh - ${sheetTopPx}px)`,
+          // Never climb into the measured header. Narrow open Elements keeps
+          // its reserved band. When Timing would cross the Elements sheet or
+          // the camera bar, inset or drop the stack so those controls stay
+          // clickable on their own.
+          maxHeight: `calc(100dvh - ${topLimitPx}px)`,
+          ...(toolbarPadLeftPx > 0 ? { paddingLeft: `${toolbarPadLeftPx}px` } : {}),
         }}
         {...(sheetCoversChrome && !editing
           ? ({ inert: true, 'aria-hidden': true } as Record<string, unknown>)
@@ -565,7 +698,9 @@ export function EditorShell() {
           {!editing &&
             !polishSession &&
             !glideSession &&
-            !presetSession && <ClipTimeline />}
+            !presetSession && (
+              <ClipTimeline onOpenChange={onSequenceOpenChange} />
+            )}
           {polishSession && <PolishPanel />}
           {glideSession && <GlidePanel />}
           {presetSession && <PresetPanel />}

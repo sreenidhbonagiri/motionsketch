@@ -19,7 +19,13 @@ const togglePill =
 const desktopFloatSheet =
   'sm:pointer-events-auto sm:fixed sm:top-[var(--ms-sheet-top,4.5rem)] sm:left-4 sm:z-[35] sm:h-auto sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-1rem))] sm:w-[min(16rem,calc(100vw-2rem))] sm:justify-start sm:gap-0 sm:overflow-hidden sm:rounded-xl sm:border sm:border-ms-border sm:bg-white/90 sm:shadow-[var(--ms-shadow)] sm:backdrop-blur-xl'
 
-export function ActorList({ floatOpen = false }: { floatOpen?: boolean }) {
+export function ActorList({
+  floatOpen = false,
+  onOpenChange,
+}: {
+  floatOpen?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
   const actors = useEditorStore((s) => s.project.actors)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const playbackHead = useEditorStore((s) => s.playbackHead)
@@ -47,6 +53,7 @@ export function ActorList({ floatOpen = false }: { floatOpen?: boolean }) {
   const setOpenPref = (next: boolean) => {
     setOpen(next)
     writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, next)
+    onOpenChange?.(next)
   }
 
   return (
@@ -55,10 +62,10 @@ export function ActorList({ floatOpen = false }: { floatOpen?: boolean }) {
       data-actors-open={open ? 'true' : 'false'}
       className={
         open
-          ? // Narrow + open: float a bounded left sheet above Sequence so the
-            // body is not crushed by toolbar clearance. Desktop stays in-slot
-            // unless Timing leaves too little room (floatOpen).
-            `pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5 max-sm:pointer-events-auto max-sm:fixed max-sm:left-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:z-[35] max-sm:w-[min(16rem,calc(100vw-1.5rem))] max-sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-7rem))] max-sm:justify-start max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border max-sm:border-ms-border max-sm:bg-white/90 max-sm:shadow-[var(--ms-shadow)] max-sm:backdrop-blur-xl${
+          ? // Narrow + open: fixed sheet in the reserved band under the header,
+            // ending before the camera bar and above Timing (see EditorShell).
+            // Desktop stays in-slot unless Timing leaves too little room.
+            `pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5 max-sm:pointer-events-auto max-sm:fixed max-sm:left-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:z-[35] max-sm:w-[min(16rem,var(--ms-actors-max-w,calc(100vw-1.5rem)))] max-sm:max-h-[var(--ms-actors-reserve,min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-7rem)))] max-sm:justify-start max-sm:gap-0 max-sm:overflow-hidden max-sm:rounded-xl max-sm:border max-sm:border-ms-border max-sm:bg-white/90 max-sm:shadow-[var(--ms-shadow)] max-sm:backdrop-blur-xl${
               floatOpen ? ` ${desktopFloatSheet}` : ''
             }`
           : 'pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5'

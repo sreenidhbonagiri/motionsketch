@@ -56,7 +56,11 @@ function suppressNativeInvalid(event: FormEvent<HTMLInputElement>) {
  * Collapsible Sequence panel: when each actor moves on the shared Duration.
  * Local Start at / Move for drafts commit together via Apply or Enter.
  */
-export function ClipTimeline() {
+export function ClipTimeline({
+  onOpenChange,
+}: {
+  onOpenChange?: (open: boolean) => void
+}) {
   const actors = useEditorStore((s) => s.project.actors)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
@@ -335,6 +339,7 @@ export function ClipTimeline() {
   const setOpenPref = (next: boolean) => {
     setOpen(next)
     writePanelOpenPref(SEQUENCE_PANEL_OPEN_KEY, next)
+    onOpenChange?.(next)
   }
 
   if (!open) {

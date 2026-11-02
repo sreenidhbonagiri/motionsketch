@@ -29,6 +29,22 @@ async function assertPlayCenteredInDock(page: Page, tolerancePx = 6) {
   expect(centered.delta).toBeLessThanOrEqual(tolerancePx)
 }
 
+/** Topmost test id at the element's center (walks out of inner SVG/text). */
+async function topTestIdAtCenter(page: Page, testId: string) {
+  return page.evaluate((id) => {
+    const el = document.querySelector(`[data-testid="${id}"]`)
+    if (!(el instanceof HTMLElement)) return 'missing'
+    const rect = el.getBoundingClientRect()
+    if (rect.width < 8 || rect.height < 8) return 'zero-size'
+    const top = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    )
+    if (!(top instanceof Element)) return 'none'
+    return top.closest('[data-testid]')?.getAttribute('data-testid') ?? 'none'
+  }, testId)
+}
+
 async function assertFullyInViewport(
   page: import('@playwright/test').Page,
   testId: string,
@@ -777,5 +793,312 @@ test.describe('workspace layout', () => {
     await viewCss.scrollIntoViewIfNeeded()
     await viewCss.click()
     await expect(page.getByTestId('css-dialog')).toBeVisible()
+  })
+
+  for (const viewport of [
+    { width: 390, height: 844, label: '390x844' },
+    { width: 390, height: 560, label: '390x560 short' },
+    { width: 850, height: 650, label: '850x650' },
+    { width: 1280, height: 720, label: '1280x720' },
+  ]) {
+    test(`${viewport.label}: Elements and Timing collapse controls stay independent`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      await page.goto('/')
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      const elementsToggle = page.getByTestId('btn-toggle-actor-list')
+      const timingToggle = page.getByTestId('btn-toggle-clip-timeline')
+      if ((await elementsToggle.getAttribute('aria-expanded')) !== 'true') {
+        await elementsToggle.click()
+      }
+      if ((await timingToggle.getAttribute('aria-expanded')) !== 'true') {
+        await timingToggle.click()
+      }
+      await expect(elementsToggle).toHaveAttribute('aria-expanded', 'true')
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.getByTestId('actors-collapse-label')).toBeVisible()
+      await expect(page.getByTestId('sequence-collapse-label')).toBeVisible()
+
+      const targets = [
+        'btn-toggle-clip-timeline',
+        'btn-toggle-actor-list',
+        'btn-add-actor',
+        'btn-play',
+        'playback-scrubber',
+        'btn-zoom-out',
+        'btn-zoom-in',
+        'btn-fit-stage',
+      ] as const
+      for (const id of targets) {
+        await page.getByTestId(id).evaluate((el) => {
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        })
+        expect(await topTestIdAtCenter(page, id), `${id} center`).toBe(id)
+      }
+
+      await timingToggle.click()
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'false')
+      await expect(elementsToggle).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.getByTestId('actor-list-body')).toBeVisible()
+      await expect(page.getByTestId('sequence-panel-body')).toHaveCount(0)
+
+      await timingToggle.click()
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+      await expect(elementsToggle).toHaveAttribute('aria-expanded', 'true')
+
+      await elementsToggle.click()
+      await expect(elementsToggle).toHaveAttribute('aria-expanded', 'false')
+      await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+      await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+    })
+  }
+
+  for (const viewport of [
+    { width: 850, height: 650, elementsOpen: true, label: '850x650 both open' },
+    { width: 850, height: 650, elementsOpen: false, label: '850x650 Timing under camera' },
+    { width: 390, height: 844, elementsOpen: false, label: '390x844 Timing under camera' },
+    { width: 390, height: 560, elementsOpen: false, label: '390x560 Timing under camera' },
+    { width: 1280, height: 720, elementsOpen: true, label: '1280x720 both open' },
+  ]) {
+    test(`${viewport.label}: Timing header stays clear of Elements and the camera bar`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      await page.goto('/')
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      const inner = await page.evaluate(() => [window.innerWidth, window.innerHeight])
+      expect(inner, 'layout viewport').toEqual([viewport.width, viewport.height])
+
+      const elementsToggle = page.getByTestId('btn-toggle-actor-list')
+      const timingToggle = page.getByTestId('btn-toggle-clip-timeline')
+      const elementsOpen =
+        (await elementsToggle.getAttribute('aria-expanded')) === 'true'
+      if (viewport.elementsOpen && !elementsOpen) await elementsToggle.click()
+      if (!viewport.elementsOpen && elementsOpen) await elementsToggle.click()
+      if ((await timingToggle.getAttribute('aria-expanded')) !== 'true') {
+        await timingToggle.click()
+      }
+
+      const reachable = [
+        'btn-record',
+        'btn-play',
+        'playback-scrubber',
+        'btn-zoom-out',
+        'btn-zoom-in',
+        'btn-fit-stage',
+      ] as const
+      for (const id of reachable) {
+        await page.getByTestId(id).evaluate((el) => {
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        })
+        expect(await topTestIdAtCenter(page, id), `${id} center`).toBe(id)
+      }
+      if (viewport.elementsOpen) {
+        await page.getByTestId('btn-add-actor').evaluate((el) => {
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        })
+        expect(await topTestIdAtCenter(page, 'btn-add-actor'), 'Add center').toBe(
+          'btn-add-actor',
+        )
+      }
+
+      const headerClear = async () =>
+        page.evaluate(() => {
+          const header = document.querySelector('[data-testid="sequence-header"]')
+          const list = document.querySelector('[data-testid="actor-list"]')
+          const camera = document.querySelector('[data-testid="workspace-camera-bar"]')
+          if (!(header instanceof HTMLElement)) return { ok: false, reason: 'no header' }
+          const rectsOverlap = (a: DOMRect, b: DOMRect) => {
+            const x = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+            const y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+            return x > 2 && y > 2
+          }
+          const hr = header.getBoundingClientRect()
+          if (list instanceof HTMLElement && rectsOverlap(hr, list.getBoundingClientRect())) {
+            return { ok: false, reason: 'header overlaps Elements' }
+          }
+          if (
+            camera instanceof HTMLElement &&
+            rectsOverlap(hr, camera.getBoundingClientRect())
+          ) {
+            return { ok: false, reason: 'header overlaps camera bar' }
+          }
+          const toggle = document.querySelector('[data-testid="btn-toggle-clip-timeline"]')
+          if (!(toggle instanceof HTMLElement)) return { ok: false, reason: 'no toggle' }
+          const xs = [hr.left + 24, hr.left + hr.width / 2, hr.right - 24]
+          const ys = [hr.top + 6, hr.top + hr.height / 2]
+          for (const y of ys) {
+            for (const x of xs) {
+              const top = document.elementFromPoint(x, y)
+              if (!(top instanceof Element) || !toggle.contains(top)) {
+                const id =
+                  top instanceof Element
+                    ? (top.closest('[data-testid]')?.getAttribute('data-testid') ?? 'none')
+                    : 'none'
+                return { ok: false, reason: `${Math.round(x)},${Math.round(y)} hit ${id}` }
+              }
+            }
+          }
+          return {
+            ok: true,
+            reason: 'clear',
+            left: { x: hr.left + 24, y: hr.top + hr.height / 2 },
+            upperRight: { x: hr.right - 24, y: hr.top + 6 },
+          }
+        })
+
+      await expect.poll(headerClear, { timeout: 2000 }).toMatchObject({ ok: true })
+      const points = await headerClear()
+      expect(points.ok).toBe(true)
+
+      const upperRight = points.upperRight!
+      await page.mouse.click(upperRight.x, upperRight.y)
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'false')
+      await expect(elementsToggle).toHaveAttribute(
+        'aria-expanded',
+        viewport.elementsOpen ? 'true' : 'false',
+      )
+      await expect(page.getByTestId('sequence-panel-body')).toHaveCount(0)
+
+      await timingToggle.click()
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+      await expect.poll(headerClear, { timeout: 2000 }).toMatchObject({ ok: true })
+      const again = await headerClear()
+      await page.mouse.click(again.left!.x, again.left!.y)
+      await expect(timingToggle).toHaveAttribute('aria-expanded', 'false')
+      await expect(elementsToggle).toHaveAttribute(
+        'aria-expanded',
+        viewport.elementsOpen ? 'true' : 'false',
+      )
+      expect(await topTestIdAtCenter(page, 'btn-zoom-out')).toBe('btn-zoom-out')
+      expect(await topTestIdAtCenter(page, 'btn-fit-stage')).toBe('btn-fit-stage')
+    })
+  }
+
+  test('390x560: both panels expanded, Timing fields apply through scrolling', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 560 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    const inner = await page.evaluate(() => [window.innerWidth, window.innerHeight])
+    expect(inner, 'layout viewport').toEqual([390, 560])
+
+    const elementsToggle = page.getByTestId('btn-toggle-actor-list')
+    const timingToggle = page.getByTestId('btn-toggle-clip-timeline')
+    if ((await elementsToggle.getAttribute('aria-expanded')) !== 'true') {
+      await elementsToggle.click()
+    }
+    if ((await timingToggle.getAttribute('aria-expanded')) !== 'true') {
+      await timingToggle.click()
+    }
+    await expect(elementsToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+
+    const prefs = () =>
+      page.evaluate(() => ({
+        actors: sessionStorage.getItem('motionsketch.actorsPanelOpen'),
+        sequence: sessionStorage.getItem('motionsketch.sequencePanelOpen'),
+      }))
+    await expect.poll(prefs).toEqual({ actors: '1', sequence: '1' })
+
+    const wheelUntil = async (scrollerSelector: string, testId: string) => {
+      const scroller = page.locator(scrollerSelector)
+      const box = await scroller.boundingBox()
+      expect(box, scrollerSelector).toBeTruthy()
+      expect(box!.height).toBeGreaterThan(48)
+      await page.mouse.move(
+        box!.x + box!.width / 2,
+        box!.y + Math.min(20, box!.height / 2),
+      )
+      await expect
+        .poll(async () => {
+          const place = await page.evaluate(
+            ({ scrollerSelector: selector, testId: id }) => {
+              const scroller = document.querySelector(selector)
+              const el = document.querySelector(`[data-testid="${id}"]`)
+              if (!(scroller instanceof HTMLElement) || !(el instanceof HTMLElement)) {
+                return 'missing'
+              }
+              const bounds = scroller.getBoundingClientRect()
+              const rect = el.getBoundingClientRect()
+              const x = rect.left + Math.min(28, rect.width / 2)
+              const y = rect.top + rect.height / 2
+              const centerInScroller = y >= bounds.top + 1 && y <= bounds.bottom - 1
+              const hit = document.elementFromPoint(x, y)
+              const owned =
+                hit instanceof Element && (el.contains(hit) || hit.contains(el))
+              if (centerInScroller && owned) return 'ready'
+              return y > bounds.bottom - 4 ? 'below' : 'above'
+            },
+            { scrollerSelector, testId },
+          )
+          if (place === 'ready') return 'ready'
+          await page.mouse.wheel(0, place === 'below' ? 48 : -48)
+          return place
+        })
+        .toBe('ready')
+    }
+
+    const row = page.locator('[data-testid^="actor-list-item-"]').first()
+    const rowId = await row.getAttribute('data-testid')
+    expect(rowId).toBeTruthy()
+    await wheelUntil(
+      '[data-testid="actor-list-body"] .overflow-y-auto',
+      rowId!,
+    )
+    await row.click()
+    await expect(row).toHaveAttribute('data-selected', 'true')
+
+    await wheelUntil(
+      '[data-testid="actor-list-body"] .overflow-y-auto',
+      'btn-add-actor',
+    )
+    expect(await topTestIdAtCenter(page, 'btn-add-actor')).toBe('btn-add-actor')
+
+    await wheelUntil('[data-testid="sequence-panel-body"]', 'clip-start-input')
+    await page.getByTestId('clip-start-input').fill('0.20')
+    await wheelUntil('[data-testid="sequence-panel-body"]', 'clip-move-for-input')
+    await page.getByTestId('clip-move-for-input').fill('0.80')
+    await wheelUntil('[data-testid="sequence-panel-body"]', 'btn-apply-clip-times')
+    await page.getByTestId('btn-apply-clip-times').click()
+
+    await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue('0.80')
+    await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+    await expect(elementsToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(await prefs()).toEqual({ actors: '1', sequence: '1' })
+
+    for (const id of [
+      'btn-toggle-actor-list',
+      'btn-toggle-clip-timeline',
+      'btn-record',
+      'btn-play',
+      'playback-scrubber',
+      'btn-zoom-out',
+      'btn-zoom-in',
+      'btn-fit-stage',
+    ]) {
+      await page.getByTestId(id).evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      expect(await topTestIdAtCenter(page, id), id).toBe(id)
+    }
   })
 })
