@@ -114,6 +114,8 @@ export function usePointerRecorder({ stageRef }: UsePointerRecorderOptions) {
       useEditorStore.getState().setSnapIndicator(null)
 
       if (state.mode === 'armed') {
+        // preventDefault above suppresses pointer focus; don't leave Record active.
+        captureEl.focus({ preventScroll: true })
         startRecordingDrag(event.pointerId, event.timeStamp, center)
       } else {
         startIdleDrag(event.pointerId, center)
