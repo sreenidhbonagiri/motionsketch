@@ -44,9 +44,12 @@ interface FloatingPanelProps {
 
 /**
  * Compact anchored contextual panel — shared treatment for Adjust / Appearance /
- * Project / Export. On narrow viewports this becomes a bounded sheet between the
- * measured header and the safe-area bottom, with a sticky title/Close and one
- * scrollable body. Escape / Close dismiss without hitting the canvas.
+ * Project / Export. Desktop height stops above the Elements toggle and the dock
+ * (header offset + measured toolbar clearance + one toggle row); extra content
+ * scrolls inside the body. On narrow viewports this becomes a bounded sheet
+ * between the measured header and the safe-area bottom, with a sticky
+ * title/Close and one scrollable body. Escape / Close dismiss without hitting
+ * the canvas.
  */
 export function FloatingPanel({
   id,
@@ -120,7 +123,7 @@ export function FloatingPanel({
       aria-modal="false"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex max-h-[min(32rem,calc(100dvh-12rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-ms-border bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
+      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex max-h-[min(32rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-var(--ms-toolbar-clearance,12rem)-2.75rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-ms-border bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
         align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}

@@ -364,6 +364,7 @@ export function EditorShell() {
       className="fixed inset-0 overflow-hidden bg-[var(--ms-canvas)] text-ms-ink antialiased"
       style={{
         ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
+        ['--ms-toolbar-clearance' as string]: `${toolbarClearancePx}px`,
         ['--ms-actors-max-w' as string]: `${actorsMaxWidthPx}px`,
         ...(actorsReservePx > 0
           ? { ['--ms-actors-reserve' as string]: `${actorsReservePx}px` }
