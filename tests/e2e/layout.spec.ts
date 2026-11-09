@@ -41,6 +41,9 @@ async function topTestIdAtCenter(page: Page, testId: string) {
       rect.top + rect.height / 2,
     )
     if (!(top instanceof Element)) return 'none'
+    // Labels and icons inside the control are that control. A different
+    // test id counts only when it actually covers the center.
+    if (el.contains(top)) return id
     return top.closest('[data-testid]')?.getAttribute('data-testid') ?? 'none'
   }, testId)
 }

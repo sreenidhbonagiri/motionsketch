@@ -54,13 +54,19 @@ const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
 // band that still keeps the collapse row. The toolbar keeps the dock, the
 // Timing header, and its own padding. When Timing is expanded too, also keep
 // a body tall enough that Start at, Move for, and Apply can scroll into view.
-const NARROW_ACTORS_PREFERRED_PX = 208
+const NARROW_ACTORS_PREFERRED_PX = 272
 const NARROW_ACTORS_MIN_PX = 120
 const TIMING_HEADER_PX = 44
 // Leaves the narrow Elements sheet about 108px on a 560px phone: Collapse,
 // plus a scrollport tall enough for Add. Timing's body stays near 80px, so
 // Start at / Move for / Apply fit when scrolled into it.
 const TIMING_BODY_MIN_PX = 72
+// The help block is ~160px at this column width and grows when text wraps.
+// The list floor keeps that scrollport above the 48px wheel target after the
+// dock gains a wrapped status line; only the timing reserve above its own
+// floor is given up.
+const ELEMENTS_LIST_FLOOR_PX = 112
+const TIMING_BODY_FLOOR_PX = 56
 const TOOLBAR_CHROME_PX = 36
 const PANEL_GAP_PX = 8
 const ACTORS_SHEET_LEFT_PX = 12
@@ -202,6 +208,8 @@ export function EditorShell() {
       setCameraBottomPx(Math.ceil(rect.bottom))
     }
     update()
+    // ResizeObserver misses a pure move. The bar's top is the header clearance,
+    // so measure again once that clearance settles.
     const ro = new ResizeObserver(update)
     ro.observe(bar)
     window.addEventListener('resize', update)
@@ -209,7 +217,7 @@ export function EditorShell() {
       ro.disconnect()
       window.removeEventListener('resize', update)
     }
-  }, [])
+  }, [headerClearancePx])
 
   useLayoutEffect(() => {
     const el = headerRef.current
@@ -306,18 +314,32 @@ export function EditorShell() {
   const reserveActorsBand = narrowViewport && actorsOpen && !editing
   // Only while Timing is expanded. A collapsed Timing pill does not take a body,
   // so Elements keeps the full preferred band.
-  const timingBodyReservePx =
+  const timingBodyBudgetPx =
     reserveActorsBand && sequenceOpen && hasRecording ? TIMING_BODY_MIN_PX : 0
-  const actorsRoomPx = Math.max(
+  let actorsRoomPx = Math.max(
     0,
     viewportHeightPx -
       sheetTopPx -
       dockHeightPx -
       TIMING_HEADER_PX -
-      timingBodyReservePx -
+      timingBodyBudgetPx -
       TOOLBAR_CHROME_PX -
       PANEL_GAP_PX,
   )
+  // A wrapped dock line shrinks this room into the 40s. Give the Elements
+  // scrollport its floor back from Timing's spare, and stop before Timing's
+  // own scrollport would fall through 48px.
+  if (
+    timingBodyBudgetPx > 0 &&
+    actorsRoomPx < ELEMENTS_LIST_FLOOR_PX &&
+    timingBodyBudgetPx > TIMING_BODY_FLOOR_PX
+  ) {
+    const give = Math.min(
+      ELEMENTS_LIST_FLOOR_PX - actorsRoomPx,
+      timingBodyBudgetPx - TIMING_BODY_FLOOR_PX,
+    )
+    actorsRoomPx += give
+  }
   const actorsReservePx = reserveActorsBand
     ? Math.min(
         NARROW_ACTORS_PREFERRED_PX,
