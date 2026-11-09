@@ -11,6 +11,7 @@ import { cloneExampleProject, loadExampleSnapshot } from '../examples/load'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import { useConfirm } from '../hooks/useConfirm'
 import { getAppPersistenceController } from '../lib/persistenceController'
+import { blockProjectReplaceDuringTutorial } from '../lib/tutorialGuard'
 import { useEditorStore } from '../state/store'
 import { ExamplePreviewStage } from './ExamplePreviewStage'
 import { ExampleThumbnail } from './ExampleThumbnail'
@@ -148,10 +149,11 @@ export function ExampleGallery({ onClose }: ExampleGalleryProps) {
   const handleUse = (id: ExampleId) => {
     void (async () => {
       setError(null)
+      if (await blockProjectReplaceDuringTutorial(confirm)) return
       if (projectHasMeaningfulWork(project)) {
         const ok = await confirm({
           title: 'Load this example?',
-          body: 'It replaces your current project, including actors, appearance, and motion.',
+          body: 'It replaces your current project, including elements, appearance, and motion.',
           confirmLabel: 'Load example',
           testId: 'load-example-confirm',
           confirmTestId: 'btn-load-example-confirm',

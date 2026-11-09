@@ -56,7 +56,11 @@ function suppressNativeInvalid(event: FormEvent<HTMLInputElement>) {
  * Collapsible Sequence panel: when each actor moves on the shared Duration.
  * Local Start at / Move for drafts commit together via Apply or Enter.
  */
-export function ClipTimeline() {
+export function ClipTimeline({
+  onOpenChange,
+}: {
+  onOpenChange?: (open: boolean) => void
+}) {
   const actors = useEditorStore((s) => s.project.actors)
   const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
@@ -335,6 +339,7 @@ export function ClipTimeline() {
   const setOpenPref = (next: boolean) => {
     setOpen(next)
     writePanelOpenPref(SEQUENCE_PANEL_OPEN_KEY, next)
+    onOpenChange?.(next)
   }
 
   if (!open) {
@@ -353,7 +358,7 @@ export function ClipTimeline() {
           onClick={() => setOpenPref(true)}
           className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-ms-border bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white"
         >
-          <span>Sequence</span>
+          <span>Timing</span>
           <span className="sr-only">Expand</span>
           <span aria-hidden className="text-slate-400">
             ▸
@@ -386,7 +391,7 @@ export function ClipTimeline() {
           onClick={() => setOpenPref(false)}
           className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-1.5 text-left text-sm font-semibold tracking-tight text-slate-800"
         >
-          <span>Sequence</span>
+          <span>Timing</span>
           <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
             <span data-testid="sequence-collapse-label">Collapse</span>
             <span aria-hidden className="text-slate-400">
@@ -405,7 +410,7 @@ export function ClipTimeline() {
             data-testid="clip-timeline-help"
             className="text-xs text-slate-600"
           >
-            Choose when each actor moves.
+            Choose when each element moves.
           </p>
 
           {!hintDismissed && (
@@ -420,7 +425,7 @@ export function ClipTimeline() {
               <button
                 type="button"
                 data-testid="btn-dismiss-sequence-hint"
-                aria-label="Dismiss sequence hint"
+                aria-label="Dismiss timing hint"
                 onClick={dismissHint}
                 className="shrink-0 rounded px-1.5 py-0.5 font-medium text-ms-success hover:bg-ms-selected"
               >
@@ -449,7 +454,7 @@ export function ClipTimeline() {
             data-testid="clip-timeline-rows"
             className="space-y-1.5"
             role="list"
-            aria-label="Actor sequence"
+            aria-label="Element timing"
           >
             {actors.map((actor) => {
               const selectedRow = actor.id === selectedActorId
@@ -518,7 +523,7 @@ export function ClipTimeline() {
                       data-testid={`clip-bar-${actor.id}`}
                       title={
                         stationary
-                          ? 'Stationary — no recorded movement'
+                          ? 'Stationary. No recorded movement'
                           : 'Drag to change start time'
                       }
                       className={`absolute top-0.5 bottom-0.5 touch-none rounded ${
@@ -571,8 +576,8 @@ export function ClipTimeline() {
             data-testid="sequence-gesture-help"
             className="text-xs leading-snug text-slate-500"
           >
-            Moving a bar changes its start. Resizing an edge changes Move for —
-            it does not trim the recording. Arrows nudge; [ ] resize.
+            Moving a bar changes its start. Resizing an edge changes Move for.
+            It does not trim the recording. Arrows nudge; [ ] resize.
           </p>
 
           {selected && (

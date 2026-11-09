@@ -309,9 +309,13 @@ test.describe('react package export', () => {
     await page.getByTestId('btn-download-react-package').click()
     const download = await downloadPromise
     expect(download.suggestedFilename()).toMatch(/react-zip-react-.*\.zip/)
-    await expect(page.getByTestId('export-action-status')).toHaveText(
+    await expect(page.getByTestId('export-react-download-success-title')).toHaveText(
       'React package download started.',
     )
+    await expect(page.getByTestId('export-react-download-success-hint')).toContainText(
+      'existing component',
+    )
+    await expect(page.getByTestId('export-download-success')).toHaveCount(0)
     const zipPath = await download.path()
     expect(zipPath).toBeTruthy()
   })

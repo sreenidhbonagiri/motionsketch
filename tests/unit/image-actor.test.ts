@@ -184,7 +184,7 @@ describe('image actor export', () => {
 
     const { css } = buildProjectCssExport(project)
     expect(isSafeCssForEmbed(css)).toBe(true)
-    expect(css).toContain('alt="Actor image"')
+    expect(css).toContain('alt="Element image"')
     expect(css).not.toContain('@import')
     expect(css).not.toContain(riskyLabel)
 
@@ -203,7 +203,7 @@ describe('image actor export', () => {
       packed.files.find((f) => f.path === WEB_PACKAGE_CSS_NAME)!.bytes,
     )
     expect(isSafeCssForEmbed(pkgCss)).toBe(true)
-    expect(pkgCss).toContain('alt="Actor image"')
+    expect(pkgCss).toContain('alt="Element image"')
     expect(pkgCss).not.toContain('@import')
     expect(pkgCss).not.toContain(riskyLabel)
   })

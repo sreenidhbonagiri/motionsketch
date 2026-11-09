@@ -73,6 +73,14 @@ export function shouldOfferPreviewPauseControl(
   return false
 }
 
+/**
+ * Visible name for a trigger. Stored values stay `page-load`, `click`,
+ * `hover`, and `viewport`.
+ */
+export function playbackTriggerLabel(trigger: PlaybackTrigger): string {
+  return trigger === 'viewport' ? 'when it scrolls into view' : trigger
+}
+
 export function triggerHelpText(trigger: PlaybackTrigger): string {
   switch (trigger) {
     case 'page-load':

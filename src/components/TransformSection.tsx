@@ -125,7 +125,7 @@ export function TransformSection() {
           <p className="text-sm font-medium text-slate-800">Transform</p>
           <p className="text-xs leading-relaxed text-slate-500">
             Rotation (unwrapped °) and uniform scale ({MIN_TRANSFORM_SCALE}–
-            {MAX_TRANSFORM_SCALE}) about the actor center. Empty track → 0° /
+            {MAX_TRANSFORM_SCALE}) about the element center. Empty track → 0° /
             1×. Times are progress along Duration.
           </p>
         </div>
@@ -271,7 +271,7 @@ export function TransformSection() {
 
       {transform.keyframes.length === 0 && (
         <p className="text-xs text-slate-500">
-          No keyframes — actor stays at {formatRotation(DEFAULT_TRANSFORM.rotationDeg)}{' '}
+          No keyframes. The element stays at {formatRotation(DEFAULT_TRANSFORM.rotationDeg)}{' '}
           / {formatScale(DEFAULT_TRANSFORM.scale)}.
         </p>
       )}

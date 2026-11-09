@@ -833,7 +833,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (!availability.enabled) {
         set({
           actionAnnouncement:
-            availability.reason ?? 'Continue path is unavailable.',
+            availability.reason ?? 'Extend path is unavailable.',
         })
         return false
       }
@@ -1037,14 +1037,14 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         after: nextProject,
       })
       if (!snap) {
-        restoreIdle('Continue path failed.')
+        restoreIdle('Extend path failed.')
         return
       }
 
       const first = plan.geometryEdit.samples[0]!
       const bakedNote = plan.bakedLiveTiming
-        ? ' Existing smoothing, Steady Speed, and Glide are now part of the continued path so earlier motion stays the same.'
-        : ' Existing smoothing is now part of the continued path.'
+        ? ' Existing smoothing, Steady Speed, and Glide are now part of the extended path so earlier motion stays the same.'
+        : ' Existing smoothing is now part of the extended path.'
       set({
         mode: 'idle',
         pointerId: null,
@@ -1070,7 +1070,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           'continuePath',
         ),
         actorEditRedoOrder: [],
-        actionAnnouncement: `Path continued.${bakedNote}`,
+        actionAnnouncement: `Path extended.${bakedNote}`,
       })
     },
 
@@ -1090,7 +1090,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         recordingIntent: 'replace',
         livePosition: { ...endpoint },
         playbackHead: actor.clip.end,
-        actionAnnouncement: 'Continue path cancelled.',
+        actionAnnouncement: 'Extend path cancelled.',
         geometryEdit: geometryMirror(actor.geometryEdit),
       })
     },
@@ -1131,7 +1131,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ? { x: first.x, y: first.y }
           : { ...actor.restPosition },
         playbackHead: 0,
-        actionAnnouncement: 'Undo continue path',
+        actionAnnouncement: 'Undo extend path',
       })
     },
 
@@ -1171,7 +1171,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ? { x: first.x, y: first.y }
           : { ...actor.restPosition },
         playbackHead: 0,
-        actionAnnouncement: 'Redo continue path',
+        actionAnnouncement: 'Redo extend path',
       })
     },
 
@@ -1366,7 +1366,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
             x: recording.samples[0]!.x,
             y: recording.samples[0]!.y,
           },
-          actionAnnouncement: 'SVG path imported for the selected actor.',
+          actionAnnouncement: 'SVG path imported for the selected element.',
         }
       })
     },
@@ -2132,7 +2132,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const state = get()
       if (state.project.actors.length >= MAX_ACTORS) {
         set({
-          actionAnnouncement: `Actor limit reached (${MAX_ACTORS}).`,
+          actionAnnouncement: `Element limit reached (${MAX_ACTORS}).`,
         })
         return null
       }
@@ -2168,7 +2168,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const state = get()
       if (state.project.actors.length >= MAX_ACTORS) {
         set({
-          actionAnnouncement: `Actor limit reached (${MAX_ACTORS}).`,
+          actionAnnouncement: `Element limit reached (${MAX_ACTORS}).`,
         })
         return null
       }
@@ -2202,7 +2202,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     deleteSelectedActor: () => {
       const state = get()
       if (state.project.actors.length <= 1) {
-        set({ actionAnnouncement: 'At least one actor is required.' })
+        set({ actionAnnouncement: 'At least one element is required.' })
         return false
       }
       if (
@@ -2223,7 +2223,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         livePosition: { ...next.restPosition },
         ...clearHistoryForActorSwitch(state, { resetContinue: true }),
         geometryEdit: geometryMirror(next.geometryEdit),
-        actionAnnouncement: 'Actor deleted.',
+        actionAnnouncement: 'Element deleted.',
       })
       return true
     },

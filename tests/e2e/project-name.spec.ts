@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ensureEditor, openPanel } from './helpers'
+import { ensureEditor, openPanel, skipTutorialIfPresent } from './helpers'
 
 test.describe('named project entry', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -9,6 +9,9 @@ test.describe('named project entry', () => {
     await expect(page.getByTestId('welcome-screen')).toHaveCount(0)
     await expect(page.getByTestId('project-name-dialog')).toHaveCount(0)
     await expect(page.getByTestId('app-shell')).toBeVisible()
+    // Fresh visits auto-start practice. Skipping with no flight restores the
+    // untitled board and must not write a project.
+    await skipTutorialIfPresent(page)
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
       'Untitled project',
     )
@@ -16,7 +19,7 @@ test.describe('named project entry', () => {
       'Draw motion. Ship it to your website.',
     )
     await expect(page.getByTestId('first-use-next-step')).toContainText(
-      /drag the actor/i,
+      /drag the element/i,
     )
     await expect(page.getByTestId('btn-try-example')).toBeVisible()
     await expect(page.getByTestId('header-save-status')).toHaveCount(0)

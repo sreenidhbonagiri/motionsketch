@@ -34,12 +34,12 @@ export const ADD_POINT_PLACEMENT_COARSE =
   'The ghost sits on the sample that will become the handle. Tap near the path, or use ←/→ then Enter / Place here. Shape stays until you drag.'
 
 /**
- * Armed-record guidance — same drag verb for mouse, touch, and SR/keyboard focus.
- * Shown in the dock as “Ready — …” and re-announced when empty-canvas drag misses.
+ * Armed-record guidance. Same drag verb for mouse, touch, and SR/keyboard focus.
+ * Shown in the dock as “Ready. …” and re-announced when empty-canvas drag misses.
  */
 export const ARMED_INSTRUCTION = 'Drag the element to record.'
 
-export const ARMED_ANNOUNCEMENT = `Ready — ${ARMED_INSTRUCTION}`
+export const ARMED_ANNOUNCEMENT = `Ready. ${ARMED_INSTRUCTION}`
 
 /** Visible + live-region copy after an armed empty-canvas miss (mode stays armed). */
 export const ARMED_MISS_INSTRUCTION = ARMED_INSTRUCTION
@@ -47,12 +47,12 @@ export const ARMED_MISS_INSTRUCTION = ARMED_INSTRUCTION
 /** Live-region copy while a replace take is in progress. */
 export const RECORDING_ANNOUNCEMENT = 'Recording'
 
-/** Live-region copy while a continue-path take is in progress. */
-export const RECORDING_CONTINUATION_ANNOUNCEMENT = 'Recording continuation'
+/** Live-region copy while an extend-path take is in progress. */
+export const RECORDING_CONTINUATION_ANNOUNCEMENT = 'Extending'
 
 /**
- * Mode/chrome announcements that belong on the dock / live region only —
- * not Project file-status UI.
+ * Mode/chrome announcements that belong on the dock / live region only.
+ * Not Project file-status UI.
  */
 export function isRecordingChromeAnnouncement(message: string): boolean {
   if (
@@ -65,8 +65,8 @@ export function isRecordingChromeAnnouncement(message: string): boolean {
   ) {
     return true
   }
-  // Continue-armed dock copy (“Continue — …”) shares the Ready pattern.
-  if (message.startsWith('Ready — ')) return true
+  // Extend-armed dock copy (“Ready. …”) shares the Ready pattern.
+  if (message.startsWith('Ready. ') || message.startsWith('Ready — ')) return true
   return false
 }
 
@@ -81,60 +81,16 @@ export const PLAYING_EDIT_PATH_HINT = 'Pause before editing the path.'
 export const FIRST_USE_HEADLINE = 'Draw motion. Ship it to your website.'
 
 /** Next-step line under the headline — fine pointer (mouse). */
-export const FIRST_USE_NEXT_STEP_FINE = 'Click Record, then drag the actor.'
+export const FIRST_USE_NEXT_STEP_FINE = 'Click Record, then drag the element.'
 
 /** Next-step line under the headline — coarse pointer (touch). */
-export const FIRST_USE_NEXT_STEP_COARSE = 'Tap Record, then drag the actor.'
+export const FIRST_USE_NEXT_STEP_COARSE = 'Tap Record, then drag the element.'
 
 /** Accessible Record/Play empty-board help (same wording as the intro next step). */
 export const EMPTY_BOARD_RECORD_HINT_FINE = FIRST_USE_NEXT_STEP_FINE
 
 /** Accessible Record/Play empty-board help — coarse pointer. */
 export const EMPTY_BOARD_RECORD_HINT_COARSE = FIRST_USE_NEXT_STEP_COARSE
-
-/** After a path exists — next step toward using the motion on a website. */
-export const AFTER_PATH_WEBSITE_HINT =
-  'Play to preview, then open Export → Download for your website.'
-
-/**
- * sessionStorage key for dismissed after-path toasts.
- * Value: JSON string[] of {@link afterPathWebsiteHintProjectKey} entries.
- * Dismissal lasts for the current browser tab session, per project identity
- * (name + first actor id). A New project gets a new actor id, so the toast
- * can appear again after that project’s first path.
- */
-export const AFTER_PATH_WEBSITE_HINT_DISMISSED_KEY =
-  'motionsketch.afterPathWebsiteHintDismissed.v1'
-
-export function afterPathWebsiteHintProjectKey(project: {
-  name: string
-  actors: ReadonlyArray<{ id: string }>
-}): string {
-  return `${project.name}::${project.actors[0]?.id ?? ''}`
-}
-
-export function readAfterPathWebsiteHintDismissedKeys(): Set<string> {
-  try {
-    const raw = sessionStorage.getItem(AFTER_PATH_WEBSITE_HINT_DISMISSED_KEY)
-    if (!raw) return new Set()
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return new Set()
-    return new Set(parsed.filter((k): k is string => typeof k === 'string'))
-  } catch {
-    return new Set()
-  }
-}
-
-export function writeAfterPathWebsiteHintDismissedKeys(keys: Set<string>) {
-  try {
-    sessionStorage.setItem(
-      AFTER_PATH_WEBSITE_HINT_DISMISSED_KEY,
-      JSON.stringify([...keys]),
-    )
-  } catch {
-    // ignore quota / private mode
-  }
-}
 
 export function resolveModeStatus(input: {
   mode: EditorMode
@@ -198,7 +154,7 @@ export function resolveModeStatus(input: {
     if (recordingIntent === 'continue') {
       return {
         kind: 'armed',
-        label: 'Continue',
+        label: 'Extend',
         instruction: CONTINUE_PATH_INSTRUCTION,
       }
     }
@@ -213,7 +169,7 @@ export function resolveModeStatus(input: {
     if (recordingIntent === 'continue') {
       return {
         kind: 'recording',
-        label: 'Continuing',
+        label: 'Extending',
         instruction: 'Release to join, Escape to cancel.',
       }
     }
@@ -228,7 +184,7 @@ export function resolveModeStatus(input: {
     return {
       kind: 'info',
       label: '',
-      instruction: `“${actorLabel}” has no path yet. Record for this actor to edit or reset its take. Play still uses other actors’ takes.`,
+      instruction: `“${actorLabel}” has no path yet. Record for this element to edit or reset its take. Play still uses other elements’ takes.`,
     }
   }
 

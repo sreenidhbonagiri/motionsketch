@@ -64,6 +64,45 @@ function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
+/** Placement snap. Same control before a path (dock) and after one (Motion tools). */
+function SnapGridToggle({
+  pressed,
+  onToggle,
+  className,
+}: {
+  pressed: boolean
+  onToggle: () => void
+  className: string
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="snap-to-grid-toggle"
+      aria-pressed={pressed}
+      aria-describedby="snap-to-grid-help"
+      title="Align placement and path edits to the dots. Recording stays freehand."
+      onClick={onToggle}
+      className={className}
+    >
+      <span
+        data-testid="snap-to-grid-indicator"
+        data-checked={pressed ? 'true' : 'false'}
+        aria-hidden
+        className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${
+          pressed
+            ? 'border-white bg-white text-slate-900'
+            : 'border-slate-400 bg-white text-transparent'
+        }`}
+      >
+        <svg viewBox="0 0 16 16" className="size-3 fill-current">
+          <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
+        </svg>
+      </span>
+      {pressed ? 'Snap on' : 'Snap to grid'}
+    </button>
+  )
+}
+
 /** Shared control height — filled primary, ghost secondary; icons for support. */
 const control =
   'inline-flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
@@ -229,7 +268,7 @@ export function PlaybackDock() {
     ? `${formatSeconds(elapsedMs)} of ${formatSeconds(durationMs)}, backward`
     : `${formatSeconds(elapsedMs)} of ${formatSeconds(durationMs)}`
 
-  const actorLabel = selectedActor?.name?.trim() || 'the selected actor'
+  const actorLabel = selectedActor?.name?.trim() || 'the selected element'
 
   // Compact label + instruction in the dock. Empty-board Record guidance stays on
   // the stage tip (id=stage-empty-hint). Selected-point copy stays in
@@ -254,6 +293,23 @@ export function PlaybackDock() {
     actorLabel,
     recordingIntent,
   })
+  // A gesture hides the idle instruction. Putting it back on blur grows this
+  // bottom-pinned dock and moves Done out from under the pointer, so the click
+  // never leaves edit mode. Keep the resting line's box while the gesture runs.
+  const gestureInstructionReserve =
+    pathGestureActive && mode === 'editing'
+      ? resolveModeStatus({
+          mode,
+          pathTool,
+          pathAddMode,
+          pathGestureActive: false,
+          coarsePointer,
+          hasAnyRecording,
+          hasSelectedRecording: hasRecording,
+          actorLabel,
+          recordingIntent,
+        })?.instruction
+      : null
 
   const emptyBoardHintId = 'stage-empty-hint'
   const playingEditHintId = 'playing-edit-path-hint'
@@ -806,10 +862,10 @@ export function PlaybackDock() {
                     onClick={() => {
                       void (async () => {
                         if (recording) {
-                          const label = selectedActor?.name ?? 'this actor'
+                          const label = selectedActor?.name ?? 'this element'
                           const ok = await confirm({
                             title: `Re-record “${label}”?`,
-                            body: 'This replaces only that actor’s path and transform keyframes. Shared Duration stays the same.',
+                            body: 'This replaces only that element’s path and transform keyframes. Shared Duration stays the same.',
                             confirmLabel: 'Replace recording',
                             testId: 'rerecord-confirm',
                             confirmTestId: 'btn-rerecord-confirm',
@@ -842,7 +898,7 @@ export function PlaybackDock() {
                       data-testid="btn-continue-path-spacer"
                       className={`${btnSecondary} pointer-events-none invisible`}
                     >
-                      Continue path
+                      Extend path
                     </span>
                   ) : (
                     <button
@@ -856,7 +912,7 @@ export function PlaybackDock() {
                       aria-describedby="continue-path-help"
                       className={btnSecondary}
                     >
-                      Continue path
+                      Extend path
                     </button>
                   ))}
               </div>
@@ -910,7 +966,7 @@ export function PlaybackDock() {
                 </span>
                 <span
                   className="inline-flex"
-                  title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                  title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                 >
                   <button
                     type="button"
@@ -919,14 +975,14 @@ export function PlaybackDock() {
                     disabled={isRecordingLike || actorEditOrder.length === 0}
                     className={btnIcon}
                     aria-label="Undo"
-                    title="Undo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                    title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                   >
                     <span aria-hidden>↶</span>
                   </button>
                 </span>
                 <span
                   className="inline-flex"
-                  title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                  title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                 >
                   <button
                     type="button"
@@ -935,13 +991,24 @@ export function PlaybackDock() {
                     disabled={isRecordingLike || actorEditRedoOrder.length === 0}
                     className={btnIcon}
                     aria-label="Redo"
-                    title="Redo placement, transform, sequence timing, Glide, continue path, stage resize, or a motion preset"
+                    title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
                   >
                     <span aria-hidden>↷</span>
                   </button>
                 </span>
               </div>
             </div>
+
+            {/* Placement snap is usable before any path. Motion tools stay hidden until one exists. */}
+            {!hasAnyRecording && !isRecordingLike && (
+              <div className="flex w-full justify-center">
+                <SnapGridToggle
+                  pressed={snapToGrid}
+                  onToggle={() => setSnapToGrid(!snapToGrid)}
+                  className={`${snapToGrid ? btnPrimary : btnSecondary} gap-2`}
+                />
+              </div>
+            )}
 
             {/* Motion-editing actions appear only once a path exists — keeps the empty dock compact. */}
             {hasAnyRecording && (
@@ -975,11 +1042,11 @@ export function PlaybackDock() {
                   aria-expanded={refineOpen}
                   aria-haspopup="dialog"
                   aria-controls={refinePanelId}
-                  title="Refine"
+                  title="Motion tools"
                   onClick={() => setRefineOpen((open) => !open)}
                   className={`${btnSecondary} min-h-8 px-2.5`}
                 >
-                  Refine
+                  Motion tools
                 </button>
                 {refineOpen &&
                   refinePopoverBox &&
@@ -990,7 +1057,7 @@ export function PlaybackDock() {
                       data-testid="refine-motion-tools"
                       data-placement={refinePopoverBox.placement}
                       role="dialog"
-                      aria-label="Refine"
+                      aria-label="Motion tools"
                       tabIndex={-1}
                       className="pointer-events-auto fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
                       style={{
@@ -1042,36 +1109,13 @@ export function PlaybackDock() {
 
                         {!isRecordingLike && (
                           <div className="rounded-lg px-1 py-1">
-                            <button
-                              type="button"
-                              data-testid="snap-to-grid-toggle"
-                              aria-pressed={snapToGrid}
-                              aria-describedby="snap-to-grid-help"
-                              title="Align placement and path edits to the dots. Recording stays freehand."
-                              onClick={() => setSnapToGrid(!snapToGrid)}
+                            <SnapGridToggle
+                              pressed={snapToGrid}
+                              onToggle={() => setSnapToGrid(!snapToGrid)}
                               className={`${
                                 snapToGrid ? btnPrimary : btnSecondary
                               } h-10 min-h-10 w-full justify-start gap-2 px-2.5`}
-                            >
-                              <span
-                                data-testid="snap-to-grid-indicator"
-                                data-checked={snapToGrid ? 'true' : 'false'}
-                                aria-hidden
-                                className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${
-                                  snapToGrid
-                                    ? 'border-white bg-white text-slate-900'
-                                    : 'border-slate-400 bg-white text-transparent'
-                                }`}
-                              >
-                                <svg
-                                  viewBox="0 0 16 16"
-                                  className="size-3 fill-current"
-                                >
-                                  <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
-                                </svg>
-                              </span>
-                              {snapToGrid ? 'Snap on' : 'Snap to grid'}
-                            </button>
+                            />
                           </div>
                         )}
 
@@ -1115,10 +1159,10 @@ export function PlaybackDock() {
                 onClick={() => {
                   void (async () => {
                     if (recording) {
-                      const label = selectedActor?.name ?? 'this actor'
+                      const label = selectedActor?.name ?? 'this element'
                       const ok = await confirm({
                         title: `Reset motion for “${label}”?`,
-                        body: 'Clears this actor’s recorded path, path edits, and transform keyframes. Appearance, other actors, and project Duration / Loop stay the same.',
+                        body: 'Clears this element’s recorded path, path edits, and transform keyframes. Appearance, other elements, and project Duration / Loop stay the same.',
                         confirmLabel: 'Reset motion',
                         danger: true,
                         testId: 'reset-actor-confirm',
@@ -1238,11 +1282,11 @@ export function PlaybackDock() {
               {modeStatus.kind === 'armed' && modeStatus.instruction ? (
                 <>
                   <span aria-hidden="true" className="text-slate-500">
-                    {' — '}
+                    {'. '}
                   </span>
                   <span
                     data-testid="mode-status-instruction"
-                    className="text-slate-500"
+                    className="text-sm text-ms-ink"
                   >
                     {modeStatus.instruction}
                   </span>
@@ -1250,9 +1294,13 @@ export function PlaybackDock() {
               ) : modeStatus.instruction ? (
                 <span
                   data-testid="mode-status-instruction"
-                  className="text-slate-500"
+                  className="text-sm text-ms-ink"
                 >
                   {modeStatus.instruction}
+                </span>
+              ) : gestureInstructionReserve ? (
+                <span aria-hidden="true" className="invisible text-sm text-ms-ink">
+                  {gestureInstructionReserve}
                 </span>
               ) : null}
             </div>
@@ -1266,7 +1314,7 @@ export function PlaybackDock() {
             on the stage, or focus it and use arrow keys to nudge. Hold Shift for
             a larger step. Escape or pointer cancel restores the baseline without
             an undo entry. Stage bounds keep every sample center on stage when
-            the path starts in bounds; the actor’s rotated or scaled appearance
+            the path starts in bounds; the element’s rotated or scaled appearance
             may still extend past the stage.
           </p>
           <p id="path-add-help" className="sr-only">

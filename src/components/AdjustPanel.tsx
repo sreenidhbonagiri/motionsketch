@@ -44,7 +44,7 @@ export function AdjustPanel() {
       <p className="text-xs text-slate-500">
         Duration and loop are shared. Smoothing and Steady Speed apply to{' '}
         <span className="font-medium text-slate-700">
-          {selectedActor?.name ?? 'the selected actor'}
+          {selectedActor?.name ?? 'the selected element'}
         </span>
         .
       </p>
@@ -81,9 +81,9 @@ export function AdjustPanel() {
           data-testid="duration-help"
           className="text-xs leading-relaxed text-slate-500"
         >
-          Total playback time for the project. Changing Duration scales the
-          Sequence proportionally — each actor keeps the same relative start and
-          Move for. Longer Duration plays the same motions more slowly.
+          Total playback time for the project. Changing Duration scales Timing
+          proportionally. Each element keeps the same relative start and Move
+          for. Longer Duration plays the same motions more slowly.
         </p>
       </div>
 
@@ -149,7 +149,7 @@ export function AdjustPanel() {
         >
           {selectedHasRecording
             ? 'Evens out movement speed while keeping pauses. Glide (dock) adds ease-in/out after this — they compose, they are not the same control.'
-            : 'Create a path for this actor to adjust Steady Speed.'}
+            : 'Create a path for this element to adjust Steady Speed.'}
         </p>
       </div>
 

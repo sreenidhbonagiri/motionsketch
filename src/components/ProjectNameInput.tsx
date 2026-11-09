@@ -70,7 +70,7 @@ export function ProjectNameInput({
 
   if (!editing) {
     return (
-      <div className="min-w-0">
+      <div className="min-w-0 shrink-0">
         <button
           type="button"
           data-testid="btn-rename-project"

@@ -89,7 +89,7 @@ test.describe('face along path', () => {
     await toggle.check()
     await expect(page.getByTestId('direction-offset-slider')).toBeVisible()
     await expect(page.getByTestId('face-along-path-section')).toContainText(
-      /Turns the actor to follow its movement/i,
+      /Turns the element to follow its movement/i,
     )
     await expect(page.getByTestId('face-along-path-section')).toContainText(
       /does not turn around to face backward travel/i,

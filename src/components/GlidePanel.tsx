@@ -125,7 +125,7 @@ export function GlidePanel() {
         {session.changed
           ? `Preview ready (${session.segmentsAdjusted} moving section${
               session.segmentsAdjusted === 1 ? '' : 's'
-            }). Watch the actor — not just the path.`
+            }). Watch the element, not just the path.`
           : (session.reason ?? 'Nothing to glide at this strength.')}
       </p>
 

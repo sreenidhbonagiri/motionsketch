@@ -83,7 +83,7 @@ test.describe('mode and path-tool status', () => {
       'armed',
     )
     await expect(page.getByTestId('dock-status')).toContainText(
-      'Ready — Drag the element to record.',
+      'Ready. Drag the element to record.',
     )
     await expect(page.getByTestId('btn-stop')).toHaveAccessibleName(
       'Cancel record',

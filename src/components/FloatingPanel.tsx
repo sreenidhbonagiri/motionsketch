@@ -1,7 +1,12 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { useEditorStore } from '../state/store'
 
-export type ChromePanel = 'project' | 'adjust' | 'appearance' | 'export'
+export type ChromePanel =
+  | 'project'
+  | 'adjust'
+  | 'appearance'
+  | 'export'
+  | 'help'
 
 /**
  * After a chrome panel unmounts, return-focus to the opener only when focus
@@ -39,9 +44,14 @@ interface FloatingPanelProps {
 
 /**
  * Compact anchored contextual panel — shared treatment for Adjust / Appearance /
- * Project / Export. On narrow viewports this becomes a bounded sheet between the
- * measured header and the safe-area bottom, with a sticky title/Close and one
- * scrollable body. Escape / Close dismiss without hitting the canvas.
+ * Project / Export. Left panels stop above the Elements toggle (header offset +
+ * measured bottom-stack clearance + one toggle row). Right panels stop above
+ * the dock only: an open Timing stack already fills the column under the
+ * header, and subtracting that stack collapses Export to nothing. Extra content
+ * scrolls inside the body. On narrow viewports this becomes a bounded sheet
+ * between the measured header and the safe-area bottom, with a sticky
+ * title/Close and one scrollable body. Escape / Close dismiss without hitting
+ * the canvas.
  */
 export function FloatingPanel({
   id,
@@ -106,6 +116,11 @@ export function FloatingPanel({
 
   if (!open) return null
 
+  const desktopMaxHeight =
+    align === 'left'
+      ? 'max-h-[min(32rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-var(--ms-toolbar-clearance,12rem)-2.75rem))]'
+      : 'max-h-[min(32rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-var(--ms-dock-clearance,12rem)))]'
+
   return (
     <div
       ref={panelRef}
@@ -115,7 +130,7 @@ export function FloatingPanel({
       aria-modal="false"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex max-h-[min(32rem,calc(100dvh-12rem))] w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-ms-border bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
+      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex ${desktopMaxHeight} w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-ms-border bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
         align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}

@@ -41,9 +41,9 @@ export function FaceAlongPathSection() {
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-800">Face along path</p>
           <p id={helpId} className="text-xs leading-relaxed text-slate-500">
-            Turns the actor to follow its movement. Path heading is a base
+            Turns the element to follow its movement. Path heading is a base
             rotation; transform keyframes and Direction offset add to it. With
-            Alternate loop, poses reverse along the same angles — the actor does
+            Alternate loop, poses reverse along the same angles. The element does
             not turn around to face backward travel.
           </p>
         </div>
@@ -54,8 +54,8 @@ export function FaceAlongPathSection() {
           data-testid="face-along-continue-note"
           className="text-xs leading-relaxed text-amber-800/90"
         >
-          Continue path is unavailable while Face along path is on. Facing uses
-          the whole stroke, so continuing would change earlier facing.
+          Extend path is unavailable while Face along path is on. Facing uses
+          the whole stroke, so extending would change earlier facing.
         </p>
       )}
 
