@@ -125,9 +125,11 @@ describe('workspace camera', () => {
     )
   })
 
-  it('blocks Space pan while focus is in form controls', () => {
+  it('blocks workspace shortcuts while focus is in form controls', () => {
     const input = document.createElement('input')
     expect(isSpacePanBlockedTarget(input)).toBe(true)
+    const button = document.createElement('button')
+    expect(isSpacePanBlockedTarget(button)).toBe(true)
     const div = document.createElement('div')
     expect(isSpacePanBlockedTarget(div)).toBe(false)
   })

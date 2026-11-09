@@ -157,17 +157,8 @@ export function formatZoomPercent(zoom: number): string {
   return `${Math.round(clampCameraZoom(zoom) * 100)}%`
 }
 
-/**
- * True when Space should be ignored (typing / form controls), so pan does not
- * steal keys from inputs, textareas, selects, or contenteditable.
- */
-export function isSpacePanBlockedTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false
-  const el = target.closest(
-    'input, textarea, select, button, [contenteditable="true"], [role="textbox"], [role="combobox"], [role="spinbutton"]',
-  )
-  return el !== null
-}
+/** Re-export: form/button targets that must keep native Space / typing. */
+export { isWorkspaceShortcutBlockedTarget as isSpacePanBlockedTarget } from '../lib/editorShortcuts'
 
 /**
  * True when the event target is empty workspace/stage canvas — not an actor,

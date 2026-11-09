@@ -11,6 +11,7 @@ import {
   statusLabel,
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
+import { useEditorShortcuts } from '../hooks/useEditorShortcuts'
 import { useTransformShortcuts } from '../hooks/useTransformShortcuts'
 import { useTutorial } from '../hooks/useTutorial'
 import {
@@ -30,6 +31,7 @@ import { ExportPanel } from './ExportPanel'
 import { GlidePanel } from './GlidePanel'
 import { HelpPanel } from './HelpPanel'
 import { PresetPanel } from './PresetPanel'
+import { ShortcutSheet } from './ShortcutSheet'
 import { ProjectNameInput } from './ProjectNameInput'
 import {
   FloatingPanel,
@@ -110,6 +112,7 @@ export function EditorShell() {
   const actorIsImage = actor?.kind === 'image' && !!actor.image
 
   const [openPanel, setOpenPanel] = useState<ChromePanel | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [examplesOpen, setExamplesOpen] = useState(false)
   const [hintDismissed, setHintDismissed] = useState(() => {
     try {
@@ -161,11 +164,23 @@ export function EditorShell() {
     setExamplesOpen(false)
     setOpenPanel('export')
   }, [])
+  const openShortcuts = useCallback(() => {
+    setExamplesOpen(false)
+    setOpenPanel(null)
+    setShortcutsOpen(true)
+  }, [])
+  const closeShortcuts = useCallback(() => setShortcutsOpen(false), [])
 
   const { view: tutorial, skipTutorial, goNext, restartTutorial } = useTutorial({
     openPanel,
     closePanels: closeChrome,
     ensureExportOpen,
+  })
+
+  useEditorShortcuts({
+    shortcutsOpen,
+    onOpenShortcuts: openShortcuts,
+    onCloseShortcuts: closeShortcuts,
   })
 
   const togglePanel = (id: ChromePanel) => {
@@ -413,6 +428,8 @@ export function EditorShell() {
       {/* Full-viewport interactive stage (only drawing surface) */}
       <CanvasStage />
 
+      <ShortcutSheet open={shortcutsOpen} onClose={closeShortcuts} />
+
       {tutorial.active && tutorial.step && (
         <TutorialCoach
           step={tutorial.step}
@@ -530,6 +547,10 @@ export function EditorShell() {
               onRestartTutorial={() => {
                 closePanel()
                 restartTutorial()
+              }}
+              onOpenShortcuts={() => {
+                closePanel()
+                openShortcuts()
               }}
             />
           </FloatingPanel>

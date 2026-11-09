@@ -13,7 +13,7 @@ MotionSketch stores each project’s **logical stage aspect** (`stageAspect` = w
 
 ## How the editor presents the stage
 
-The workspace fills the viewport with the same light canvas wash as before. Inside it, a **stage frame** uses the project’s stored `stageAspect` (the exported scene), marked by a subtle hairline when the bounds are visible. Normalized coordinates map to that frame. A view-only camera (empty-canvas pan / zoom / Fit stage; Space pans over actors) moves the view; it never rewrites samples, `stageAspect`, undo history, or export output. Panning does not enlarge the exported animation area.
+The workspace fills the viewport with the same light canvas wash as before. Inside it, a **stage frame** uses the project’s stored `stageAspect` (the exported scene), marked by a subtle hairline when the bounds are visible. Normalized coordinates map to that frame. A view-only camera (empty-canvas pan / zoom / Fit stage; hold H or middle-drag to pan over actors; Space plays or pauses) moves the view; it never rewrites samples, `stageAspect`, undo history, or export output. Panning does not enlarge the exported animation area.
 
 Off-frame workspace is for navigation only. Sample centers stay clamped to the stage (`[0, 1]²`). To add usable drawing space, use **Stage size → Resize** (expand with a 3×3 anchor). Shrinking past existing content is rejected. There is no automatic growth while drawing and no infinite-canvas export.
 

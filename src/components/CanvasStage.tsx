@@ -173,8 +173,8 @@ export function CanvasStage() {
   const {
     layout,
     worldTransform,
-    spaceHeld,
-    spacePanActive,
+    handHeld,
+    handPanActive,
     backgroundPanEnabled,
     panning,
     fitStage,
@@ -376,10 +376,10 @@ export function CanvasStage() {
     snapIndicator,
   ])
 
-  // Grab on empty canvas; grabbing while panning; Space override uses grab too.
+  // Grab on empty canvas; grabbing while panning; H override uses grab too.
   const cursorClass = panning
     ? 'cursor-grabbing'
-    : spacePanActive || backgroundPanEnabled
+    : handPanActive || backgroundPanEnabled
       ? editing && pathAddMode
         ? 'cursor-crosshair'
         : 'cursor-grab'
@@ -418,7 +418,7 @@ export function CanvasStage() {
             height: layout.height > 0 ? layout.height : undefined,
           }}
           onPointerDown={
-            !spacePanActive &&
+            !handPanActive &&
             editing &&
             pathAddMode &&
             pathTool === 'edit-points'
@@ -426,7 +426,7 @@ export function CanvasStage() {
               : undefined
           }
           onPointerMove={
-            spacePanActive
+            handPanActive
               ? undefined
               : editing
                 ? pathAddMode && pathTool === 'edit-points'
@@ -435,10 +435,10 @@ export function CanvasStage() {
                 : onRecordPointerMove
           }
           onPointerUp={
-            spacePanActive || editing ? undefined : onRecordPointerUp
+            handPanActive || editing ? undefined : onRecordPointerUp
           }
           onPointerCancel={
-            spacePanActive || editing ? undefined : onRecordPointerCancel
+            handPanActive || editing ? undefined : onRecordPointerCancel
           }
         >
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
@@ -497,11 +497,11 @@ export function CanvasStage() {
                   stageHeight={size.height}
                   zIndex={10 + index}
                   selected={isSelected}
-                  armed={mode === 'armed' && isSelected && !spaceHeld}
-                  recording={mode === 'recording' && isSelected && !spaceHeld}
+                  armed={mode === 'armed' && isSelected && !handHeld}
+                  recording={mode === 'recording' && isSelected && !handHeld}
                   hidden={hidden}
-                  // Space temporarily disables actor hits so pan can override.
-                  interactive={!spaceHeld}
+                  // H temporarily disables actor hits so pan can override.
+                  interactive={!handHeld}
                   rotationDeg={rotationDeg}
                   scale={xf.scale}
                   onPointerDown={(e) => onActorPointerDown(actor.id, e)}
@@ -513,7 +513,7 @@ export function CanvasStage() {
             workingSamples &&
             size.width > 0 &&
             moveTool &&
-            !spaceHeld && (
+            !handHeld && (
             <PathMoveOverlay
               samples={workingSamples}
               hovered={moveHovered}
@@ -533,7 +533,7 @@ export function CanvasStage() {
             workingSamples &&
             size.width > 0 &&
             !moveTool &&
-            !spaceHeld && (
+            !handHeld && (
             <PathHandles
               samples={workingSamples}
               handleIndices={handleIndices}

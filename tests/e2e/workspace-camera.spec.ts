@@ -184,7 +184,7 @@ test.describe('workspace camera', () => {
     expect(Math.hypot(end.x - prev.x, end.y - prev.y)).toBeGreaterThan(0.02)
   })
 
-  test('Space pans temporarily over actors without a Hand toggle', async ({
+  test('H pans temporarily over actors without a Hand toggle', async ({
     page,
   }) => {
     await page.goto('/')
@@ -195,15 +195,15 @@ test.describe('workspace camera', () => {
     await closeOpenChromePanels(page)
     // waitForSaved opens Project then closes it; FloatingPanel may briefly
     // return focus to btn-project. Take the stage afterward and assert it
-    // before Space — Space on a focused button is intentionally ignored.
+    // before H — H on a focused button is intentionally ignored.
     await page.getByTestId('stage').focus()
     await expect(page.getByTestId('stage')).toBeFocused()
     await expect(page.getByTestId('btn-hand-tool')).toHaveCount(0)
     const before = await readCamera(page)
 
     await expect(page.getByTestId('stage')).toBeFocused()
-    await page.keyboard.down(' ')
-    // Drag starting over the actor — Space overrides actor interaction.
+    await page.keyboard.down('h')
+    // Drag starting over the actor — H overrides actor interaction.
     const actor = page.getByTestId('actor')
     const box = await actor.boundingBox()
     expect(box).toBeTruthy()
@@ -215,18 +215,18 @@ test.describe('workspace camera', () => {
     expect(
       Math.hypot(mid.panX - before.panX, mid.panY - before.panY),
     ).toBeGreaterThan(5)
-    await page.keyboard.up(' ')
+    await page.keyboard.up('h')
 
     const afterSamples = await readActor0Samples(page)
     expect(afterSamples!.samples).toEqual(beforeSamples!.samples)
 
-    // Typing in a form control must not arm Space-pan-over-actors.
+    // Typing in a form control must not arm H-pan-over-actors.
     await page.getByTestId('btn-rename-project').click()
     const name = page.getByTestId('header-project-name-input')
     await expect(name).toBeFocused()
     const typedBefore = await readCamera(page)
-    await page.keyboard.down(' ')
-    // Drag starting on the actor: without Space override this must not pan
+    await page.keyboard.down('h')
+    // Drag starting on the actor: without H override this must not pan
     // (actor hit wins; empty-canvas pan would still work elsewhere).
     const actorBox = await page.getByTestId('actor').boundingBox()
     expect(actorBox).toBeTruthy()
@@ -237,10 +237,29 @@ test.describe('workspace camera', () => {
     await page.mouse.down()
     await page.mouse.move(actorBox!.x + 60, actorBox!.y + 40, { steps: 4 })
     await page.mouse.up()
-    await page.keyboard.up(' ')
+    await page.keyboard.up('h')
     const typedAfter = await readCamera(page)
     expect(typedAfter.panX).toBeCloseTo(typedBefore.panX, 0)
     expect(typedAfter.panY).toBeCloseTo(typedBefore.panY, 0)
+  })
+
+  test('Space plays and pauses from the stage without panning', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await closeOpenChromePanels(page)
+    await page.getByTestId('stage').focus()
+    await expect(page.getByTestId('stage')).toBeFocused()
+    const before = await readCamera(page)
+    await page.keyboard.press(' ')
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await page.keyboard.press(' ')
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+    const after = await readCamera(page)
+    expect(after.panX).toBeCloseTo(before.panX, 0)
+    expect(after.panY).toBeCloseTo(before.panY, 0)
   })
 
   test('Edit points and snap stay aligned under zoom; handle drag beats pan', async ({

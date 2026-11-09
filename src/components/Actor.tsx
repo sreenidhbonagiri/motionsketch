@@ -20,7 +20,7 @@ interface ActorProps {
   /** When true, not painted for hit-testing; still mounted for layout tests. */
   hidden?: boolean
   /**
-   * When false, visible but not interactive (e.g. workspace Hand / Space pan).
+   * When false, visible but not interactive (e.g. workspace H / middle pan).
    * Does not change saved visibility.
    */
   interactive?: boolean

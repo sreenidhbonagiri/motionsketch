@@ -11,7 +11,7 @@ export type ChromePanel =
 /**
  * After a chrome panel unmounts, return-focus to the opener only when focus
  * is still neutral (body / gone with the panel). If the user or a test already
- * moved focus elsewhere (e.g. the stage for Space-pan), leave it alone —
+ * moved focus elsewhere (e.g. the stage for Space play/pause), leave it alone —
  * double-rAF restore must not steal that focus back onto the opener button.
  */
 export function shouldReturnFocusOnClose(

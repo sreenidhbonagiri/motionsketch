@@ -14,6 +14,7 @@ import {
   smoothBendAvailability,
 } from '../core/edit'
 import { traversalElapsedMs } from '../core/playback'
+import { useArmRecording } from '../hooks/useArmRecording'
 import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { useConfirm } from '../hooks/useConfirm'
 import {
@@ -141,14 +142,12 @@ export function PlaybackDock() {
   const playbackHead = useEditorStore((s) => s.playbackHead)
   const playbackDirection = useEditorStore((s) => s.playbackDirection)
   const scrubPlayback = useEditorStore((s) => s.scrubPlayback)
-  const armRecording = useEditorStore((s) => s.armRecording)
   const armContinuePath = useEditorStore((s) => s.armContinuePath)
   const recordingIntent = useEditorStore((s) => s.recordingIntent)
   const play = useEditorStore((s) => s.play)
   const pause = useEditorStore((s) => s.pause)
   const restartPlayback = useEditorStore((s) => s.restartPlayback)
   const resetRecording = useEditorStore((s) => s.resetRecording)
-  const setPlaybackHead = useEditorStore((s) => s.setPlaybackHead)
   const enterEditMode = useEditorStore((s) => s.enterEditMode)
   const exitEditMode = useEditorStore((s) => s.exitEditMode)
   const beginPolishSession = useEditorStore((s) => s.beginPolishSession)
@@ -180,6 +179,7 @@ export function PlaybackDock() {
   const stageAspect = useEditorStore((s) => s.project.stageAspect)
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const confirm = useConfirm()
+  const requestArmRecording = useArmRecording()
   const coarsePointer = useCoarsePointer()
   const [refineOpen, setRefineOpen] = useState(false)
   const refineBtnRef = useRef<HTMLButtonElement>(null)
@@ -860,23 +860,7 @@ export function PlaybackDock() {
                       !hasAnyRecording ? emptyBoardHintId : undefined
                     }
                     onClick={() => {
-                      void (async () => {
-                        if (recording) {
-                          const label = selectedActor?.name ?? 'this element'
-                          const ok = await confirm({
-                            title: `Re-record “${label}”?`,
-                            body: 'This replaces only that element’s path and transform keyframes. Shared Duration stays the same.',
-                            confirmLabel: 'Replace recording',
-                            testId: 'rerecord-confirm',
-                            confirmTestId: 'btn-rerecord-confirm',
-                            cancelTestId: 'btn-rerecord-cancel',
-                            bodyTestId: 'rerecord-confirm-copy',
-                          })
-                          if (!ok) return
-                        }
-                        setPlaybackHead(0)
-                        armRecording()
-                      })()
+                      void requestArmRecording()
                     }}
                     // Empty board: Record is the primary action. After a path exists,
                     // Play takes the primary style so preview/export stays front-of-mind.
