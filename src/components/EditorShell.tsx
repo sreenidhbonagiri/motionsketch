@@ -131,6 +131,9 @@ export function EditorShell() {
     typeof window === 'undefined' ? 1280 : window.innerWidth,
   )
   const [dockHeightPx, setDockHeightPx] = useState(176)
+  // Space from the viewport bottom to the top of the dock, so right-hand
+  // chrome panels stop above Play rather than using the whole Timing stack.
+  const [dockClearancePx, setDockClearancePx] = useState(192)
   const [cameraLeftPx, setCameraLeftPx] = useState(() =>
     typeof window === 'undefined' ? 1024 : window.innerWidth,
   )
@@ -246,7 +249,11 @@ export function EditorShell() {
       setViewportWidthPx(window.innerWidth)
       const dock = slot.querySelector('[data-testid="playback-dock"]')
       if (dock instanceof HTMLElement) {
-        setDockHeightPx(Math.ceil(dock.getBoundingClientRect().height))
+        const dockRect = dock.getBoundingClientRect()
+        setDockHeightPx(Math.ceil(dockRect.height))
+        setDockClearancePx(
+          Math.ceil(window.innerHeight - dockRect.top) + gapPx,
+        )
       }
     }
     update()
@@ -387,6 +394,7 @@ export function EditorShell() {
       style={{
         ['--ms-sheet-top' as string]: `${sheetTopPx}px`,
         ['--ms-toolbar-clearance' as string]: `${toolbarClearancePx}px`,
+        ['--ms-dock-clearance' as string]: `${dockClearancePx}px`,
         ['--ms-actors-max-w' as string]: `${actorsMaxWidthPx}px`,
         ...(actorsReservePx > 0
           ? { ['--ms-actors-reserve' as string]: `${actorsReservePx}px` }
