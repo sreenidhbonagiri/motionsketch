@@ -293,6 +293,23 @@ export function PlaybackDock() {
     actorLabel,
     recordingIntent,
   })
+  // A gesture hides the idle instruction. Putting it back on blur grows this
+  // bottom-pinned dock and moves Done out from under the pointer, so the click
+  // never leaves edit mode. Keep the resting line's box while the gesture runs.
+  const gestureInstructionReserve =
+    pathGestureActive && mode === 'editing'
+      ? resolveModeStatus({
+          mode,
+          pathTool,
+          pathAddMode,
+          pathGestureActive: false,
+          coarsePointer,
+          hasAnyRecording,
+          hasSelectedRecording: hasRecording,
+          actorLabel,
+          recordingIntent,
+        })?.instruction
+      : null
 
   const emptyBoardHintId = 'stage-empty-hint'
   const playingEditHintId = 'playing-edit-path-hint'
@@ -1280,6 +1297,10 @@ export function PlaybackDock() {
                   className="text-sm text-ms-ink"
                 >
                   {modeStatus.instruction}
+                </span>
+              ) : gestureInstructionReserve ? (
+                <span aria-hidden="true" className="invisible text-sm text-ms-ink">
+                  {gestureInstructionReserve}
                 </span>
               ) : null}
             </div>
