@@ -17,6 +17,7 @@ import {
   openPanel,
   readExportedCss,
   ensureActorListExpanded,
+  closePanel,
 } from './helpers'
 
 function roundedTurnSamples(n = 41): MotionSample[] {
@@ -236,7 +237,7 @@ test.describe('local bend actions', () => {
     await ensureActorListExpanded(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-list-item-actor-a').click()
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await page.getByTestId('btn-edit-path').click()
     for (let i = 0; i < handles.indexOf(mid); i++) {
       await page.keyboard.press(']')
@@ -250,7 +251,7 @@ test.describe('local bend actions', () => {
     await ensureActorListExpanded(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-list-item-actor-b').click()
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await page.getByTestId('btn-edit-path').click()
     // Actor B still has the straight fixture handle count / make-corner disabled.
     await page.keyboard.press(']')

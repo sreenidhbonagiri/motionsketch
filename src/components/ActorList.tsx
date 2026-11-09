@@ -21,9 +21,14 @@ const desktopFloatSheet =
 
 export function ActorList({
   floatOpen = false,
+  variant = 'floating',
+  forceOpen = false,
   onOpenChange,
 }: {
   floatOpen?: boolean
+  /** Docked sidebar: fills its grid cell and reserves layout space. */
+  variant?: 'floating' | 'docked'
+  forceOpen?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const actors = useEditorStore((s) => s.project.actors)
@@ -39,10 +44,12 @@ export function ActorList({
   const moveSelectedActor = useEditorStore((s) => s.moveSelectedActor)
   const confirm = useConfirm()
 
-  // Fresh workspace: collapsed. Explicit toggles persist for this tab.
+  // Fresh workspace: collapsed (floating) or open (docked sidebar).
   const [open, setOpen] = useState(() =>
-    readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, false),
+    forceOpen || readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, variant === 'docked'),
   )
+  const docked = variant === 'docked'
+  const showBody = docked || open
   const busy =
     mode === 'recording' || mode === 'armed' || mode === 'editing'
 
@@ -54,6 +61,204 @@ export function ActorList({
     setOpen(next)
     writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, next)
     onOpenChange?.(next)
+  }
+
+  if (docked) {
+    return (
+      <div
+        data-testid="actor-list"
+        data-actors-open="true"
+        className="flex h-full min-h-0 w-full flex-col"
+      >
+        <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-ms-border px-2">
+          <span className="truncate text-xs font-semibold text-slate-800">
+            Elements{' '}
+            <span className="font-normal tabular-nums text-slate-500">
+              {actors.length}/{MAX_ACTORS}
+            </span>
+          </span>
+          <button
+            type="button"
+            data-testid="btn-toggle-actor-list"
+            aria-expanded="true"
+            aria-controls="actor-list-body"
+            onClick={() => setOpenPref(false)}
+            className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+          >
+            <span data-testid="actors-collapse-label">Collapse</span>
+            <span aria-hidden className="text-slate-400">
+              ▾
+            </span>
+          </button>
+        </div>
+        <div
+          id="actor-list-body"
+          data-testid="actor-list-body"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-2.5 py-2 [overflow-anchor:none]">
+            <ul
+              data-testid="actor-list-items"
+              className="space-y-1 overflow-auto"
+              role="listbox"
+              aria-label="Elements"
+            >
+              {actors.map((actor, index) => {
+                const selectedRow = actor.id === selectedActorId
+                const hiddenNow = !isActorVisibleAt(playbackHead, actor.clip)
+                return (
+                  <li key={actor.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selectedRow}
+                      data-testid={`actor-list-item-${actor.id}`}
+                      data-selected={selectedRow ? 'true' : 'false'}
+                      data-hidden-now={hiddenNow ? 'true' : 'false'}
+                      disabled={busy && !selectedRow}
+                      onClick={() => selectActor(actor.id)}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition ${
+                        selectedRow
+                          ? 'bg-ms-selected font-medium text-ms-ink ring-1 ring-ms-primary/30'
+                          : 'text-slate-700 hover:bg-slate-900/[0.05]'
+                      } disabled:opacity-50`}
+                    >
+                      <span
+                        className="size-2.5 shrink-0 rounded-sm"
+                        style={{
+                          background:
+                            actor.appearance.kind === 'shape'
+                              ? actor.appearance.color
+                              : '#94a3b8',
+                        }}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {actor.name}
+                      </span>
+                      <span className="shrink-0 text-xs text-ms-muted">
+                        {index + 1}
+                        {actor.recording ? ' · path' : ''}
+                        {hiddenNow ? ' · hidden' : ''}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            {selected && (
+              <label className="block space-y-1">
+                <span className="text-xs text-slate-500">Name</span>
+                <ActorNameInput
+                  actorId={selected.id}
+                  committedName={selected.name}
+                  disabled={busy}
+                  onCommit={(id, name) => renameActor(id, name)}
+                />
+              </label>
+            )}
+            {selected && selectedHidden && (
+              <div
+                data-testid="actor-hidden-indicator"
+                className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2"
+              >
+                <p className="text-[11px] font-medium text-amber-950">
+                  Hidden at this time
+                </p>
+                <button
+                  type="button"
+                  data-testid="btn-seek-clip-start"
+                  disabled={busy}
+                  onClick={() => scrubPlayback(selected.clip.start)}
+                  className="rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-medium text-amber-950 transition hover:bg-amber-100 disabled:opacity-40"
+                >
+                  Go to start
+                </button>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                data-testid="btn-add-actor"
+                disabled={busy || actors.length >= MAX_ACTORS}
+                onClick={() => addActor()}
+                className="inline-flex h-8 min-h-8 items-center rounded-lg bg-ms-primary px-2.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                data-testid="btn-duplicate-actor"
+                disabled={busy || actors.length >= MAX_ACTORS}
+                onClick={() => duplicateSelectedActor()}
+                className="inline-flex h-8 min-h-8 items-center rounded-lg px-2.5 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                data-testid="btn-delete-actor"
+                disabled={busy || actors.length <= 1}
+                aria-describedby="actor-list-help"
+                onClick={() => {
+                  void (async () => {
+                    const label = selected?.name?.trim() || 'this element'
+                    const ok = await confirm({
+                      title: `Delete “${label}”?`,
+                      body: 'Its path, transform keyframes, path edits, and appearance are removed. This cannot be undone.',
+                      confirmLabel: 'Delete element',
+                      danger: true,
+                      testId: 'delete-actor-confirm',
+                      confirmTestId: 'btn-delete-actor-confirm',
+                      cancelTestId: 'btn-delete-actor-cancel',
+                      bodyTestId: 'delete-actor-confirm-copy',
+                    })
+                    if (ok) deleteSelectedActor()
+                  })()
+                }}
+                className="inline-flex h-8 min-h-8 items-center rounded-lg px-2.5 text-xs font-medium text-ms-danger transition hover:bg-red-50 disabled:opacity-40"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                data-testid="btn-actor-reorder-up"
+                disabled={busy}
+                onClick={() => moveSelectedActor(-1)}
+                className="inline-flex h-8 min-h-8 min-w-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
+                aria-label="Move element earlier in stack"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                data-testid="btn-actor-reorder-down"
+                disabled={busy}
+                onClick={() => moveSelectedActor(1)}
+                className="inline-flex h-8 min-h-8 min-w-8 items-center justify-center rounded-lg text-xs font-medium text-slate-600 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
+                aria-label="Move element later in stack"
+              >
+                ↓
+              </button>
+            </div>
+            <p
+              id="actor-list-help"
+              data-testid="actor-list-help"
+              className="text-[13px] leading-snug text-ms-muted"
+            >
+              List order is stacking (later on top). Path and transform edits
+              apply to the selected element only. Switching elements clears path
+              and transform undo history for the previous selection.
+              {actors.length <= 1
+                ? ' Delete stays unavailable while only one element remains.'
+                : busy
+                  ? ' Element list actions pause while recording or editing a path.'
+                  : ''}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -71,7 +276,7 @@ export function ActorList({
           : 'pointer-events-none flex max-h-full w-[min(100%,16rem)] flex-col justify-end gap-1.5'
       }
     >
-      {open && (
+      {showBody && (
         <div
           id="actor-list-body"
           data-testid="actor-list-body"

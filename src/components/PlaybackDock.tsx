@@ -1,5 +1,3 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { localToProject } from '../core/clip'
 import {
   CONTINUE_PATH_BAKE_NOTE,
@@ -133,7 +131,6 @@ export function PlaybackDock() {
   const selectedTransformId = useEditorStore((s) => s.selectedTransformId)
   const actorEditOrder = useEditorStore((s) => s.actorEditOrder)
   const actorEditRedoOrder = useEditorStore((s) => s.actorEditRedoOrder)
-  const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const undoStack = useEditorStore((s) => s.undoStack)
   const redoStack = useEditorStore((s) => s.redoStack)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
@@ -181,20 +178,6 @@ export function PlaybackDock() {
   const confirm = useConfirm()
   const requestArmRecording = useArmRecording()
   const coarsePointer = useCoarsePointer()
-  const [refineOpen, setRefineOpen] = useState(false)
-  const refineBtnRef = useRef<HTMLButtonElement>(null)
-  const refinePanelRef = useRef<HTMLDivElement>(null)
-  const refineReturnFocusRef = useRef<HTMLElement | null>(null)
-  /** Escape restores trigger focus; outside dismiss / session handoff must not. */
-  const refineRestoreFocusRef = useRef(false)
-  const refinePanelId = useId()
-  const [refinePopoverBox, setRefinePopoverBox] = useState<{
-    bottom: number
-    left: number
-    width: number
-    maxHeight: number
-    placement: 'anchored' | 'sheet'
-  } | null>(null)
 
   const onRestoreRecordedPath = async () => {
     const ok = await confirm({
@@ -338,190 +321,12 @@ export function PlaybackDock() {
         : undefined
     : undefined
 
-  // Polish / Glide sessions own the chrome — close Refine; focus moves to the session.
-  useEffect(() => {
-    if (!polishSession && !glideSession) return
-    refineRestoreFocusRef.current = false
-    setRefineOpen(false)
-  }, [polishSession, glideSession])
-
-  // Portaled popover: anchor above the trigger; sheet-center when space is tight.
-  useLayoutEffect(() => {
-    if (!refineOpen) {
-      setRefinePopoverBox(null)
-      return
-    }
-    const update = () => {
-      const btn = refineBtnRef.current
-      if (!btn) return
-      const btnRect = btn.getBoundingClientRect()
-      // Sit above the whole dock so sibling controls stay clickable.
-      const dock = document.querySelector('[data-testid="playback-dock"]')
-      const dockTop =
-        dock instanceof HTMLElement
-          ? dock.getBoundingClientRect().top
-          : btnRect.top
-      const gap = 8
-      const margin = 16
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const width = Math.min(17.5 * 16, vw - margin * 2)
-      const bottom = Math.max(margin, vh - dockTop + gap)
-      const available = Math.max(0, dockTop - gap - margin)
-      // Narrow / short viewports: centered sheet above the dock (covers ~500×short).
-      const useSheet =
-        vw <= 520 || available < 14 * 16 || width >= vw - margin * 2 - 8
-      let left: number
-      let maxHeight: number
-      if (useSheet) {
-        left = Math.max(margin, (vw - width) / 2)
-        maxHeight = Math.max(
-          10 * 16,
-          Math.min(vh * 0.55, Math.max(available, vh * 0.4)),
-        )
-      } else {
-        // Align popover’s right edge with the trigger, then clamp into the viewport.
-        left = btnRect.right - width
-        left = Math.min(Math.max(left, margin), vw - width - margin)
-        maxHeight = Math.max(
-          12 * 16,
-          Math.min(vh * 0.6, available),
-        )
-      }
-      setRefinePopoverBox({
-        bottom,
-        left,
-        width,
-        maxHeight,
-        placement: useSheet ? 'sheet' : 'anchored',
-      })
-    }
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-    }
-  }, [refineOpen])
-
-  useEffect(() => {
-    if (!refineOpen) return
-    refineReturnFocusRef.current =
-      refineBtnRef.current ??
-      (document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null)
-    // Portal mounts after layout; focus once the panel node exists.
-    requestAnimationFrame(() => {
-      refinePanelRef.current?.focus()
-    })
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      if (document.querySelector('dialog[open]')) return
-      const editor = useEditorStore.getState()
-      if (editor.polishSession || editor.glideSession) return
-      if (
-        editor.mode === 'editing' &&
-        (editor.pathGestureActive ||
-          editor.editPreview !== null ||
-          editor.pathAddMode)
-      ) {
-        return
-      }
-      if (editor.pathGestureActive) return
-      e.preventDefault()
-      e.stopPropagation()
-      refineRestoreFocusRef.current = true
-      setRefineOpen(false)
-    }
-    // Dismiss on pointerup outside so unmount does not interrupt actor/stage
-    // pointer capture mid-gesture (placement, path edit, recording).
-    let outsidePointerId: number | null = null
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as Node | null
-      if (!target) return
-      if (refinePanelRef.current?.contains(target)) {
-        outsidePointerId = null
-        return
-      }
-      if (refineBtnRef.current?.contains(target)) {
-        outsidePointerId = null
-        return
-      }
-      outsidePointerId = e.pointerId
-    }
-    const onPointerUp = (e: PointerEvent) => {
-      if (outsidePointerId === null || e.pointerId !== outsidePointerId) return
-      outsidePointerId = null
-      refineRestoreFocusRef.current = false
-      setRefineOpen(false)
-    }
-    const onPointerCancel = (e: PointerEvent) => {
-      if (outsidePointerId === null || e.pointerId !== outsidePointerId) return
-      outsidePointerId = null
-    }
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('pointerdown', onPointerDown, true)
-    window.addEventListener('pointerup', onPointerUp, true)
-    window.addEventListener('pointercancel', onPointerCancel, true)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('pointerdown', onPointerDown, true)
-      window.removeEventListener('pointerup', onPointerUp, true)
-      window.removeEventListener('pointercancel', onPointerCancel, true)
-      const shouldRestore = refineRestoreFocusRef.current
-      refineRestoreFocusRef.current = false
-      const restore = refineReturnFocusRef.current
-      refineReturnFocusRef.current = null
-      if (!shouldRestore) return
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (
-            restore &&
-            document.contains(restore) &&
-            !document.getElementById(refinePanelId)
-          ) {
-            restore.focus()
-          }
-        })
-      })
-    }
-  }, [refineOpen, refinePanelId])
-
-  const openPolishFromRefine = () => {
-    refineRestoreFocusRef.current = false
-    setRefineOpen(false)
-    beginPolishSession()
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document
-          .querySelector<HTMLElement>('[data-testid="polish-strength"]')
-          ?.focus()
-      })
-    })
-  }
-
-  const openGlideFromRefine = () => {
-    refineRestoreFocusRef.current = false
-    setRefineOpen(false)
-    beginGlideSession()
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document
-          .querySelector<HTMLElement>('[data-testid="glide-strength"]')
-          ?.focus()
-      })
-    })
-  }
-
   return (
     <div
       data-testid="playback-dock"
       // mt-auto pins the dock to the slot bottom when Sequence is absent.
       // Short viewports hide elapsed/total labels only (see index.css) — actions stay.
-      className={`pointer-events-auto relative mt-auto flex w-full max-w-xl shrink-0 flex-col gap-1 ${surfaceChrome} px-2 py-1.5 sm:max-w-2xl sm:px-2.5 sm:py-2`}
+      className={`pointer-events-auto relative flex w-full max-w-3xl shrink-0 flex-col gap-1 mx-auto ${surfaceChrome} px-2 py-1.5 sm:px-2.5 sm:py-2`}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {hasAnyRecording && !editing && (
@@ -983,16 +788,17 @@ export function PlaybackDock() {
               </div>
             </div>
 
-            {/* Placement snap is usable before any path. Motion tools stay hidden until one exists. */}
-            {!hasAnyRecording && !isRecordingLike && (
-              <div className="flex w-full justify-center">
+            {/* Placement snap stays on the dock; keep the row mounted while
+                recording so transport bounds do not jump. */}
+            <div className="flex h-8 w-full justify-center">
+              {!isRecordingLike ? (
                 <SnapGridToggle
                   pressed={snapToGrid}
                   onToggle={() => setSnapToGrid(!snapToGrid)}
                   className={`${snapToGrid ? btnPrimary : btnSecondary} gap-2`}
                 />
-              </div>
-            )}
+              ) : null}
+            </div>
 
             {/* Motion-editing actions appear only once a path exists — keeps the empty dock compact. */}
             {hasAnyRecording && (
@@ -1018,119 +824,19 @@ export function PlaybackDock() {
                 Edit path
               </button>
 
-              <div data-testid="refine-motion" className="relative w-auto shrink-0">
-                <button
-                  ref={refineBtnRef}
-                  type="button"
-                  data-testid="btn-refine-motion"
-                  aria-expanded={refineOpen}
-                  aria-haspopup="dialog"
-                  aria-controls={refinePanelId}
-                  title="Motion tools"
-                  onClick={() => setRefineOpen((open) => !open)}
-                  className={`${btnSecondary} min-h-8 px-2.5`}
-                >
-                  Motion tools
-                </button>
-                {refineOpen &&
-                  refinePopoverBox &&
-                  createPortal(
-                    <div
-                      ref={refinePanelRef}
-                      id={refinePanelId}
-                      data-testid="refine-motion-tools"
-                      data-placement={refinePopoverBox.placement}
-                      role="dialog"
-                      aria-label="Motion tools"
-                      tabIndex={-1}
-                      className="pointer-events-auto fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
-                      style={{
-                        bottom: refinePopoverBox.bottom,
-                        left: refinePopoverBox.left,
-                        width: refinePopoverBox.width,
-                        maxHeight: refinePopoverBox.maxHeight,
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain bg-white p-2">
-                        <div className="rounded-lg px-1 py-1">
-                          <button
-                            type="button"
-                            data-testid="btn-polish-motion"
-                            onClick={openPolishFromRefine}
-                            disabled={polishDisabled}
-                            title="Preview a gentler path while keeping pauses and corners"
-                            className={`${btnSecondary} h-10 min-h-10 w-full justify-start px-2.5`}
-                          >
-                            Polish motion
-                          </button>
-                          <p
-                            data-testid="polish-motion-help"
-                            className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
-                          >
-                            Soften wobble; pauses and corners stay put.
-                          </p>
-                        </div>
-
-                        <div className="rounded-lg px-1 py-1">
-                          <button
-                            type="button"
-                            data-testid="btn-glide"
-                            onClick={openGlideFromRefine}
-                            disabled={glideDisabled}
-                            title="Softens starts and stops while keeping your path and pauses"
-                            className={`${btnSecondary} h-10 min-h-10 w-full justify-start px-2.5`}
-                          >
-                            Glide
-                          </button>
-                          <p
-                            data-testid="glide-motion-help"
-                            className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
-                          >
-                            Ease starts and stops; path and pauses stay.
-                          </p>
-                        </div>
-
-                        {!isRecordingLike && (
-                          <div className="rounded-lg px-1 py-1">
-                            <SnapGridToggle
-                              pressed={snapToGrid}
-                              onToggle={() => setSnapToGrid(!snapToGrid)}
-                              className={`${
-                                snapToGrid ? btnPrimary : btnSecondary
-                              } h-10 min-h-10 w-full justify-start gap-2 px-2.5`}
-                            />
-                          </div>
-                        )}
-
-                        {geometryEdit && (
-                          <div className="mt-1 border-t border-ms-border bg-white px-1 pt-2">
-                            <button
-                              type="button"
-                              data-testid="btn-restore-path"
-                              onClick={() => {
-                                void onRestoreRecordedPath()
-                              }}
-                              title={RESTORE_RECORDED_PATH_HELP}
-                              aria-describedby="restore-path-help"
-                              className={`${btnQuiet} h-10 min-h-10 w-full justify-start px-2.5`}
-                            >
-                              Restore recorded path
-                            </button>
-                            <p
-                              id="restore-path-help"
-                              data-testid="restore-path-help"
-                              className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
-                            >
-                              {RESTORE_RECORDED_PATH_HELP}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>,
-                    document.body,
-                  )}
-              </div>
+              <button
+                type="button"
+                data-testid="btn-refine-motion"
+                title="Open Motion tools in the inspector"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('ms-open-inspector', { detail: 'motion' }),
+                  )
+                }}
+                className={`${btnSecondary} min-h-8 px-2.5`}
+              >
+                Motion tools
+              </button>
 
               <span
                 aria-hidden
@@ -1171,17 +877,11 @@ export function PlaybackDock() {
         )}
 
         {editing && !isRecordingLike && (
-          <button
-            type="button"
-            data-testid="snap-to-grid-toggle"
-            aria-pressed={snapToGrid}
-            aria-describedby="snap-to-grid-help"
-            title="Align placement and path edits to the dots. Recording stays freehand."
-            onClick={() => setSnapToGrid(!snapToGrid)}
+          <SnapGridToggle
+            pressed={snapToGrid}
+            onToggle={() => setSnapToGrid(!snapToGrid)}
             className={snapToGrid ? btnPrimary : btnSecondary}
-          >
-            {snapToGrid ? 'Snap on' : 'Snap to grid'}
-          </button>
+          />
         )}
       </div>
 

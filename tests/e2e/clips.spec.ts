@@ -13,6 +13,7 @@ import {
   readExportedCss,
   recordSimplePath,
   selectActorByIndex,
+  closePanel,
 } from './helpers'
 
 async function ensureClipTimelineOpen(
@@ -158,7 +159,7 @@ test.describe('per-actor clip timing', () => {
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('loop-toggle')).toBeChecked()
     await expect(page.getByTestId('loop-mode-alternate')).toBeChecked()
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
 
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()

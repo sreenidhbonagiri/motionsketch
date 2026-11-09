@@ -546,14 +546,8 @@ export function CanvasStage() {
         </div>
       </div>
 
-      {/*
-        Screen-fixed chrome — uses measured header clearance (--ms-sheet-top)
-        so it sits just below the header without overlap.
-      */}
-      <div
-        className="pointer-events-none absolute right-2 z-[32] sm:right-3"
-        style={{ top: 'var(--ms-sheet-top, 4.5rem)' }}
-      >
+      {/* Camera chrome stays inside the stage viewport cell (not floating over chrome). */}
+      <div className="pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3">
         <WorkspaceCameraBar
           zoomIn={zoomIn}
           zoomOut={zoomOut}

@@ -8,6 +8,7 @@ import {
   openPanel,
   recordSimplePath,
   selectActorByIndex,
+  closePanel,
 } from './helpers'
 
 async function openClipTimeline(page: import('@playwright/test').Page) {
@@ -61,7 +62,7 @@ test.describe('editor workflow polish', () => {
       'aria-describedby',
       'actor-image-type-help',
     )
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
 
     await openPanel(page, 'project')
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
@@ -103,18 +104,18 @@ test.describe('editor workflow polish', () => {
     )
   })
 
-  test('closing Adjust with Escape restores focus to the trigger', async ({
-    page,
-  }) => {
+  test('Escape leaves the docked Motion inspector open', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
     await page.getByTestId('btn-adjust').click()
-    await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
-    await expect(page.getByTestId('adjust-panel-root')).toBeFocused()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
 
     await page.keyboard.press('Escape')
-    await expect(page.getByTestId('adjust-panel-root')).toHaveCount(0)
-    await expect(page.getByTestId('btn-adjust')).toBeFocused()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
+    await expect(page.getByTestId('btn-inspector-motion')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
   })
 
   test('Sequence Start at / Move for draft: blur/switch discard; Apply/Enter/Escape; validation; undo', async ({
@@ -125,7 +126,7 @@ test.describe('editor workflow polish', () => {
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
 
     await openClipTimeline(page)
     await expect(page.getByTestId('btn-toggle-clip-timeline')).toContainText(

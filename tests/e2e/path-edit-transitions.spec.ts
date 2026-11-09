@@ -126,7 +126,7 @@ test.describe('path edit mode transitions', () => {
 
     await move.click()
     await expect(page.getByTestId('path-move-overlay')).toBeVisible()
-    await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
   })
 
   test('Escape cancels Move nudge before closing an open floating panel', async ({
@@ -147,12 +147,12 @@ test.describe('path edit mode transitions', () => {
       'data-path-gesture',
       'true',
     )
-    await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
     await page.keyboard.press('Escape')
     await page.keyboard.up('ArrowRight')
 
     // Gesture cancelled; Adjust stays open because Escape was consumed.
-    await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
     await expect(page.getByTestId('stage-frame')).toHaveAttribute(
       'data-path-gesture',
       'false',

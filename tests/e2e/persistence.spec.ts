@@ -6,6 +6,7 @@ import {
   readExportedCss,
   recordSimplePath,
   respondToConfirm,
+  closePanel,
 } from './helpers'
 
 async function waitForSaved(page: Page) {
@@ -84,7 +85,7 @@ test.describe('project persistence', () => {
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('loop-toggle').check()
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
     await waitForSaved(page)
 
     await page.reload()
@@ -271,7 +272,7 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('download-project-help')).toContainText(
       'Create a path',
     )
-    await page.getByTestId('btn-close-project').click()
+    await closePanel(page, 'project')
 
     await recordSimplePath(page)
     await waitForSaved(page)

@@ -91,17 +91,29 @@ function candidatesNearDockControl(
     MARGIN,
     vw - cardW - MARGIN,
   )
+  const aboveDock = anchor.top - cardH - GAP
+  // Phone: keep the card near Record (tests require <320px) while clearing Fit.
+  if (vw < 640) {
+    const side = clamp(vw - cardW - MARGIN, MARGIN, vw - cardW - MARGIN)
+    return [
+      { top: aboveDock, left: MARGIN },
+      { top: aboveDock, left: side },
+      { top: aboveDock, left: centeredLeft },
+      { top: Math.max(MARGIN + 72, aboveDock - 36), left: MARGIN },
+      { top: MARGIN + 72, left: MARGIN },
+    ]
+  }
   return [
     // Above (preferred for dock controls)
-    { top: anchor.top - cardH - GAP, left: centeredLeft },
+    { top: aboveDock, left: centeredLeft },
     // Above, shifted left
     {
-      top: anchor.top - cardH - GAP,
+      top: aboveDock,
       left: clamp(anchor.left - 8, MARGIN, vw - cardW - MARGIN),
     },
     // Above, shifted right
     {
-      top: anchor.top - cardH - GAP,
+      top: aboveDock,
       left: clamp(anchor.right - cardW + 8, MARGIN, vw - cardW - MARGIN),
     },
     // To the left of control
@@ -183,16 +195,18 @@ function candidatesBesideExportPanel(
   narrow: boolean,
 ): Array<{ top: number; left: number }> {
   if (narrow) {
-    // Compact strip above the sheet body / under the chrome.
+    // Sit in the header band above the fixed Export sheet (top-14).
+    const side = clamp(vw - cardW - MARGIN, MARGIN, vw - cardW - MARGIN)
     return [
-      { top: MARGIN + 4, left: MARGIN },
+      { top: 4, left: MARGIN },
+      { top: 4, left: side },
       {
-        top: clamp(panel.top - cardH - GAP, MARGIN, vh - cardH - MARGIN),
+        top: clamp(panel.top - cardH - GAP, 4, vh - cardH - MARGIN),
         left: MARGIN,
       },
       {
-        top: clamp(panel.bottom - cardH - MARGIN, MARGIN, vh - cardH - MARGIN),
-        left: MARGIN,
+        top: clamp(panel.top - cardH - GAP, 4, vh - cardH - MARGIN),
+        left: side,
       },
     ]
   }

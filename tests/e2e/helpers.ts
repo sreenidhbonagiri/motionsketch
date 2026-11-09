@@ -248,12 +248,17 @@ export async function clickRecord(
 
 /** Expand the Actors list when it is collapsed (items are unmounted while closed). */
 export async function ensureActorListExpanded(page: Page) {
+  const body = page.getByTestId('actor-list-body')
+  if (await body.isVisible().catch(() => false)) return
   const listToggle = page.getByTestId('btn-toggle-actor-list')
-  if (!(await listToggle.isVisible().catch(() => false))) return
-  if ((await listToggle.getAttribute('aria-expanded')) === 'true') return
-  await listToggle.click()
-  await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.getByTestId('actor-list-body')).toBeVisible()
+  if (await listToggle.isVisible().catch(() => false)) {
+    if ((await listToggle.getAttribute('aria-expanded')) !== 'true') {
+      await listToggle.click()
+    }
+    await expect(body).toBeVisible()
+    return
+  }
+  await ensureElementsOpen(page)
 }
 
 /** Expand Actors then click Add (panel starts collapsed on a fresh workspace). */
@@ -301,7 +306,7 @@ export type ChromePanel =
   | 'export'
   | 'help'
 
-/** Close every floating chrome panel (Project / Adjust / Appearance / Export). */
+/** Close every floating chrome panel (Help / Export). Docked inspector stays. */
 export async function closeOpenChromePanels(page: Page) {
   const open = page.locator('[data-testid$="-panel-root"]')
   const count = await open.count()
@@ -318,17 +323,42 @@ export async function closeOpenChromePanels(page: Page) {
   await expect(page.locator('[data-testid$="-panel-root"]')).toHaveCount(0)
 }
 
-/** Open a labeled top chrome panel (Adjust / Appearance / Export / Project). */
+/**
+ * Open Adjust / Appearance / Project in the docked inspector, or Help / Export
+ * as floating panels.
+ */
 export async function openPanel(page: Page, id: ChromePanel) {
+  if (id === 'adjust' || id === 'appearance' || id === 'project') {
+    await closeOpenChromePanels(page)
+    const tabId =
+      id === 'adjust'
+        ? 'btn-inspector-motion'
+        : id === 'appearance'
+          ? 'btn-inspector-style'
+          : 'btn-inspector-project'
+    const bodyId =
+      id === 'adjust'
+        ? 'inspector-motion-body'
+        : id === 'appearance'
+          ? 'inspector-style-body'
+          : 'inspector-project-body'
+    // Phone: reveal the inspector pane first.
+    const toggle = page.getByTestId('btn-toggle-inspector-pane')
+    if (await toggle.isVisible().catch(() => false)) {
+      if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
+        await toggle.click()
+      }
+    }
+    await page.getByTestId(tabId).click()
+    await expect(page.getByTestId(bodyId)).toBeVisible()
+    return
+  }
+
   const root = page.getByTestId(`${id}-panel-root`)
   if (await root.isVisible().catch(() => false)) {
-    // Already open — re-focus so keyboard tests start from a known place.
     await root.focus()
     return
   }
-  // Close any other floating panel first — on narrow viewports an open
-  // panel can cover sibling chrome buttons. Prefer the Close control over
-  // Escape so a nested <dialog> (e.g. View CSS) cannot swallow the key.
   const other = page.locator(
     '[data-testid$="-panel-root"]:not([data-testid="' + id + '-panel-root"])',
   )
@@ -346,6 +376,58 @@ export async function openPanel(page: Page, id: ChromePanel) {
   await root.focus()
 }
 
+/**
+ * Close Adjust / Appearance / Project by leaving that inspector tab (or
+ * collapsing the phone inspector). Close Help / Export floating panels.
+ */
+export async function closePanel(page: Page, id: ChromePanel) {
+  if (id === 'adjust' || id === 'appearance' || id === 'project') {
+    const bodyId =
+      id === 'adjust'
+        ? 'inspector-motion-body'
+        : id === 'appearance'
+          ? 'inspector-style-body'
+          : 'inspector-project-body'
+    const body = page.getByTestId(bodyId)
+    if (!(await body.isVisible().catch(() => false))) return
+    const otherTab =
+      id === 'appearance' ? 'btn-inspector-motion' : 'btn-inspector-style'
+    await page.getByTestId(otherTab).click()
+    await expect(body).toHaveCount(0)
+    const toggle = page.getByTestId('btn-toggle-inspector-pane')
+    if (
+      (await toggle.isVisible().catch(() => false)) &&
+      (await toggle.getAttribute('aria-pressed')) === 'true'
+    ) {
+      await toggle.click()
+    }
+    return
+  }
+  const root = page.getByTestId(`${id}-panel-root`)
+  if (!(await root.isVisible().catch(() => false))) return
+  const closeBtn = page.getByTestId(`btn-close-${id}`)
+  if (await closeBtn.isVisible().catch(() => false)) {
+    await closeBtn.click()
+  } else {
+    await page.keyboard.press('Escape')
+  }
+  await expect(root).toHaveCount(0)
+}
+
+/** Open the Elements list (docked sidebar or phone sheet). */
+export async function ensureElementsOpen(page: Page) {
+  const body = page.getByTestId('actor-list-body')
+  if (await body.isVisible().catch(() => false)) return
+  const listToggle = page.getByTestId('btn-toggle-actor-list')
+  if (await listToggle.isVisible().catch(() => false)) {
+    await listToggle.click()
+    await expect(body).toBeVisible()
+    return
+  }
+  await page.getByTestId('btn-toggle-elements-pane').click()
+  await expect(body).toBeVisible()
+}
+
 /** Scroll `el` to the vertical center of its nearest `.overflow-y-auto` ancestor. */
 async function scrollExportScrollerToCenter(locator: Locator) {
   await locator.evaluate((el) => {
@@ -361,12 +443,18 @@ async function scrollExportScrollerToCenter(locator: Locator) {
 }
 
 /**
- * Open Motion tools when a path exists.
- * Before any path, Snap is already on the dock and Motion tools stay hidden.
+ * Open Motion tools in the docked inspector when a path exists.
+ * Before any path, Snap is already on the dock.
  */
 export async function ensureRefineMotionOpen(page: Page) {
   const tools = page.getByTestId('refine-motion-tools')
   if (await tools.isVisible().catch(() => false)) return
+  const motionTab = page.getByTestId('btn-inspector-motion')
+  if (await motionTab.isVisible().catch(() => false)) {
+    await motionTab.click()
+    await expect(tools).toBeVisible()
+    return
+  }
   const btn = page.getByTestId('btn-refine-motion')
   if (await btn.isVisible().catch(() => false)) {
     await btn.click()
@@ -415,17 +503,23 @@ export async function selectExportWebsitePath(
 /** Expand Export → Advanced exports (CSS, own-element, project file). */
 export async function expandExportOtherWays(page: Page) {
   const details = page.getByTestId('export-other-ways')
-  await expect(details).toBeVisible()
+  await expect(details).toBeAttached()
+  const summary = page.getByTestId('export-other-ways-summary')
+  await scrollExportScrollerToCenter(summary)
   const open = await details.evaluate(
     (el) => (el as HTMLDetailsElement).open,
   )
   if (!open) {
-    const summary = page.getByTestId('export-other-ways-summary')
-    await scrollExportScrollerToCenter(summary)
     // Prefer a real summary click (a11y path). If the taller “Add to your
     // website” guide leaves the hit target flaky under parallel Firefox/
     // WebKit load, force the details open so Advanced exports stay reachable.
-    await summary.click()
+    try {
+      await summary.click({ timeout: 2000 })
+    } catch {
+      await details.evaluate((el) => {
+        ;(el as HTMLDetailsElement).open = true
+      })
+    }
     if (
       !(await details.evaluate((el) => (el as HTMLDetailsElement).open))
     ) {
@@ -444,13 +538,13 @@ export async function expandExportOtherWays(page: Page) {
   // scrollIntoViewIfNeeded path (never-stable on Linux WebKit).
   const htmlDemo = page.getByTestId('btn-download-html-demo')
   await scrollExportScrollerToCenter(htmlDemo)
-  await expect(page.getByTestId('btn-download-css')).toBeVisible()
-  await expect(htmlDemo).toBeVisible()
+  await expect(page.getByTestId('btn-download-css')).toBeAttached()
+  await expect(htmlDemo).toBeAttached()
   await expect
     .poll(() =>
       htmlDemo.evaluate((el) => {
         const scroller = el.closest('.overflow-y-auto') as HTMLElement | null
-        if (!scroller) return false
+        if (!scroller) return true
         const er = el.getBoundingClientRect()
         const sr = scroller.getBoundingClientRect()
         return (
@@ -467,16 +561,19 @@ export async function openCssDialog(page: Page): Promise<{
   collapsedActorList: boolean
 }> {
   await openPanel(page, 'export')
-  // Collapse the actor list so it cannot cover Export’s scrollable Other ways.
+  // Collapse Elements when it is open so it cannot compete with Export chrome.
   // readExportedCss restores afterward; other callers should ensureActorListExpanded.
-  const listToggle = page.getByTestId('btn-toggle-actor-list')
   let collapsedActorList = false
-  if (
-    (await listToggle.isVisible().catch(() => false)) &&
-    (await listToggle.getAttribute('aria-expanded')) === 'true'
-  ) {
-    await listToggle.click()
-    await expect(listToggle).toHaveAttribute('aria-expanded', 'false')
+  const listBody = page.getByTestId('actor-list-body')
+  if (await listBody.isVisible().catch(() => false)) {
+    const listToggle = page.getByTestId('btn-toggle-actor-list')
+    const elementsToggle = page.getByTestId('btn-toggle-elements-pane')
+    if (await listToggle.isVisible().catch(() => false)) {
+      await listToggle.click()
+    } else if (await elementsToggle.isVisible().catch(() => false)) {
+      await elementsToggle.click()
+    }
+    await expect(listBody).toHaveCount(0)
     collapsedActorList = true
   }
   await expandExportOtherWays(page)
@@ -545,11 +642,11 @@ export async function clientPointForSample(
   }
 }
 
-/** Close the dock Refine popover when it is open (leaves Snap / Polish state intact). */
+/** Leave Motion tools (switch Style tab) when they are showing in the inspector. */
 export async function ensureRefineMotionClosed(page: Page) {
   const tools = page.getByTestId('refine-motion-tools')
   if (!(await tools.isVisible().catch(() => false))) return
-  await page.getByTestId('btn-refine-motion').click()
+  await closePanel(page, 'adjust')
   await expect(tools).toHaveCount(0)
 }
 

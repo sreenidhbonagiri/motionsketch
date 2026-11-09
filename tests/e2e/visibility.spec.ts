@@ -16,6 +16,7 @@ import {
   openPanel,
   recordSimplePath,
   selectActorByIndex,
+  closePanel,
 } from './helpers'
 
 async function openClipTimeline(page: Page) {
@@ -78,7 +79,7 @@ test.describe('per-actor visibility timing', () => {
 
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
 
     await openClipTimeline(page)
     // 0.4s–1.6s of a 2s timeline → 0.2–0.8 normalized.
@@ -299,7 +300,7 @@ test.describe('per-actor visibility timing', () => {
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
 
     await openClipTimeline(page)
     await applyClipSeconds(page, '1.00', '2.00')

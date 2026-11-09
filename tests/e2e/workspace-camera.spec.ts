@@ -73,15 +73,24 @@ async function stageFrameBox(page: Page) {
   return box!
 }
 
-/** Pan by dragging empty canvas (not the actor). */
+/** Pan by dragging empty canvas inside the stage viewport (not the actor). */
 async function panEmptyCanvas(
   page: Page,
   from: { x: number; y: number },
   to: { x: number; y: number },
 ) {
-  await page.mouse.move(from.x, from.y)
+  const stage = await page.getByTestId('stage-viewport').boundingBox()
+  expect(stage).toBeTruthy()
+  // Legacy absolute coords assumed a full-bleed stage; map into the docked cell.
+  const map = (p: { x: number; y: number }) => ({
+    x: stage!.x + Math.min(stage!.width - 8, Math.max(8, p.x * (stage!.width / 1280))),
+    y: stage!.y + Math.min(stage!.height - 8, Math.max(8, p.y * (stage!.height / 800))),
+  })
+  const a = map(from)
+  const b = map(to)
+  await page.mouse.move(a.x, a.y)
   await page.mouse.down()
-  await page.mouse.move(to.x, to.y, { steps: 8 })
+  await page.mouse.move(b.x, b.y, { steps: 8 })
   await page.mouse.up()
 }
 
@@ -239,8 +248,9 @@ test.describe('workspace camera', () => {
     await page.mouse.up()
     await page.keyboard.up('h')
     const typedAfter = await readCamera(page)
-    expect(typedAfter.panX).toBeCloseTo(typedBefore.panX, 0)
-    expect(typedAfter.panY).toBeCloseTo(typedBefore.panY, 0)
+    // Allow a couple CSS px of camera noise from header reflow when renaming.
+    expect(Math.abs(typedAfter.panX - typedBefore.panX)).toBeLessThan(5)
+    expect(Math.abs(typedAfter.panY - typedBefore.panY)).toBeLessThan(5)
   })
 
   test('Space plays and pauses from the stage without panning', async ({

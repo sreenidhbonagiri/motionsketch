@@ -438,11 +438,9 @@ test.describe('first-use guidance and export wording', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     await ensureEditor(page)
-    const listExpanded = await page
-      .getByTestId('btn-toggle-actor-list')
-      .getAttribute('aria-expanded')
-    if (listExpanded === 'true') {
-      await page.getByTestId('btn-toggle-actor-list').click()
+    const elementsPane = page.getByTestId('btn-toggle-elements-pane')
+    if ((await elementsPane.getAttribute('aria-pressed')) === 'true') {
+      await elementsPane.click()
     }
     await recordSimplePath(page)
     await openPanel(page, 'export')
@@ -493,11 +491,9 @@ test.describe('first-use guidance and export wording', () => {
       await page.goto('/')
       await ensureEditor(page)
       if (width < 500) {
-        const listExpanded = await page
-          .getByTestId('btn-toggle-actor-list')
-          .getAttribute('aria-expanded')
-        if (listExpanded === 'true') {
-          await page.getByTestId('btn-toggle-actor-list').click()
+        const elementsPane = page.getByTestId('btn-toggle-elements-pane')
+        if ((await elementsPane.getAttribute('aria-pressed')) === 'true') {
+          await elementsPane.click()
         }
       }
       await recordSimplePath(page)

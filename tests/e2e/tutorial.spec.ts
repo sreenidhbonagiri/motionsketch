@@ -7,6 +7,7 @@ import {
   openPanel,
   recordSimplePath,
   skipTutorialIfPresent,
+  closePanel,
 } from './helpers'
 import {
   TUTORIAL_PRACTICE_SAVE_STATUS,
@@ -392,7 +393,7 @@ test.describe('first-use tutorial', () => {
       'Saved in this browser',
       { timeout: 4000 },
     )
-    await page.getByTestId('btn-close-project').click()
+    await closePanel(page, 'project')
 
     const storedBefore = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',
@@ -426,7 +427,7 @@ test.describe('first-use tutorial', () => {
     await expect(page.getByTestId('save-status')).toHaveText(
       TUTORIAL_PRACTICE_SAVE_STATUS,
     )
-    await page.getByTestId('btn-close-project').click()
+    await closePanel(page, 'project')
 
     await page.getByTestId('btn-tutorial-skip').click()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
@@ -453,7 +454,7 @@ test.describe('first-use tutorial', () => {
       'Saved in this browser',
       { timeout: 4000 },
     )
-    await page.getByTestId('btn-close-project').click()
+    await closePanel(page, 'project')
 
     const storedBefore = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',
@@ -513,7 +514,7 @@ test.describe('first-use tutorial', () => {
     )
     expect(storedAfterBlock).toBe(storedBefore)
 
-    await page.getByTestId('btn-close-project').click()
+    await closePanel(page, 'project')
     await page.getByTestId('btn-tutorial-skip').click()
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
     await expect(page.getByTestId('btn-rename-project')).toHaveText(

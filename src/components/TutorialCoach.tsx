@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import {
   TUTORIAL_FINISH_LABEL,
@@ -104,6 +105,7 @@ export function TutorialCoach({
         document.querySelector('[data-testid="btn-export"]'),
       )
       const header = readElementRect(document.querySelector('header'))
+      // Do not avoid the whole playback dock — the coach anchors next to Record/Play.
       const avoidExtra = [
         fit,
         cameraBar,
@@ -236,9 +238,10 @@ export function TutorialCoach({
   }, [step])
 
   const progress = tutorialProgressLabel(step)
-  const layerZ = exportOpen ? 'z-[55]' : 'z-[45]'
+  // Above portaled Help/Export sheets (z-40) so Finish/Skip stay hittable.
+  const layerZ = exportOpen ? 'z-[60]' : 'z-[45]'
 
-  return (
+  return createPortal(
     <div
       data-testid="tutorial-coach"
       data-tutorial-step={step}
@@ -325,6 +328,7 @@ export function TutorialCoach({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
