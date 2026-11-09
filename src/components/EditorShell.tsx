@@ -438,7 +438,7 @@ export function EditorShell() {
               <span className="hidden text-xs font-semibold uppercase tracking-wide text-ms-muted sm:block">
                 MotionSketch
               </span>
-              <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
+              <div className="flex min-w-0 flex-nowrap items-baseline gap-x-1.5">
                 <ProjectNameInput
                   committedName={projectName}
                   onCommit={renameProject}
@@ -446,10 +446,11 @@ export function EditorShell() {
                 {saveLabel && (
                   <p
                     data-testid="header-save-status"
+                    title={saveLabel}
                     className={
                       status === 'save-error' || status === 'restore-error'
-                        ? 'text-xs font-medium text-amber-800'
-                        : 'text-xs text-ms-muted'
+                        ? 'min-w-0 shrink truncate text-xs font-medium text-amber-800'
+                        : 'min-w-0 shrink truncate text-xs text-ms-muted'
                     }
                   >
                     {saveLabel}
