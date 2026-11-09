@@ -64,6 +64,45 @@ function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
+/** Placement snap. Same control before a path (dock) and after one (Motion tools). */
+function SnapGridToggle({
+  pressed,
+  onToggle,
+  className,
+}: {
+  pressed: boolean
+  onToggle: () => void
+  className: string
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="snap-to-grid-toggle"
+      aria-pressed={pressed}
+      aria-describedby="snap-to-grid-help"
+      title="Align placement and path edits to the dots. Recording stays freehand."
+      onClick={onToggle}
+      className={className}
+    >
+      <span
+        data-testid="snap-to-grid-indicator"
+        data-checked={pressed ? 'true' : 'false'}
+        aria-hidden
+        className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${
+          pressed
+            ? 'border-white bg-white text-slate-900'
+            : 'border-slate-400 bg-white text-transparent'
+        }`}
+      >
+        <svg viewBox="0 0 16 16" className="size-3 fill-current">
+          <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
+        </svg>
+      </span>
+      {pressed ? 'Snap on' : 'Snap to grid'}
+    </button>
+  )
+}
+
 /** Shared control height — filled primary, ghost secondary; icons for support. */
 const control =
   'inline-flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
@@ -943,6 +982,17 @@ export function PlaybackDock() {
               </div>
             </div>
 
+            {/* Placement snap is usable before any path. Motion tools stay hidden until one exists. */}
+            {!hasAnyRecording && !isRecordingLike && (
+              <div className="flex w-full justify-center">
+                <SnapGridToggle
+                  pressed={snapToGrid}
+                  onToggle={() => setSnapToGrid(!snapToGrid)}
+                  className={`${snapToGrid ? btnPrimary : btnSecondary} gap-2`}
+                />
+              </div>
+            )}
+
             {/* Motion-editing actions appear only once a path exists — keeps the empty dock compact. */}
             {hasAnyRecording && (
             <div
@@ -1042,36 +1092,13 @@ export function PlaybackDock() {
 
                         {!isRecordingLike && (
                           <div className="rounded-lg px-1 py-1">
-                            <button
-                              type="button"
-                              data-testid="snap-to-grid-toggle"
-                              aria-pressed={snapToGrid}
-                              aria-describedby="snap-to-grid-help"
-                              title="Align placement and path edits to the dots. Recording stays freehand."
-                              onClick={() => setSnapToGrid(!snapToGrid)}
+                            <SnapGridToggle
+                              pressed={snapToGrid}
+                              onToggle={() => setSnapToGrid(!snapToGrid)}
                               className={`${
                                 snapToGrid ? btnPrimary : btnSecondary
                               } h-10 min-h-10 w-full justify-start gap-2 px-2.5`}
-                            >
-                              <span
-                                data-testid="snap-to-grid-indicator"
-                                data-checked={snapToGrid ? 'true' : 'false'}
-                                aria-hidden
-                                className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${
-                                  snapToGrid
-                                    ? 'border-white bg-white text-slate-900'
-                                    : 'border-slate-400 bg-white text-transparent'
-                                }`}
-                              >
-                                <svg
-                                  viewBox="0 0 16 16"
-                                  className="size-3 fill-current"
-                                >
-                                  <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
-                                </svg>
-                              </span>
-                              {snapToGrid ? 'Snap on' : 'Snap to grid'}
-                            </button>
+                            />
                           </div>
                         )}
 

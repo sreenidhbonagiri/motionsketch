@@ -360,14 +360,20 @@ async function scrollExportScrollerToCenter(locator: Locator) {
   })
 }
 
-/** Open the dock’s Refine popover (Polish, Glide, Snap, Restore). */
+/**
+ * Open Motion tools when a path exists.
+ * Before any path, Snap is already on the dock and Motion tools stay hidden.
+ */
 export async function ensureRefineMotionOpen(page: Page) {
   const tools = page.getByTestId('refine-motion-tools')
   if (await tools.isVisible().catch(() => false)) return
   const btn = page.getByTestId('btn-refine-motion')
-  await expect(btn).toBeVisible()
-  await btn.click()
-  await expect(tools).toBeVisible()
+  if (await btn.isVisible().catch(() => false)) {
+    await btn.click()
+    await expect(tools).toBeVisible()
+    return
+  }
+  await expect(page.getByTestId('snap-to-grid-toggle')).toBeVisible()
 }
 
 /** Open Refine if needed, then start Polish motion. */
