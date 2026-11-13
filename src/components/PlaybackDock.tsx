@@ -934,13 +934,12 @@ export function PlaybackDock() {
           </>
         ) : (
           <>
-            {/* Transport: Play absolutely centered; side clusters keep gutters so
-                Edit path / Reset never overlap Play’s hit target on phones. */}
+            {/* Transport: three-column grid so Play never overlays Edit/Reset. */}
             <div
               data-testid="dock-transport"
-              className="relative flex w-full items-center"
+              className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-1"
             >
-              <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-1 pr-11">
+              <div className="flex min-w-0 flex-nowrap items-center justify-end gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {isRecordingLike ? (
                   <button
                     type="button"
@@ -1012,41 +1011,39 @@ export function PlaybackDock() {
                   ))}
               </div>
 
-              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-                <div className="pointer-events-auto">
-                  {mode === 'playing' ? (
-                    <button
-                      type="button"
-                      data-testid="btn-pause"
-                      onClick={pause}
-                      aria-label="Pause"
-                      title="Pause"
-                      className={`${btnPrimary} h-8 w-8 min-h-8 min-w-8 px-0`}
-                    >
-                      <PauseIcon />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      data-testid="btn-play"
-                      onClick={() => play()}
-                      disabled={playbackDisabled}
-                      aria-label="Play"
-                      title="Play"
-                      aria-describedby={playbackDescribedBy}
-                      className={`${hasAnyRecording ? btnPrimary : btnSecondary} h-8 w-8 min-h-8 min-w-8 px-0`}
-                    >
-                      <PlayIcon />
-                    </button>
-                  )}
-                </div>
+              <div className="flex shrink-0 items-center justify-center">
+                {mode === 'playing' ? (
+                  <button
+                    type="button"
+                    data-testid="btn-pause"
+                    onClick={pause}
+                    aria-label="Pause"
+                    title="Pause"
+                    className={`${btnPrimary} h-8 w-8 min-h-8 min-w-8 px-0`}
+                  >
+                    <PauseIcon />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="btn-play"
+                    onClick={() => play()}
+                    disabled={playbackDisabled}
+                    aria-label="Play"
+                    title="Play"
+                    aria-describedby={playbackDescribedBy}
+                    className={`${hasAnyRecording ? btnPrimary : btnSecondary} h-8 w-8 min-h-8 min-w-8 px-0`}
+                  >
+                    <PlayIcon />
+                  </button>
+                )}
               </div>
 
-              <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1 pl-11">
+              <div className="flex min-w-0 flex-nowrap items-center justify-start gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {hasAnyRecording && !isRecordingLike && (
                   <div
                     data-testid="dock-editing"
-                    className="flex shrink-0 flex-nowrap items-center justify-end gap-1"
+                    className="flex shrink-0 flex-nowrap items-center justify-start gap-1"
                   >
                     <button
                       type="button"
@@ -1064,8 +1061,14 @@ export function PlaybackDock() {
                       }
                       className={`${btnSecondary} px-2`}
                     >
-                      <span className="max-[480px]:hidden">Edit path</span>
-                      <span className="min-[481px]:hidden">Edit</span>
+                      {wideDock ? (
+                        <>
+                          <span className="max-[480px]:hidden">Edit path</span>
+                          <span className="min-[481px]:hidden">Edit</span>
+                        </>
+                      ) : (
+                        'Edit'
+                      )}
                     </button>
 
                     <button
@@ -1098,7 +1101,9 @@ export function PlaybackDock() {
                       className={`${btnSecondary} gap-1.5`}
                     >
                       <EraserIcon />
-                      <span className="max-[420px]:sr-only">Reset</span>
+                      <span className={wideDock ? 'max-[420px]:sr-only' : 'sr-only'}>
+                        Reset
+                      </span>
                     </button>
 
                     <DockMoreMenu
