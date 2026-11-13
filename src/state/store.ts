@@ -3892,7 +3892,6 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           state.selectedActorId,
           () => restored,
         ),
-        selectedTransformId: null,
         ...clearEditState(),
         ...clearTransformEditState(),
         // After clearEditState — restore mirrored geometry from the take.
@@ -3928,7 +3927,6 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           state.selectedActorId,
           () => restored,
         ),
-        selectedTransformId: null,
         ...clearEditState(),
         ...clearTransformEditState(),
         geometryEdit: geometryMirror(next.geometryEdit),
