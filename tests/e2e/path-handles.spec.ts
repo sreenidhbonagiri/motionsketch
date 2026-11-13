@@ -13,6 +13,7 @@ import {
   openPanel,
   readExportedCss,
   recordSimplePath,
+  openEditMore
 } from './helpers'
 
 test.describe('user path handles', () => {
@@ -130,6 +131,7 @@ test.describe('user path handles', () => {
     await expect(page.getByTestId('export-panel-root')).toHaveCount(0)
 
     // Remove the interior handle — geometry should stay dragged.
+    await openEditMore(page)
     await page.getByTestId('btn-path-remove-handle').click()
     await expect(page.getByTestId('action-live-region')).toContainText(
       'Handle removed',
@@ -258,6 +260,7 @@ test.describe('user path handles', () => {
     const ghostX = await ghost.getAttribute('data-sample-x')
     const ghostY = await ghost.getAttribute('data-sample-y')
 
+    await openEditMore(page)
     await page.getByTestId('btn-path-add-confirm').click()
     await expect(page.getByTestId('action-live-region')).toContainText(
       'Handle added',

@@ -17,6 +17,8 @@ import {
   openPanel,
   readExportedCss,
   ensureActorListExpanded,
+  closePanel,
+  openEditMore
 } from './helpers'
 
 function roundedTurnSamples(n = 41): MotionSample[] {
@@ -119,6 +121,7 @@ test.describe('local bend actions', () => {
         y: el.getAttribute('data-sample-y'),
       }))
 
+    await openEditMore(page)
     await expect(page.getByTestId('btn-smooth-bend')).toBeEnabled()
     await page.getByTestId('btn-smooth-bend').click()
     await expect(page.getByTestId('action-live-region')).toContainText(
@@ -148,7 +151,9 @@ test.describe('local bend actions', () => {
     for (let i = 0; i < handles.indexOf(mid); i++) {
       await page.keyboard.press(']')
     }
+    await openEditMore(page)
     await expect(page.getByTestId('btn-make-corner')).toBeEnabled()
+    await page.keyboard.press('Escape')
     await page.keyboard.press('c')
     await expect(page.getByTestId('action-live-region')).toContainText(
       'Sharpened',
@@ -160,7 +165,9 @@ test.describe('local bend actions', () => {
     await page.getByTestId('btn-edit-path').click()
     // Select an interior handle (not endpoint).
     await page.keyboard.press(']')
+    await openEditMore(page)
     await expect(page.getByTestId('btn-make-corner')).toBeDisabled()
+    await page.keyboard.press('Escape')
     await page.keyboard.press('c')
     await expect(page.getByTestId('action-live-region')).toContainText(
       /straight|already/i,
@@ -175,8 +182,9 @@ test.describe('local bend actions', () => {
 
     // Free sample still addable after local actions (selection model intact).
     const free = buildPathHandlesFixtureSamples()[PATH_HANDLES_FREE_SAMPLE]!
+    await page.getByTestId('btn-fit-stage').click()
     await page.getByTestId('btn-path-add-mode').click()
-    const stage = page.getByTestId('stage')
+    const stage = page.getByTestId('stage-frame')
     const box = await stage.boundingBox()
     expect(box).toBeTruthy()
     await page.mouse.click(
@@ -236,11 +244,12 @@ test.describe('local bend actions', () => {
     await ensureActorListExpanded(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-list-item-actor-a').click()
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await page.getByTestId('btn-edit-path').click()
     for (let i = 0; i < handles.indexOf(mid); i++) {
       await page.keyboard.press(']')
     }
+    await openEditMore(page)
     await page.getByTestId('btn-make-corner').click()
     await expect(page.getByTestId('action-live-region')).toContainText(
       'Sharpened',
@@ -250,10 +259,11 @@ test.describe('local bend actions', () => {
     await ensureActorListExpanded(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-list-item-actor-b').click()
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await page.getByTestId('btn-edit-path').click()
     // Actor B still has the straight fixture handle count / make-corner disabled.
     await page.keyboard.press(']')
+    await openEditMore(page)
     await expect(page.getByTestId('btn-make-corner')).toBeDisabled()
     await expect(page.locator('[data-testid^="path-handle-"]')).toHaveCount(
       PATH_HANDLES_INDICES.length,

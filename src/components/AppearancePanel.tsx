@@ -16,6 +16,7 @@ import {
 } from '../core/types'
 import { useEditorStore } from '../state/store'
 import { FaceAlongPathSection } from './FaceAlongPathSection'
+import { HelpDisclosure } from './HelpDisclosure'
 import { TransformSection } from './TransformSection'
 
 function formatSizePercent(size: number): string {
@@ -87,7 +88,7 @@ export function AppearancePanel() {
   }
 
   return (
-    <div data-testid="appearance-panel" className="space-y-4 p-3">
+    <div data-testid="appearance-panel" className="space-y-2.5 px-2.5 py-2">
       <p className="text-xs text-slate-500">
         Editing <span className="font-medium text-slate-700">{selectedName}</span>
       </p>
@@ -142,18 +143,17 @@ export function AppearancePanel() {
             Text
           </label>
         </div>
-        <p className="text-xs leading-relaxed text-slate-500">
+        <HelpDisclosure summary="About element types">
           Shape, Image, and Text keep each other’s settings when you switch —
           color, corners, image file, and text stay available to switch back.
-        </p>
+        </HelpDisclosure>
         {!actor.image && actor.kind !== 'image' && (
           <p
             id="actor-image-type-help"
             data-testid="actor-image-type-help"
             className="text-xs leading-relaxed text-slate-500"
           >
-            Upload an image below to enable the Image type. Text is available
-            anytime.
+            Upload an image below to enable the Image type.
           </p>
         )}
       </fieldset>
@@ -182,15 +182,15 @@ export function AppearancePanel() {
             onChange={(e) => setActorSize(Number(e.target.value))}
             className="w-full accent-ms-primary"
           />
-          <p
+          <HelpDisclosure
             id="actor-size-help"
-            data-testid="actor-size-help"
-            className="text-xs leading-relaxed text-slate-500"
+            testId="actor-size-help"
+            summary="About Size"
           >
             {actor.kind === 'text'
               ? 'Width of the text wrap box, as a fraction of the stage’s shorter side. Height follows your lines. Center stays fixed.'
               : 'Longer edge of the element box, as a fraction of the stage’s shorter side. Images keep their proportions inside that box. Center stays fixed.'}
-          </p>
+          </HelpDisclosure>
         </div>
 
         {(actor.kind === 'shape' || actor.kind === 'text') && (
@@ -216,14 +216,11 @@ export function AppearancePanel() {
               onChange={(e) => setActorColor(e.target.value)}
               className="h-9 w-full cursor-pointer rounded-md border border-ms-border bg-white p-0.5"
             />
-            <p
-              id="actor-color-help"
-              className="text-xs leading-relaxed text-slate-500"
-            >
+            <span id="actor-color-help" className="sr-only">
               {actor.kind === 'text'
                 ? 'Color of the letters.'
                 : 'Fill color of the tile.'}
-            </p>
+            </span>
           </div>
         )}
 
@@ -250,19 +247,16 @@ export function AppearancePanel() {
               onChange={(e) => setActorBorderRadius(Number(e.target.value))}
               className="w-full accent-ms-primary"
             />
-            <p
-              id="actor-radius-help"
-              className="text-xs leading-relaxed text-slate-500"
-            >
+            <span id="actor-radius-help" className="sr-only">
               Square through fully round.
-            </p>
+            </span>
           </div>
         )}
 
         {actor.kind === 'text' && actor.text && (
           <div
             data-testid="actor-text-section"
-            className="space-y-3 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
+            className="space-y-2 p-0.5"
           >
             <p className="text-sm font-medium text-slate-800">Text</p>
             <div className="space-y-1.5">
@@ -282,14 +276,14 @@ export function AppearancePanel() {
                 className="w-full resize-y rounded-md border border-ms-border bg-white px-2 py-1.5 text-sm text-slate-800"
                 aria-describedby="actor-text-content-help"
               />
-              <p
+              <HelpDisclosure
                 id="actor-text-content-help"
-                className="text-xs leading-relaxed text-slate-500"
+                summary="About text content"
               >
                 Short multiline copy (up to {MAX_ACTOR_TEXT_LENGTH} characters).
                 Press Enter for a new line. Empty text is allowed and saved as
                 empty.
-              </p>
+              </HelpDisclosure>
             </div>
 
             <div className="space-y-2">
@@ -390,29 +384,29 @@ export function AppearancePanel() {
                 <option value="serif">Serif</option>
                 <option value="mono">Monospace</option>
               </select>
-              <p
-                data-testid="actor-text-font-help"
-                className="text-xs leading-relaxed text-slate-500"
+              <HelpDisclosure
+                testId="actor-text-font-help"
+                summary="About fonts"
               >
                 Uses built-in system fonts so exports stay offline. Exact letter
                 shapes can vary between devices and browsers.
-              </p>
+              </HelpDisclosure>
             </div>
           </div>
         )}
 
         <div
             data-testid="actor-image-section"
-            className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
+            className="space-y-2 p-0.5"
           >
             <p className="text-sm font-medium text-slate-800">Image</p>
-            <p className="text-xs leading-relaxed text-slate-500">
+            <HelpDisclosure summary="About image files">
               PNG, JPEG, WebP, or SVG from this device. Max{' '}
               {(MAX_IMAGE_BYTES / (1024 * 1024)).toFixed(1)} MB and{' '}
               {MAX_IMAGE_EDGE_PX}×{MAX_IMAGE_EDGE_PX}px. SVGs must be static
               (no scripts or external links) and render as an image, not live
               markup.
-            </p>
+            </HelpDisclosure>
 
             {actor.image && (
               <div className="flex items-center gap-3">

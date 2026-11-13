@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
-  dragActor,
   ensureEditor,
   openPanel,
   recordSimplePath,
+  clickResetMotion
 } from './helpers'
 
 async function readCamera(page: Page) {
@@ -222,11 +222,11 @@ test.describe('recording dock UX', () => {
     await page.getByTestId('btn-stop').click()
   })
 
-  test('Reset motion still requires confirmation', async ({ page }) => {
+  test('Reset still requires confirmation', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
-    await page.getByTestId('btn-reset').click()
+    await clickResetMotion(page)
     await expect(page.getByTestId('reset-actor-confirm')).toBeVisible()
     await page.getByTestId('btn-reset-actor-cancel').click()
     await expect(page.getByTestId('btn-play')).toBeEnabled()

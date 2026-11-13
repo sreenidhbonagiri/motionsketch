@@ -4,6 +4,7 @@ import {
   loadProjectSnapshot,
   openPanel,
   readExportedCss,
+  closePanel,
 } from './helpers'
 
 /** Adjust panel scrolls on short Linux WebKit viewports — stabilize before click. */
@@ -32,8 +33,8 @@ async function openSlideInPreview(page: Page) {
   await expect(page.getByTestId('preset-panel')).toContainText(
     'Preview: Slide In',
   )
-  await page.getByTestId('btn-close-adjust').click()
-  await expect(page.getByTestId('adjust-panel-root')).toHaveCount(0)
+  await closePanel(page, 'adjust')
+  await expect(page.getByTestId('inspector-motion-body')).toHaveCount(0)
 }
 
 async function setSlideInTiming(page: Page) {
@@ -101,7 +102,7 @@ test.describe('motion presets', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2500')
     await expect(page.getByTestId('duration-value')).toHaveText('2.50 s')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
     await expect(page.getByTestId('preset-compare-preset')).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -109,7 +110,7 @@ test.describe('motion presets', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
     await expect(page.getByTestId('duration-value')).toHaveText('2.00 s')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
 
     await page.getByTestId('btn-preset-cancel').click()
     await expect(page.getByTestId('preset-panel')).toHaveCount(0)

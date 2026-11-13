@@ -46,6 +46,15 @@ test.describe('image actors', () => {
     await recordSimplePath(page)
 
     await page.getByTestId('playback-scrubber').fill('0.4')
+    // Open Inspector first so stage letterboxing is stable before measuring.
+    await openPanel(page, 'appearance')
+    await expect
+      .poll(async () => {
+        const box = await page.getByTestId('stage-frame').boundingBox()
+        return box?.width ?? 0
+      })
+      .toBeGreaterThan(100)
+
     const before = await page.getByTestId('actor').boundingBox()
     expect(before).toBeTruthy()
     const beforeCenter = {
@@ -53,7 +62,6 @@ test.describe('image actors', () => {
       y: before!.y + before!.height / 2,
     }
 
-    await openPanel(page, 'appearance')
     const png = await makePngBytes(page, 400, 100, '#94a3b8')
     await page.getByTestId('actor-image-input').setInputFiles({
       name: 'wide-logo.png',

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ensureEditor, openPanel, skipTutorialIfPresent } from './helpers'
+import { ensureEditor, openPanel, skipTutorialIfPresent, closePanel } from './helpers'
 
 test.describe('named project entry', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
@@ -31,7 +31,7 @@ test.describe('named project entry', () => {
 
     // UI-only actions must not create a stored project.
     await openPanel(page, 'project')
-    await page.getByTestId('btn-close-project').click()
+    await closePanel(page, 'project')
     await openPanel(page, 'adjust')
     await page.keyboard.press('Escape')
     const stillEmpty = await page.evaluate(() =>

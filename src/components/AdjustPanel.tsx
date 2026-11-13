@@ -3,6 +3,7 @@ import {
   MIN_PLAYBACK_DURATION_MS,
 } from '../core/types'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 import { MotionPresets } from './MotionPresets'
 import { SvgPathImport } from './SvgPathImport'
 
@@ -40,14 +41,14 @@ export function AdjustPanel() {
   const editing = mode === 'editing'
 
   return (
-    <div data-testid="adjust-panel" className="space-y-4 p-3">
-      <p className="text-xs text-slate-500">
-        Duration and loop are shared. Smoothing and Steady Speed apply to{' '}
+    <div data-testid="adjust-panel" className="space-y-2.5 px-2.5 py-2">
+      <HelpDisclosure testId="adjust-panel-help" summary="About Adjust">
+        Adjusting{' '}
         <span className="font-medium text-slate-700">
           {selectedActor?.name ?? 'the selected element'}
         </span>
-        .
-      </p>
+        . Duration and loop are shared.
+      </HelpDisclosure>
 
       <SvgPathImport />
 
@@ -76,15 +77,15 @@ export function AdjustPanel() {
           onChange={(e) => setDurationMs(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
-        <p
+        <HelpDisclosure
           id="duration-help"
-          data-testid="duration-help"
-          className="text-xs leading-relaxed text-slate-500"
+          testId="duration-help"
+          summary="About Duration"
         >
           Total playback time for the project. Changing Duration scales Timing
           proportionally. Each element keeps the same relative start and Move
           for. Longer Duration plays the same motions more slowly.
-        </p>
+        </HelpDisclosure>
       </div>
 
       <div className="space-y-2">
@@ -110,15 +111,24 @@ export function AdjustPanel() {
           onChange={(e) => setSmoothing(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
-        <p
-          id="smoothing-help"
-          data-testid="smoothing-help"
-          className="text-xs leading-relaxed text-slate-500"
-        >
-          {smoothingLocked
-            ? 'Smoothing is baked into your path edit. Restore recorded path to change it.'
-            : 'Reduces wobble in your drawn path.'}
-        </p>
+        {smoothingLocked ? (
+          <p
+            id="smoothing-help"
+            data-testid="smoothing-help"
+            className="text-xs leading-relaxed text-amber-800"
+          >
+            Smoothing is baked into your path edit. Restore recorded path to
+            change it.
+          </p>
+        ) : (
+          <HelpDisclosure
+            id="smoothing-help"
+            testId="smoothing-help"
+            summary="About Smoothing"
+          >
+            Reduces wobble in your drawn path.
+          </HelpDisclosure>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -142,15 +152,24 @@ export function AdjustPanel() {
           onChange={(e) => setSteadySpeed(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
-        <p
-          id="steady-speed-help"
-          data-testid="steady-speed-help"
-          className="text-xs leading-relaxed text-slate-500"
-        >
-          {selectedHasRecording
-            ? 'Evens out movement speed while keeping pauses. Glide (dock) adds ease-in/out after this — they compose, they are not the same control.'
-            : 'Create a path for this element to adjust Steady Speed.'}
-        </p>
+        {selectedHasRecording ? (
+          <HelpDisclosure
+            id="steady-speed-help"
+            testId="steady-speed-help"
+            summary="About Steady Speed"
+          >
+            Evens out movement speed while keeping pauses. Glide adds ease-in/out
+            after this — they compose, they are not the same control.
+          </HelpDisclosure>
+        ) : (
+          <HelpDisclosure
+            id="steady-speed-help"
+            testId="steady-speed-help"
+            summary="About Steady Speed"
+          >
+            Create a path for this element to adjust Steady Speed.
+          </HelpDisclosure>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -165,10 +184,6 @@ export function AdjustPanel() {
             className="size-4 accent-ms-primary disabled:opacity-40"
           />
         </label>
-        <p className="text-xs leading-relaxed text-slate-500">
-          Shared for the project. Off plays once forward. On, choose how it
-          continues.
-        </p>
 
         {loop && (
           <fieldset
@@ -188,10 +203,10 @@ export function AdjustPanel() {
               />
               <span>
                 <span className="font-medium">Repeat</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                <HelpDisclosure summary="About Repeat">
                   Plays again from the start. End and start may jump if they
                   differ — the path is not changed.
-                </span>
+                </HelpDisclosure>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
@@ -205,10 +220,10 @@ export function AdjustPanel() {
               />
               <span>
                 <span className="font-medium">Back and forth</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                <HelpDisclosure summary="About Back and forth">
                   Alternates forward and backward with no jump. Duration is one
                   way; a full cycle takes twice that long.
-                </span>
+                </HelpDisclosure>
               </span>
             </label>
           </fieldset>

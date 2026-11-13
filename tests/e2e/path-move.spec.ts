@@ -12,6 +12,7 @@ import {
   readExportedCss,
   respondToConfirm,
   selectActorByIndex,
+  openEditMore
 } from './helpers'
 
 test.describe('move entire path', () => {
@@ -68,6 +69,7 @@ test.describe('move entire path', () => {
       baseline[PATH_MOVE_HANDLE_INDICES[2]]!.x,
     )
 
+    await openEditMore(page)
     await page.getByTestId('btn-restore-path').click()
     await respondToConfirm(page, {
       dialogTestId: 'restore-path-confirm',
@@ -253,6 +255,7 @@ test.describe('move entire path', () => {
     )
 
     // Return to the fixture pose via Restore (clears nudge history).
+    await openEditMore(page)
     await page.getByTestId('btn-restore-path').click()
     await respondToConfirm(page, {
       dialogTestId: 'restore-path-confirm',

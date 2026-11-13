@@ -13,6 +13,7 @@ import {
   recordSimplePath,
   respondToConfirm,
   selectActorByIndex,
+  closePanel,
 } from './helpers'
 
 async function makePngBytes(
@@ -206,7 +207,7 @@ test.describe('web package export', () => {
       buffer: png,
     })
     await expect(page.getByTestId('actor-image-status')).toContainText('Loaded')
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await clickRecord(page)
     await dragActor(page, { x: 20, y: -10 }, { x: 90, y: 25 })
 
@@ -274,7 +275,7 @@ test.describe('web package export', () => {
       buffer: png,
     })
     await expect(page.getByTestId('actor-image-status')).toContainText('Loaded')
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await clickRecord(page)
     await dragActor(page, { x: 20, y: -10 }, { x: 90, y: 25 })
 
@@ -333,7 +334,7 @@ test.describe('web package export', () => {
     await expect(page.getByTestId('btn-play')).toBeEnabled()
     await openPanel(page, 'appearance')
     await page.getByTestId('actor-color').fill('#c2410c')
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     await openPanel(page, 'export')
     const dlB = page.waitForEvent('download')
     await page.getByTestId('btn-download-web-package').click()

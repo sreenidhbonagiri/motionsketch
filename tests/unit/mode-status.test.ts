@@ -26,6 +26,8 @@ describe('resolveModeStatus', () => {
       instruction: expect.stringContaining('Drag a point to reshape the path.'),
     })
     expect(status?.instruction).toMatch(/Arrow keys nudge/)
+    expect(status?.instruction).toMatch(/\[ and \] move between points/)
+    expect(status?.instruction).not.toMatch(/\[ \] cycle/)
   })
 
   it('adapts Edit points for coarse pointers without keyboard guidance', () => {

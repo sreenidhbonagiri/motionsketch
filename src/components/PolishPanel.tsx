@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 /**
  * Compact Polish motion controls. Preview lives in polishSession only —
@@ -36,7 +37,8 @@ export function PolishPanel() {
   return (
     <div
       data-testid="polish-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-ms-border bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      tabIndex={-1}
+      className="pointer-events-auto w-full max-w-xl rounded-xl border border-ms-border bg-white/90 px-3 py-2 shadow-[var(--ms-shadow)] outline-none backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -57,7 +59,7 @@ export function PolishPanel() {
         </p>
       </div>
 
-      <div className="mt-2 space-y-1.5">
+      <div className="mt-2 space-y-1">
         <label
           htmlFor="polish-strength"
           className="flex items-center justify-between text-sm text-slate-600"
@@ -79,16 +81,16 @@ export function PolishPanel() {
           className="w-full accent-ms-primary"
           aria-describedby="polish-strength-help"
         />
-        <p
+        <HelpDisclosure
           id="polish-strength-help"
-          data-testid="polish-strength-help"
-          className="text-xs leading-relaxed text-slate-500"
+          testId="polish-strength-help"
+          summary="About strength"
         >
           Higher strength eases wobble on open curves and may even out speed in
-          moving sections. Pauses, sharp corners, and path handles stay put by
-          default. Total duration is unchanged. Transform keyframes keep the
-          same times even if speed along the path shifts.
-        </p>
+          moving sections. Pauses, sharp corners, and path handles stay put.
+          Duration is unchanged. Transform keyframes keep the same times even if
+          speed along the path shifts.
+        </HelpDisclosure>
       </div>
 
       {showRoundingControl && (

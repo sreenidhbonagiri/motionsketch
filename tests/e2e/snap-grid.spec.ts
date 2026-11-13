@@ -44,11 +44,20 @@ test.describe('snap to grid', () => {
   }) => {
     await page.goto('/')
     await ensureEditor(page)
+    // Open Motion first so stage letterboxing is stable before measuring —
+    // otherwise enabling Snap looks like a move when the inspector reflows.
+    await ensureRefineMotionOpen(page)
+    await expect
+      .poll(async () => {
+        const box = await page.getByTestId('stage-frame').boundingBox()
+        return box?.width ?? 0
+      })
+      .toBeGreaterThan(100)
+
     const actor = page.getByTestId('actor')
     const before = await actor.boundingBox()
     expect(before).toBeTruthy()
 
-    await ensureRefineMotionOpen(page)
     await page.getByTestId('snap-to-grid-toggle').click()
     const afterToggle = await actor.boundingBox()
     expect(Math.abs(afterToggle!.x - before!.x)).toBeLessThan(2)

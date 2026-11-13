@@ -3,9 +3,18 @@ import { defineConfig, devices } from '@playwright/test'
 /**
  * Browser coverage: Chromium, Firefox, and Playwright WebKit.
  * WebKit here is useful engine coverage — not a claim of every Safari/iOS version.
+ *
+ * Failure artifacts (traces, error-context) land in a per-run directory so a
+ * later Playwright invocation cannot overwrite an earlier failure's evidence.
+ * Override with PLAYWRIGHT_OUTPUT_DIR when needed.
  */
+const playwrightOutputDir =
+  process.env.PLAYWRIGHT_OUTPUT_DIR ??
+  `test-results/runs/${new Date().toISOString().replaceAll(':', '-')}`
+
 export default defineConfig({
   testDir: './tests/e2e',
+  outputDir: playwrightOutputDir,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // Keep failures visible — do not retry to paper over flakes (CI also passes --retries=0).

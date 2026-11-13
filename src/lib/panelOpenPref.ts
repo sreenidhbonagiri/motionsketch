@@ -22,4 +22,5 @@ export function writePanelOpenPref(key: string, open: boolean) {
 }
 
 export const ACTORS_PANEL_OPEN_KEY = 'motionsketch.actorsPanelOpen'
+export const INSPECTOR_PANEL_OPEN_KEY = 'motionsketch.inspectorPanelOpen'
 export const SEQUENCE_PANEL_OPEN_KEY = 'motionsketch.sequencePanelOpen'

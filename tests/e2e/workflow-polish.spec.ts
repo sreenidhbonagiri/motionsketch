@@ -4,19 +4,16 @@ import {
   clickAddActor,
   dragActor,
   ensureActorListExpanded,
+  ensureClipTimesOpen,
   ensureEditor,
   openPanel,
   recordSimplePath,
   selectActorByIndex,
+  closePanel,
 } from './helpers'
 
 async function openClipTimeline(page: import('@playwright/test').Page) {
-  const toggle = page.getByTestId('btn-toggle-clip-timeline')
-  await expect(toggle).toBeVisible()
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-    await toggle.click()
-  }
-  await expect(page.getByTestId('clip-timeline-rows')).toBeVisible()
+  await ensureClipTimesOpen(page)
 }
 
 test.describe('editor workflow polish', () => {
@@ -61,7 +58,7 @@ test.describe('editor workflow polish', () => {
       'aria-describedby',
       'actor-image-type-help',
     )
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
 
     await openPanel(page, 'project')
     await expect(page.getByTestId('btn-download-project')).toBeDisabled()
@@ -103,21 +100,21 @@ test.describe('editor workflow polish', () => {
     )
   })
 
-  test('closing Adjust with Escape restores focus to the trigger', async ({
-    page,
-  }) => {
+  test('Escape leaves the docked Motion inspector open', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
-    await page.getByTestId('btn-adjust').click()
-    await expect(page.getByTestId('adjust-panel-root')).toBeVisible()
-    await expect(page.getByTestId('adjust-panel-root')).toBeFocused()
+    await openPanel(page, 'adjust')
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
 
     await page.keyboard.press('Escape')
-    await expect(page.getByTestId('adjust-panel-root')).toHaveCount(0)
-    await expect(page.getByTestId('btn-adjust')).toBeFocused()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
+    await expect(page.getByTestId('btn-inspector-motion')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
   })
 
-  test('Sequence Start at / Move for draft: blur/switch discard; Apply/Enter/Escape; validation; undo', async ({
+  test('Timing Start after / Move for: Cancel/Escape discard; Apply/Enter; validation; undo', async ({
     page,
   }) => {
     await page.goto('/')
@@ -125,15 +122,11 @@ test.describe('editor workflow polish', () => {
     await recordSimplePath(page)
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
 
     await openClipTimeline(page)
-    await expect(page.getByTestId('btn-toggle-clip-timeline')).toContainText(
-      'Timing',
-    )
-    await expect(page.getByTestId('clip-timeline-help')).toContainText(
-      /Choose when each element moves/i,
-    )
+    await expect(page.getByTestId('timing-dialog')).toBeVisible()
+    await expect(page.getByTestId('timing-element-name')).toBeVisible()
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
     await expect(page.getByTestId('clip-ends-at')).toContainText('2.00')
@@ -141,23 +134,30 @@ test.describe('editor workflow polish', () => {
     // Partial input + blur must not commit.
     await page.getByTestId('clip-start-input').fill('0.')
     await page.getByTestId('clip-start-input').blur()
-    await page.getByTestId('clip-times-help').click()
+    await page.getByTestId('clip-ends-at').click()
     await expect(page.getByTestId('btn-apply-clip-times')).toBeEnabled()
+    await page.getByTestId('btn-timing-cancel').click()
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
     await page.getByTestId('playback-scrubber').fill('0.5')
-    // Committed clip still full range — actor should still move mid-timeline.
     const midBox = await page.getByTestId('actor').boundingBox()
     expect(midBox).toBeTruthy()
 
-    // Escape restores committed values.
+    // Escape closes and discards unapplied values.
+    await openClipTimeline(page)
     await page.getByTestId('clip-start-input').fill('0.80')
     await page.getByTestId('clip-move-for-input').fill('1.00')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.80')
-    await page.getByTestId('clip-start-input').press('Escape')
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
     await expect(page.getByTestId('btn-apply-clip-times')).toBeDisabled()
+    await page.getByTestId('btn-timing-cancel').click()
 
-    // Actor switch discards uncommitted draft.
+    // Actor switch discards uncommitted draft (Timing closes while selecting).
     await clickAddActor(page)
     await selectActorByIndex(page, 0)
     await openClipTimeline(page)
@@ -177,15 +177,18 @@ test.describe('editor workflow polish', () => {
       /Move for must|at least/i,
     )
     await expect(page.getByTestId('clip-start-input')).toHaveValue('1.50')
-    await page.getByTestId('clip-start-input').press('Escape')
+    await page.keyboard.press('Escape')
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
 
-    // Apply commits both; one undo restores both.
+    // Apply commits both; close, undo, reopen.
     await applyClipSeconds(page, '0.40', '1.60')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.40')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.20')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.60')
+    await page.getByTestId('btn-timing-cancel').click()
     await page.getByTestId('btn-undo-transform').click()
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
 

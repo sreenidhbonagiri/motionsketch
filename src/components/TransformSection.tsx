@@ -7,6 +7,7 @@ import {
   evaluateTransform,
 } from '../core/transform'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 function formatRotation(deg: number): string {
   if (Number.isInteger(deg)) return `${deg}°`
@@ -107,10 +108,9 @@ export function TransformSection() {
         className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
       >
         <p className="text-sm font-medium text-slate-800">Transform</p>
-        <p className="text-xs leading-relaxed text-slate-500">
-          Record a path first, then add rotation and scale keyframes along the
-          timeline.
-        </p>
+        <HelpDisclosure summary="About Transform">
+          Record a path first, then add rotation and scale keyframes.
+        </HelpDisclosure>
       </div>
     )
   }
@@ -121,13 +121,13 @@ export function TransformSection() {
       className="space-y-2.5 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0 space-y-1">
           <p className="text-sm font-medium text-slate-800">Transform</p>
-          <p className="text-xs leading-relaxed text-slate-500">
+          <HelpDisclosure summary="About Transform">
             Rotation (unwrapped °) and uniform scale ({MIN_TRANSFORM_SCALE}–
             {MAX_TRANSFORM_SCALE}) about the element center. Empty track → 0° /
             1×. Times are progress along Duration.
-          </p>
+          </HelpDisclosure>
         </div>
         {selected && (
           <button

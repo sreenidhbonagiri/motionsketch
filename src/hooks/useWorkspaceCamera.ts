@@ -40,14 +40,19 @@ function viewportSizeOf(el: HTMLElement | null): ViewportSize {
   return { width: el.offsetWidth, height: el.offsetHeight }
 }
 
+function isHandPanKey(event: KeyboardEvent): boolean {
+  return event.code === 'KeyH' || event.key === 'h' || event.key === 'H'
+}
+
 /**
  * Workspace pan/zoom around a letterboxed stage frame.
  * Camera is view-only; all geometry tools keep using stage-frame rects.
  *
- * Empty-canvas drag pans immediately while idle. Space temporarily pans even
- * over actors. While Record is armed, empty-canvas drag does not pan (Space
- * still pans); actor drag still starts recording. Handle / Move path /
- * recording gestures keep priority.
+ * Empty-canvas drag pans immediately while idle. Hold H or middle-drag to pan
+ * even over actors. While Record is armed, empty-canvas drag does not pan
+ * (H / middle-drag still pan); actor drag still starts recording. Handle /
+ * Move path / recording gestures keep priority. Space is play/pause (see
+ * useEditorShortcuts), not pan.
  */
 export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
   const camera = useEditorStore((s) => s.camera)
@@ -62,27 +67,27 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
 
   const [viewport, setViewport] = useState<ViewportSize>({ width: 0, height: 0 })
   const [layout, setLayout] = useState<StageLayoutSize>({ width: 0, height: 0 })
-  const [spaceHeld, setSpaceHeld] = useState(false)
+  const [handHeld, setHandHeld] = useState(false)
   const [panning, setPanning] = useState(false)
 
   const panSessionRef = useRef<WorkspacePanSession | null>(null)
   const captureElRef = useRef<HTMLElement | null>(null)
   const layoutRef = useRef(layout)
   const viewportRefState = useRef(viewport)
-  const spaceHeldRef = useRef(false)
+  const handHeldRef = useRef(false)
   const gestureBusyRef = useRef(false)
 
   layoutRef.current = layout
   viewportRefState.current = viewport
-  spaceHeldRef.current = spaceHeld
+  handHeldRef.current = handHeld
 
   const gestureBusy =
     isRecordingActive() || pathGestureActive || getActivePointerId() !== null
   gestureBusyRef.current = gestureBusy
 
-  /** Space override, or empty-canvas pan when no geometry gesture is active. */
-  const spacePanActive = spaceHeld && !gestureBusy
-  // Armed empty-canvas must not pan; Space-held pan still uses spacePanActive.
+  /** H / middle override, or empty-canvas pan when no geometry gesture is active. */
+  const handPanActive = handHeld && !gestureBusy
+  // Armed empty-canvas must not pan; H-held pan still uses handPanActive.
   const backgroundPanEnabled = !gestureBusy && mode !== 'armed'
 
   const syncLayout = useCallback(
@@ -185,10 +190,17 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
 
   const onViewportPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
-      if (event.button !== 0) return
       if (gestureBusyRef.current) return
 
-      if (spaceHeldRef.current) {
+      // Middle button always pans over elements (when idle of geometry gestures).
+      if (event.button === 1) {
+        beginPan(event)
+        return
+      }
+
+      if (event.button !== 0) return
+
+      if (handHeldRef.current) {
         beginPan(event)
         return
       }
@@ -278,31 +290,33 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     [zoomBy],
   )
 
-  // Space = temporary pan-over-everything. Ignore while typing / form controls.
+  // H = temporary pan-over-everything. Ignore while typing / form controls.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== 'Space' && event.key !== ' ') return
+      if (!isHandPanKey(event)) return
       if (event.repeat) return
+      if (event.isComposing || event.keyCode === 229) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
       if (isSpacePanBlockedTarget(event.target)) return
       if (gestureBusyRef.current) return
       event.preventDefault()
-      if (spaceHeldRef.current) return
-      spaceHeldRef.current = true
-      setSpaceHeld(true)
+      if (handHeldRef.current) return
+      handHeldRef.current = true
+      setHandHeld(true)
     }
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== 'Space' && event.key !== ' ') return
-      if (!spaceHeldRef.current) return
-      spaceHeldRef.current = false
-      setSpaceHeld(false)
-      // End an in-flight space-pan; keep the pan offset (view-only).
+      if (!isHandPanKey(event)) return
+      if (!handHeldRef.current) return
+      handHeldRef.current = false
+      setHandHeld(false)
+      // End an in-flight hand-pan; keep the pan offset (view-only).
       if (panSessionRef.current) endPanSession()
     }
     const onBlur = () => {
       if (panSessionRef.current) endPanSession({ revert: true })
-      if (spaceHeldRef.current) {
-        spaceHeldRef.current = false
-        setSpaceHeld(false)
+      if (handHeldRef.current) {
+        handHeldRef.current = false
+        setHandHeld(false)
       }
     }
     const onKeyEscape = (event: KeyboardEvent) => {
@@ -312,19 +326,30 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
         endPanSession({ revert: true })
       }
     }
+    // Suppress the browser’s middle-click autoscroll affordance on the stage.
+    const onAuxClick = (event: MouseEvent) => {
+      if (event.button !== 1) return
+      const el = viewportRef.current
+      if (!el || !(event.target instanceof Node) || !el.contains(event.target)) {
+        return
+      }
+      event.preventDefault()
+    }
     window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('keyup', onKeyUp, true)
     window.addEventListener('keydown', onKeyEscape, true)
     window.addEventListener('blur', onBlur)
+    window.addEventListener('auxclick', onAuxClick, true)
     return () => {
       window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener('keyup', onKeyUp, true)
       window.removeEventListener('keydown', onKeyEscape, true)
       window.removeEventListener('blur', onBlur)
+      window.removeEventListener('auxclick', onAuxClick, true)
       endPanSession()
-      spaceHeldRef.current = false
+      handHeldRef.current = false
     }
-  }, [endPanSession])
+  }, [endPanSession, viewportRef])
 
   // Deliberate zoom only: ctrl/meta + wheel (trackpad pinch). No plain scroll hijack.
   useEffect(() => {
@@ -354,8 +379,8 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     camera,
     layout,
     viewport,
-    spaceHeld,
-    spacePanActive,
+    handHeld,
+    handPanActive,
     backgroundPanEnabled,
     panning,
     worldTransform: cameraCssTransform(camera),

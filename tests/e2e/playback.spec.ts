@@ -7,6 +7,7 @@ import {
   openPanel,
   readExportedCss,
   recordSimplePath,
+  closePanel,
 } from './helpers'
 
 test.describe('playback inspection', () => {
@@ -19,7 +20,7 @@ test.describe('playback inspection', () => {
     await loadProjectSnapshot(page, buildPathHandlesFixtureJson())
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('2000')
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
     await expect(page.getByTestId('playback-timeline')).toBeVisible()
     await expect(page.getByTestId('playback-total')).toHaveText('2.00 s')
 
@@ -137,7 +138,7 @@ test.describe('playback inspection', () => {
     await page.getByTestId('transform-rotation-input').fill('360')
     await page.getByTestId('transform-scale-slider').fill('2')
     await page.getByTestId('btn-set-transform-keyframe').click()
-    await page.getByTestId('btn-close-appearance').click()
+    await closePanel(page, 'appearance')
     // Return to start so the clock run measures from t=0 forward→reverse.
     await page.getByTestId('playback-scrubber').fill('0')
 
@@ -227,7 +228,7 @@ test.describe('playback inspection', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('loop-toggle').check()
     await page.getByTestId('loop-mode-alternate').check()
-    await page.getByTestId('btn-close-adjust').click()
+    await closePanel(page, 'adjust')
     const css = await readExportedCss(page)
     expect(css).toContain('linear infinite alternate')
     expect(css).toContain('full cycle is 2×')

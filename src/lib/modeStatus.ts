@@ -146,7 +146,7 @@ export function resolveModeStatus(input: {
         ? null
         : coarsePointer
           ? 'Drag a point to reshape the path.'
-          : 'Drag a point to reshape the path. Arrow keys nudge; [ ] cycle.',
+          : 'Drag a point to reshape the path. Arrow keys nudge. [ and ] move between points.',
     }
   }
 

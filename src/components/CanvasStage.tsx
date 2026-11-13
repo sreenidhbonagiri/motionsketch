@@ -173,8 +173,8 @@ export function CanvasStage() {
   const {
     layout,
     worldTransform,
-    spaceHeld,
-    spacePanActive,
+    handHeld,
+    handPanActive,
     backgroundPanEnabled,
     panning,
     fitStage,
@@ -376,10 +376,10 @@ export function CanvasStage() {
     snapIndicator,
   ])
 
-  // Grab on empty canvas; grabbing while panning; Space override uses grab too.
+  // Grab on empty canvas; grabbing while panning; H override uses grab too.
   const cursorClass = panning
     ? 'cursor-grabbing'
-    : spacePanActive || backgroundPanEnabled
+    : handPanActive || backgroundPanEnabled
       ? editing && pathAddMode
         ? 'cursor-crosshair'
         : 'cursor-grab'
@@ -392,7 +392,15 @@ export function CanvasStage() {
       ref={viewportRef}
       data-testid="stage"
       tabIndex={-1}
-      className={`absolute inset-0 touch-none overflow-hidden bg-[#F8F9FC] outline-none ${cursorClass}`}
+      className={`absolute inset-0 touch-none overflow-hidden outline-none ${cursorClass}`}
+      style={{
+        // Continuous drawing field: same paper + lattice feel as the stage grid.
+        backgroundColor: msPalette.canvas,
+        backgroundImage:
+          'radial-gradient(rgba(71, 85, 105, 0.28) 1.1px, transparent 1.2px)',
+        backgroundSize: '22px 22px',
+        backgroundPosition: 'center',
+      }}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
       onPointerUp={onViewportPointerUp}
@@ -412,13 +420,13 @@ export function CanvasStage() {
           data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
           data-path-tool={editing ? pathTool : undefined}
           data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
-          className="relative overflow-hidden bg-[#F8F9FC] shadow-[0_0_0_1px_rgba(15,23,42,0.10)]"
+          className="relative overflow-hidden bg-[#F8F9FC] shadow-[0_0_0_1px_rgba(15,23,42,0.18),0_0_0_3px_rgba(248,249,252,0.92)]"
           style={{
             width: layout.width > 0 ? layout.width : undefined,
             height: layout.height > 0 ? layout.height : undefined,
           }}
           onPointerDown={
-            !spacePanActive &&
+            !handPanActive &&
             editing &&
             pathAddMode &&
             pathTool === 'edit-points'
@@ -426,7 +434,7 @@ export function CanvasStage() {
               : undefined
           }
           onPointerMove={
-            spacePanActive
+            handPanActive
               ? undefined
               : editing
                 ? pathAddMode && pathTool === 'edit-points'
@@ -435,10 +443,10 @@ export function CanvasStage() {
                 : onRecordPointerMove
           }
           onPointerUp={
-            spacePanActive || editing ? undefined : onRecordPointerUp
+            handPanActive || editing ? undefined : onRecordPointerUp
           }
           onPointerCancel={
-            spacePanActive || editing ? undefined : onRecordPointerCancel
+            handPanActive || editing ? undefined : onRecordPointerCancel
           }
         >
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
@@ -497,11 +505,11 @@ export function CanvasStage() {
                   stageHeight={size.height}
                   zIndex={10 + index}
                   selected={isSelected}
-                  armed={mode === 'armed' && isSelected && !spaceHeld}
-                  recording={mode === 'recording' && isSelected && !spaceHeld}
+                  armed={mode === 'armed' && isSelected && !handHeld}
+                  recording={mode === 'recording' && isSelected && !handHeld}
                   hidden={hidden}
-                  // Space temporarily disables actor hits so pan can override.
-                  interactive={!spaceHeld}
+                  // H temporarily disables actor hits so pan can override.
+                  interactive={!handHeld}
                   rotationDeg={rotationDeg}
                   scale={xf.scale}
                   onPointerDown={(e) => onActorPointerDown(actor.id, e)}
@@ -513,7 +521,7 @@ export function CanvasStage() {
             workingSamples &&
             size.width > 0 &&
             moveTool &&
-            !spaceHeld && (
+            !handHeld && (
             <PathMoveOverlay
               samples={workingSamples}
               hovered={moveHovered}
@@ -533,7 +541,7 @@ export function CanvasStage() {
             workingSamples &&
             size.width > 0 &&
             !moveTool &&
-            !spaceHeld && (
+            !handHeld && (
             <PathHandles
               samples={workingSamples}
               handleIndices={handleIndices}
@@ -546,14 +554,8 @@ export function CanvasStage() {
         </div>
       </div>
 
-      {/*
-        Screen-fixed chrome — uses measured header clearance (--ms-sheet-top)
-        so it sits just below the header without overlap.
-      */}
-      <div
-        className="pointer-events-none absolute right-2 z-[32] sm:right-3"
-        style={{ top: 'var(--ms-sheet-top, 4.5rem)' }}
-      >
+      {/* Camera chrome stays inside the stage viewport cell (not floating over chrome). */}
+      <div className="pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3">
         <WorkspaceCameraBar
           zoomIn={zoomIn}
           zoomOut={zoomOut}

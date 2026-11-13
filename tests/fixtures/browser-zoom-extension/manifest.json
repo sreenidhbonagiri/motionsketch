@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "MotionSketch Browser Zoom Helper",
+  "version": "1.0.0",
+  "description": "Test-only helper that applies real Chromium tab zoom via chrome.tabs.setZoom.",
+  "permissions": ["tabs"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

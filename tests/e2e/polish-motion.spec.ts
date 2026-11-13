@@ -13,6 +13,7 @@ import {
   openPanel,
   readExportedCss,
   selectActorByIndex,
+  openEditMore
 } from './helpers'
 
 test.describe('polish motion', () => {
@@ -152,6 +153,7 @@ test.describe('polish motion', () => {
     await page.getByTestId('btn-edit-path').click()
     await expect(page.getByTestId('path-handles')).toBeVisible()
     await page.getByTestId('path-handle-114').click({ force: true })
+    await openEditMore(page)
     await page.getByTestId('btn-polish-motion').click()
     await expect(page.getByTestId('polish-panel')).toBeVisible()
     await expect(page.getByTestId('polish-allow-rounding')).toBeEnabled()

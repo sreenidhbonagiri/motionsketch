@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import {
   clickAddActor,
   ensureActorListExpanded,
+  ensureClipTimesOpen,
   ensureEditor,
   openPanel,
   recordSimplePath,
@@ -21,12 +22,7 @@ async function closeChromePanels(page: import('@playwright/test').Page) {
 }
 
 async function ensureClipTimelineOpen(page: import('@playwright/test').Page) {
-  const toggle = page.getByTestId('btn-toggle-clip-timeline')
-  await expect(toggle).toBeVisible()
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-    await toggle.click()
-  }
-  await expect(page.getByTestId('clip-timeline-rows')).toBeVisible()
+  await ensureClipTimesOpen(page)
 }
 
 test.describe('unified actor edit undo', () => {
@@ -54,35 +50,46 @@ test.describe('unified actor edit undo', () => {
     await page.getByTestId('clip-move-for-input').fill('1.00')
     await page.getByTestId('clip-start-input').press('Enter')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
+    await page.getByTestId('btn-timing-cancel').click()
 
     // Dock undoes sequence first (chronological), not the older transform.
     await page.getByTestId('btn-undo-transform').click()
+    await ensureClipTimelineOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
+    await page.getByTestId('btn-timing-cancel').click()
     await expect(page.locator('[data-transform-marker]')).toHaveCount(2)
 
     // Redo sequence, then keyboard undo still targets sequence (top of stack).
     await page.getByTestId('btn-redo-transform').click()
+    await ensureClipTimelineOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
+    await page.getByTestId('btn-timing-cancel').click()
     const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
-    // Leave the sequence fields so the editor shortcut (not native input undo) runs.
+    // Leave fields so the editor shortcut (not native input undo) runs.
     await page.getByTestId('stage').focus()
     await expect(page.getByTestId('stage')).toBeFocused()
     await page.keyboard.press(`${mod}+z`)
+    await ensureClipTimelineOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
+    await page.getByTestId('btn-timing-cancel').click()
 
     // Next undo removes the transform track entry.
     await page.keyboard.press(`${mod}+z`)
     await expect(page.locator('[data-transform-marker]')).toHaveCount(0)
 
     // Sequence-only keyboard undo when that is the sole pending edit.
+    await ensureClipTimelineOpen(page)
     await page.getByTestId('clip-start-input').fill('0.30')
     await page.getByTestId('clip-move-for-input').fill('0.90')
     await page.getByTestId('clip-start-input').press('Enter')
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.30')
+    await page.getByTestId('btn-timing-cancel').click()
     await page.getByTestId('stage').focus()
     await expect(page.getByTestId('stage')).toBeFocused()
     await page.keyboard.press(`${mod}+z`)
+    await ensureClipTimelineOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
+    await page.getByTestId('btn-timing-cancel').click()
 
     // Focused text inputs keep native undo; editor shortcut must not fire.
     await ensureActorListExpanded(page)

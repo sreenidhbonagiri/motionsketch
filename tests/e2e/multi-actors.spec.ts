@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import {
+  clickResetMotion,
   actorIdsFromList,
   clickAddActor,
   clickRecord,
@@ -28,8 +29,8 @@ test.describe('multiple actors', () => {
   test('add, rename, duplicate, delete, and reorder', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
-    await expect(page.getByTestId('actor-list')).toBeVisible()
     await ensureActorListExpanded(page)
+    await expect(page.getByTestId('actor-list')).toBeVisible()
     await expect(page.getByTestId('btn-add-actor')).toBeEnabled()
 
     await clickAddActor(page)
@@ -242,7 +243,7 @@ test.describe('multiple actors', () => {
 
     const ids = await actorIdsFromList(page)
     await selectActorByIndex(page, 0)
-    await page.getByTestId('btn-reset').click()
+    await clickResetMotion(page)
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',
       confirmTestId: 'btn-reset-actor-confirm',
@@ -476,13 +477,7 @@ test.describe('multiple actors', () => {
   test('canvas click selects actor and scopes Appearance', async ({ page }) => {
     await page.goto('/')
     await ensureEditor(page)
-    if (
-      (await page
-        .getByTestId('btn-toggle-actor-list')
-        .getAttribute('aria-expanded')) !== 'true'
-    ) {
-      await page.getByTestId('btn-toggle-actor-list').click()
-    }
+    await ensureActorListExpanded(page)
     await expect(page.getByTestId('actor-list-items')).toBeVisible()
     await clickAddActor(page)
     const ids = await actorIdsFromList(page)

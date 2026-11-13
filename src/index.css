@@ -1,20 +1,35 @@
 @import 'tailwindcss';
 
 :root {
-  /* Approved premium chrome palette — flat fills, restrained borders/shadows. */
-  --ms-primary: #3048b8;
-  --ms-primary-hover: #2539a0;
-  --ms-primary-pressed: #1e2f85;
+  /* Canvas-first chrome — light surface, distinct action colors (VibeDraw-inspired). */
+  --ms-primary: #2563eb;
+  --ms-primary-hover: #1d4ed8;
+  --ms-primary-pressed: #1e40af;
+  /* Play / selected / commit — blue */
+  --ms-play: #2563eb;
+  --ms-play-hover: #1d4ed8;
+  --ms-play-pressed: #1e40af;
+  /* Record — coral / red */
+  --ms-record: #e11d48;
+  --ms-record-hover: #be123c;
+  /* Motion tools — purple */
+  --ms-motion: #7c3aed;
+  --ms-motion-hover: #6d28d9;
+  /* Export — teal */
+  --ms-export: #0d9488;
+  --ms-export-hover: #0f766e;
   --ms-canvas: #f8f9fc;
   --ms-panel: #ffffff;
   --ms-ink: #17213a;
   --ms-muted: #647089;
-  --ms-selected: #ebefff;
-  --ms-border: #dfe4ee;
-  --ms-danger: #d93645;
-  --ms-danger-hover: #c22f3c;
+  --ms-selected: #eff6ff;
+  --ms-border: #e2e8f0;
+  --ms-danger: #e11d48;
+  --ms-danger-hover: #be123c;
   --ms-success: #18794e;
   --ms-success-surface: #ecf8f0;
+  --ms-warning-ink: #92400e;
+  --ms-warning-surface: #fffbeb;
 
   --ms-surface: rgb(255 255 255 / 0.92);
   --ms-surface-strong: #ffffff;
@@ -45,6 +60,15 @@
   --color-ms-primary: var(--ms-primary);
   --color-ms-primary-hover: var(--ms-primary-hover);
   --color-ms-primary-pressed: var(--ms-primary-pressed);
+  --color-ms-play: var(--ms-play);
+  --color-ms-play-hover: var(--ms-play-hover);
+  --color-ms-play-pressed: var(--ms-play-pressed);
+  --color-ms-record: var(--ms-record);
+  --color-ms-record-hover: var(--ms-record-hover);
+  --color-ms-motion: var(--ms-motion);
+  --color-ms-motion-hover: var(--ms-motion-hover);
+  --color-ms-export: var(--ms-export);
+  --color-ms-export-hover: var(--ms-export-hover);
   --color-ms-canvas: var(--ms-canvas);
   --color-ms-panel: var(--ms-panel);
   --color-ms-ink: var(--ms-ink);
@@ -55,6 +79,8 @@
   --color-ms-danger-hover: var(--ms-danger-hover);
   --color-ms-success: var(--ms-success);
   --color-ms-success-surface: var(--ms-success-surface);
+  --color-ms-warning-ink: var(--ms-warning-ink);
+  --color-ms-warning-surface: var(--ms-warning-surface);
 
   /* Neutral slate remapped toward approved ink / muted / border / canvas. */
   --color-slate-950: #0f1629;
@@ -102,8 +128,17 @@ dialog.confirm-dialog:not([open]) {
 
 /*
  * Closed <dialog> must stay display:none. Tailwind `flex` would override that
- * and leave a full-size invisible (but click-blocking) code panel on the page.
+ * and leave a full-size invisible (but click-blocking) panel on the page.
  */
+dialog.timing-dialog:not([open]) {
+  display: none;
+}
+
+dialog.timing-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 dialog.css-export-dialog:not([open]) {
   display: none;
 }
@@ -158,13 +193,11 @@ textarea.css-export-code {
 }
 
 /*
- * Short viewports (toast + Sequence + dock): hide informational time labels
- * only. Scrubber, transform markers, transport, Continue, Snap, and path
- * tools stay. dock-status is live status text (not an action); keep it as
- * sr-only so assistive tech still hears it. Desktop / normal mobile unchanged.
+ * Short viewports / Timing-open strip: hide informational chrome so Collapse,
+ * ruler, scrubber, and transport stay hittable. Live status stays available to
+ * assistive tech as sr-only. Normal desktop with Timing collapsed is unchanged.
  */
-@media (max-height: 420px) {
-  /* ~8–10px: Linux CI fonts leave Play ~7px past 360 after labels hide. */
+@media (max-height: 640px) {
   [data-testid='playback-dock'] {
     padding-block: 0.25rem;
     gap: 0.125rem;
@@ -183,8 +216,48 @@ textarea.css-export-code {
     white-space: nowrap;
     border-width: 0;
   }
-  /* Drop reserved status-slot height when the status itself is sr-only. */
   [data-testid='playback-dock'] [data-testid='dock-status-slot'] {
     min-height: 0;
+  }
+}
+
+/* Timing expanded: dock shares a capped strip — one transport row, hide
+   informational labels/status only. Snap and Edit path stay mounted (Snap
+   lives on the dock editing row after a take; there is no inspector Snap). */
+[data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='playback-dock'] {
+  padding-block: 0.25rem;
+  gap: 0.125rem;
+}
+[data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='playback-time-labels'] {
+  display: none;
+}
+[data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='dock-status'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+[data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='dock-status-slot'] {
+  min-height: 0;
+  height: 0;
+  overflow: hidden;
+}
+[data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='dock-snap-row'],
+[data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='dock-snap-spacer'] {
+  display: none;
+}
+/* Transport uses flex + absolutely centered Play (see PlaybackDock). */
+
+/* Narrow phone: primary dock actions stay visible — no nested horizontal scroll. */
+
+@media (max-height: 420px) {
+  [data-testid='toolbar-slot'][data-timing-open='true'] [data-testid='playback-dock'] {
+    padding-block: 0;
+    gap: 0;
   }
 }

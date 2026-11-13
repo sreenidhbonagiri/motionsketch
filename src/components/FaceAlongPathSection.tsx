@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 function formatOffset(deg: number): string {
   if (Number.isInteger(deg)) return `${deg}°`
@@ -38,14 +39,13 @@ export function FaceAlongPathSection() {
       className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-1">
           <p className="text-sm font-medium text-slate-800">Face along path</p>
-          <p id={helpId} className="text-xs leading-relaxed text-slate-500">
-            Turns the element to follow its movement. Path heading is a base
-            rotation; transform keyframes and Direction offset add to it. With
-            Alternate loop, poses reverse along the same angles. The element does
-            not turn around to face backward travel.
-          </p>
+          <HelpDisclosure id={helpId} summary="About facing">
+            {recording
+              ? 'Turns the element to follow its movement. Path heading is a base rotation; transform keyframes and Direction offset add to it. With Alternate loop, poses reverse along the same angles. The element does not turn around to face backward travel.'
+              : 'Record a path first to enable facing. Turns the element to follow its movement once a path exists.'}
+          </HelpDisclosure>
         </div>
       </div>
 
@@ -76,12 +76,6 @@ export function FaceAlongPathSection() {
         <span>Face along path</span>
       </label>
 
-      {!recording && (
-        <p className="text-xs text-slate-500">
-          Record a path first to enable facing.
-        </p>
-      )}
-
       {enabled && recording && (
         <div className="space-y-2 pt-0.5">
           <label
@@ -93,9 +87,9 @@ export function FaceAlongPathSection() {
               {formatOffset(offset)}
             </span>
           </label>
-          <p id={offsetHelpId} className="text-xs leading-relaxed text-slate-500">
+          <HelpDisclosure id={offsetHelpId} summary="About direction offset">
             Align images that face up, right, or another direction (degrees).
-          </p>
+          </HelpDisclosure>
           <input
             id={offsetId}
             data-testid="direction-offset-slider"

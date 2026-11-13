@@ -34,8 +34,8 @@ describe('workspace camera', () => {
   it('fits a stage frame to export aspect with padding', () => {
     const layout = fitStageLayoutSize(viewport, 16 / 10)
     expect(layout.width / layout.height).toBeCloseTo(1.6, 5)
-    expect(layout.width).toBeLessThanOrEqual(viewport.width * 0.9 + 1e-6)
-    expect(layout.height).toBeLessThanOrEqual(viewport.height * 0.9 + 1e-6)
+    expect(layout.width).toBeLessThanOrEqual(viewport.width * 0.96 + 1e-6)
+    expect(layout.height).toBeLessThanOrEqual(viewport.height * 0.96 + 1e-6)
     const cam = fitCamera(viewport, layout)
     expect(cam.zoom).toBe(1)
     expect(cam.panX).toBeCloseTo((viewport.width - layout.width) / 2)
@@ -125,9 +125,11 @@ describe('workspace camera', () => {
     )
   })
 
-  it('blocks Space pan while focus is in form controls', () => {
+  it('blocks workspace shortcuts while focus is in form controls', () => {
     const input = document.createElement('input')
     expect(isSpacePanBlockedTarget(input)).toBe(true)
+    const button = document.createElement('button')
+    expect(isSpacePanBlockedTarget(button)).toBe(true)
     const div = document.createElement('div')
     expect(isSpacePanBlockedTarget(div)).toBe(false)
   })

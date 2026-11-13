@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import {
   TUTORIAL_FINISH_LABEL,
@@ -94,22 +95,23 @@ export function TutorialCoach({
       const plane = readElementRect(
         document.querySelector('[data-testid="actor"]'),
       )
-      const adjust = readElementRect(
-        document.querySelector('[data-testid="btn-adjust"]'),
+      const motionTab = readElementRect(
+        document.querySelector('[data-testid="btn-inspector-motion"]'),
       )
-      const appearance = readElementRect(
-        document.querySelector('[data-testid="btn-appearance"]'),
+      const styleTab = readElementRect(
+        document.querySelector('[data-testid="btn-inspector-style"]'),
       )
       const exportBtn = readElementRect(
         document.querySelector('[data-testid="btn-export"]'),
       )
       const header = readElementRect(document.querySelector('header'))
+      // Do not avoid the whole playback dock — the coach anchors next to Record/Play.
       const avoidExtra = [
         fit,
         cameraBar,
         plane,
-        adjust,
-        appearance,
+        motionTab,
+        styleTab,
         exportBtn,
       ].filter(Boolean) as NonNullable<ReturnType<typeof readElementRect>>[]
 
@@ -131,8 +133,8 @@ export function TutorialCoach({
       const chromeClearanceTop = Math.max(
         header?.bottom ?? 0,
         cameraBar?.bottom ?? 0,
-        adjust?.bottom ?? 0,
-        appearance?.bottom ?? 0,
+        motionTab?.bottom ?? 0,
+        styleTab?.bottom ?? 0,
         exportBtn?.bottom ?? 0,
       )
 
@@ -236,9 +238,10 @@ export function TutorialCoach({
   }, [step])
 
   const progress = tutorialProgressLabel(step)
-  const layerZ = exportOpen ? 'z-[55]' : 'z-[45]'
+  // Above portaled Help/Export sheets (z-40) so Finish/Skip stay hittable.
+  const layerZ = exportOpen ? 'z-[60]' : 'z-[45]'
 
-  return (
+  return createPortal(
     <div
       data-testid="tutorial-coach"
       data-tutorial-step={step}
@@ -266,7 +269,7 @@ export function TutorialCoach({
             // Export: 3px white gap, 3px cobalt outline, restrained outer halo (no pulse).
             boxShadow:
               highlightTestId === 'btn-export'
-                ? '0 0 0 3px #ffffff, 0 0 0 6px #3048b8, 0 0 16px rgb(48 72 184 / 0.35)'
+                ? '0 0 0 3px #ffffff, 0 0 0 6px #2563eb, 0 0 16px rgb(37 99 235 / 0.35)'
                 : softHighlight
                   ? '0 0 0 2px rgb(48 72 184 / 0.35)'
                   : '0 0 0 9999px rgb(23 33 58 / 0.22)',
@@ -325,6 +328,7 @@ export function TutorialCoach({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

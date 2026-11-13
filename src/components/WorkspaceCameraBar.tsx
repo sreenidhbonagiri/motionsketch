@@ -18,7 +18,7 @@ interface WorkspaceCameraBarProps {
 
 /**
  * Compact, screen-fixed workspace zoom controls (not inside the world transform).
- * Empty-canvas drag pans; Space temporarily pans over actors — no Hand toggle.
+ * Empty-canvas drag pans; hold H or middle-drag to pan over actors — no Hand toggle.
  */
 export function WorkspaceCameraBar({
   zoomIn,
@@ -66,7 +66,7 @@ export function WorkspaceCameraBar({
         type="button"
         data-testid="btn-fit-stage"
         aria-label="Fit stage"
-        title="Fit stage. Center and show the full exported stage. Drag empty canvas to pan; hold Space to pan over elements."
+        title="Fit stage. Center and show the full exported stage. Drag empty canvas to pan; hold H or middle-drag to pan over elements."
         onClick={fitStage}
         className={control}
       >

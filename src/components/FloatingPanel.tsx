@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useEditorStore } from '../state/store'
 
 export type ChromePanel =
@@ -11,7 +12,7 @@ export type ChromePanel =
 /**
  * After a chrome panel unmounts, return-focus to the opener only when focus
  * is still neutral (body / gone with the panel). If the user or a test already
- * moved focus elsewhere (e.g. the stage for Space-pan), leave it alone —
+ * moved focus elsewhere (e.g. the stage for Space play/pause), leave it alone —
  * double-rAF restore must not steal that focus back onto the opener button.
  */
 export function shouldReturnFocusOnClose(
@@ -116,12 +117,9 @@ export function FloatingPanel({
 
   if (!open) return null
 
-  const desktopMaxHeight =
-    align === 'left'
-      ? 'max-h-[min(32rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-var(--ms-toolbar-clearance,12rem)-2.75rem))]'
-      : 'max-h-[min(32rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-var(--ms-dock-clearance,12rem)))]'
-
-  return (
+  // Portal to body so header filters/stacking cannot trap position:fixed sheets.
+  const desktopMaxHeight = 'max-h-[min(32rem,calc(100dvh-6rem))]'
+  const panel = (
     <div
       ref={panelRef}
       id={`${id}-panel-root`}
@@ -130,8 +128,8 @@ export function FloatingPanel({
       aria-modal="false"
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`pointer-events-auto absolute top-full z-50 mt-1.5 flex ${desktopMaxHeight} w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-ms-border bg-white/92 shadow-[var(--ms-shadow)] backdrop-blur-xl outline-none max-sm:fixed max-sm:inset-x-3 max-sm:top-[var(--ms-sheet-top,4.5rem)] max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:mt-0 max-sm:max-h-none max-sm:w-auto ${
-        align === 'left' ? 'left-0 max-sm:left-3' : 'right-0 max-sm:right-3'
+      className={`pointer-events-auto fixed z-40 flex ${desktopMaxHeight} flex-col overflow-hidden rounded-xl border border-ms-border bg-white/95 shadow-[var(--ms-shadow)] outline-none max-sm:inset-x-3 max-sm:top-14 max-sm:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-sm:w-auto max-sm:max-h-none sm:top-14 sm:w-[min(20rem,calc(100vw-1.5rem))] ${
+        align === 'left' ? 'sm:left-3' : 'sm:right-3'
       }`}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
@@ -167,4 +165,6 @@ export function FloatingPanel({
       </button>
     </div>
   )
+
+  return createPortal(panel, document.body)
 }

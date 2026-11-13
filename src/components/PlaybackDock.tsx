@@ -1,5 +1,10 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { localToProject } from '../core/clip'
 import {
   CONTINUE_PATH_BAKE_NOTE,
@@ -14,6 +19,7 @@ import {
   smoothBendAvailability,
 } from '../core/edit'
 import { traversalElapsedMs } from '../core/playback'
+import { useArmRecording } from '../hooks/useArmRecording'
 import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { useConfirm } from '../hooks/useConfirm'
 import {
@@ -22,6 +28,7 @@ import {
 } from '../lib/modeStatus'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
+import { TimingDialog } from './TimingDialog'
 
 function PlayIcon() {
   return (
@@ -60,25 +67,48 @@ function StopSquareIcon() {
   )
 }
 
+/** Eraser mark for Reset — distinct from Restart’s circular arrow. */
+function EraserIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-3.5 fill-none stroke-current"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+      <path d="M22 21H7" />
+      <path d="m5 11 9 9" />
+    </svg>
+  )
+}
+
 function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-/** Placement snap. Same control before a path (dock) and after one (Motion tools). */
+/** Placement snap. Same control before a path (dock) and after one (editing row). */
 function SnapGridToggle({
   pressed,
   onToggle,
   className,
+  compact = false,
+  ariaLabel,
 }: {
   pressed: boolean
   onToggle: () => void
   className: string
+  compact?: boolean
+  ariaLabel?: string
 }) {
   return (
     <button
       type="button"
       data-testid="snap-to-grid-toggle"
       aria-pressed={pressed}
+      aria-label={ariaLabel ?? (pressed ? 'Snap on' : 'Snap to grid')}
       aria-describedby="snap-to-grid-help"
       title="Align placement and path edits to the dots. Recording stays freehand."
       onClick={onToggle}
@@ -98,7 +128,13 @@ function SnapGridToggle({
           <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
         </svg>
       </span>
-      {pressed ? 'Snap on' : 'Snap to grid'}
+      {compact ? (
+        <span className="sr-only">{pressed ? 'Snap on' : 'Snap to grid'}</span>
+      ) : pressed ? (
+        'Snap on'
+      ) : (
+        'Snap to grid'
+      )}
     </button>
   )
 }
@@ -106,19 +142,141 @@ function SnapGridToggle({
 /** Shared control height — filled primary, ghost secondary; icons for support. */
 const control =
   'inline-flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
-const btnPrimary = `${control} bg-ms-primary text-white hover:bg-ms-primary-hover active:bg-ms-primary-pressed`
+/** Shared width so Record ↔ Cancel does not shift the transport grid. */
+const recordSlot =
+  'inline-flex h-8 min-h-8 min-w-[5.75rem] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
+const btnPrimary = `${control} bg-ms-play text-white hover:bg-ms-play-hover active:bg-ms-play-pressed`
+const btnRecord = `${recordSlot} bg-ms-record text-white hover:bg-ms-record-hover`
 const btnSecondary = `${control} text-slate-700 hover:bg-slate-900/[0.06]`
 const btnQuiet = `${control} text-slate-500 hover:bg-slate-900/[0.05]`
 const btnIcon =
   'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-40'
-/** Shared width so Record ↔ Cancel does not shift the transport grid. */
-const recordSlot =
-  'inline-flex h-8 min-h-8 min-w-[5.75rem] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium transition disabled:opacity-40'
-const surfaceChrome =
-  'rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
+const menuItem =
+  'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:cursor-not-allowed disabled:opacity-40'
+const menuItemQuiet =
+  'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-slate-500 transition hover:bg-slate-900/[0.05] disabled:cursor-not-allowed disabled:opacity-40'
+const menuItemMotion =
+  'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-ms-motion transition hover:bg-ms-motion/10 disabled:cursor-not-allowed disabled:opacity-40'
+
+/** Labeled overflow menu for occasional dock actions — no nested horizontal scroll. */
+function DockMoreMenu({
+  testId,
+  menuTestId,
+  label = 'More',
+  buttonRef,
+  children,
+}: {
+  testId: string
+  menuTestId: string
+  label?: string
+  buttonRef?: RefObject<HTMLButtonElement | null>
+  children: (api: { close: () => void }) => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ bottom: number; right: number } | null>(
+    null,
+  )
+  const rootRef = useRef<HTMLDivElement>(null)
+  const localBtnRef = useRef<HTMLButtonElement>(null)
+  const btnRef = buttonRef ?? localBtnRef
+
+  useEffect(() => {
+    if (!open) {
+      setMenuPos(null)
+      return
+    }
+    const place = () => {
+      const btn = btnRef.current
+      if (!btn) return
+      const r = btn.getBoundingClientRect()
+      setMenuPos({
+        bottom: Math.max(8, window.innerHeight - r.top + 4),
+        right: Math.max(8, window.innerWidth - r.right),
+      })
+    }
+    place()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setOpen(false)
+      btnRef.current?.focus()
+    }
+    const onPtr = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('resize', place)
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onPtr, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onPtr, true)
+    }
+  }, [open, btnRef])
+
+  return (
+    <div
+      ref={rootRef}
+      data-testid={`${testId}-wrap`}
+      className="relative shrink-0"
+    >
+      <button
+        ref={btnRef}
+        type="button"
+        data-testid={testId}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        onClick={() => setOpen((v) => !v)}
+        className={`${btnSecondary} px-2`}
+      >
+        <span className="max-[360px]:hidden">{label}</span>
+        <span className="hidden max-[360px]:inline" aria-hidden>
+          ···
+        </span>
+      </button>
+      {open && menuPos ? (
+        <div
+          role="menu"
+          data-testid={menuTestId}
+          aria-label={label}
+          className="fixed z-50 min-w-[12rem] overflow-hidden rounded-lg border border-ms-border bg-white py-1 shadow-[var(--ms-shadow)]"
+          style={{ bottom: menuPos.bottom, right: menuPos.right }}
+        >
+          {children({ close: () => setOpen(false) })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 export function PlaybackDock() {
   const mode = useEditorStore((s) => s.mode)
+  const [timingOpen, setTimingOpen] = useState(false)
+  const [wideDock, setWideDock] = useState(true)
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
+
+  // Compress the toolbar slot while the Timing dialog is open (legacy CSS hook).
+  useEffect(() => {
+    const slot = document.querySelector('[data-testid="toolbar-slot"]')
+    if (!(slot instanceof HTMLElement)) return
+    if (timingOpen) slot.setAttribute('data-timing-open', 'true')
+    else slot.removeAttribute('data-timing-open')
+    return () => {
+      slot.removeAttribute('data-timing-open')
+    }
+  }, [timingOpen])
+
+  // Keep Reset on the strip; tuck Restart/Undo/Redo into More below md
+  // so 640-wide / 200% zoom layouts don’t crowd Play’s center column.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const sync = () => setWideDock(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
@@ -132,7 +290,6 @@ export function PlaybackDock() {
   const selectedTransformId = useEditorStore((s) => s.selectedTransformId)
   const actorEditOrder = useEditorStore((s) => s.actorEditOrder)
   const actorEditRedoOrder = useEditorStore((s) => s.actorEditRedoOrder)
-  const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const undoStack = useEditorStore((s) => s.undoStack)
   const redoStack = useEditorStore((s) => s.redoStack)
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
@@ -141,14 +298,12 @@ export function PlaybackDock() {
   const playbackHead = useEditorStore((s) => s.playbackHead)
   const playbackDirection = useEditorStore((s) => s.playbackDirection)
   const scrubPlayback = useEditorStore((s) => s.scrubPlayback)
-  const armRecording = useEditorStore((s) => s.armRecording)
   const armContinuePath = useEditorStore((s) => s.armContinuePath)
   const recordingIntent = useEditorStore((s) => s.recordingIntent)
   const play = useEditorStore((s) => s.play)
   const pause = useEditorStore((s) => s.pause)
   const restartPlayback = useEditorStore((s) => s.restartPlayback)
   const resetRecording = useEditorStore((s) => s.resetRecording)
-  const setPlaybackHead = useEditorStore((s) => s.setPlaybackHead)
   const enterEditMode = useEditorStore((s) => s.enterEditMode)
   const exitEditMode = useEditorStore((s) => s.exitEditMode)
   const beginPolishSession = useEditorStore((s) => s.beginPolishSession)
@@ -180,21 +335,8 @@ export function PlaybackDock() {
   const stageAspect = useEditorStore((s) => s.project.stageAspect)
   const pathGestureActive = useEditorStore((s) => s.pathGestureActive)
   const confirm = useConfirm()
+  const requestArmRecording = useArmRecording()
   const coarsePointer = useCoarsePointer()
-  const [refineOpen, setRefineOpen] = useState(false)
-  const refineBtnRef = useRef<HTMLButtonElement>(null)
-  const refinePanelRef = useRef<HTMLDivElement>(null)
-  const refineReturnFocusRef = useRef<HTMLElement | null>(null)
-  /** Escape restores trigger focus; outside dismiss / session handoff must not. */
-  const refineRestoreFocusRef = useRef(false)
-  const refinePanelId = useId()
-  const [refinePopoverBox, setRefinePopoverBox] = useState<{
-    bottom: number
-    left: number
-    width: number
-    maxHeight: number
-    placement: 'anchored' | 'sheet'
-  } | null>(null)
 
   const onRestoreRecordedPath = async () => {
     const ok = await confirm({
@@ -311,6 +453,89 @@ export function PlaybackDock() {
         })?.instruction
       : null
 
+  // Edit-path copy stays available to AT/help; not a persistent grey paragraph.
+  // After a take, keep a reserved status row so armed/recording doesn't grow the dock.
+  const editStatusScreenReaderOnly = editing
+  const reservePostTakeStatus = !editing && hasAnyRecording
+  const dockStatusSlot = (modeStatus || !editing) ? (
+        <div
+          data-testid="dock-status-slot"
+          className={
+            editStatusScreenReaderOnly
+              ? 'sr-only'
+              : modeStatus || reservePostTakeStatus
+                ? 'flex min-h-8 flex-wrap items-center justify-center gap-x-1.5 overflow-hidden text-center text-xs leading-snug'
+                : 'hidden'
+          }
+          aria-hidden={!modeStatus}
+        >
+          {modeStatus ? (
+            <div
+              id={dockStatusId}
+              data-testid="dock-status"
+              data-mode-status={modeStatus.kind}
+              role="status"
+              className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
+            >
+              {modeStatus.kind === 'recording' ? (
+                <span
+                  data-testid="mode-status-label"
+                  className="inline-flex items-center gap-1.5 font-semibold text-ms-danger"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-2 shrink-0 rounded-full bg-ms-danger"
+                  />
+                  {modeStatus.label}
+                </span>
+              ) : modeStatus.kind === 'armed' ? (
+                <span
+                  data-testid="mode-status-label"
+                  className="font-semibold text-slate-700"
+                >
+                  Ready
+                </span>
+              ) : modeStatus.label ? (
+                <span
+                  data-testid="mode-status-label"
+                  className="font-semibold text-slate-700"
+                >
+                  {modeStatus.label}
+                </span>
+              ) : null}
+              {modeStatus.kind === 'armed' && modeStatus.instruction ? (
+                <>
+                  <span aria-hidden="true" className="text-slate-500">
+                    {'. '}
+                  </span>
+                  <span
+                    data-testid="mode-status-instruction"
+                    className="text-xs text-ms-ink"
+                  >
+                    {modeStatus.instruction}
+                  </span>
+                </>
+              ) : modeStatus.instruction ? (
+                <span
+                  data-testid="mode-status-instruction"
+                  className={
+                    editStatusScreenReaderOnly
+                      ? undefined
+                      : 'text-xs text-ms-ink'
+                  }
+                >
+                  {modeStatus.instruction}
+                </span>
+              ) : gestureInstructionReserve ? (
+                <span aria-hidden="true" className="invisible text-xs text-ms-ink">
+                  {gestureInstructionReserve}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null
+
   const emptyBoardHintId = 'stage-empty-hint'
   const playingEditHintId = 'playing-edit-path-hint'
   const playbackDescribedBy = playbackDisabled
@@ -338,190 +563,14 @@ export function PlaybackDock() {
         : undefined
     : undefined
 
-  // Polish / Glide sessions own the chrome — close Refine; focus moves to the session.
-  useEffect(() => {
-    if (!polishSession && !glideSession) return
-    refineRestoreFocusRef.current = false
-    setRefineOpen(false)
-  }, [polishSession, glideSession])
-
-  // Portaled popover: anchor above the trigger; sheet-center when space is tight.
-  useLayoutEffect(() => {
-    if (!refineOpen) {
-      setRefinePopoverBox(null)
-      return
-    }
-    const update = () => {
-      const btn = refineBtnRef.current
-      if (!btn) return
-      const btnRect = btn.getBoundingClientRect()
-      // Sit above the whole dock so sibling controls stay clickable.
-      const dock = document.querySelector('[data-testid="playback-dock"]')
-      const dockTop =
-        dock instanceof HTMLElement
-          ? dock.getBoundingClientRect().top
-          : btnRect.top
-      const gap = 8
-      const margin = 16
-      const vw = window.innerWidth
-      const vh = window.innerHeight
-      const width = Math.min(17.5 * 16, vw - margin * 2)
-      const bottom = Math.max(margin, vh - dockTop + gap)
-      const available = Math.max(0, dockTop - gap - margin)
-      // Narrow / short viewports: centered sheet above the dock (covers ~500×short).
-      const useSheet =
-        vw <= 520 || available < 14 * 16 || width >= vw - margin * 2 - 8
-      let left: number
-      let maxHeight: number
-      if (useSheet) {
-        left = Math.max(margin, (vw - width) / 2)
-        maxHeight = Math.max(
-          10 * 16,
-          Math.min(vh * 0.55, Math.max(available, vh * 0.4)),
-        )
-      } else {
-        // Align popover’s right edge with the trigger, then clamp into the viewport.
-        left = btnRect.right - width
-        left = Math.min(Math.max(left, margin), vw - width - margin)
-        maxHeight = Math.max(
-          12 * 16,
-          Math.min(vh * 0.6, available),
-        )
-      }
-      setRefinePopoverBox({
-        bottom,
-        left,
-        width,
-        maxHeight,
-        placement: useSheet ? 'sheet' : 'anchored',
-      })
-    }
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-    }
-  }, [refineOpen])
-
-  useEffect(() => {
-    if (!refineOpen) return
-    refineReturnFocusRef.current =
-      refineBtnRef.current ??
-      (document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null)
-    // Portal mounts after layout; focus once the panel node exists.
-    requestAnimationFrame(() => {
-      refinePanelRef.current?.focus()
-    })
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      if (document.querySelector('dialog[open]')) return
-      const editor = useEditorStore.getState()
-      if (editor.polishSession || editor.glideSession) return
-      if (
-        editor.mode === 'editing' &&
-        (editor.pathGestureActive ||
-          editor.editPreview !== null ||
-          editor.pathAddMode)
-      ) {
-        return
-      }
-      if (editor.pathGestureActive) return
-      e.preventDefault()
-      e.stopPropagation()
-      refineRestoreFocusRef.current = true
-      setRefineOpen(false)
-    }
-    // Dismiss on pointerup outside so unmount does not interrupt actor/stage
-    // pointer capture mid-gesture (placement, path edit, recording).
-    let outsidePointerId: number | null = null
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as Node | null
-      if (!target) return
-      if (refinePanelRef.current?.contains(target)) {
-        outsidePointerId = null
-        return
-      }
-      if (refineBtnRef.current?.contains(target)) {
-        outsidePointerId = null
-        return
-      }
-      outsidePointerId = e.pointerId
-    }
-    const onPointerUp = (e: PointerEvent) => {
-      if (outsidePointerId === null || e.pointerId !== outsidePointerId) return
-      outsidePointerId = null
-      refineRestoreFocusRef.current = false
-      setRefineOpen(false)
-    }
-    const onPointerCancel = (e: PointerEvent) => {
-      if (outsidePointerId === null || e.pointerId !== outsidePointerId) return
-      outsidePointerId = null
-    }
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('pointerdown', onPointerDown, true)
-    window.addEventListener('pointerup', onPointerUp, true)
-    window.addEventListener('pointercancel', onPointerCancel, true)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('pointerdown', onPointerDown, true)
-      window.removeEventListener('pointerup', onPointerUp, true)
-      window.removeEventListener('pointercancel', onPointerCancel, true)
-      const shouldRestore = refineRestoreFocusRef.current
-      refineRestoreFocusRef.current = false
-      const restore = refineReturnFocusRef.current
-      refineReturnFocusRef.current = null
-      if (!shouldRestore) return
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (
-            restore &&
-            document.contains(restore) &&
-            !document.getElementById(refinePanelId)
-          ) {
-            restore.focus()
-          }
-        })
-      })
-    }
-  }, [refineOpen, refinePanelId])
-
-  const openPolishFromRefine = () => {
-    refineRestoreFocusRef.current = false
-    setRefineOpen(false)
-    beginPolishSession()
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document
-          .querySelector<HTMLElement>('[data-testid="polish-strength"]')
-          ?.focus()
-      })
-    })
-  }
-
-  const openGlideFromRefine = () => {
-    refineRestoreFocusRef.current = false
-    setRefineOpen(false)
-    beginGlideSession()
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document
-          .querySelector<HTMLElement>('[data-testid="glide-strength"]')
-          ?.focus()
-      })
-    })
-  }
-
   return (
     <div
       data-testid="playback-dock"
-      // mt-auto pins the dock to the slot bottom when Sequence is absent.
+      // Integrated bottom strip — no nested card chrome; toolbar-slot provides the edge.
       // Short viewports hide elapsed/total labels only (see index.css) — actions stay.
-      className={`pointer-events-auto relative mt-auto flex w-full max-w-xl shrink-0 flex-col gap-1 ${surfaceChrome} px-2 py-1.5 sm:max-w-2xl sm:px-2.5 sm:py-2`}
+      className={`pointer-events-auto relative mx-auto flex w-full max-w-4xl shrink-0 flex-col gap-0.5 px-1.5 py-1 sm:px-2.5 sm:py-1.5 ${
+        editing ? 'max-h-none overflow-visible' : 'max-h-full overflow-hidden'
+      }`}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {hasAnyRecording && !editing && (
@@ -601,16 +650,23 @@ export function PlaybackDock() {
         </div>
       )}
 
+      {/* Edit-path status is sr-only; armed/recording status stays visible below. */}
+      {editing ? dockStatusSlot : null}
+
       <div
         data-testid="toolbar"
         className={
           editing
-            ? 'flex max-w-full flex-wrap items-center justify-center gap-1 sm:gap-1.5'
+            ? 'flex w-full max-w-full flex-col items-center gap-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-1.5'
             : 'flex w-full max-w-full flex-col gap-1'
         }
       >
         {editing ? (
           <>
+            <div
+              data-testid="dock-edit-primary"
+              className="flex flex-nowrap items-center justify-center gap-1"
+            >
             <button
               type="button"
               data-testid="btn-done-edit"
@@ -624,7 +680,7 @@ export function PlaybackDock() {
               data-testid="btn-undo-edit"
               onClick={undoEdit}
               disabled={undoStack.length === 0}
-              className={btnSecondary}
+              className={`${btnSecondary} px-2`}
             >
               Undo
             </button>
@@ -633,10 +689,15 @@ export function PlaybackDock() {
               data-testid="btn-redo-edit"
               onClick={redoEdit}
               disabled={redoStack.length === 0}
-              className={btnSecondary}
+              className={`${btnSecondary} px-2`}
             >
               Redo
             </button>
+            </div>
+            <div
+              data-testid="dock-edit-tools"
+              className="flex max-w-full flex-nowrap items-center justify-center gap-1"
+            >
             <div
               data-testid="path-tool-toggle"
               className="flex h-8 items-center rounded-lg bg-ms-selected p-0.5"
@@ -700,135 +761,183 @@ export function PlaybackDock() {
             >
               {pathAddMode ? 'Adding point…' : 'Add point'}
             </button>
-            <button
-              type="button"
-              data-testid="btn-path-add-confirm"
-              onClick={() => {
-                const idx =
-                  pathAddCandidateIndex ??
-                  (editSession
-                    ? Math.floor(editSession.samples.length / 2)
-                    : null)
-                if (idx === null) return
-                addPathHandleAt(idx)
-              }}
-              disabled={
-                pathTool === 'move-path' ||
-                !pathAddMode ||
-                pathAddCandidateIndex === null
-              }
-              className={btnSecondary}
+            <div
+              data-testid="dock-edit-trailing"
+              className="flex shrink-0 flex-nowrap items-center gap-1"
             >
-              Place here
-            </button>
-            <button
-              type="button"
-              data-testid="btn-path-remove-handle"
-              onClick={() => removeSelectedPathHandle()}
-              disabled={pathTool === 'move-path' || !canRemoveHandle}
-              aria-describedby="path-remove-help"
-              title={
-                pathTool === 'move-path'
-                  ? 'Switch to Edit points to remove handles'
-                  : canRemoveHandle
-                    ? 'Remove the selected interior handle (path shape stays)'
-                    : selectedHandleIndex !== null &&
-                        editSession &&
-                        isEndpointHandle(
-                          editSession.samples.length,
-                          selectedHandleIndex,
-                        )
-                      ? 'Start and end points can’t be removed'
-                      : 'Select an interior handle to remove'
-              }
-              className={btnQuiet}
+            <DockMoreMenu
+              testId="btn-edit-more"
+              menuTestId="dock-edit-more-menu"
+              label="More"
             >
-              Remove handle
-            </button>
-            <button
-              type="button"
-              data-testid="btn-smooth-bend"
-              onClick={() => smoothSelectedBend()}
-              disabled={pathTool === 'move-path' || !smoothAvail.enabled}
-              aria-describedby="path-smooth-help"
-              title={
-                pathTool === 'move-path'
-                  ? 'Switch to Edit points to smooth a bend'
-                  : smoothAvail.enabled
-                    ? 'Smooth the bend near the selected point (S)'
-                    : (smoothAvail.message ?? 'Smooth bend unavailable')
-              }
-              className={btnSecondary}
-            >
-              Smooth bend
-            </button>
-            <button
-              type="button"
-              data-testid="btn-make-corner"
-              onClick={() => makeSelectedCorner()}
-              disabled={pathTool === 'move-path' || !cornerAvail.enabled}
-              aria-describedby="path-corner-help"
-              title={
-                pathTool === 'move-path'
-                  ? 'Switch to Edit points to sharpen a corner'
-                  : cornerAvail.enabled
-                    ? 'Sharpen the corner at the selected point (C)'
-                    : (cornerAvail.message ?? 'Make corner unavailable')
-              }
-              className={btnSecondary}
-            >
-              Make corner
-            </button>
-            <button
-              type="button"
-              data-testid="btn-polish-motion"
-              onClick={() => beginPolishSession()}
-              disabled={polishDisabled || pathTool === 'move-path'}
-              title={
-                pathTool === 'move-path'
-                  ? 'Switch to Edit points to polish motion'
-                  : selectedHandleIndex !== null
-                    ? 'Preview a gentler path; optional rounding uses the selected point'
-                    : 'Preview a gentler path while keeping pauses and corners'
-              }
-              className={btnSecondary}
-            >
-              Polish motion
-            </button>
-            <button
-              type="button"
-              data-testid="btn-glide"
-              onClick={() => beginGlideSession()}
-              disabled={glideDisabled || pathTool === 'move-path'}
-              title="Softens starts and stops while keeping your path and pauses"
-              className={btnSecondary}
-            >
-              Glide
-            </button>
-            <button
-              type="button"
-              data-testid="btn-restore-path"
-              onClick={() => {
-                void onRestoreRecordedPath()
-              }}
-              title={RESTORE_RECORDED_PATH_HELP}
-              aria-describedby="restore-path-help-edit"
-              className={btnQuiet}
-            >
-              Restore recorded path
-            </button>
-            <span id="restore-path-help-edit" className="sr-only">
-              {RESTORE_RECORDED_PATH_HELP}
-            </span>
+              {({ close }) => (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-path-add-confirm"
+                    onClick={() => {
+                      const idx =
+                        pathAddCandidateIndex ??
+                        (editSession
+                          ? Math.floor(editSession.samples.length / 2)
+                          : null)
+                      if (idx === null) return
+                      addPathHandleAt(idx)
+                      close()
+                    }}
+                    disabled={
+                      pathTool === 'move-path' ||
+                      !pathAddMode ||
+                      pathAddCandidateIndex === null
+                    }
+                    className={menuItem}
+                  >
+                    Place here
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-path-remove-handle"
+                    onClick={() => {
+                      removeSelectedPathHandle()
+                      close()
+                    }}
+                    disabled={pathTool === 'move-path' || !canRemoveHandle}
+                    aria-describedby="path-remove-help"
+                    title={
+                      pathTool === 'move-path'
+                        ? 'Switch to Edit points to remove handles'
+                        : canRemoveHandle
+                          ? 'Remove the selected interior handle (path shape stays)'
+                          : selectedHandleIndex !== null &&
+                              editSession &&
+                              isEndpointHandle(
+                                editSession.samples.length,
+                                selectedHandleIndex,
+                              )
+                            ? 'Start and end points can’t be removed'
+                            : 'Select an interior handle to remove'
+                    }
+                    className={menuItemQuiet}
+                  >
+                    Remove handle
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-smooth-bend"
+                    onClick={() => {
+                      smoothSelectedBend()
+                      close()
+                    }}
+                    disabled={pathTool === 'move-path' || !smoothAvail.enabled}
+                    aria-describedby="path-smooth-help"
+                    title={
+                      pathTool === 'move-path'
+                        ? 'Switch to Edit points to smooth a bend'
+                        : smoothAvail.enabled
+                          ? 'Smooth the bend near the selected point (S)'
+                          : (smoothAvail.message ?? 'Smooth bend unavailable')
+                    }
+                    className={menuItem}
+                  >
+                    Smooth bend
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-make-corner"
+                    onClick={() => {
+                      makeSelectedCorner()
+                      close()
+                    }}
+                    disabled={pathTool === 'move-path' || !cornerAvail.enabled}
+                    aria-describedby="path-corner-help"
+                    title={
+                      pathTool === 'move-path'
+                        ? 'Switch to Edit points to sharpen a corner'
+                        : cornerAvail.enabled
+                          ? 'Sharpen the corner at the selected point (C)'
+                          : (cornerAvail.message ?? 'Make corner unavailable')
+                    }
+                    className={menuItem}
+                  >
+                    Make corner
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-polish-motion"
+                    onClick={() => {
+                      beginPolishSession()
+                      close()
+                    }}
+                    disabled={polishDisabled || pathTool === 'move-path'}
+                    title={
+                      pathTool === 'move-path'
+                        ? 'Switch to Edit points to polish motion'
+                        : selectedHandleIndex !== null
+                          ? 'Preview a gentler path; optional rounding uses the selected point'
+                          : 'Preview a gentler path while keeping pauses and corners'
+                    }
+                    className={menuItem}
+                  >
+                    Polish motion
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-glide"
+                    onClick={() => {
+                      beginGlideSession()
+                      close()
+                    }}
+                    disabled={glideDisabled || pathTool === 'move-path'}
+                    title="Softens starts and stops while keeping your path and pauses"
+                    className={menuItem}
+                  >
+                    Glide
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-testid="btn-restore-path"
+                    onClick={() => {
+                      close()
+                      void onRestoreRecordedPath()
+                    }}
+                    title={RESTORE_RECORDED_PATH_HELP}
+                    aria-describedby="restore-path-help-edit"
+                    className={menuItemQuiet}
+                  >
+                    Restore recorded path
+                  </button>
+                  <span id="restore-path-help-edit" className="sr-only">
+                    {RESTORE_RECORDED_PATH_HELP}
+                  </span>
+                </>
+              )}
+            </DockMoreMenu>
+              <SnapGridToggle
+                pressed={snapToGrid}
+                onToggle={() => setSnapToGrid(!snapToGrid)}
+                compact
+                className={`${snapToGrid ? btnPrimary : btnSecondary} gap-1.5 px-2`}
+                ariaLabel="Snap to grid"
+              />
+            </div>
+            </div>
           </>
         ) : (
           <>
-            {/* Transport: balanced 1fr | Play | 1fr so Play stays dock-centered. */}
+            {/* Transport: Play absolutely centered; side clusters keep gutters so
+                Edit path / Reset never overlap Play’s hit target on phones. */}
             <div
               data-testid="dock-transport"
-              className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-1 gap-y-1"
+              className="relative flex w-full items-center"
             >
-              <div className="flex min-w-0 flex-wrap items-center justify-start gap-1 max-sm:col-span-3 max-sm:row-start-1 max-sm:justify-center sm:col-start-1 sm:row-start-1">
+              <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-1 pr-11">
                 {isRecordingLike ? (
                   <button
                     type="button"
@@ -848,7 +957,7 @@ export function PlaybackDock() {
                     ) : (
                       <>
                         <StopSquareIcon />
-                        Stop
+                        <span className="max-[360px]:sr-only">Stop</span>
                       </>
                     )}
                   </button>
@@ -856,350 +965,317 @@ export function PlaybackDock() {
                   <button
                     type="button"
                     data-testid="btn-record"
+                    aria-label="Record"
                     aria-describedby={
                       !hasAnyRecording ? emptyBoardHintId : undefined
                     }
                     onClick={() => {
-                      void (async () => {
-                        if (recording) {
-                          const label = selectedActor?.name ?? 'this element'
-                          const ok = await confirm({
-                            title: `Re-record “${label}”?`,
-                            body: 'This replaces only that element’s path and transform keyframes. Shared Duration stays the same.',
-                            confirmLabel: 'Replace recording',
-                            testId: 'rerecord-confirm',
-                            confirmTestId: 'btn-rerecord-confirm',
-                            cancelTestId: 'btn-rerecord-cancel',
-                            bodyTestId: 'rerecord-confirm-copy',
-                          })
-                          if (!ok) return
-                        }
-                        setPlaybackHead(0)
-                        armRecording()
-                      })()
+                      void requestArmRecording()
                     }}
-                    // Empty board: Record is the primary action. After a path exists,
-                    // Play takes the primary style so preview/export stays front-of-mind.
-                    className={`${recordSlot} ${hasAnyRecording ? 'text-slate-700 hover:bg-slate-900/[0.06]' : 'bg-ms-primary text-white hover:bg-ms-primary-hover active:bg-ms-primary-pressed'}`}
+                    // Coral Record stays distinct; after a take Play is the blue primary.
+                    className={
+                      hasAnyRecording
+                        ? `${recordSlot} border border-ms-record/30 px-2 text-ms-record hover:bg-ms-record/5`
+                        : btnRecord
+                    }
                   >
                     <span
                       aria-hidden
-                      className="size-2 shrink-0 rounded-full bg-ms-danger"
+                      className={`size-2 shrink-0 rounded-full ${hasAnyRecording ? 'bg-ms-record' : 'bg-white'}`}
                     />
-                    Record
+                    <span
+                      className={
+                        hasAnyRecording ? 'max-[360px]:sr-only' : undefined
+                      }
+                    >
+                      Record
+                    </span>
                   </button>
                 )}
-
-                {hasRecording &&
+                {/* After a take, Snap sits on the transport row (no extra dock row). */}
+                {hasAnyRecording &&
                   (isRecordingLike ? (
-                    // Reserve Continue width while armed/recording so Play stays put.
                     <span
                       aria-hidden
-                      data-testid="btn-continue-path-spacer"
-                      className={`${btnSecondary} pointer-events-none invisible`}
-                    >
-                      Extend path
-                    </span>
+                      data-testid="dock-snap-spacer"
+                      className="inline-flex h-8 min-h-8 min-w-8 shrink-0"
+                    />
                   ) : (
-                    <button
-                      type="button"
-                      data-testid="btn-continue-path"
-                      onClick={() => {
-                        armContinuePath()
-                      }}
-                      disabled={!continueAvail.enabled}
-                      title={continueAvail.reason ?? CONTINUE_PATH_HELP}
-                      aria-describedby="continue-path-help"
-                      className={btnSecondary}
-                    >
-                      Extend path
-                    </button>
+                    <SnapGridToggle
+                      pressed={snapToGrid}
+                      onToggle={() => setSnapToGrid(!snapToGrid)}
+                      className={`shrink-0 ${snapToGrid ? btnPrimary : btnSecondary} min-w-8 gap-0 px-2`}
+                      compact
+                    />
                   ))}
               </div>
 
-              <div className="flex h-8 w-8 justify-center max-sm:col-start-2 max-sm:row-start-2 sm:col-start-2 sm:row-start-1">
-                {mode === 'playing' ? (
-                  <button
-                    type="button"
-                    data-testid="btn-pause"
-                    onClick={pause}
-                    aria-label="Pause"
-                    title="Pause"
-                    className={`${btnPrimary} h-8 w-8 min-h-8 min-w-8 px-0`}
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <div className="pointer-events-auto">
+                  {mode === 'playing' ? (
+                    <button
+                      type="button"
+                      data-testid="btn-pause"
+                      onClick={pause}
+                      aria-label="Pause"
+                      title="Pause"
+                      className={`${btnPrimary} h-8 w-8 min-h-8 min-w-8 px-0`}
+                    >
+                      <PauseIcon />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="btn-play"
+                      onClick={() => play()}
+                      disabled={playbackDisabled}
+                      aria-label="Play"
+                      title="Play"
+                      aria-describedby={playbackDescribedBy}
+                      className={`${hasAnyRecording ? btnPrimary : btnSecondary} h-8 w-8 min-h-8 min-w-8 px-0`}
+                    >
+                      <PlayIcon />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1 pl-11">
+                {hasAnyRecording && !isRecordingLike && (
+                  <div
+                    data-testid="dock-editing"
+                    className="flex shrink-0 flex-nowrap items-center justify-end gap-1"
                   >
-                    <PauseIcon />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    data-testid="btn-play"
-                    onClick={() => play()}
-                    disabled={playbackDisabled}
-                    aria-label="Play"
-                    title="Play"
-                    aria-describedby={playbackDescribedBy}
-                    className={`${hasAnyRecording ? btnPrimary : btnSecondary} h-8 w-8 min-h-8 min-w-8 px-0`}
-                  >
-                    <PlayIcon />
-                  </button>
+                    <button
+                      type="button"
+                      data-testid="btn-edit-path"
+                      onClick={enterEditMode}
+                      disabled={editPathDisabled}
+                      aria-label="Edit path"
+                      aria-describedby={editDescribedBy}
+                      title={
+                        mode === 'playing'
+                          ? PLAYING_EDIT_PATH_HINT
+                          : editPathDisabled
+                            ? undefined
+                            : 'Edit path'
+                      }
+                      className={`${btnSecondary} px-2`}
+                    >
+                      <span className="max-[480px]:hidden">Edit path</span>
+                      <span className="min-[481px]:hidden">Edit</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      data-testid="btn-reset"
+                      onClick={() => {
+                        void (async () => {
+                          if (recording) {
+                            const label =
+                              selectedActor?.name ?? 'this element'
+                            const ok = await confirm({
+                              title: `Reset “${label}”?`,
+                              body: 'Clears this element’s recorded path, path edits, and transform keyframes. Appearance, other elements, and project Duration / Loop stay the same.',
+                              confirmLabel: 'Reset',
+                              danger: true,
+                              testId: 'reset-actor-confirm',
+                              confirmTestId: 'btn-reset-actor-confirm',
+                              cancelTestId: 'btn-reset-actor-cancel',
+                              bodyTestId: 'reset-actor-confirm-copy',
+                            })
+                            if (!ok) return
+                          }
+                          resetRecording()
+                        })()
+                      }}
+                      disabled={resetDisabled}
+                      aria-label="Reset"
+                      aria-describedby={resetDescribedBy}
+                      title="Reset this element’s recorded path"
+                      className={`${btnQuiet} gap-1.5`}
+                    >
+                      <EraserIcon />
+                      <span className="max-[420px]:sr-only">Reset</span>
+                    </button>
+
+                    <DockMoreMenu
+                      testId="btn-dock-more"
+                      menuTestId="dock-more-menu"
+                      label="More"
+                      buttonRef={moreBtnRef}
+                    >
+                      {({ close }) => (
+                        <>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            data-testid="btn-continue-path"
+                            onClick={() => {
+                              armContinuePath()
+                              close()
+                            }}
+                            disabled={!continueAvail.enabled}
+                            title={continueAvail.reason ?? CONTINUE_PATH_HELP}
+                            aria-describedby="continue-path-help"
+                            className={menuItem}
+                          >
+                            Extend path
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            data-testid="btn-timing"
+                            aria-haspopup="dialog"
+                            aria-expanded={timingOpen}
+                            title="When this element moves"
+                            onClick={() => {
+                              close()
+                              setTimingOpen(true)
+                            }}
+                            className={menuItem}
+                          >
+                            Timing
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            data-testid="btn-refine-motion"
+                            title="Open Motion tools in the inspector"
+                            onClick={() => {
+                              close()
+                              window.dispatchEvent(
+                                new CustomEvent('ms-open-inspector', {
+                                  detail: 'motion',
+                                }),
+                              )
+                            }}
+                            className={menuItemMotion}
+                          >
+                            Motion tools
+                          </button>
+                          {!wideDock ? (
+                            <>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                data-testid="btn-restart"
+                                onClick={() => {
+                                  restartPlayback()
+                                  close()
+                                }}
+                                disabled={playbackDisabled}
+                                className={menuItem}
+                              >
+                                Restart
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                data-testid="btn-undo-transform"
+                                onClick={() => {
+                                  undoActorEdit()
+                                  close()
+                                }}
+                                disabled={actorEditOrder.length === 0}
+                                className={menuItem}
+                              >
+                                Undo
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                data-testid="btn-redo-transform"
+                                onClick={() => {
+                                  redoActorEdit()
+                                  close()
+                                }}
+                                disabled={actorEditRedoOrder.length === 0}
+                                className={menuItem}
+                              >
+                                Redo
+                              </button>
+                            </>
+                          ) : null}
+                        </>
+                      )}
+                    </DockMoreMenu>
+                  </div>
+                )}
+                {(wideDock || !hasAnyRecording || isRecordingLike) && (
+                  <>
+                    {hasAnyRecording && !isRecordingLike ? (
+                      <span
+                        aria-hidden
+                        className="mx-0.5 h-4 w-px shrink-0 bg-slate-900/10"
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      data-testid="btn-restart"
+                      onClick={() => restartPlayback()}
+                      disabled={playbackDisabled}
+                      aria-label="Restart"
+                      aria-describedby={playbackDescribedBy}
+                      title="Restart from the beginning"
+                      className={btnIcon}
+                    >
+                      <span aria-hidden>↻</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="btn-undo-transform"
+                      onClick={() => undoActorEdit()}
+                      disabled={isRecordingLike || actorEditOrder.length === 0}
+                      className={btnIcon}
+                      aria-label="Undo"
+                      title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
+                    >
+                      <span aria-hidden>↶</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="btn-redo-transform"
+                      onClick={() => redoActorEdit()}
+                      disabled={
+                        isRecordingLike || actorEditRedoOrder.length === 0
+                      }
+                      className={btnIcon}
+                      aria-label="Redo"
+                      title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
+                    >
+                      <span aria-hidden>↷</span>
+                    </button>
+                  </>
                 )}
               </div>
-
-              <div className="flex items-center justify-end gap-1 max-sm:col-start-3 max-sm:row-start-2 sm:col-start-3 sm:row-start-1">
-                {/* title on wrapper so tooltips still work when the control is disabled */}
-                <span
-                  className="inline-flex"
-                  title="Restart from the beginning"
-                >
-                  <button
-                    type="button"
-                    data-testid="btn-restart"
-                    onClick={() => restartPlayback()}
-                    disabled={playbackDisabled}
-                    aria-label="Restart"
-                    aria-describedby={playbackDescribedBy}
-                    title="Restart from the beginning"
-                    className={btnIcon}
-                  >
-                    <span aria-hidden>↻</span>
-                  </button>
-                </span>
-                <span
-                  className="inline-flex"
-                  title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
-                >
-                  <button
-                    type="button"
-                    data-testid="btn-undo-transform"
-                    onClick={() => undoActorEdit()}
-                    disabled={isRecordingLike || actorEditOrder.length === 0}
-                    className={btnIcon}
-                    aria-label="Undo"
-                    title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
-                  >
-                    <span aria-hidden>↶</span>
-                  </button>
-                </span>
-                <span
-                  className="inline-flex"
-                  title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
-                >
-                  <button
-                    type="button"
-                    data-testid="btn-redo-transform"
-                    onClick={() => redoActorEdit()}
-                    disabled={isRecordingLike || actorEditRedoOrder.length === 0}
-                    className={btnIcon}
-                    aria-label="Redo"
-                    title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
-                  >
-                    <span aria-hidden>↷</span>
-                  </button>
-                </span>
-              </div>
             </div>
-
-            {/* Placement snap is usable before any path. Motion tools stay hidden until one exists. */}
-            {!hasAnyRecording && !isRecordingLike && (
-              <div className="flex w-full justify-center">
-                <SnapGridToggle
-                  pressed={snapToGrid}
-                  onToggle={() => setSnapToGrid(!snapToGrid)}
-                  className={`${snapToGrid ? btnPrimary : btnSecondary} gap-2`}
-                />
-              </div>
-            )}
-
-            {/* Motion-editing actions appear only once a path exists — keeps the empty dock compact. */}
-            {hasAnyRecording && (
-            <div
-              data-testid="dock-editing"
-              className="flex w-full flex-nowrap items-center justify-center gap-1"
-            >
-              <button
-                type="button"
-                data-testid="btn-edit-path"
-                onClick={enterEditMode}
-                disabled={editPathDisabled}
-                aria-describedby={editDescribedBy}
-                title={
-                  mode === 'playing'
-                    ? PLAYING_EDIT_PATH_HINT
-                    : editPathDisabled
-                      ? undefined
-                      : 'Edit path'
-                }
-                className={btnSecondary}
-              >
-                Edit path
-              </button>
-
-              <div data-testid="refine-motion" className="relative w-auto shrink-0">
-                <button
-                  ref={refineBtnRef}
-                  type="button"
-                  data-testid="btn-refine-motion"
-                  aria-expanded={refineOpen}
-                  aria-haspopup="dialog"
-                  aria-controls={refinePanelId}
-                  title="Motion tools"
-                  onClick={() => setRefineOpen((open) => !open)}
-                  className={`${btnSecondary} min-h-8 px-2.5`}
-                >
-                  Motion tools
-                </button>
-                {refineOpen &&
-                  refinePopoverBox &&
-                  createPortal(
-                    <div
-                      ref={refinePanelRef}
-                      id={refinePanelId}
-                      data-testid="refine-motion-tools"
-                      data-placement={refinePopoverBox.placement}
-                      role="dialog"
-                      aria-label="Motion tools"
-                      tabIndex={-1}
-                      className="pointer-events-auto fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-slate-900/[0.1] bg-white shadow-[var(--ms-shadow)] outline-none"
-                      style={{
-                        bottom: refinePopoverBox.bottom,
-                        left: refinePopoverBox.left,
-                        width: refinePopoverBox.width,
-                        maxHeight: refinePopoverBox.maxHeight,
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain bg-white p-2">
-                        <div className="rounded-lg px-1 py-1">
-                          <button
-                            type="button"
-                            data-testid="btn-polish-motion"
-                            onClick={openPolishFromRefine}
-                            disabled={polishDisabled}
-                            title="Preview a gentler path while keeping pauses and corners"
-                            className={`${btnSecondary} h-10 min-h-10 w-full justify-start px-2.5`}
-                          >
-                            Polish motion
-                          </button>
-                          <p
-                            data-testid="polish-motion-help"
-                            className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
-                          >
-                            Soften wobble; pauses and corners stay put.
-                          </p>
-                        </div>
-
-                        <div className="rounded-lg px-1 py-1">
-                          <button
-                            type="button"
-                            data-testid="btn-glide"
-                            onClick={openGlideFromRefine}
-                            disabled={glideDisabled}
-                            title="Softens starts and stops while keeping your path and pauses"
-                            className={`${btnSecondary} h-10 min-h-10 w-full justify-start px-2.5`}
-                          >
-                            Glide
-                          </button>
-                          <p
-                            data-testid="glide-motion-help"
-                            className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
-                          >
-                            Ease starts and stops; path and pauses stay.
-                          </p>
-                        </div>
-
-                        {!isRecordingLike && (
-                          <div className="rounded-lg px-1 py-1">
-                            <SnapGridToggle
-                              pressed={snapToGrid}
-                              onToggle={() => setSnapToGrid(!snapToGrid)}
-                              className={`${
-                                snapToGrid ? btnPrimary : btnSecondary
-                              } h-10 min-h-10 w-full justify-start gap-2 px-2.5`}
-                            />
-                          </div>
-                        )}
-
-                        {geometryEdit && (
-                          <div className="mt-1 border-t border-ms-border bg-white px-1 pt-2">
-                            <button
-                              type="button"
-                              data-testid="btn-restore-path"
-                              onClick={() => {
-                                void onRestoreRecordedPath()
-                              }}
-                              title={RESTORE_RECORDED_PATH_HELP}
-                              aria-describedby="restore-path-help"
-                              className={`${btnQuiet} h-10 min-h-10 w-full justify-start px-2.5`}
-                            >
-                              Restore recorded path
-                            </button>
-                            <p
-                              id="restore-path-help"
-                              data-testid="restore-path-help"
-                              className="mt-0.5 px-2.5 text-[11px] leading-snug text-slate-500"
-                            >
-                              {RESTORE_RECORDED_PATH_HELP}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>,
-                    document.body,
-                  )}
-              </div>
-
-              <span
-                aria-hidden
-                className="mx-0.5 h-4 w-px shrink-0 bg-slate-900/10"
-              />
-
-              <button
-                type="button"
-                data-testid="btn-reset"
-                onClick={() => {
-                  void (async () => {
-                    if (recording) {
-                      const label = selectedActor?.name ?? 'this element'
-                      const ok = await confirm({
-                        title: `Reset motion for “${label}”?`,
-                        body: 'Clears this element’s recorded path, path edits, and transform keyframes. Appearance, other elements, and project Duration / Loop stay the same.',
-                        confirmLabel: 'Reset motion',
-                        danger: true,
-                        testId: 'reset-actor-confirm',
-                        confirmTestId: 'btn-reset-actor-confirm',
-                        cancelTestId: 'btn-reset-actor-cancel',
-                        bodyTestId: 'reset-actor-confirm-copy',
-                      })
-                      if (!ok) return
-                    }
-                    resetRecording()
-                  })()
-                }}
-                disabled={resetDisabled}
-                aria-describedby={resetDescribedBy}
-                className={btnQuiet}
-              >
-                Reset motion
-              </button>
-            </div>
-            )}
           </>
         )}
-
-        {editing && !isRecordingLike && (
-          <button
-            type="button"
-            data-testid="snap-to-grid-toggle"
-            aria-pressed={snapToGrid}
-            aria-describedby="snap-to-grid-help"
-            title="Align placement and path edits to the dots. Recording stays freehand."
-            onClick={() => setSnapToGrid(!snapToGrid)}
-            className={snapToGrid ? btnPrimary : btnSecondary}
-          >
-            {snapToGrid ? 'Snap on' : 'Snap to grid'}
-          </button>
-        )}
       </div>
+
+      {/* Empty board only: Snap on its own centered row. After a take it sits
+          next to Record. Help text stays screen-reader / title only. */}
+      {!hasAnyRecording && !isRecordingLike && (
+        <div
+          data-testid="dock-snap-row"
+          className="flex h-8 w-full items-center justify-center"
+        >
+          <SnapGridToggle
+            pressed={snapToGrid}
+            onToggle={() => setSnapToGrid(!snapToGrid)}
+            className={`${snapToGrid ? btnPrimary : btnSecondary} gap-2`}
+          />
+        </div>
+      )}
+
+      <p
+        id="snap-to-grid-help"
+        data-testid="snap-to-grid-help"
+        className="sr-only"
+      >
+        Align placement and path edits to the dots. Recording stays freehand.
+      </p>
 
       {hasRecording && !editing && !isRecordingLike && (
         <p
@@ -1221,92 +1297,8 @@ export function PlaybackDock() {
         </p>
       )}
 
-      {!isRecordingLike && (
-        <p
-          id="snap-to-grid-help"
-          data-testid="snap-to-grid-help"
-          className={
-            editing
-              ? 'max-w-xl text-center text-[11px] leading-snug text-slate-500'
-              : 'sr-only'
-          }
-        >
-          Align placement and path edits to the dots. Recording stays freehand.
-        </p>
-      )}
-
-      {/* Outside path-edit: always reserve status-row height so arming/recording
-          does not grow the dock. While editing, only mount when there is status. */}
-      {(modeStatus || !editing) && (
-        <div
-          data-testid="dock-status-slot"
-          className={`flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-xs leading-snug ${
-            editing ? '' : 'min-h-[1.25rem]'
-          }`}
-          aria-hidden={!modeStatus}
-        >
-          {modeStatus ? (
-            <div
-              id={dockStatusId}
-              data-testid="dock-status"
-              data-mode-status={modeStatus.kind}
-              role="status"
-              className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5"
-            >
-              {modeStatus.kind === 'recording' ? (
-                <span
-                  data-testid="mode-status-label"
-                  className="inline-flex items-center gap-1.5 font-semibold text-ms-danger"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="inline-block size-2 shrink-0 rounded-full bg-ms-danger"
-                  />
-                  {modeStatus.label}
-                </span>
-              ) : modeStatus.kind === 'armed' ? (
-                <span
-                  data-testid="mode-status-label"
-                  className="font-semibold text-slate-700"
-                >
-                  Ready
-                </span>
-              ) : modeStatus.label ? (
-                <span
-                  data-testid="mode-status-label"
-                  className="font-semibold text-slate-700"
-                >
-                  {modeStatus.label}
-                </span>
-              ) : null}
-              {modeStatus.kind === 'armed' && modeStatus.instruction ? (
-                <>
-                  <span aria-hidden="true" className="text-slate-500">
-                    {'. '}
-                  </span>
-                  <span
-                    data-testid="mode-status-instruction"
-                    className="text-sm text-ms-ink"
-                  >
-                    {modeStatus.instruction}
-                  </span>
-                </>
-              ) : modeStatus.instruction ? (
-                <span
-                  data-testid="mode-status-instruction"
-                  className="text-sm text-ms-ink"
-                >
-                  {modeStatus.instruction}
-                </span>
-              ) : gestureInstructionReserve ? (
-                <span aria-hidden="true" className="invisible text-sm text-ms-ink">
-                  {gestureInstructionReserve}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      )}
+      {/* Idle/armed/recording: status under transport (height reserved). */}
+      {!editing ? dockStatusSlot : null}
       {editing && (
         <>
           <p id="path-move-help" className="sr-only">
@@ -1361,6 +1353,14 @@ export function PlaybackDock() {
               : ''}
           </p>
         </>
+      )}
+
+      {hasAnyRecording && (
+        <TimingDialog
+          open={timingOpen}
+          onClose={() => setTimingOpen(false)}
+          returnFocusRef={moreBtnRef}
+        />
       )}
     </div>
   )
