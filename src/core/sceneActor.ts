@@ -34,6 +34,9 @@ export function newActorId(): string {
 
 export const DEFAULT_REST_POSITION: Vec2 = { x: 0.35, y: 0.5 }
 
+/** Default label for a brand-new element (UI says Elements, not Actors). */
+export const DEFAULT_ELEMENT_NAME = 'Element 1'
+
 export function createSceneActor(
   partial?: Omit<Partial<SceneActor>, 'clip'> & {
     name?: string
@@ -43,7 +46,7 @@ export function createSceneActor(
   const appearance = cloneActor(partial?.appearance ?? DEFAULT_ACTOR)
   return {
     id: partial?.id && partial.id.length > 0 ? partial.id : newActorId(),
-    name: sanitizeActorName(partial?.name ?? 'Actor 1'),
+    name: sanitizeActorName(partial?.name ?? DEFAULT_ELEMENT_NAME),
     appearance,
     recording: partial?.recording
       ? {
@@ -139,7 +142,7 @@ export function duplicateSceneActor(
 
 export function sanitizeActorName(name: string): string {
   const trimmed = name.trim().slice(0, MAX_ACTOR_NAME_LENGTH)
-  return trimmed.length > 0 ? trimmed : 'Actor'
+  return trimmed.length > 0 ? trimmed : 'Element'
 }
 
 export function uniqueActorName(base: string, existing: string[]): string {
@@ -150,6 +153,54 @@ export function uniqueActorName(base: string, existing: string[]): string {
     if (!existing.includes(candidate)) return candidate
   }
   return sanitizeActorName(`${root} ${Date.now()}`)
+}
+
+/**
+ * Next free “Element N” label. Does not rename existing/saved names
+ * (including legacy “Actor 1”).
+ */
+export function nextDefaultElementName(existing: string[]): string {
+  for (let i = 1; i < 1000; i++) {
+    const candidate = sanitizeActorName(`Element ${i}`)
+    if (!existing.includes(candidate)) return candidate
+  }
+  return uniqueActorName('Element', existing)
+}
+
+const MIN_NEW_ELEMENT_SEPARATION = 0.14
+
+/**
+ * Rest position for a newly added element — clear of existing rests so a
+ * same-size shape cannot completely cover another.
+ */
+export function nextDefaultRestPosition(occupied: readonly Vec2[]): Vec2 {
+  for (let n = 0; n < 40; n++) {
+    const col = n % 5
+    const row = Math.floor(n / 5)
+    const candidate: Vec2 = {
+      x: clamp01Local(0.28 + col * MIN_NEW_ELEMENT_SEPARATION),
+      y: clamp01Local(0.42 + row * MIN_NEW_ELEMENT_SEPARATION),
+    }
+    if (
+      candidate.x < 0.12 ||
+      candidate.x > 0.88 ||
+      candidate.y < 0.18 ||
+      candidate.y > 0.82
+    ) {
+      continue
+    }
+    const clear = occupied.every((p) => {
+      const dx = p.x - candidate.x
+      const dy = p.y - candidate.y
+      return Math.hypot(dx, dy) >= MIN_NEW_ELEMENT_SEPARATION - 1e-6
+    })
+    if (clear) return candidate
+  }
+  const n = occupied.length
+  return {
+    x: Math.min(0.85, Math.max(0.15, DEFAULT_REST_POSITION.x + n * 0.08)),
+    y: Math.min(0.8, Math.max(0.2, DEFAULT_REST_POSITION.y + (n % 2) * 0.12)),
+  }
 }
 
 export function findActor(

@@ -23,7 +23,8 @@ export function projectHasMeaningfulWork(project: Project): boolean {
   if (project.actors.length !== 1) return true
 
   const actor = project.actors[0]
-  if (actor.name !== 'Actor 1') return true
+  // Fresh projects use Element 1; older saves may still say Actor 1.
+  if (actor.name !== 'Element 1' && actor.name !== 'Actor 1') return true
   if (actor.appearance.kind !== 'shape') return true
   if (actor.appearance.image) return true
   if (actor.appearance.color.toLowerCase() !== DEFAULT_ACTOR.color.toLowerCase()) {
