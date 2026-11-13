@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { isActorVisibleAt } from '../core/clip'
 import { MAX_ACTORS } from '../core/sceneActor'
 import { useConfirm } from '../hooks/useConfirm'
@@ -86,9 +87,11 @@ export function ActorList({
             className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
           >
             <span data-testid="actors-collapse-label">Close</span>
-            <span aria-hidden className="text-slate-400">
-              ▾
-            </span>
+            <ChevronDown
+              className="size-3.5 text-slate-400"
+              aria-hidden
+              strokeWidth={2}
+            />
           </button>
         </div>
         <div
@@ -482,9 +485,19 @@ export function ActorList({
               Collapse
             </span>
           ) : null}
-          <span aria-hidden className="text-slate-400">
-            {open ? '▾' : '▸'}
-          </span>
+          {open ? (
+            <ChevronDown
+              className="size-3.5 text-slate-400"
+              aria-hidden
+              strokeWidth={2}
+            />
+          ) : (
+            <ChevronRight
+              className="size-3.5 text-slate-400"
+              aria-hidden
+              strokeWidth={2}
+            />
+          )}
         </span>
       </button>
     </div>

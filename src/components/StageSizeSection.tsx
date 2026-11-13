@@ -7,6 +7,7 @@ import {
   type StageResizeAnchor,
 } from '../core/stageResize'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 /**
  * Compact Stage size controls under Project.
@@ -73,16 +74,16 @@ export function StageSizeSection() {
       aria-labelledby={headingId}
       className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
     >
-      <div className="min-w-0">
+      <div className="min-w-0 space-y-1">
         <h3 id={headingId} className="text-sm font-medium text-slate-800">
           Stage size
         </h3>
-        <p id={helpId} className="text-xs leading-relaxed text-slate-500">
+        <HelpDisclosure id={helpId} summary="About stage size">
           Width and Height are saved composition units for aspect and working
           area (not export pixels). Expanding adds space without stretching
           motion. Same-aspect growth is real extra drawing room. Exports stay
           responsive to the page.
-        </p>
+        </HelpDisclosure>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -171,9 +172,9 @@ export function StageSizeSection() {
             )
           })}
         </div>
-        <p className="text-[11px] text-slate-500">
+        <HelpDisclosure summary="About expansion anchor">
           Where the current frame sits in the new size. Default: center.
-        </p>
+        </HelpDisclosure>
       </div>
 
       <button

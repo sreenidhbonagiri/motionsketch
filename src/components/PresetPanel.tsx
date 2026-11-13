@@ -6,6 +6,7 @@ import {
   type MotionPresetId,
 } from '../core/motionPresets'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 function formatSec(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
@@ -186,15 +187,14 @@ export function PresetPanel() {
         </button>
       </div>
 
-      <p
-        data-testid="preset-panel-behavior"
-        className="mt-1.5 text-xs leading-relaxed text-slate-600"
-      >
-        {behavior}
-        {showLoopHint
-          ? ' Turn on Loop in the Motion inspector for continuous playback.'
-          : ''}
-      </p>
+      <div className="mt-1.5">
+        <HelpDisclosure testId="preset-panel-behavior" summary="About this preset">
+          {behavior}
+          {showLoopHint
+            ? ' Turn on Loop in the Motion inspector for continuous playback.'
+            : ''}
+        </HelpDisclosure>
+      </div>
 
       <div
         data-testid="preset-timing"
@@ -259,16 +259,18 @@ export function PresetPanel() {
           />
         </label>
       </div>
-      <p
-        id="preset-timing-help"
-        data-testid="preset-timing-help"
-        className="mt-1 text-xs leading-relaxed text-slate-500"
-      >
-        Start at and Move for match Timing for this element, not the project
-        Duration in the Motion inspector. Entrance presets turn on Hide before
-        Start, so the element stays hidden until Start at. Values stay shared
-        when you switch presets.
-      </p>
+      <div className="mt-1">
+        <HelpDisclosure
+          id="preset-timing-help"
+          testId="preset-timing-help"
+          summary="About Start at and Move for"
+        >
+          Start at and Move for match Timing for this element, not the project
+          Duration in the Motion inspector. Entrance presets turn on Hide before
+          Start, so the element stays hidden until Start at. Values stay shared
+          when you switch presets.
+        </HelpDisclosure>
+      </div>
     </div>
   )
 }

@@ -29,15 +29,14 @@ function drawGrid(
   ctx.fillRect(0, 0, width, height)
 
   const lines = gridLineCoords()
-  // Moderately darker than the old CSS-pixel field so dots read clearly
-  // without competing with paths/actors.
-  ctx.fillStyle = 'rgba(71, 85, 105, 0.48)'
+  // Stage-only lattice — small black dots; snap on/off does not change it.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
   for (const nx of lines) {
     for (const ny of lines) {
       const x = nx * width
       const y = ny * height
       ctx.beginPath()
-      ctx.arc(x, y, 1.2, 0, Math.PI * 2)
+      ctx.arc(x, y, 1, 0, Math.PI * 2)
       ctx.fill()
     }
   }
@@ -443,12 +442,8 @@ export function CanvasStage() {
       tabIndex={-1}
       className={`absolute inset-0 touch-none overflow-hidden outline-none ${cursorClass}`}
       style={{
-        // Continuous drawing field: same paper + lattice feel as the stage grid.
+        // Plain white workspace; dotted grid lives only inside the stage frame.
         backgroundColor: msPalette.canvas,
-        backgroundImage:
-          'radial-gradient(rgba(71, 85, 105, 0.28) 1.1px, transparent 1.2px)',
-        backgroundSize: '22px 22px',
-        backgroundPosition: 'center',
       }}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
@@ -469,7 +464,7 @@ export function CanvasStage() {
           data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
           data-path-tool={editing ? pathTool : undefined}
           data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
-          className="relative overflow-hidden bg-[#F8F9FC] shadow-[0_0_0_1px_rgba(15,23,42,0.18),0_0_0_3px_rgba(248,249,252,0.92)]"
+          className="relative overflow-hidden bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.16)]"
           style={{
             width: layout.width > 0 ? layout.width : undefined,
             height: layout.height > 0 ? layout.height : undefined,
