@@ -140,6 +140,8 @@ export function useTutorial(opts: {
             cancelLabel: previousEmpty
               ? TUTORIAL_KEEP_FRESH
               : TUTORIAL_KEEP_RESTORE,
+            // Cancel discards the practice flight — do not focus it for Space.
+            initialFocus: 'confirm',
             testId: 'tutorial-keep-confirm',
             confirmTestId: 'btn-tutorial-keep',
             cancelTestId: previousEmpty

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { buildMotionPresetsFixtureJson } from '../fixtures/motionPresetsProject'
 import {
+  assertUnclippedClickable,
   loadProjectSnapshot,
   openPanel,
   readExportedCss,
@@ -82,12 +83,18 @@ test.describe('motion presets', () => {
 
     await openSlideInPreview(page)
     await expect(page.getByTestId('preset-panel-hint')).toContainText(
-      /temporary preview/i,
+      /dashed original stays on stage/i,
+    )
+    await expect(page.getByTestId('preset-compare-legend')).toContainText(
+      /Dashed.*Original/i,
     )
     await expect(page.getByTestId('preset-compare-preset')).toHaveAttribute(
       'aria-pressed',
       'true',
     )
+    // Apply/Cancel live in the header — reachable without scrolling the dock.
+    await assertUnclippedClickable(page, 'btn-preset-apply')
+    await assertUnclippedClickable(page, 'btn-preset-cancel')
 
     // Deterministic Start at / Move for → hide-before visibility stops in CSS.
     await setSlideInTiming(page)

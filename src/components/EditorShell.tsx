@@ -57,7 +57,7 @@ const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
 const headerBtn =
   'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]'
 const headerBtnPrimary =
-  'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg bg-ms-export px-2.5 text-xs font-medium text-white transition hover:bg-ms-export-hover'
+  'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-full bg-ms-export px-3 text-xs font-medium text-white shadow-[var(--ms-shadow-sm)] transition hover:bg-ms-export-hover'
 
 type MobilePane = 'elements' | 'inspector' | null
 
@@ -631,7 +631,7 @@ export function EditorShell() {
         {/* Bottom transport — compact dock; Timing is a dialog, not a panel. */}
         <div
           data-testid="toolbar-slot"
-          className={`col-span-full flex flex-col items-stretch gap-0 border-t border-ms-border bg-white/95 ${
+          className={`col-span-full flex flex-col items-stretch gap-0 border-t border-ms-border bg-white shadow-[0_-4px_14px_rgb(15_23_42_/_0.04)] ${
             editing
               ? 'min-h-0 shrink-0 overflow-visible max-h-[min(42vh,14rem)]'
               : motionPreviewSession

@@ -92,6 +92,8 @@ test.describe('Timing dialog layout and inputs', () => {
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.77')
     await page.getByTestId('btn-apply-clip-times').click()
     await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.97')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('0.80')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.77')
@@ -105,6 +107,7 @@ test.describe('Timing dialog layout and inputs', () => {
     await page.getByTestId('clip-start-input').fill('1.50')
     await page.getByTestId('clip-move-for-input').fill('0.02')
     await page.getByTestId('btn-apply-clip-times').click()
+    await expect(page.getByTestId('timing-dialog')).toBeVisible()
     await expect(page.getByTestId('clip-times-error')).toBeVisible()
     await expect(page.getByTestId('clip-times-error')).toContainText(
       /Move for must|at least/i,
@@ -115,6 +118,7 @@ test.describe('Timing dialog layout and inputs', () => {
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.97')
 
     await applyClipSeconds(page, '0.00', '2.00')
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
   })
 

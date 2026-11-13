@@ -1,24 +1,24 @@
 @import 'tailwindcss';
 
 :root {
-  /* Canvas-first chrome — light surface, distinct action colors (VibeDraw-inspired). */
+  /* Canvas-first chrome — white surface, distinct action colors (VibeDraw-inspired). */
   --ms-primary: #2563eb;
   --ms-primary-hover: #1d4ed8;
   --ms-primary-pressed: #1e40af;
-  /* Play / selected / commit — blue */
-  --ms-play: #2563eb;
-  --ms-play-hover: #1d4ed8;
-  --ms-play-pressed: #1e40af;
+  /* Play — near-black on white */
+  --ms-play: #17213a;
+  --ms-play-hover: #0f1629;
+  --ms-play-pressed: #0b1020;
   /* Record — coral / red */
   --ms-record: #e11d48;
   --ms-record-hover: #be123c;
   /* Motion tools — purple */
   --ms-motion: #7c3aed;
   --ms-motion-hover: #6d28d9;
-  /* Export — teal */
-  --ms-export: #0d9488;
-  --ms-export-hover: #0f766e;
-  --ms-canvas: #f8f9fc;
+  /* Export — purple pill */
+  --ms-export: #7c3aed;
+  --ms-export-hover: #6d28d9;
+  --ms-canvas: #ffffff;
   --ms-panel: #ffffff;
   --ms-ink: #17213a;
   --ms-muted: #647089;
@@ -31,12 +31,12 @@
   --ms-warning-ink: #92400e;
   --ms-warning-surface: #fffbeb;
 
-  --ms-surface: rgb(255 255 255 / 0.92);
+  --ms-surface: rgb(255 255 255 / 0.96);
   --ms-surface-strong: #ffffff;
-  --ms-shadow: 0 2px 16px rgb(23 33 58 / 0.06);
-  --ms-shadow-sm: 0 1px 6px rgb(23 33 58 / 0.05);
+  --ms-shadow: 0 4px 14px rgb(15 23 42 / 0.08);
+  --ms-shadow-sm: 0 1px 4px rgb(15 23 42 / 0.06);
   --ms-control-h: 2rem;
-  --ms-radius: 0.75rem;
+  --ms-radius: 0.625rem;
   --ms-radius-sm: 0.5rem;
 
   color: var(--ms-ink);
@@ -93,7 +93,7 @@
   --color-slate-300: #b8c0ce;
   --color-slate-200: #dfe4ee;
   --color-slate-100: #ebefff;
-  --color-slate-50: #f8f9fc;
+  --color-slate-50: #f8fafc;
 }
 
 * {

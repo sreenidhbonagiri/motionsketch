@@ -49,6 +49,8 @@ test.describe('unified actor edit undo', () => {
     await page.getByTestId('clip-start-input').fill('0.20')
     await page.getByTestId('clip-move-for-input').fill('1.00')
     await page.getByTestId('clip-start-input').press('Enter')
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await ensureClipTimelineOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
     await page.getByTestId('btn-timing-cancel').click()
 
@@ -82,8 +84,7 @@ test.describe('unified actor edit undo', () => {
     await page.getByTestId('clip-start-input').fill('0.30')
     await page.getByTestId('clip-move-for-input').fill('0.90')
     await page.getByTestId('clip-start-input').press('Enter')
-    await expect(page.getByTestId('clip-start-input')).toHaveValue('0.30')
-    await page.getByTestId('btn-timing-cancel').click()
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
     await page.getByTestId('stage').focus()
     await expect(page.getByTestId('stage')).toBeFocused()
     await page.keyboard.press(`${mod}+z`)
@@ -92,13 +93,15 @@ test.describe('unified actor edit undo', () => {
     await page.getByTestId('btn-timing-cancel').click()
 
     // Focused text inputs keep native undo; editor shortcut must not fire.
+    // Recording remains on the unified stack after clip/transform undos.
     await ensureActorListExpanded(page)
     const name = page.getByTestId('actor-name-input')
     await name.click()
     await name.fill('TypedName')
-    await expect(page.getByTestId('btn-undo-transform')).toBeDisabled()
+    await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
     await name.press(`${mod}+z`)
-    await expect(page.getByTestId('btn-undo-transform')).toBeDisabled()
+    await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
   })
 
   test('actor switch clears unified undo history', async ({ page }) => {
@@ -111,6 +114,7 @@ test.describe('unified actor edit undo', () => {
     await ensureClipTimelineOpen(page)
     await page.getByTestId('clip-move-for-input').fill('0.70')
     await page.getByTestId('clip-move-for-input').press('Enter')
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
     await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
 
     await selectActorByIndex(page, 1)

@@ -36,9 +36,25 @@ test.describe('multiple actors', () => {
     await clickAddActor(page)
     let ids = await actorIdsFromList(page)
     expect(ids).toHaveLength(2)
-    await expect(page.getByTestId('actor-name-input')).toHaveValue(/Actor/)
+    await expect(page.getByTestId('actor-name-input')).toHaveValue('Element 2')
+    const selectedBox = await page.getByTestId('actor').boundingBox()
+    const otherBox = await page.getByTestId(`actor-${ids[0]}`).boundingBox()
+    expect(selectedBox).toBeTruthy()
+    expect(otherBox).toBeTruthy()
+    const dist = Math.hypot(
+      selectedBox!.x +
+        selectedBox!.width / 2 -
+        (otherBox!.x + otherBox!.width / 2),
+      selectedBox!.y +
+        selectedBox!.height / 2 -
+        (otherBox!.y + otherBox!.height / 2),
+    )
+    // Centers far enough that one default-size shape cannot fully hide the other.
+    expect(dist).toBeGreaterThan(
+      Math.min(selectedBox!.width, selectedBox!.height) * 0.55,
+    )
 
-    // Clearing the field must stay empty (no “Actor” snap-back) until commit.
+    // Clearing the field must stay empty (no default-name snap-back) until commit.
     const nameInput = page.getByTestId('actor-name-input')
     await nameInput.click()
     await nameInput.fill('')

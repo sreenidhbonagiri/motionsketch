@@ -144,7 +144,12 @@ describe('starter examples', () => {
       transformUndoStack: [
         { keyframes: [{ id: 'x', t: 0, rotationDeg: 1, scale: 1 }] },
       ],
-      clipUndoStack: [{ start: 0.1, end: 0.9 }],
+      clipUndoStack: [
+        {
+          durationMs: 2000,
+          clips: [{ id: 'a', clip: { start: 0.1, end: 0.9, hideBeforeStart: false, hideAfterEnd: false } }],
+        },
+      ],
       actorEditOrder: ['transform', 'clip'],
       playbackHead: 0.7,
     })

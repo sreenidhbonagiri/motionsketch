@@ -48,6 +48,14 @@ type HtmlSectionCopy = 'head' | 'body' | 'scripts'
 const WEB_DOWNLOAD_SUCCESS_TITLE = 'Website package download started.'
 const WEB_DOWNLOAD_SUCCESS_HINT =
   'Unzip the folder and open index.html to preview. Paste the three sections into an existing page.'
+
+/** Live-region / panel status left over from a prior download or package build. */
+function isStaleExportAnnouncement(message: string | null | undefined): boolean {
+  if (!message) return false
+  return /download started|could not download|couldn’t build|could not build/i.test(
+    message,
+  )
+}
 const REACT_DOWNLOAD_SUCCESS_TITLE = 'React package download started.'
 const REACT_DOWNLOAD_SUCCESS_HINT =
   'Unzip all files into src/motionsketch/, then render MotionSketchScene inside an existing component.'
@@ -200,6 +208,36 @@ export function ExportPanel() {
       block: 'nearest',
     })
   }, [reactDownloadSuccess])
+
+  // Opening Export must not re-announce a download from a previous visit.
+  useEffect(() => {
+    const current = useEditorStore.getState().actionAnnouncement
+    if (isStaleExportAnnouncement(current)) {
+      announceAction(null)
+    }
+    return () => {
+      const leaving = useEditorStore.getState().actionAnnouncement
+      if (isStaleExportAnnouncement(leaving)) {
+        useEditorStore.getState().announceAction(null)
+      }
+    }
+  }, [announceAction])
+
+  const clearDownloadFeedback = () => {
+    setWebDownloadSuccess(false)
+    setReactDownloadSuccess(false)
+    setActionStatus(null)
+    const current = useEditorStore.getState().actionAnnouncement
+    if (isStaleExportAnnouncement(current)) {
+      announceAction(null)
+    }
+  }
+
+  const selectWebsitePath = (id: WebsitePath) => {
+    if (id === websitePath) return
+    clearDownloadFeedback()
+    setWebsitePath(id)
+  }
 
   const describedBy = (...ids: Array<string | false | null | undefined>) => {
     const list = ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -552,7 +590,7 @@ export function ExportPanel() {
                 aria-selected={selected}
                 aria-controls={`export-guide-${id}`}
                 data-selected={selected ? 'true' : 'false'}
-                onClick={() => setWebsitePath(id)}
+                onClick={() => selectWebsitePath(id)}
                 // No color/bg transition — highlight must move with content in the
                 // same paint (animated lag made React look like HTML was still selected).
                 className={`rounded-md px-1.5 py-1.5 text-[11px] ${

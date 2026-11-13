@@ -6,6 +6,11 @@ export type ConfirmRequest = {
   confirmLabel: string
   cancelLabel?: string
   danger?: boolean
+  /**
+   * Which action receives initial focus. Default `cancel` (safer for destructive
+   * confirms). Use `confirm` when cancel discards work (e.g. tutorial Keep).
+   */
+  initialFocus?: 'confirm' | 'cancel'
   testId?: string
   confirmTestId?: string
   cancelTestId?: string

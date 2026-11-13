@@ -810,7 +810,7 @@ export function createEmptyPersistableProject(
   return {
     version: 1,
     name: safeName,
-    actors: [createSceneActor({ name: 'Actor 1' })],
+    actors: [createSceneActor({ name: 'Element 1' })],
     playback: { ...DEFAULT_PLAYBACK },
     stageAspect: aspect,
     stageWidth: size.width,

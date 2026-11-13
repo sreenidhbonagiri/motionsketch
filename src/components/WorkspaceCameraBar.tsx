@@ -1,3 +1,4 @@
+import { Minus, Plus } from 'lucide-react'
 import {
   formatZoomPercent,
   MIN_CAMERA_ZOOM,
@@ -8,7 +9,7 @@ import { useEditorStore } from '../state/store'
 const control =
   'inline-flex h-8 min-h-8 shrink-0 items-center justify-center rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:opacity-40'
 const iconBtn =
-  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:opacity-40'
+  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:opacity-40'
 
 interface WorkspaceCameraBarProps {
   zoomIn: () => void
@@ -30,7 +31,7 @@ export function WorkspaceCameraBar({
   return (
     <div
       data-testid="workspace-camera-bar"
-      className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-ms-border bg-white/90 p-0.5 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl"
+      className="pointer-events-auto flex max-w-full flex-wrap items-center gap-0.5 rounded-xl border border-ms-border bg-white p-0.5 shadow-[var(--ms-shadow-sm)]"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <button
@@ -42,7 +43,7 @@ export function WorkspaceCameraBar({
         onClick={zoomOut}
         className={iconBtn}
       >
-        <span aria-hidden>−</span>
+        <Minus className="size-3.5" aria-hidden strokeWidth={2} />
       </button>
       <span
         data-testid="zoom-percent"
@@ -60,7 +61,7 @@ export function WorkspaceCameraBar({
         onClick={zoomIn}
         className={iconBtn}
       >
-        <span aria-hidden>+</span>
+        <Plus className="size-3.5" aria-hidden strokeWidth={2} />
       </button>
       <button
         type="button"

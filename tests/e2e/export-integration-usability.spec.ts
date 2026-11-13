@@ -199,11 +199,10 @@ test.describe('export integration usability', () => {
 
       await page.getByTestId('btn-export-path-html').click()
       await expect(page.getByTestId('export-react-download-success')).toHaveCount(0)
-      await expect(page.getByTestId('export-download-success-hint')).toContainText(
-        'index.html',
-      )
-      await expect(page.getByTestId('export-download-success-hint')).toContainText(
-        'existing page',
+      // Switching tabs clears prior download notices (no stale success).
+      await expect(page.getByTestId('export-download-success')).toHaveCount(0)
+      await expect(page.getByTestId('action-live-region')).not.toContainText(
+        /download started/i,
       )
     })
   }

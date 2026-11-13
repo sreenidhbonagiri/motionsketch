@@ -88,19 +88,24 @@ import {
 import { captureViewportStageAspect, clampStageAspect } from '../core/stageAspect'
 import {
   clampClip,
+  clipFromSeconds,
   clipsEqual,
   cloneClip,
   localToProject,
   projectToLocal,
+  remapClipAbsoluteTimes,
 } from '../core/clip'
 import {
   cloneSceneActor,
   createSceneActor,
+  DEFAULT_ELEMENT_NAME,
   DEFAULT_REST_POSITION,
   duplicateSceneActor,
   findActor,
   mapActor,
   MAX_ACTORS,
+  nextDefaultElementName,
+  nextDefaultRestPosition,
   projectHasAnyRecording,
   restPositionFromRecording,
   sanitizeActorName,
@@ -182,6 +187,8 @@ export type PresetSession = {
    * `original` = committed actor (project unchanged); `preset` = proposed.
    */
   compareMode: 'original' | 'preset'
+  /** Playhead before this preview opened — restored on Cancel / Escape. */
+  resumePlaybackHead: number
 }
 
 /** Chronological actor-edit kinds for unified placement/clip/transform undo. */
@@ -191,8 +198,43 @@ export type ActorEditKind =
   | 'placement'
   | 'glide'
   | 'preset'
+  | 'recording'
   | 'continuePath'
   | 'stageResize'
+
+/** One Timing/clip undo step — restores Duration + every actor’s clip together. */
+export type ClipHistoryEntry = {
+  durationMs: number
+  clips: Array<{ id: string; clip: ActorClip }>
+}
+
+function captureClipHistory(project: Project): ClipHistoryEntry {
+  return {
+    durationMs: project.playback.durationMs,
+    clips: project.actors.map((a) => ({
+      id: a.id,
+      clip: cloneClip(a.clip),
+    })),
+  }
+}
+
+function applyClipHistory(
+  project: Project,
+  entry: ClipHistoryEntry,
+): Project {
+  const byId = new Map(entry.clips.map((c) => [c.id, c.clip]))
+  return {
+    ...project,
+    playback: {
+      ...project.playback,
+      durationMs: entry.durationMs,
+    },
+    actors: project.actors.map((a) => {
+      const clip = byId.get(a.id)
+      return clip ? { ...a, clip: cloneClip(clip) } : a
+    }),
+  }
+}
 
 const PLACEMENT_NOOP_EPS = 1e-9
 
@@ -256,6 +298,11 @@ interface EditorStore {
    * the drag threshold). Floating panels must not steal Escape meanwhile.
    */
   pathGestureActive: boolean
+  /**
+   * True when Edit path started with no committed geometryEdit. Undoing back to
+   * an empty path-undo stack then clears geometry so Smoothing unlocks.
+   */
+  pathEditStartedClean: boolean
   /** Non-destructive Polish motion preview (null when inactive). */
   polishSession: PolishSession | null
   /**
@@ -274,6 +321,18 @@ interface EditorStore {
   /** Previous full motion snapshots for preset undo (selected actor). */
   presetUndoStack: MotionPresetMotionState[]
   presetRedoStack: MotionPresetMotionState[]
+
+  /**
+   * Completed replace-recording undo (selected actor). Snapshots are captured
+   * at beginRecording before the take clears geometry/transform.
+   */
+  recordingUndoStack: MotionPresetMotionState[]
+  recordingRedoStack: MotionPresetMotionState[]
+  /**
+   * Motion state before the in-flight replace take. Restored when the gesture
+   * yields no take; pushed to recordingUndoStack on a successful finish.
+   */
+  pendingRecordingBaseline: MotionPresetMotionState | null
 
   /**
    * Continue-path undo: per-commit snapshots. Undo restores the continued
@@ -300,17 +359,18 @@ interface EditorStore {
   transformUndoStack: TransformTrack[]
   transformRedoStack: TransformTrack[]
 
-  /** Selection-scoped clip timing history (one gesture → one entry). */
-  clipUndoStack: ActorClip[]
-  clipRedoStack: ActorClip[]
+  /** Selection-scoped clip timing history (one Apply/gesture → one entry). */
+  clipUndoStack: ClipHistoryEntry[]
+  clipRedoStack: ClipHistoryEntry[]
 
   /** Selection-scoped unrecorded placement history (one drag → one entry). */
   placementUndoStack: Vec2[]
   placementRedoStack: Vec2[]
 
   /**
-   * Chronological order of completed placement/clip/transform edits for the
-   * selected actor. Dock + keyboard undo/redo pop the most recent kind first.
+   * Chronological order of completed placement/clip/transform/recording edits
+   * for the selected actor. Dock + keyboard undo/redo pop the most recent kind
+   * first.
    */
   actorEditOrder: ActorEditKind[]
   actorEditRedoOrder: ActorEditKind[]
@@ -334,6 +394,8 @@ interface EditorStore {
   finishContinuePath: (addition: Recording | null) => void
   /** Abort an in-progress continue stroke (no history). */
   cancelContinueRecording: () => void
+  undoRecording: () => void
+  redoRecording: () => void
   undoContinuePath: () => void
   redoContinuePath: () => void
   /**
@@ -432,6 +494,17 @@ interface EditorStore {
 
   /** Commit a full clip replace for an actor (one undo step). */
   commitActorClip: (id: string, clip: ActorClip) => void
+  /**
+   * Apply Timing Start after / Move for in absolute seconds. Extends project
+   * Duration when needed (up to the max) and remaps other elements by absolute
+   * time so their movement lengths stay put. One undo entry.
+   */
+  commitActorClipSeconds: (
+    id: string,
+    startSec: number,
+    endSec: number,
+    visibility?: Pick<ActorClip, 'hideBeforeStart' | 'hideAfterEnd'>,
+  ) => { ok: true } | { ok: false; error: string }
   /** Live preview while dragging (no history). */
   previewActorClip: (id: string, clip: ActorClip) => void
   /** Begin a clip drag/resize; pairs with finishClipGesture. */
@@ -513,6 +586,7 @@ function clearEditState() {
     pathAddCandidateIndex: null as number | null,
     pathTool: 'edit-points' as PathEditTool,
     pathGestureActive: false,
+    pathEditStartedClean: false,
     polishSession: null as PolishSession | null,
     glideSession: null as GlideSession | null,
     presetSession: null as PresetSession | null,
@@ -616,8 +690,8 @@ function clearTransformEditState() {
 
 function clearClipEditState() {
   return {
-    clipUndoStack: [] as ActorClip[],
-    clipRedoStack: [] as ActorClip[],
+    clipUndoStack: [] as ClipHistoryEntry[],
+    clipRedoStack: [] as ClipHistoryEntry[],
   }
 }
 
@@ -676,6 +750,9 @@ function clearHistoryForActorSwitch(
     glideRedoStack: [] as number[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
+    recordingUndoStack: [] as MotionPresetMotionState[],
+    recordingRedoStack: [] as MotionPresetMotionState[],
+    pendingRecordingBaseline: null as MotionPresetMotionState | null,
     ...(resetContinue
       ? {
           ...clearActorEditOrder(),
@@ -690,6 +767,17 @@ function clearHistoryForActorSwitch(
         }),
     recordingIntent: 'replace' as RecordingIntent,
   }
+}
+
+/** Kinds that survive a successful replace recording (still meaningful after). */
+function keepAfterReplaceRecording(k: ActorEditKind): boolean {
+  return (
+    k === 'clip' ||
+    k === 'glide' ||
+    k === 'continuePath' ||
+    k === 'stageResize' ||
+    k === 'recording'
+  )
 }
 
 function popKindFromOrder(
@@ -786,6 +874,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     glideRedoStack: [] as number[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
+    recordingUndoStack: [] as MotionPresetMotionState[],
+    recordingRedoStack: [] as MotionPresetMotionState[],
+    pendingRecordingBaseline: null as MotionPresetMotionState | null,
     continuePathUndoStack: [] as ContinuePathSnapshot[],
     continuePathRedoStack: [] as ContinuePathSnapshot[],
     stageResizeUndoStack: [] as StageResizeSnapshot[],
@@ -882,10 +973,14 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           playbackDirection: 1,
           stageHint: 'default',
           actionAnnouncement: RECORDING_CONTINUATION_ANNOUNCEMENT,
+          pendingRecordingBaseline: null,
           ...clearPlacementHistory(state),
         })
         return
       }
+      const actor = getSelected(state)
+      // Capture before clearing geometry/transform so undo can restore the prior take.
+      const baseline = captureMotionState(actor)
       set({
         mode: 'recording',
         pointerId,
@@ -896,6 +991,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         stageHint: 'default',
         actionAnnouncement: RECORDING_ANNOUNCEMENT,
         recordingIntent: 'replace',
+        pendingRecordingBaseline: baseline,
         ...clearEditState(),
         ...clearTransformEditState(),
         ...clearPlacementHistory(state),
@@ -925,6 +1021,51 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         get().finishContinuePath(recording)
         return
       }
+      const baseline = state.pendingRecordingBaseline
+      // Short / cancelled replace: restore pre-take motion (no history entry).
+      if (!recording) {
+        if (baseline) {
+          const actor = getSelected(state)
+          const restored = applyMotionStateToActor(actor, baseline)
+          const first = baseline.recording?.samples[0]
+          set({
+            mode: 'idle',
+            pointerId: null,
+            liveTrail: [],
+            playbackHead: 0,
+            recordingIntent: 'replace',
+            actionAnnouncement: null,
+            pendingRecordingBaseline: null,
+            ...clearEditState(),
+            ...clearTransformEditState(),
+            ...clearPlacementHistory(state),
+            project: withSelectedActor(
+              state.project,
+              state.selectedActorId,
+              () => restored,
+            ),
+            // After clearEditState — reinstate pre-take geometry mirror.
+            geometryEdit: geometryMirror(baseline.geometryEdit),
+            livePosition: first
+              ? { x: first.x, y: first.y }
+              : { ...baseline.restPosition },
+          })
+          return
+        }
+        set({
+          mode: 'idle',
+          pointerId: null,
+          liveTrail: [],
+          playbackHead: 0,
+          recordingIntent: 'replace',
+          actionAnnouncement: null,
+          pendingRecordingBaseline: null,
+          ...clearEditState(),
+          ...clearTransformEditState(),
+          ...clearPlacementHistory(state),
+        })
+        return
+      }
       set((s) => {
         const nextProject = withSelectedActor(
           s.project,
@@ -935,11 +1076,14 @@ export const useEditorStore = create<EditorStore>((set, get) => {
             // Shared Duration is unchanged — take is mapped to normalized progress.
             transform: emptyTransformTrack(),
             geometryEdit: null,
-            restPosition: recording
-              ? restPositionFromRecording(recording, a.restPosition)
-              : a.restPosition,
+            restPosition: restPositionFromRecording(recording, a.restPosition),
           }),
         )
+        const placementCleared = clearPlacementHistory(s)
+        const priorBaseline =
+          baseline ??
+          // Tests may call finishRecording without beginRecording.
+          captureMotionState(getSelected(s))
         return {
           mode: 'idle' as const,
           pointerId: null,
@@ -948,16 +1092,31 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           recordingIntent: 'replace' as RecordingIntent,
           // Drop "Recording" so Project / live region do not stay stuck after idle.
           actionAnnouncement: null,
+          pendingRecordingBaseline: null,
           ...clearEditState(),
           ...clearTransformEditState(),
-          ...clearPlacementHistory(s),
+          ...placementCleared,
+          // Take replaces path/transform/preset — drop orphaned kinds so Undo
+          // cannot target empty transform/preset stacks.
+          presetUndoStack: [] as MotionPresetMotionState[],
+          presetRedoStack: [] as MotionPresetMotionState[],
+          recordingUndoStack: [
+            ...s.recordingUndoStack,
+            priorBaseline,
+          ].slice(-MAX_UNDO),
+          recordingRedoStack: [] as MotionPresetMotionState[],
+          actorEditOrder: pushEditOrder(
+            placementCleared.actorEditOrder.filter(keepAfterReplaceRecording),
+            'recording',
+          ),
+          actorEditRedoOrder: placementCleared.actorEditRedoOrder.filter(
+            keepAfterReplaceRecording,
+          ),
           project: nextProject,
-          livePosition: recording
-            ? {
-                x: recording.samples[0].x,
-                y: recording.samples[0].y,
-              }
-            : s.livePosition,
+          livePosition: {
+            x: recording.samples[0].x,
+            y: recording.samples[0].y,
+          },
         }
       })
     },
@@ -2055,7 +2214,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         },
         size,
       )
-      const first = project.actors[0] ?? createSceneActor({ name: 'Actor 1' })
+      const first =
+        project.actors[0] ?? createSceneActor({ name: DEFAULT_ELEMENT_NAME })
       if (project.actors.length === 0) {
         project.actors = [first]
       }
@@ -2145,11 +2305,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       const names = state.project.actors.map((a) => a.name)
       const actor = createSceneActor({
-        name: uniqueActorName('Actor', names),
-        restPosition: {
-          x: clamp(0.35 + state.project.actors.length * 0.06, 0.15, 0.85),
-          y: clamp(0.5 + (state.project.actors.length % 3) * 0.05, 0.2, 0.8),
-        },
+        name: nextDefaultElementName(names),
+        restPosition: nextDefaultRestPosition(
+          state.project.actors.map((a) => a.restPosition),
+        ),
       })
       set({
         project: {
@@ -2265,6 +2424,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const next = clampClip(clip)
       const prev = cloneClip(actor.clip)
       if (clipsEqual(prev, next)) return
+      const history = captureClipHistory(state.project)
       set({
         project: {
           ...state.project,
@@ -2274,13 +2434,80 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           })),
         },
         selectedActorId: id,
-        clipUndoStack: [...state.clipUndoStack, prev].slice(-MAX_UNDO),
+        clipUndoStack: [...state.clipUndoStack, history].slice(-MAX_UNDO),
         clipRedoStack: [],
         transformRedoStack: [],
         placementRedoStack: [],
         actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
         actorEditRedoOrder: [],
       })
+    },
+
+    commitActorClipSeconds: (id, startSec, endSec, visibility) => {
+      const state = get()
+      const actor = findActor(state.project.actors, id)
+      if (!actor) {
+        return { ok: false, error: 'Select an element to set Timing.' }
+      }
+      if (
+        state.mode === 'recording' ||
+        state.mode === 'armed' ||
+        state.mode === 'editing'
+      ) {
+        return { ok: false, error: 'Finish recording or editing first.' }
+      }
+      const fromMs = state.project.playback.durationMs
+      const requiredMs = Math.max(fromMs, endSec * 1000)
+      if (requiredMs > MAX_PLAYBACK_DURATION_MS + 1e-9) {
+        return {
+          ok: false,
+          error: `Ends at would be ${endSec.toFixed(2)} s — project Duration cannot exceed ${MAX_PLAYBACK_DURATION_MS / 1000} s. Shorten Start after or Move for (movement is not shortened automatically).`,
+        }
+      }
+      const toMs = Math.min(MAX_PLAYBACK_DURATION_MS, requiredMs)
+      const nextClip = clampClip({
+        ...clipFromSeconds(startSec, endSec, toMs, {
+          hideBeforeStart:
+            visibility?.hideBeforeStart ?? actor.clip.hideBeforeStart,
+          hideAfterEnd: visibility?.hideAfterEnd ?? actor.clip.hideAfterEnd,
+        }),
+      })
+      const history = captureClipHistory(state.project)
+      const durationChanged = Math.abs(toMs - fromMs) > 1e-9
+      const nextActors = state.project.actors.map((a) => {
+        if (a.id === id) return { ...a, clip: nextClip }
+        if (!durationChanged) return a
+        return {
+          ...a,
+          clip: remapClipAbsoluteTimes(a.clip, fromMs, toMs),
+        }
+      })
+      const nextProject: Project = {
+        ...state.project,
+        playback: {
+          ...state.project.playback,
+          durationMs: toMs,
+        },
+        actors: nextActors,
+      }
+      const unchanged =
+        !durationChanged &&
+        clipsEqual(actor.clip, nextClip) &&
+        nextActors.every((a, i) =>
+          clipsEqual(a.clip, state.project.actors[i]!.clip),
+        )
+      if (unchanged) return { ok: true }
+      set({
+        project: nextProject,
+        selectedActorId: id,
+        clipUndoStack: [...state.clipUndoStack, history].slice(-MAX_UNDO),
+        clipRedoStack: [],
+        transformRedoStack: [],
+        placementRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'clip'),
+        actorEditRedoOrder: [],
+      })
+      return { ok: true }
     },
 
     previewActorClip: (id, clip) => {
@@ -2331,6 +2558,12 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         })
         return
       }
+      // Preview may already have written `next` — snapshot peers + duration, but
+      // keep this actor’s pre-gesture baseline for undo.
+      const history = captureClipHistory(state.project)
+      history.clips = history.clips.map((c) =>
+        c.id === id ? { id, clip: cloneClip(baseline) } : c,
+      )
       set({
         project: {
           ...state.project,
@@ -2340,7 +2573,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           })),
         },
         selectedActorId: id,
-        clipUndoStack: [...state.clipUndoStack, baseline].slice(-MAX_UNDO),
+        clipUndoStack: [...state.clipUndoStack, history].slice(-MAX_UNDO),
         clipRedoStack: [],
         transformRedoStack: [],
         placementRedoStack: [],
@@ -2359,15 +2592,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       ) {
         return
       }
-      const previous = state.clipUndoStack[state.clipUndoStack.length - 1]
-      const actor = getSelected(state)
-      const current = cloneClip(actor.clip)
+      const previous = state.clipUndoStack[state.clipUndoStack.length - 1]!
+      const current = captureClipHistory(state.project)
       set({
-        project: withSelectedActor(
-          state.project,
-          state.selectedActorId,
-          (a) => ({ ...a, clip: cloneClip(previous) }),
-        ),
+        project: applyClipHistory(state.project, previous),
         clipUndoStack: state.clipUndoStack.slice(0, -1),
         clipRedoStack: [...state.clipRedoStack, current].slice(-MAX_UNDO),
         actorEditOrder: popKindFromOrder(state.actorEditOrder, 'clip'),
@@ -2385,15 +2613,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       ) {
         return
       }
-      const next = state.clipRedoStack[state.clipRedoStack.length - 1]
-      const actor = getSelected(state)
-      const current = cloneClip(actor.clip)
+      const next = state.clipRedoStack[state.clipRedoStack.length - 1]!
+      const current = captureClipHistory(state.project)
       set({
-        project: withSelectedActor(
-          state.project,
-          state.selectedActorId,
-          (a) => ({ ...a, clip: cloneClip(next) }),
-        ),
+        project: applyClipHistory(state.project, next),
         clipRedoStack: state.clipRedoStack.slice(0, -1),
         clipUndoStack: [...state.clipUndoStack, current].slice(-MAX_UNDO),
         actorEditRedoOrder: popKindFromOrder(state.actorEditRedoOrder, 'clip'),
@@ -2429,6 +2652,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'preset') {
         get().undoPreset()
+        return
+      }
+      if (kind === 'recording') {
+        get().undoRecording()
         return
       }
       if (kind === 'continuePath') {
@@ -2468,6 +2695,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'preset') {
         get().redoPreset()
+        return
+      }
+      if (kind === 'recording') {
+        get().redoRecording()
         return
       }
       if (kind === 'continuePath') {
@@ -2522,6 +2753,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathAddMode: false,
         pathAddCandidateIndex: null,
         pathTool: 'edit-points',
+        pathEditStartedClean: !source,
         polishSession: null,
         glideSession: null,
         presetSession: null,
@@ -2972,16 +3204,23 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
       const previous = state.undoStack[state.undoStack.length - 1]!
       const next = copyGeometryEdit(previous)
+      const undoStack = state.undoStack.slice(0, -1)
+      // Undoing the only edit from a clean recording drops geometry so the
+      // Smoothing slider/warning match the restored (unedited) path.
+      const clearGeometry =
+        undoStack.length === 0 && state.pathEditStartedClean
+      const committed = clearGeometry ? null : next
 
       set({
         project: withSelectedActor(
           state.project,
           state.selectedActorId,
-          (a) => ({ ...a, geometryEdit: next }),
+          (a) => ({ ...a, geometryEdit: committed }),
         ),
-        geometryEdit: next,
+        geometryEdit: committed,
+        // Keep handles available while still editing even if geometry cleared.
         editSession: state.mode === 'editing' ? next : null,
-        undoStack: state.undoStack.slice(0, -1),
+        undoStack,
         redoStack: [...state.redoStack, copyGeometryEdit(current)].slice(
           -MAX_UNDO,
         ),
@@ -3438,6 +3677,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           delayMs: timing.delayMs,
           durationMs: timing.durationMs,
           compareMode,
+          // Keep the first-open playhead across preset switches.
+          resumePlaybackHead: prior?.resumePlaybackHead ?? state.playbackHead,
         },
         pathAddMode: false,
         pathAddCandidateIndex: null,
@@ -3543,13 +3784,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         pathGestureActive: false,
         polishSession: null,
         glideSession: null,
-        // Preset replaces path/transform/clip/glide — drop orphaned edit kinds
-        // so Undo cannot target empty transform/clip/glide stacks.
+        // Preset replaces path/transform/clip/glide/recording — drop orphaned
+        // edit kinds so Undo cannot target empty stacks.
         ...clearTransformEditState(),
         ...clearClipEditState(),
         ...clearPlacementEditState(),
         glideUndoStack: [],
         glideRedoStack: [],
+        recordingUndoStack: [],
+        recordingRedoStack: [],
+        pendingRecordingBaseline: null,
         presetUndoStack: [...state.presetUndoStack, previous].slice(-MAX_UNDO),
         presetRedoStack: [],
         actorEditOrder: ['preset'],
@@ -3567,10 +3811,13 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     cancelPreset: () => {
       const state = get()
-      if (!state.presetSession) return
+      const session = state.presetSession
+      if (!session) return
       set({
         presetSession: null,
         mode: 'idle',
+        playbackHead: session.resumePlaybackHead,
+        playbackDirection: 1,
         actionAnnouncement: 'Preset preview cancelled.',
       })
       get().pause()
@@ -3627,6 +3874,76 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ? { x: first.x, y: first.y }
           : { ...next.restPosition },
         actionAnnouncement: 'Redo motion preset',
+      })
+    },
+
+    undoRecording: () => {
+      const state = get()
+      if (state.recordingUndoStack.length === 0) return
+      const previous =
+        state.recordingUndoStack[state.recordingUndoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = captureMotionState(actor)
+      const restored = applyMotionStateToActor(actor, previous)
+      const first = previous.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => restored,
+        ),
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        // After clearEditState — restore mirrored geometry from the take.
+        geometryEdit: geometryMirror(previous.geometryEdit),
+        recordingUndoStack: state.recordingUndoStack.slice(0, -1),
+        recordingRedoStack: [...state.recordingRedoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'recording'),
+        actorEditRedoOrder: pushEditOrder(
+          state.actorEditRedoOrder,
+          'recording',
+        ),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...previous.restPosition },
+        playbackHead: 0,
+        actionAnnouncement: 'Undo recording',
+      })
+    },
+
+    redoRecording: () => {
+      const state = get()
+      if (state.recordingRedoStack.length === 0) return
+      const next = state.recordingRedoStack[state.recordingRedoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = captureMotionState(actor)
+      const restored = applyMotionStateToActor(actor, next)
+      const first = next.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => restored,
+        ),
+        ...clearEditState(),
+        ...clearTransformEditState(),
+        geometryEdit: geometryMirror(next.geometryEdit),
+        recordingRedoStack: state.recordingRedoStack.slice(0, -1),
+        recordingUndoStack: [...state.recordingUndoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'recording'),
+        actorEditRedoOrder: popKindFromOrder(
+          state.actorEditRedoOrder,
+          'recording',
+        ),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...next.restPosition },
+        playbackHead: 0,
+        actionAnnouncement: 'Redo recording',
       })
     },
 

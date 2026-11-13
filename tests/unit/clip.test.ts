@@ -55,7 +55,12 @@ describe('clip mapping', () => {
     expect(validateClipSecondsDraft('0.5', '0.5', 2000).ok).toBe(false)
     expect(validateClipSecondsDraft('1.5', '1.52', 2000).ok).toBe(false)
     expect(validateClipSecondsDraft('-0.1', '1', 2000).ok).toBe(false)
-    expect(validateClipSecondsDraft('0', '3', 2000).ok).toBe(false)
+    // Past current Duration is allowed (Apply extends Duration up to the max).
+    const extendsOk = validateClipSecondsDraft('0', '3', 2000)
+    expect(extendsOk.ok).toBe(true)
+    if (extendsOk.ok) {
+      expect(extendsOk.requiredDurationMs).toBeCloseTo(3000, 5)
+    }
     const ok = validateClipSecondsDraft('0.4', '1.6', 2000)
     expect(ok.ok).toBe(true)
     if (ok.ok) {
@@ -64,26 +69,35 @@ describe('clip mapping', () => {
     }
   })
 
-  it('validateClipStartMoveForDraft uses Start at / Move for wording', () => {
+  it('validateClipStartMoveForDraft uses Start after / Move for wording', () => {
     const short = validateClipStartMoveForDraft('1.50', '0.02', 2000)
     expect(short.ok).toBe(false)
     if (!short.ok) {
       expect(short.error).toMatch(/Move for must be at least/i)
     }
-    const overflow = validateClipStartMoveForDraft('1.50', '1.00', 2000)
-    expect(overflow.ok).toBe(false)
-    if (!overflow.ok) {
-      expect(overflow.error).toMatch(/Ends at would be/i)
+    const overMax = validateClipStartMoveForDraft('7.50', '1.00', 2000)
+    expect(overMax.ok).toBe(false)
+    if (!overMax.ok) {
+      expect(overMax.error).toMatch(/Start after|cannot exceed|8/i)
+      expect(overMax.error).toMatch(/not shortened/i)
+    }
+    const extendsDuration = validateClipStartMoveForDraft('1.00', '1.20', 1200)
+    expect(extendsDuration.ok).toBe(true)
+    if (extendsDuration.ok) {
+      expect(extendsDuration.startSec).toBe(1)
+      expect(extendsDuration.endSec).toBeCloseTo(2.2, 5)
+      expect(extendsDuration.requiredDurationMs).toBeCloseTo(2200, 5)
     }
     const ok = validateClipStartMoveForDraft('0.40', '1.20', 2000)
     expect(ok.ok).toBe(true)
     if (ok.ok) {
       expect(ok.startSec).toBe(0.4)
       expect(ok.endSec).toBe(1.6)
+      expect(ok.requiredDurationMs).toBe(2000)
     }
   })
 
-  it('accepts hundredth-second Start at values such as 0.97', () => {
+  it('accepts hundredth-second Start after values such as 0.97', () => {
     const ok = validateClipStartMoveForDraft('0.97', '0.80', 2000)
     expect(ok.ok).toBe(true)
     if (ok.ok) {
@@ -250,5 +264,70 @@ describe('clip store history', () => {
       0.2,
       5,
     )
+  })
+
+  it('extending Duration remaps other actors by absolute time; undo/redo restore all', () => {
+    const project = makeProject({
+      playback: {
+        durationMs: 2000,
+        loop: false,
+        loopMode: 'repeat',
+        trigger: 'page-load',
+      },
+      actors: [
+        makeActor({
+          id: 'a',
+          name: 'Lead',
+          clip: { start: 0, end: 0.6, hideBeforeStart: false, hideAfterEnd: false },
+        }),
+        makeActor({
+          id: 'b',
+          name: 'Other',
+          clip: {
+            start: 0.25,
+            end: 0.75,
+            hideBeforeStart: true,
+            hideAfterEnd: false,
+          },
+        }),
+      ],
+    })
+    useEditorStore.setState({
+      project,
+      selectedActorId: 'a',
+      mode: 'idle',
+      clipUndoStack: [],
+      clipRedoStack: [],
+      actorEditOrder: [],
+      actorEditRedoOrder: [],
+    })
+    const before = structuredClone(useEditorStore.getState().project)
+    // Start after 1s + Move for 1.2s → Ends at 2.2s → Duration 2200ms.
+    const result = useEditorStore
+      .getState()
+      .commitActorClipSeconds('a', 1, 2.2)
+    expect(result.ok).toBe(true)
+    const after = useEditorStore.getState().project
+    expect(after.playback.durationMs).toBeCloseTo(2200, 5)
+    const lead = after.actors.find((a) => a.id === 'a')!
+    const other = after.actors.find((a) => a.id === 'b')!
+    expect(lead.clip.start * after.playback.durationMs).toBeCloseTo(1000, 5)
+    expect(lead.clip.end * after.playback.durationMs).toBeCloseTo(2200, 5)
+    // Other keeps absolute 500–1500ms (was 0.25–0.75 of 2000).
+    expect(other.clip.start * after.playback.durationMs).toBeCloseTo(500, 5)
+    expect(other.clip.end * after.playback.durationMs).toBeCloseTo(1500, 5)
+    expect(other.clip.hideBeforeStart).toBe(true)
+
+    useEditorStore.getState().undoClip()
+    expect(useEditorStore.getState().project).toEqual(before)
+    useEditorStore.getState().redoClip()
+    expect(useEditorStore.getState().project.playback.durationMs).toBeCloseTo(
+      2200,
+      5,
+    )
+    expect(
+      useEditorStore.getState().project.actors.find((a) => a.id === 'b')!.clip
+        .start * 2200,
+    ).toBeCloseTo(500, 5)
   })
 })

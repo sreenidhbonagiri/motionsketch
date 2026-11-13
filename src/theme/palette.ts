@@ -7,11 +7,17 @@ export const msPalette = {
   primary: '#2563EB',
   primaryHover: '#1D4ED8',
   primaryPressed: '#1E40AF',
-  play: '#2563EB',
+  /** Near-black Play / commit actions — high contrast on white canvas. */
+  play: '#17213A',
+  playHover: '#0F1629',
+  playPressed: '#0B1020',
   record: '#E11D48',
   motion: '#7C3AED',
-  export: '#0D9488',
-  canvas: '#F8F9FC',
+  /** Export pill — purple (aligned with motion chrome). */
+  export: '#7C3AED',
+  exportHover: '#6D28D9',
+  /** Pure white drawing surface. */
+  canvas: '#FFFFFF',
   panel: '#FFFFFF',
   ink: '#17213A',
   muted: '#647089',

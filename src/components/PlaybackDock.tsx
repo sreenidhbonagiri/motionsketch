@@ -5,6 +5,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
+import { Ellipsis, Grid3x3, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import { localToProject } from '../core/clip'
 import {
   CONTINUE_PATH_BAKE_NOTE,
@@ -93,40 +94,36 @@ function formatSeconds(ms: number): string {
 function SnapGridToggle({
   pressed,
   onToggle,
-  className,
   compact = false,
-  ariaLabel,
 }: {
   pressed: boolean
   onToggle: () => void
-  className: string
   compact?: boolean
-  ariaLabel?: string
 }) {
   return (
     <button
       type="button"
       data-testid="snap-to-grid-toggle"
       aria-pressed={pressed}
-      aria-label={ariaLabel ?? (pressed ? 'Snap on' : 'Snap to grid')}
+      aria-label="Snap to grid"
       aria-describedby="snap-to-grid-help"
       title="Align placement and path edits to the dots. Recording stays freehand."
       onClick={onToggle}
-      className={className}
+      className={
+        pressed
+          ? `${control} gap-1.5 border border-ms-primary/35 bg-ms-selected px-2 text-ms-primary-pressed${
+              compact ? ' min-w-8 gap-0' : ''
+            }`
+          : `${btnSecondary} gap-1.5 px-2${compact ? ' min-w-8 gap-0' : ''}`
+      }
     >
       <span
         data-testid="snap-to-grid-indicator"
         data-checked={pressed ? 'true' : 'false'}
         aria-hidden
-        className={`inline-flex size-4 shrink-0 items-center justify-center rounded border ${
-          pressed
-            ? 'border-white bg-white text-slate-900'
-            : 'border-slate-400 bg-white text-transparent'
-        }`}
+        className="inline-flex size-4 shrink-0 items-center justify-center"
       >
-        <svg viewBox="0 0 16 16" className="size-3 fill-current">
-          <path d="M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5-5L12.3 5.3z" />
-        </svg>
+        <Grid3x3 className="size-3.5" strokeWidth={2} />
       </span>
       {compact ? (
         <span className="sr-only">{pressed ? 'Snap on' : 'Snap to grid'}</span>
@@ -148,9 +145,8 @@ const recordSlot =
 const btnPrimary = `${control} bg-ms-play text-white hover:bg-ms-play-hover active:bg-ms-play-pressed`
 const btnRecord = `${recordSlot} bg-ms-record text-white hover:bg-ms-record-hover`
 const btnSecondary = `${control} text-slate-700 hover:bg-slate-900/[0.06]`
-const btnQuiet = `${control} text-slate-500 hover:bg-slate-900/[0.05]`
 const btnIcon =
-  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-sm font-medium text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-40'
+  'inline-flex h-8 min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-900/[0.06] hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-400 disabled:opacity-40'
 const menuItem =
   'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:cursor-not-allowed disabled:opacity-40'
 const menuItemQuiet =
@@ -232,9 +228,11 @@ function DockMoreMenu({
         className={`${btnSecondary} px-2`}
       >
         <span className="max-[360px]:hidden">{label}</span>
-        <span className="hidden max-[360px]:inline" aria-hidden>
-          ···
-        </span>
+        <Ellipsis
+          className="hidden size-3.5 max-[360px]:block"
+          aria-hidden
+          strokeWidth={2}
+        />
       </button>
       {open && menuPos ? (
         <div
@@ -268,14 +266,21 @@ export function PlaybackDock() {
     }
   }, [timingOpen])
 
-  // Keep Reset on the strip; tuck Restart/Undo/Redo into More below md
-  // so 640-wide / 200% zoom layouts don’t crowd Play’s center column.
+  // Keep Reset on the strip; tuck Restart/Undo/Redo into More when the
+  // transport is narrow. Key off the toolbar slot width (not viewport): at
+  // ~900px with Inspector open the dock is ~560–640px while the viewport is
+  // still “md”, and viewport media queries left Edit path overlapping Play.
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const sync = () => setWideDock(mq.matches)
+    const slot = document.querySelector('[data-testid="toolbar-slot"]')
+    if (!(slot instanceof HTMLElement)) return
+    const WIDE_DOCK_MIN_PX = 700
+    const sync = () => {
+      setWideDock(slot.getBoundingClientRect().width >= WIDE_DOCK_MIN_PX)
+    }
     sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
+    const ro = new ResizeObserver(sync)
+    ro.observe(slot)
+    return () => ro.disconnect()
   }, [])
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -923,8 +928,6 @@ export function PlaybackDock() {
                 pressed={snapToGrid}
                 onToggle={() => setSnapToGrid(!snapToGrid)}
                 compact
-                className={`${snapToGrid ? btnPrimary : btnSecondary} gap-1.5 px-2`}
-                ariaLabel="Snap to grid"
               />
             </div>
             </div>
@@ -972,7 +975,7 @@ export function PlaybackDock() {
                     onClick={() => {
                       void requestArmRecording()
                     }}
-                    // Coral Record stays distinct; after a take Play is the blue primary.
+                    // Red Record stays distinct; after a take Play is the near-black primary.
                     className={
                       hasAnyRecording
                         ? `${recordSlot} border border-ms-record/30 px-2 text-ms-record hover:bg-ms-record/5`
@@ -1004,7 +1007,6 @@ export function PlaybackDock() {
                     <SnapGridToggle
                       pressed={snapToGrid}
                       onToggle={() => setSnapToGrid(!snapToGrid)}
-                      className={`shrink-0 ${snapToGrid ? btnPrimary : btnSecondary} min-w-8 gap-0 px-2`}
                       compact
                     />
                   ))}
@@ -1093,7 +1095,7 @@ export function PlaybackDock() {
                       aria-label="Reset"
                       aria-describedby={resetDescribedBy}
                       title="Reset this element’s recorded path"
-                      className={`${btnQuiet} gap-1.5`}
+                      className={`${btnSecondary} gap-1.5`}
                     >
                       <EraserIcon />
                       <span className="max-[420px]:sr-only">Reset</span>
@@ -1220,7 +1222,7 @@ export function PlaybackDock() {
                       title="Restart from the beginning"
                       className={btnIcon}
                     >
-                      <span aria-hidden>↻</span>
+                      <RotateCcw className="size-3.5" aria-hidden strokeWidth={2} />
                     </button>
                     <button
                       type="button"
@@ -1229,9 +1231,9 @@ export function PlaybackDock() {
                       disabled={isRecordingLike || actorEditOrder.length === 0}
                       className={btnIcon}
                       aria-label="Undo"
-                      title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
+                      title="Undo placement, transform, timing, recording, Glide, extend path, stage resize, or a motion preset"
                     >
-                      <span aria-hidden>↶</span>
+                      <Undo2 className="size-3.5" aria-hidden strokeWidth={2} />
                     </button>
                     <button
                       type="button"
@@ -1242,9 +1244,9 @@ export function PlaybackDock() {
                       }
                       className={btnIcon}
                       aria-label="Redo"
-                      title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
+                      title="Redo placement, transform, timing, recording, Glide, extend path, stage resize, or a motion preset"
                     >
-                      <span aria-hidden>↷</span>
+                      <Redo2 className="size-3.5" aria-hidden strokeWidth={2} />
                     </button>
                   </>
                 )}
@@ -1264,7 +1266,6 @@ export function PlaybackDock() {
           <SnapGridToggle
             pressed={snapToGrid}
             onToggle={() => setSnapToGrid(!snapToGrid)}
-            className={`${snapToGrid ? btnPrimary : btnSecondary} gap-2`}
           />
         </div>
       )}

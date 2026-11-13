@@ -49,6 +49,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         confirmLabel={pending?.confirmLabel ?? 'Confirm'}
         cancelLabel={pending?.cancelLabel}
         danger={pending?.danger}
+        initialFocus={pending?.initialFocus}
         testId={pending?.testId}
         confirmTestId={pending?.confirmTestId}
         cancelTestId={pending?.cancelTestId}

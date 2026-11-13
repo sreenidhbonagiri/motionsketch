@@ -232,9 +232,24 @@ export function TutorialCoach({
     }
   }, [step, reducedMotion])
 
+  // Focus the step’s primary control — not Skip. Skip + Space opened Keep, and
+  // ConfirmDialog then focused “Start fresh”, so a second Space discarded the flight.
+  // Depend on step only so Play→Pause body updates do not steal focus mid-flight.
   useEffect(() => {
-    const skip = document.querySelector('[data-testid="btn-tutorial-skip"]')
-    if (skip instanceof HTMLElement) skip.focus()
+    const preferredId =
+      step === 'play'
+        ? 'btn-play'
+        : step === 'export'
+          ? 'btn-export'
+          : step === 'draw'
+            ? 'btn-record'
+            : null
+    const el = preferredId
+      ? document.querySelector(`[data-testid="${preferredId}"]`)
+      : null
+    if (el instanceof HTMLElement) {
+      el.focus({ preventScroll: true })
+    }
   }, [step])
 
   const progress = tutorialProgressLabel(step)

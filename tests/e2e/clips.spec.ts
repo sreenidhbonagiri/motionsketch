@@ -95,6 +95,7 @@ test.describe('per-actor clip timing', () => {
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
     await selectActorByIndex(page, 2)
     await applyClipSeconds(page, '0.00', '1.50')
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.50')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.50')
     await page.getByTestId('btn-timing-cancel').click()
