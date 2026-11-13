@@ -143,9 +143,10 @@ export function AppearancePanel() {
             Text
           </label>
         </div>
-        <HelpDisclosure summary="About element types">
-          Shape, Image, and Text keep each other’s settings when you switch —
-          color, corners, image file, and text stay available to switch back.
+        <HelpDisclosure testId="appearance-style-help" summary="About Style">
+          Shape, Image, and Text keep each other’s settings when you switch.
+          Size is the longer edge (or text wrap width) as a fraction of the
+          stage’s shorter side — center stays fixed.
         </HelpDisclosure>
         {!actor.image && actor.kind !== 'image' && (
           <p
@@ -182,15 +183,11 @@ export function AppearancePanel() {
             onChange={(e) => setActorSize(Number(e.target.value))}
             className="w-full accent-ms-primary"
           />
-          <HelpDisclosure
-            id="actor-size-help"
-            testId="actor-size-help"
-            summary="About Size"
-          >
+          <p id="actor-size-help" data-testid="actor-size-help" className="sr-only">
             {actor.kind === 'text'
               ? 'Width of the text wrap box, as a fraction of the stage’s shorter side. Height follows your lines. Center stays fixed.'
               : 'Longer edge of the element box, as a fraction of the stage’s shorter side. Images keep their proportions inside that box. Center stays fixed.'}
-          </HelpDisclosure>
+          </p>
         </div>
 
         {(actor.kind === 'shape' || actor.kind === 'text') && (
@@ -278,11 +275,12 @@ export function AppearancePanel() {
               />
               <HelpDisclosure
                 id="actor-text-content-help"
-                summary="About text content"
+                testId="actor-text-font-help"
+                summary="About text"
               >
-                Short multiline copy (up to {MAX_ACTOR_TEXT_LENGTH} characters).
-                Press Enter for a new line. Empty text is allowed and saved as
-                empty.
+                Short multiline copy (up to {MAX_ACTOR_TEXT_LENGTH} characters;
+                Enter for a new line). Built-in system fonts stay offline —
+                letter shapes can vary between devices.
               </HelpDisclosure>
             </div>
 
@@ -384,13 +382,6 @@ export function AppearancePanel() {
                 <option value="serif">Serif</option>
                 <option value="mono">Monospace</option>
               </select>
-              <HelpDisclosure
-                testId="actor-text-font-help"
-                summary="About fonts"
-              >
-                Uses built-in system fonts so exports stay offline. Exact letter
-                shapes can vary between devices and browsers.
-              </HelpDisclosure>
             </div>
           </div>
         )}
@@ -465,7 +456,7 @@ export function AppearancePanel() {
                   e.stopPropagation()
                   pickFile()
                 }}
-                className="rounded-lg bg-ms-primary px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
+                className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
               >
                 {actor.image ? 'Replace image' : 'Upload image'}
               </button>

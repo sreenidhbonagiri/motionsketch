@@ -241,7 +241,7 @@ export function TransformSection() {
           data-testid="btn-set-transform-keyframe"
           disabled={disabled}
           onClick={onAddOrUpdate}
-          className="rounded-lg bg-ms-primary px-2.5 py-1.5 text-sm font-medium text-white transition hover:bg-ms-primary-hover disabled:opacity-40"
+          className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:opacity-40"
         >
           {selected && nearSelected ? 'Update keyframe' : 'Add keyframe'}
         </button>

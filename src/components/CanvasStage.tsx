@@ -163,7 +163,17 @@ function drawPolishRoundingHighlight(
  * Camera pan/zoom is CSS on the world layer; pointer tools read the
  * stage-frame’s getBoundingClientRect() so one mapping serves every tool.
  */
-export function CanvasStage() {
+interface CanvasStageProps {
+  /** Desktop floating Elements card (left) — camera stays clear on the right. */
+  floatingElements?: boolean
+  /** Desktop floating inspector — keep Fit/zoom clear of the card. */
+  floatingInspector?: boolean
+}
+
+export function CanvasStage({
+  floatingElements: _floatingElements = false,
+  floatingInspector = false,
+}: CanvasStageProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -599,7 +609,13 @@ export function CanvasStage() {
       </div>
 
       {/* Camera chrome stays inside the stage viewport cell (not floating over chrome). */}
-      <div className="pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3">
+      <div
+        className={
+          floatingInspector
+            ? 'pointer-events-none absolute top-2 z-[32] right-[min(19.25rem,calc(100%-0.25rem))] sm:top-3'
+            : 'pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3'
+        }
+      >
         <WorkspaceCameraBar
           zoomIn={zoomIn}
           zoomOut={zoomOut}

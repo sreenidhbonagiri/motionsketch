@@ -7,9 +7,9 @@ import { ProjectPanel } from './ProjectPanel'
 export type InspectorTab = 'style' | 'motion' | 'project'
 
 const tabBtn =
-  'inline-flex h-8 min-h-8 flex-1 items-center justify-center gap-1 rounded-lg px-2 text-xs font-medium transition'
+  'inline-flex h-8 min-h-8 flex-1 items-center justify-center rounded-lg px-2 text-xs font-medium whitespace-nowrap transition'
 const tabIdle = `${tabBtn} text-slate-600 hover:bg-slate-900/[0.06]`
-const tabActive = `${tabBtn} bg-slate-900/[0.08] text-slate-900 ring-1 ring-inset ring-slate-900/10`
+const tabActive = `${tabBtn} bg-ms-selected text-ms-primary`
 
 interface InspectorPanelProps {
   tab: InspectorTab
@@ -18,13 +18,18 @@ interface InspectorPanelProps {
   onBackToStage?: () => void
   /** Desktop: close the docked inspector and return space to the canvas. */
   onClose?: () => void
-  /** Optional duration chip on the Motion tab (was header Motion summary). */
+  /** Duration shown in the Motion body (not on the tab label). */
   motionSummary?: string | null
+  /**
+   * Phone/short sheet fills the slot. Desktop floating card sizes to content
+   * (capped by max-height) so it does not look like an empty full-height rail.
+   */
+  fillHeight?: boolean
 }
 
 /**
- * Docked right inspector: Style (Appearance), Motion (Adjust + tools), Project.
- * Same store actions and panel bodies as the former floating chrome.
+ * Inspector chrome: Style / Motion / Project.
+ * Desktop hosts this inside a floating card; focused chrome uses a full sheet.
  */
 export function InspectorPanel({
   tab,
@@ -32,13 +37,10 @@ export function InspectorPanel({
   onBackToStage,
   onClose,
   motionSummary,
+  fillHeight = true,
 }: InspectorPanelProps) {
-  return (
-    <aside
-      data-testid="inspector-panel"
-      data-inspector-tab={tab}
-      className="flex h-full min-h-0 min-w-0 flex-col bg-white/90 md:border-l md:border-ms-border"
-    >
+  const chrome = (
+    <>
       {onBackToStage && (
         <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
           <button
@@ -49,6 +51,20 @@ export function InspectorPanel({
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             Stage
+          </button>
+        </div>
+      )}
+      {onClose && (
+        <div className="flex shrink-0 items-center justify-end border-b border-ms-border px-1.5 py-1">
+          <button
+            type="button"
+            data-testid="btn-close-inspector"
+            aria-label="Close inspector"
+            title="Close inspector"
+            onClick={onClose}
+            className="inline-flex h-8 min-h-8 items-center rounded-lg px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+          >
+            Close
           </button>
         </div>
       )}
@@ -82,14 +98,6 @@ export function InspectorPanel({
           className={tab === 'motion' ? tabActive : tabIdle}
         >
           Motion
-          {motionSummary ? (
-            <span
-              data-testid="adjust-summary"
-              className="rounded-md bg-slate-900/[0.06] px-1 py-px text-xs font-medium tabular-nums text-ms-ink"
-            >
-              {motionSummary}
-            </span>
-          ) : null}
         </button>
         <button
           type="button"
@@ -104,20 +112,32 @@ export function InspectorPanel({
         >
           Project
         </button>
-        {onClose && (
-          <button
-            type="button"
-            data-testid="btn-close-inspector"
-            aria-label="Close inspector"
-            title="Close inspector"
-            onClick={onClose}
-            className="ml-0.5 inline-flex h-8 min-h-8 shrink-0 items-center rounded-lg px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
-          >
-            Close
-          </button>
-        )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    </>
+  )
+
+  return (
+    <aside
+      data-testid="inspector-panel"
+      data-inspector-tab={tab}
+      className={
+        fillHeight
+          ? 'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent'
+          : 'flex min-h-0 min-w-0 flex-col bg-transparent'
+      }
+    >
+      {fillHeight ? (
+        chrome
+      ) : (
+        <div className="sticky top-0 z-[1] shrink-0 bg-white">{chrome}</div>
+      )}
+      <div
+        className={
+          fillHeight
+            ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain'
+            : 'min-h-0'
+        }
+      >
         {tab === 'style' && (
           <div
             role="tabpanel"
@@ -142,8 +162,16 @@ export function InspectorPanel({
               data-testid="motion-tools-section-chrome"
               className="px-2.5 pb-2.5 pt-2"
             >
-              <h3 className="mb-1.5 text-xs font-semibold text-ms-motion">
-                Motion tools
+              <h3 className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-ms-motion">
+                <span>Motion tools</span>
+                {motionSummary ? (
+                  <span
+                    data-testid="adjust-summary"
+                    className="font-medium tabular-nums text-ms-ink"
+                  >
+                    {motionSummary}
+                  </span>
+                ) : null}
               </h3>
               <MotionToolsSection />
             </div>
