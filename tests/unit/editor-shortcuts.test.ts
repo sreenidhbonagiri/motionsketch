@@ -15,6 +15,7 @@ describe('editorShortcuts', () => {
       'undo',
       'redo',
       'escape',
+      'cycle-handles',
       'shortcuts',
     ])
   })

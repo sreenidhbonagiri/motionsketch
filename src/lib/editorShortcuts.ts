@@ -54,6 +54,11 @@ export const EDITOR_SHORTCUTS: ShortcutEntry[] = [
     action: 'Cancel the active gesture, then close open panels',
   },
   {
+    id: 'cycle-handles',
+    keys: '[ / ]',
+    action: 'Select the previous or next path point while editing',
+  },
+  {
     id: 'shortcuts',
     keys: '?',
     action: 'Open this shortcut list',

@@ -2,12 +2,13 @@ import {
   HELP_EXPORT_BLURB,
   HELP_RECORDING_BLURB,
   HELP_RESTART_TUTORIAL_LABEL,
+  HELP_TIMING_BLURB,
 } from '../lib/tutorial'
 
 interface HelpPanelProps {
   onRestartTutorial: () => void
   restartDisabled?: boolean
-  onOpenShortcuts?: () => void
+  onOpenShortcuts?: (opener?: HTMLElement | null) => void
 }
 
 export function HelpPanel({
@@ -24,6 +25,15 @@ export function HelpPanel({
           className="text-xs leading-relaxed text-slate-600"
         >
           {HELP_RECORDING_BLURB}
+        </p>
+      </section>
+      <section className="space-y-1">
+        <h3 className="text-sm font-semibold text-slate-800">Timing</h3>
+        <p
+          data-testid="help-timing-blurb"
+          className="text-xs leading-relaxed text-slate-600"
+        >
+          {HELP_TIMING_BLURB}
         </p>
       </section>
       <section className="space-y-1">
@@ -50,7 +60,7 @@ export function HelpPanel({
           <button
             type="button"
             data-testid="btn-open-shortcuts"
-            onClick={onOpenShortcuts}
+            onClick={(event) => onOpenShortcuts(event.currentTarget)}
             className="inline-flex h-8 w-full items-center justify-between rounded-lg border border-ms-border bg-white px-2.5 text-xs font-medium text-slate-800 transition hover:bg-ms-selected"
           >
             <span>Keyboard shortcuts</span>

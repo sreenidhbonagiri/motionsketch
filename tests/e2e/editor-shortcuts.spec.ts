@@ -22,17 +22,19 @@ test.describe('editor shortcuts', () => {
     await expect(page.getByTestId('shortcut-row-record')).toBeVisible()
     await expect(page.getByTestId('shortcut-row-pan-hand')).toBeVisible()
     await page.getByTestId('btn-close-shortcuts').click()
-    await expect(page.getByTestId('shortcut-sheet')).toHaveCount(0)
+    await expect(page.getByTestId('shortcut-sheet')).not.toBeVisible()
+    await expect(page.getByTestId('stage')).toBeFocused()
 
     await page.getByTestId('btn-help').click()
     await expect(page.getByTestId('help-panel')).toBeVisible()
     await expect(page.getByTestId('help-camera-blurb')).toContainText(
       'Hold H or middle-drag',
     )
+    await expect(page.getByTestId('help-timing-blurb')).toContainText(/More/i)
     await page.getByTestId('btn-open-shortcuts').click()
     await expect(page.getByTestId('shortcut-sheet')).toBeVisible()
     await page.keyboard.press('Escape')
-    await expect(page.getByTestId('shortcut-sheet')).toHaveCount(0)
+    await expect(page.getByTestId('shortcut-sheet')).not.toBeVisible()
 
     await recordSimplePath(page)
     await closeOpenChromePanels(page)

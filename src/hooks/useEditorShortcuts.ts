@@ -9,7 +9,7 @@ import { useArmRecording } from './useArmRecording'
 
 type Options = {
   shortcutsOpen: boolean
-  onOpenShortcuts: () => void
+  onOpenShortcuts: (opener?: HTMLElement | null) => void
   onCloseShortcuts: () => void
 }
 

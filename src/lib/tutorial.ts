@@ -59,6 +59,8 @@ export const TUTORIAL_KEEP_FRESH = 'Start fresh'
 
 export const HELP_RECORDING_BLURB =
   'Click Record, drag an element, then release to finish. Short or zero-motion drags are ignored. Try again.'
+export const HELP_TIMING_BLURB =
+  'After a path exists, open More next to Edit path and choose Timing to set when the selected element starts moving and how long it moves.'
 export const HELP_EXPORT_BLURB =
   'After a path exists, open Export to download a website preview package or other formats.'
 export const HELP_RESTART_TUTORIAL_LABEL = 'Restart tutorial'
