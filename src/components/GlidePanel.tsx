@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 /**
  * Glide timing preview. Softens starts/stops in moving sections without
@@ -36,7 +37,8 @@ export function GlidePanel() {
   return (
     <div
       data-testid="glide-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-ms-border bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      tabIndex={-1}
+      className="pointer-events-auto w-full max-w-xl rounded-xl border border-ms-border bg-white/90 px-3 py-2 shadow-[var(--ms-shadow)] outline-none backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -45,7 +47,7 @@ export function GlidePanel() {
           data-testid="glide-help"
           className="text-xs leading-relaxed text-slate-500"
         >
-          Softens starts and stops while keeping your path and pauses.
+          Softens starts and stops; path and pauses stay.
         </p>
       </div>
 
@@ -105,16 +107,16 @@ export function GlidePanel() {
           className="w-full accent-ms-primary"
           aria-describedby="glide-strength-help"
         />
-        <p
+        <HelpDisclosure
           id="glide-strength-help"
-          data-testid="glide-strength-help"
-          className="text-xs leading-relaxed text-slate-500"
+          testId="glide-strength-help"
+          summary="About strength"
         >
           Ease-in/out inside moving sections after Steady Speed. Path shape,
           corners, pauses, and duration stay the same. Transform keyframes keep
           their times — where they land on the path can shift when speed
           changes. Face along path follows the retimed motion.
-        </p>
+        </HelpDisclosure>
       </div>
 
       <p

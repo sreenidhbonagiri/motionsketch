@@ -59,7 +59,8 @@ export function PresetPanel() {
   return (
     <div
       data-testid="preset-panel"
-      className="pointer-events-auto w-full max-w-2xl rounded-xl border border-ms-border bg-white/90 px-3 py-2.5 shadow-[var(--ms-shadow)] backdrop-blur-xl"
+      tabIndex={-1}
+      className="pointer-events-auto w-full max-w-xl rounded-xl border border-ms-border bg-white/90 px-3 py-2 shadow-[var(--ms-shadow)] outline-none backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -145,7 +146,7 @@ export function PresetPanel() {
       >
         {behavior}
         {showLoopHint
-          ? ' Turn on Loop in Timing for continuous playback.'
+          ? ' Turn on Loop in the Motion inspector for continuous playback.'
           : ''}
       </p>
 
@@ -218,9 +219,9 @@ export function PresetPanel() {
         className="mt-1 text-xs leading-relaxed text-slate-500"
       >
         Start at and Move for match Timing for this element, not the project
-        Duration in Timing. Entrance presets turn on Hide before Start, so the
-        element stays hidden until Start at. Values stay shared when you switch
-        presets.
+        Duration in the Motion inspector. Entrance presets turn on Hide before
+        Start, so the element stays hidden until Start at. Values stay shared
+        when you switch presets.
       </p>
 
       <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
