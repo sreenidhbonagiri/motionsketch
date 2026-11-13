@@ -862,4 +862,42 @@ test.describe('first-use tutorial', () => {
     )
     expect(progress).toContain('skipped')
   })
+
+  test('Watch it move: Space plays; Keep focuses Keep not Start fresh', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await awaitAutoTutorial(page)
+
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 40, y: -30 }, { x: 180, y: 40 })
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'play',
+    )
+    await expect(page.getByTestId('tutorial-coach-title')).toHaveText(
+      'Watch it move',
+    )
+    // Primary control — not Skip — receives focus for Space.
+    await expect(page.getByTestId('btn-play')).toBeFocused()
+    await page.keyboard.press(' ')
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await page.getByTestId('btn-pause').click({ timeout: 1500 }).catch(() => {})
+
+    // Stage Space still play/pauses when focus is not on a button.
+    await page.getByTestId('stage').focus()
+    await expect(page.getByTestId('stage')).toBeFocused()
+    await page.keyboard.press(' ')
+    await expect(page.getByTestId('btn-pause')).toBeVisible()
+    await page.getByTestId('btn-pause').click({ timeout: 1500 }).catch(() => {})
+
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
+    await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
+    // Accidental Space keeps the practice flight — does not activate Start fresh.
+    await page.keyboard.press(' ')
+    await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+  })
 })

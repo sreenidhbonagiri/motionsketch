@@ -14,6 +14,8 @@ export type ConfirmDialogProps = {
   cancelLabel?: string
   /** Prefer stronger styling for irreversible actions. */
   danger?: boolean
+  /** Default `cancel`. Use `confirm` when cancel discards work. */
+  initialFocus?: 'confirm' | 'cancel'
   onConfirm: () => void
   onCancel: () => void
   testId?: string
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = 'Cancel',
   danger = false,
+  initialFocus = 'cancel',
   onConfirm,
   onCancel,
   testId = 'app-confirm',
@@ -45,6 +48,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const cancelBtnRef = useRef<HTMLButtonElement>(null)
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
   const titleId = useId()
   const bodyId = useId()
   const returnFocus = useRef<HTMLElement | null>(null)
@@ -64,8 +68,10 @@ export function ConfirmDialog({
         ? document.activeElement
         : null)
     if (!dialog.open) dialog.showModal()
-    // Prefer Cancel for safer default focus on destructive confirms.
-    cancelBtnRef.current?.focus()
+    // Default Cancel (safer for destructive confirms). Tutorial Keep focuses
+    // confirm so Space does not activate “Start fresh” / restore.
+    if (initialFocus === 'confirm') confirmBtnRef.current?.focus()
+    else cancelBtnRef.current?.focus()
 
     const onNativeCancel = (event: Event) => {
       // Escape — route through onCancel; keep React as the source of close.
@@ -76,7 +82,7 @@ export function ConfirmDialog({
     return () => {
       dialog.removeEventListener('cancel', onNativeCancel)
     }
-  }, [open, onCancel, returnFocusRef])
+  }, [open, onCancel, returnFocusRef, initialFocus])
 
   useEffect(() => {
     if (open) return
@@ -128,6 +134,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </button>
           <button
+            ref={confirmBtnRef}
             type="button"
             data-testid={confirmTestId}
             onClick={requestConfirm}
