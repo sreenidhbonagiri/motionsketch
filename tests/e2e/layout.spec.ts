@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
+  actorIdsFromList,
   assertUnclippedClickable,
+  clickAddActor,
   closeOpenChromePanels,
+  ensureActorListExpanded,
   ensureClipTimesOpen,
   ensureEditor,
   ensureRefineMotionOpen,
@@ -11,6 +14,8 @@ import {
   recordSimplePath,
   expandExportOtherWays,
   closePanel,
+  respondToConfirm,
+  selectActorByIndex,
 } from './helpers'
 
 /** Play/Pause center X should match the dock center (balanced transport columns). */
@@ -1003,7 +1008,7 @@ test.describe('workspace layout', () => {
     })
   }
 
-  test('canvas-first desktop: Elements and Inspector open on demand and return space', async ({
+  test('canvas-first desktop: Elements and Inspector float without resizing the stage cell', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 })
@@ -1029,7 +1034,7 @@ test.describe('workspace layout', () => {
         ? Math.round(cell.getBoundingClientRect().width)
         : 0
     })
-    expect(withInspector).toBeLessThan(closed - 120)
+    expect(Math.abs(withInspector - closed)).toBeLessThan(8)
     await page.getByTestId('btn-close-inspector').click()
     await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
 
@@ -1041,7 +1046,7 @@ test.describe('workspace layout', () => {
         ? Math.round(cell.getBoundingClientRect().width)
         : 0
     })
-    expect(withElements).toBeLessThan(closed - 120)
+    expect(Math.abs(withElements - closed)).toBeLessThan(8)
     await page.getByTestId('btn-toggle-actor-list').click()
     await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
     const restored = await page.evaluate(() => {
@@ -1463,6 +1468,351 @@ test.describe('workspace layout', () => {
         ).toMatchObject({ ok: true })
         // Readable label — do not collapse to icon-only at these widths.
         expect(measure.editLabel.length).toBeGreaterThan(0)
+      }
+    })
+  }
+
+  for (const size of [
+    { width: 1280, height: 800, label: '1280 both panels' },
+    { width: 900, height: 800, label: '900 both panels' },
+    { width: 500, height: 800, label: '500 inspector sheet' },
+  ] as const) {
+    test(`${size.label}: Play/Edit do not overlap; Inspector chrome stays clickable`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height })
+      await page.goto('/')
+      await page.evaluate(() => {
+        try {
+          sessionStorage.clear()
+          localStorage.clear()
+        } catch {
+          /* ignore */
+        }
+      })
+      await page.reload()
+      await ensureEditor(page)
+      const firstUse = page.getByTestId('btn-dismiss-first-use')
+      if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+      await recordSimplePath(page)
+      await closeOpenChromePanels(page)
+
+      const insp = page.getByTestId('btn-toggle-inspector-pane')
+      if ((await insp.getAttribute('aria-pressed')) !== 'true') await insp.click()
+      await expect(page.getByTestId('inspector-panel')).toBeVisible()
+
+      const focused = await page
+        .getByTestId('btn-inspector-back-to-stage')
+        .isVisible()
+        .catch(() => false)
+
+      if (!focused) {
+        const elements = page.getByTestId('btn-toggle-elements-pane')
+        if ((await elements.getAttribute('aria-pressed')) !== 'true') {
+          await elements.click()
+        }
+        await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+      }
+
+      const measure = await page.evaluate(() => {
+        const play = document
+          .querySelector('[data-testid="btn-play"]')
+          ?.getBoundingClientRect()
+        const edit = document
+          .querySelector('[data-testid="btn-edit-path"]')
+          ?.getBoundingClientRect()
+        if (!play || !edit) return { ok: false, reason: 'missing' as const }
+        const overlap = !(
+          play.right <= edit.left + 0.5 ||
+          edit.right <= play.left + 0.5 ||
+          play.bottom <= edit.top + 0.5 ||
+          edit.bottom <= play.top + 0.5
+        )
+        const top = document.elementFromPoint(
+          edit.left + edit.width / 2,
+          edit.top + edit.height / 2,
+        )
+        const hit =
+          top instanceof Element
+            ? top.closest('[data-testid]')?.getAttribute('data-testid')
+            : null
+        return {
+          ok: !overlap && hit === 'btn-edit-path',
+          reason: overlap
+            ? `overlap:${Math.round(play.right - edit.left)}`
+            : hit !== 'btn-edit-path'
+              ? `hit:${hit}`
+              : ('ok' as const),
+        }
+      })
+      expect(measure, measure.reason).toMatchObject({ ok: true })
+
+      for (const id of [
+        'btn-record',
+        'btn-play',
+        'btn-edit-path',
+        'btn-reset',
+        'snap-to-grid-toggle',
+      ] as const) {
+        await assertUnclippedClickable(page, id)
+      }
+
+      await assertUnclippedClickable(page, 'btn-inspector-style')
+      await assertUnclippedClickable(page, 'btn-inspector-motion')
+      await assertUnclippedClickable(page, 'btn-inspector-project')
+      // Full labels — do not truncate Style / Motion / Project to fit Close.
+      await expect(page.getByTestId('btn-inspector-style')).toHaveText('Style')
+      await expect(page.getByTestId('btn-inspector-motion')).toHaveText('Motion')
+      await expect(page.getByTestId('btn-inspector-project')).toHaveText(
+        'Project',
+      )
+      const tabOverflow = await page.evaluate(() => {
+        for (const id of [
+          'btn-inspector-style',
+          'btn-inspector-motion',
+          'btn-inspector-project',
+        ] as const) {
+          const el = document.querySelector(`[data-testid="${id}"]`)
+          if (!(el instanceof HTMLElement)) return id
+          if (el.scrollWidth > el.clientWidth + 1) return id
+        }
+        return null
+      })
+      expect(tabOverflow, 'Inspector tab labels must not overflow').toBeNull()
+      if (focused) {
+        await assertUnclippedClickable(page, 'btn-inspector-back-to-stage')
+        await page.getByTestId('btn-inspector-back-to-stage').click()
+        await expect(page.getByTestId('btn-play')).toBeVisible()
+      } else {
+        await assertUnclippedClickable(page, 'btn-close-inspector')
+        await page.getByTestId('btn-close-inspector').click()
+        await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+      }
+
+      // Undo remains reachable — either on the strip or under More.
+      const undo = page.getByTestId('btn-undo-transform')
+      if (await undo.isVisible().catch(() => false)) {
+        await assertUnclippedClickable(page, 'btn-undo-transform')
+      } else {
+        await openDockMore(page)
+        await assertUnclippedClickable(page, 'btn-undo-transform')
+      }
+    })
+  }
+
+  test('390×560: Inspector opens with Stage return and reachable tabs', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 560 })
+    await page.goto('/')
+    await page.evaluate(() => {
+      try {
+        sessionStorage.clear()
+        localStorage.clear()
+      } catch {
+        /* ignore */
+      }
+    })
+    await page.reload()
+    await ensureEditor(page)
+    const firstUse = page.getByTestId('btn-dismiss-first-use')
+    if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+    await recordSimplePath(page)
+
+    const toggle = page.getByTestId('btn-toggle-inspector-pane')
+    await assertUnclippedClickable(page, 'btn-toggle-inspector-pane')
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeVisible()
+    await assertUnclippedClickable(page, 'btn-inspector-back-to-stage')
+    await assertUnclippedClickable(page, 'btn-inspector-style')
+    await assertUnclippedClickable(page, 'btn-inspector-motion')
+    await assertUnclippedClickable(page, 'btn-inspector-project')
+    await page.getByTestId('btn-inspector-motion').click()
+    await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
+    await page.getByTestId('btn-inspector-back-to-stage').click()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  for (const size of [
+    { width: 1280, height: 800, label: '1280 both cards' },
+    { width: 900, height: 800, label: '900 both cards' },
+    { width: 390, height: 560, label: '390×560 sheet' },
+  ] as const) {
+    test(`${size.label}: full Elements list scrolls; chrome stays reachable`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height })
+      await page.goto('/')
+      await page.evaluate(() => {
+        try {
+          sessionStorage.clear()
+          localStorage.clear()
+        } catch {
+          /* ignore */
+        }
+      })
+      await page.reload()
+      await ensureEditor(page)
+      const firstUse = page.getByTestId('btn-dismiss-first-use')
+      if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+      await recordSimplePath(page)
+      await closeOpenChromePanels(page)
+
+      const cameraBefore = await page.evaluate(() => {
+        const zoom = document
+          .querySelector('[data-testid="zoom-percent"]')
+          ?.textContent?.trim()
+        const world = document.querySelector(
+          '[data-testid="workspace-world"]',
+        ) as HTMLElement | null
+        const stage = document.querySelector('[data-testid="stage-viewport"]')
+        return {
+          zoom,
+          transform: world?.style.transform ?? '',
+          stageW:
+            stage instanceof HTMLElement
+              ? Math.round(stage.getBoundingClientRect().width)
+              : 0,
+        }
+      })
+
+      await ensureActorListExpanded(page)
+      // Fill to the hard 8-element capacity.
+      for (let i = 0; i < 7; i++) await clickAddActor(page)
+      let ids = await actorIdsFromList(page)
+      expect(ids).toHaveLength(8)
+      await expect(page.getByTestId('actor-list')).toContainText('8/8')
+      await expect(page.getByTestId('btn-add-actor')).toBeDisabled()
+      await expect(page.getByTestId('btn-duplicate-actor')).toBeDisabled()
+
+      const focused = await page
+        .getByTestId('btn-elements-back-to-stage')
+        .isVisible()
+        .catch(() => false)
+
+      if (!focused) {
+        const insp = page.getByTestId('btn-toggle-inspector-pane')
+        if ((await insp.getAttribute('aria-pressed')) !== 'true') {
+          await insp.click()
+        }
+        await expect(page.getByTestId('inspector-panel')).toBeVisible()
+        await assertUnclippedClickable(page, 'btn-close-inspector')
+      } else {
+        await assertUnclippedClickable(page, 'btn-elements-back-to-stage')
+      }
+
+      // Title / count / Close stay available while the list scrolls.
+      await assertUnclippedClickable(page, 'btn-toggle-actor-list')
+      await expect(page.getByTestId('actors-collapse-label')).toBeVisible()
+
+      const firstItem = page.getByTestId(`actor-list-item-${ids[0]}`)
+      const lastItem = page.getByTestId(`actor-list-item-${ids[7]}`)
+      await lastItem.evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      await assertUnclippedClickable(page, `actor-list-item-${ids[7]}`)
+      await lastItem.click()
+      await expect(lastItem).toHaveAttribute('data-selected', 'true')
+
+      await firstItem.evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      await assertUnclippedClickable(page, `actor-list-item-${ids[0]}`)
+      await firstItem.click()
+      await expect(firstItem).toHaveAttribute('data-selected', 'true')
+
+      const name = page.getByTestId('actor-name-input')
+      await name.click()
+      await name.fill('Alpha')
+      await name.press('Enter')
+      await expect(firstItem).toContainText('Alpha')
+
+      const reorderDown = page.getByTestId('btn-actor-reorder-down')
+      await reorderDown.evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      await assertUnclippedClickable(page, 'btn-actor-reorder-down')
+      await reorderDown.click()
+      ids = await actorIdsFromList(page)
+      expect(ids[1]).toBeTruthy()
+      await expect(page.getByTestId(`actor-list-item-${ids[1]}`)).toContainText(
+        'Alpha',
+      )
+
+      await selectActorByIndex(page, 7)
+      const del = page.getByTestId('btn-delete-actor')
+      await del.evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      await del.click()
+      await respondToConfirm(page, {
+        dialogTestId: 'delete-actor-confirm',
+        confirmTestId: 'btn-delete-actor-confirm',
+        cancelTestId: 'btn-delete-actor-cancel',
+      })
+      ids = await actorIdsFromList(page)
+      expect(ids).toHaveLength(7)
+      await expect(page.getByTestId('actor-list')).toContainText('7/8')
+      const dup = page.getByTestId('btn-duplicate-actor')
+      await dup.evaluate((el) => {
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      })
+      await expect(dup).toBeEnabled()
+      await dup.click()
+      ids = await actorIdsFromList(page)
+      expect(ids).toHaveLength(8)
+      await expect(page.getByTestId('btn-add-actor')).toBeDisabled()
+
+      // Keyboard: Close (desktop) or Stage back (phone) via focus + Enter.
+      if (focused) {
+        const back = page.getByTestId('btn-elements-back-to-stage')
+        await back.focus()
+        await page.keyboard.press('Enter')
+        await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
+        await expect(page.getByTestId('btn-play')).toBeVisible()
+        await assertUnclippedClickable(page, 'btn-play')
+      } else {
+        await assertUnclippedClickable(page, 'btn-toggle-actor-list')
+        await page.getByTestId('btn-toggle-actor-list').focus()
+        await page.keyboard.press('Enter')
+        await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+        await assertUnclippedClickable(page, 'btn-play')
+        await assertUnclippedClickable(page, 'btn-fit-stage')
+        if (
+          (await page
+            .getByTestId('btn-toggle-inspector-pane')
+            .getAttribute('aria-pressed')) === 'true'
+        ) {
+          await page.getByTestId('btn-close-inspector').click()
+        }
+      }
+
+      const cameraAfter = await page.evaluate(() => {
+        const zoom = document
+          .querySelector('[data-testid="zoom-percent"]')
+          ?.textContent?.trim()
+        const world = document.querySelector(
+          '[data-testid="workspace-world"]',
+        ) as HTMLElement | null
+        const stage = document.querySelector('[data-testid="stage-viewport"]')
+        return {
+          zoom,
+          transform: world?.style.transform ?? '',
+          stageW:
+            stage instanceof HTMLElement
+              ? Math.round(stage.getBoundingClientRect().width)
+              : 0,
+        }
+      })
+      expect(cameraAfter.zoom).toBe(cameraBefore.zoom)
+      expect(cameraAfter.transform).toBe(cameraBefore.transform)
+      if (!focused) {
+        expect(Math.abs(cameraAfter.stageW - cameraBefore.stageW)).toBeLessThan(
+          8,
+        )
       }
     })
   }

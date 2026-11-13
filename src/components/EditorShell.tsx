@@ -46,6 +46,10 @@ import { GlidePanel } from './GlidePanel'
 import { HelpPanel } from './HelpPanel'
 import { InspectorPanel, type InspectorTab } from './InspectorPanel'
 import { PlaybackDock } from './PlaybackDock'
+import {
+  floatingWorkspaceCardClass,
+  floatingWorkspaceCardSlotClass,
+} from '../theme/floatingCard'
 import { PolishPanel } from './PolishPanel'
 import { PresetPanel } from './PresetPanel'
 import { ProjectNameInput } from './ProjectNameInput'
@@ -299,25 +303,22 @@ export function EditorShell() {
   const showElementsMobile = mobilePane === 'elements' && !editing
   const showInspectorMobile = mobilePane === 'inspector'
   // Focused chrome (phone or short height): one sheet at a time. Else docked.
-  const showElementsPane = useFocusedChrome
-    ? showElementsMobile
-    : showElementsDesktop
-  const showInspectorPane = useFocusedChrome
-    ? showInspectorMobile
-    : showInspectorDesktop
+  // Desktop: Elements + Inspector float over the stage (no reserved columns).
+  // Focused chrome: one full sheet at a time with Stage back — not tiny cards.
+  const showElementsFloating =
+    !useFocusedChrome && showElementsDesktop
+  const showElementsSheet = useFocusedChrome && showElementsMobile
+  const showInspectorFloating =
+    !useFocusedChrome && showInspectorDesktop
+  const showInspectorSheet = useFocusedChrome && showInspectorMobile
   // When Elements or Inspector is open in focused mode, that pane owns the
   // workspace — stage is hidden so the dock cannot crush a tiny canvas.
   const phoneTaskPane =
     useFocusedChrome && (showInspectorMobile || showElementsMobile)
   const backToStage = () => setMobilePane(null)
   // Static Tailwind class strings only (JIT will not emit dynamic templates).
-  const workspaceCols = showElementsDesktop
-    ? showInspectorDesktop
-      ? 'md:grid-cols-[minmax(0,min(14rem,24%))_minmax(0,1fr)_minmax(0,min(18rem,30%))]'
-      : 'md:grid-cols-[minmax(0,min(14rem,24%))_minmax(0,1fr)]'
-    : showInspectorDesktop
-      ? 'md:grid-cols-[minmax(0,1fr)_minmax(0,min(18rem,32%))]'
-      : 'md:grid-cols-[minmax(0,1fr)]'
+  // Neither side panel takes a desktop grid column (floating cards instead).
+  const workspaceCols = 'md:grid-cols-[minmax(0,1fr)]'
   const motionSummary = hasRecording
     ? `${(durationMs / 1000).toFixed(1)}s`
     : null
@@ -517,31 +518,28 @@ export function EditorShell() {
             : 'grid-rows-[minmax(10rem,1fr)_auto]'
         } ${workspaceCols} md:grid-rows-[minmax(0,1fr)_auto]`}
       >
-        {/* Elements — left sidebar on desktop; full-height sheet on phone */}
-        {showElementsPane && (
+        {/* Elements — focused sheet on phone/short; desktop uses floating card on stage */}
+        {showElementsSheet && (
           <aside
             data-testid="actor-list-slot"
-            className={`flex min-h-0 min-w-0 flex-col bg-white/80 md:row-span-2 md:border-r md:border-ms-border ${
-              useFocusedChrome ? 'border-0' : 'border-b border-ms-border'
-            }`}
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white"
           >
-            {useFocusedChrome && (
-              <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
-                <button
-                  type="button"
-                  data-testid="btn-elements-back-to-stage"
-                  onClick={backToStage}
-                  className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
-                >
-                  <ArrowLeft className="size-3.5" aria-hidden />
-                  Stage
-                </button>
-              </div>
-            )}
+            <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
+              <button
+                type="button"
+                data-testid="btn-elements-back-to-stage"
+                onClick={backToStage}
+                className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+              >
+                <ArrowLeft className="size-3.5" aria-hidden />
+                Stage
+              </button>
+            </div>
             <div className="min-h-0 flex-1">
               <ActorList
                 variant="docked"
                 forceOpen
+                fillHeight
                 onOpenChange={(open) => {
                   setActorsOpen(open)
                   writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
@@ -561,8 +559,48 @@ export function EditorShell() {
               : 'relative min-h-[10rem] min-w-0 overflow-hidden bg-[var(--ms-canvas)] md:min-h-0'
           }
           aria-hidden={phoneTaskPane || undefined}
+          data-elements-floating={showElementsFloating ? 'true' : undefined}
+          data-inspector-floating={showInspectorFloating ? 'true' : undefined}
         >
-          <CanvasStage />
+          <CanvasStage
+            floatingElements={showElementsFloating}
+            floatingInspector={showInspectorFloating}
+          />
+          {showElementsFloating && (
+            <div
+              data-testid="actor-list-slot"
+              className={`${floatingWorkspaceCardSlotClass} left-2 w-[min(16rem,calc(100%-1rem))]`}
+            >
+              <div className={floatingWorkspaceCardClass}>
+                <ActorList
+                  variant="docked"
+                  forceOpen
+                  fillHeight={false}
+                  onOpenChange={(open) => {
+                    setActorsOpen(open)
+                    writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
+                    if (!open) setMobilePane((p) => (p === 'elements' ? null : p))
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {showInspectorFloating && (
+            <div
+              data-testid="inspector-slot"
+              className={`${floatingWorkspaceCardSlotClass} right-2 w-[min(18rem,calc(100%-1rem))]`}
+            >
+              <div className={floatingWorkspaceCardClass}>
+                <InspectorPanel
+                  tab={inspectorTab}
+                  onTabChange={setInspectorTab}
+                  onClose={closeInspectorDesktop}
+                  motionSummary={motionSummary}
+                  fillHeight={false}
+                />
+              </div>
+            </div>
+          )}
           {showFirstUseIntro && (
             <div
               data-testid="first-use-intro"
@@ -612,18 +650,18 @@ export function EditorShell() {
           )}
         </section>
 
-        {/* Inspector — right column on desktop; full-height sheet on phone */}
-        {showInspectorPane && (
+        {/* Inspector — focused sheet on phone/short; desktop uses floating card above */}
+        {showInspectorSheet && (
           <div
             data-testid="inspector-slot"
-            className="min-h-0 min-w-0 bg-white/90 md:row-span-2 md:border-l md:border-ms-border"
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white"
           >
             <InspectorPanel
               tab={inspectorTab}
               onTabChange={setInspectorTab}
-              onBackToStage={useFocusedChrome ? backToStage : undefined}
-              onClose={useFocusedChrome ? undefined : closeInspectorDesktop}
+              onBackToStage={backToStage}
               motionSummary={motionSummary}
+              fillHeight
             />
           </div>
         )}
@@ -643,11 +681,7 @@ export function EditorShell() {
                         ? 'max-h-[min(36vh,10rem)]'
                         : 'max-h-[min(26vh,9rem)] md:max-h-[min(24vh,8.5rem)]'
                   }`
-          } ${
-            showElementsDesktop
-              ? 'md:col-start-2 md:col-end-3'
-              : 'md:col-start-1 md:col-end-2'
-          }`}
+          } md:col-start-1 md:col-end-2`}
         >
           {(polishSession || glideSession || presetSession) && (
             <div

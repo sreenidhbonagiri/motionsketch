@@ -47,8 +47,24 @@ export function AdjustPanel() {
         <span className="font-medium text-slate-700">
           {selectedActor?.name ?? 'the selected element'}
         </span>
-        . Duration and loop are shared.
+        . Duration is shared project playback time (scales Timing). Smoothing
+        reduces path wobble. Steady Speed evens movement while keeping pauses —
+        Glide eases starts/stops afterward. Loop Repeat restarts (may jump);
+        Back and forth alternates with no jump.
       </HelpDisclosure>
+      <p id="duration-help" data-testid="duration-help" className="sr-only">
+        Total playback time for the project. Changing Duration scales Timing
+        proportionally.
+      </p>
+      <p
+        id="steady-speed-help"
+        data-testid="steady-speed-help"
+        className="sr-only"
+      >
+        {selectedHasRecording
+          ? 'Evens out movement speed while keeping pauses. Glide adds ease-in/out after this.'
+          : 'Create a path for this element to adjust Steady Speed.'}
+      </p>
 
       <SvgPathImport />
 
@@ -77,15 +93,6 @@ export function AdjustPanel() {
           onChange={(e) => setDurationMs(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
-        <HelpDisclosure
-          id="duration-help"
-          testId="duration-help"
-          summary="About Duration"
-        >
-          Total playback time for the project. Changing Duration scales Timing
-          proportionally. Each element keeps the same relative start and Move
-          for. Longer Duration plays the same motions more slowly.
-        </HelpDisclosure>
       </div>
 
       <div className="space-y-2">
@@ -121,13 +128,9 @@ export function AdjustPanel() {
             change it.
           </p>
         ) : (
-          <HelpDisclosure
-            id="smoothing-help"
-            testId="smoothing-help"
-            summary="About Smoothing"
-          >
+          <p id="smoothing-help" data-testid="smoothing-help" className="sr-only">
             Reduces wobble in your drawn path.
-          </HelpDisclosure>
+          </p>
         )}
       </div>
 
@@ -152,24 +155,6 @@ export function AdjustPanel() {
           onChange={(e) => setSteadySpeed(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
-        {selectedHasRecording ? (
-          <HelpDisclosure
-            id="steady-speed-help"
-            testId="steady-speed-help"
-            summary="About Steady Speed"
-          >
-            Evens out movement speed while keeping pauses. Glide adds ease-in/out
-            after this — they compose, they are not the same control.
-          </HelpDisclosure>
-        ) : (
-          <HelpDisclosure
-            id="steady-speed-help"
-            testId="steady-speed-help"
-            summary="About Steady Speed"
-          >
-            Create a path for this element to adjust Steady Speed.
-          </HelpDisclosure>
-        )}
       </div>
 
       <div className="space-y-2">
@@ -201,13 +186,7 @@ export function AdjustPanel() {
                 onChange={() => setLoopMode('repeat')}
                 className="mt-0.5 size-3.5 accent-ms-primary"
               />
-              <span>
-                <span className="font-medium">Repeat</span>
-                <HelpDisclosure summary="About Repeat">
-                  Plays again from the start. End and start may jump if they
-                  differ — the path is not changed.
-                </HelpDisclosure>
-              </span>
+              <span className="font-medium">Repeat</span>
             </label>
             <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
               <input
@@ -218,13 +197,7 @@ export function AdjustPanel() {
                 onChange={() => setLoopMode('alternate')}
                 className="mt-0.5 size-3.5 accent-ms-primary"
               />
-              <span>
-                <span className="font-medium">Back and forth</span>
-                <HelpDisclosure summary="About Back and forth">
-                  Alternates forward and backward with no jump. Duration is one
-                  way; a full cycle takes twice that long.
-                </HelpDisclosure>
-              </span>
+              <span className="font-medium">Back and forth</span>
             </label>
           </fieldset>
         )}

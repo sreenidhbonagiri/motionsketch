@@ -46,7 +46,8 @@ export function MotionToolsSection() {
           <span className="font-medium text-slate-700">
             {selectedActor?.name ?? 'the selected element'}
           </span>
-          . Snap stays next to Record and Play.
+          . Polish keeps pauses and corners; Glide eases starts and stops. Snap
+          stays next to Record and Play.
         </HelpDisclosure>
         <button
           type="button"
@@ -58,9 +59,6 @@ export function MotionToolsSection() {
         >
           Polish motion
         </button>
-        <HelpDisclosure testId="polish-motion-help" summary="About Polish">
-          Soften wobble; pauses and corners stay put.
-        </HelpDisclosure>
         <button
           type="button"
           data-testid="btn-glide"
@@ -71,9 +69,6 @@ export function MotionToolsSection() {
         >
           Glide
         </button>
-        <HelpDisclosure testId="glide-motion-help" summary="About Glide">
-          Ease starts and stops; path and pauses stay.
-        </HelpDisclosure>
         {(geometryEdit || selectedActor?.geometryEdit) && (
           <div className="border-t border-ms-border pt-2">
             <button
