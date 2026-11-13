@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createSceneActor,
   DEFAULT_ELEMENT_NAME,
@@ -8,8 +8,27 @@ import {
 } from '../../src/core/sceneActor'
 import { createEmptyPersistableProject } from '../../src/core/persist/document'
 import { projectHasMeaningfulWork } from '../../src/examples/meaningfulWork'
+import { useEditorStore } from '../../src/state/store'
 
 describe('element defaults', () => {
+  beforeEach(() => {
+    const project = createEmptyPersistableProject()
+    useEditorStore.setState({
+      project,
+      selectedActorId: project.actors[0]!.id,
+      mode: 'idle',
+      pointerId: null,
+      playbackHead: 0,
+      liveTrail: [],
+      polishSession: null,
+      glideSession: null,
+      presetSession: null,
+      actionAnnouncement: null,
+      actorEditOrder: [],
+      actorEditRedoOrder: [],
+    })
+  })
+
   it('names new empty projects Element 1 without treating them as edited', () => {
     const blank = createEmptyPersistableProject()
     expect(blank.actors[0]!.name).toBe(DEFAULT_ELEMENT_NAME)
@@ -40,5 +59,32 @@ describe('element defaults', () => {
     expect(
       Math.hypot(second.x - first.x, second.y - first.y),
     ).toBeGreaterThan(0.11)
+  })
+
+  it('addActor uses Element naming and separated rests; duplicate keeps geometry', () => {
+    const a0 = useEditorStore.getState().project.actors[0]!
+    expect(a0.name).toBe('Element 1')
+
+    const id1 = useEditorStore.getState().addActor()
+    expect(id1).toBeTruthy()
+    const a1 = useEditorStore
+      .getState()
+      .project.actors.find((a) => a.id === id1)!
+    expect(a1.name).toBe('Element 2')
+    expect(
+      Math.hypot(
+        a1.restPosition.x - a0.restPosition.x,
+        a1.restPosition.y - a0.restPosition.y,
+      ),
+    ).toBeGreaterThanOrEqual(0.14 - 1e-6)
+
+    useEditorStore.getState().selectActor(a0.id)
+    const dupId = useEditorStore.getState().duplicateSelectedActor()
+    const dup = useEditorStore
+      .getState()
+      .project.actors.find((a) => a.id === dupId)!
+    expect(dup.name).toMatch(/Element 1 copy/)
+    expect(dup.restPosition).toEqual(a0.restPosition)
+    expect(dup.appearance).toEqual(a0.appearance)
   })
 })

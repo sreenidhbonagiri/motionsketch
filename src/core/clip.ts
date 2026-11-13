@@ -1,9 +1,12 @@
 import { clamp01 } from './coords'
-import type { ActorClip } from './types'
+import {
+  MAX_PLAYBACK_DURATION_MS,
+  type ActorClip,
+} from './types'
 
 /**
  * Minimum movement interval as a fraction of the shared project timeline.
- * Enforced on edit/import so Start at / Move for stay ordered and exportable.
+ * Enforced on edit/import so Start after / Move for stay ordered and exportable.
  */
 export const MIN_CLIP_SPAN = 0.05
 
@@ -177,10 +180,6 @@ export function clipFromSeconds(
   })
 }
 
-export type ClipSecondsDraftResult =
-  | { ok: true; startSec: number; endSec: number }
-  | { ok: false; error: string }
-
 function parseDraftNumber(
   raw: string | number,
   emptyError: string,
@@ -195,9 +194,23 @@ function parseDraftNumber(
   return { ok: true, value }
 }
 
+export type ClipSecondsDraftSuccess = {
+  ok: true
+  startSec: number
+  endSec: number
+  /** Project Duration needed so Start after + Move for fit (may exceed current). */
+  requiredDurationMs: number
+}
+
+export type ClipSecondsDraftResult =
+  | ClipSecondsDraftSuccess
+  | { ok: false; error: string }
+
 /**
- * Validate Start at + Move for drafts for explicit Apply (no silent clamping).
- * Returns normalized start/end seconds on success.
+ * Validate Start after + Move for drafts for explicit Apply (no silent
+ * shortening of Move for). Ends past the current project Duration are allowed
+ * up to the project Duration maximum — the Apply path extends Duration and
+ * remaps other elements by absolute time.
  */
 export function validateClipStartMoveForDraft(
   startRaw: string | number,
@@ -205,7 +218,7 @@ export function validateClipStartMoveForDraft(
   durationMs: number,
 ): ClipSecondsDraftResult {
   const empty =
-    'Enter valid Start at and Move for times in seconds.'
+    'Enter valid Start after and Move for times in seconds.'
   const startParsed = parseDraftNumber(startRaw, empty)
   if (!startParsed.ok) return startParsed
   const moveParsed = parseDraftNumber(moveForRaw, empty)
@@ -214,11 +227,12 @@ export function validateClipStartMoveForDraft(
   const startSec = startParsed.value
   const moveForSec = moveParsed.value
   const durationSec = durationMs / 1000
+  const maxSec = MAX_PLAYBACK_DURATION_MS / 1000
   if (!(durationSec > 0)) {
     return { ok: false, error: 'Project duration must be greater than zero.' }
   }
   if (startSec < 0) {
-    return { ok: false, error: 'Start at cannot be negative.' }
+    return { ok: false, error: 'Start after cannot be negative.' }
   }
   if (moveForSec <= 0) {
     return {
@@ -226,39 +240,41 @@ export function validateClipStartMoveForDraft(
       error: 'Move for must be greater than zero.',
     }
   }
-  if (startSec > durationSec + 1e-9) {
-    return {
-      ok: false,
-      error: `Start at must be within 0–${durationSec.toFixed(2)} s.`,
-    }
-  }
   const endSec = startSec + moveForSec
-  if (endSec > durationSec + 1e-9) {
+  if (endSec > maxSec + 1e-9) {
     return {
       ok: false,
-      error: `Ends at would be ${endSec.toFixed(2)} s — keep Start at + Move for within 0–${durationSec.toFixed(2)} s.`,
+      error: `Ends at would be ${endSec.toFixed(2)} s — project Duration cannot exceed ${maxSec.toFixed(0)} s. Shorten Start after or Move for (movement is not shortened automatically).`,
     }
   }
-  const minSpanSec = MIN_CLIP_SPAN * durationSec
+  if (startSec > maxSec + 1e-9) {
+    return {
+      ok: false,
+      error: `Start after must be within 0–${maxSec.toFixed(0)} s.`,
+    }
+  }
+  const requiredDurationMs = Math.max(durationMs, endSec * 1000)
+  const requiredSec = requiredDurationMs / 1000
+  const minSpanSec = MIN_CLIP_SPAN * requiredSec
   if (moveForSec < minSpanSec - 1e-9) {
     return {
       ok: false,
       error: `Move for must be at least ${minSpanSec.toFixed(2)} s (${Math.round(MIN_CLIP_SPAN * 100)}% of Duration).`,
     }
   }
-  return { ok: true, startSec, endSec }
+  return { ok: true, startSec, endSec, requiredDurationMs }
 }
 
 /**
  * Validate absolute start/end seconds (keyboard nudge / legacy helpers).
- * Same bounds as Start at / Move for; no silent clamping.
+ * Same bounds as Start after / Move for; no silent clamping.
  */
 export function validateClipSecondsDraft(
   startRaw: string | number,
   endRaw: string | number,
   durationMs: number,
 ): ClipSecondsDraftResult {
-  const empty = 'Enter valid Start at and Move for times in seconds.'
+  const empty = 'Enter valid Start after and Move for times in seconds.'
   const startParsed = parseDraftNumber(startRaw, empty)
   if (!startParsed.ok) return startParsed
   const endParsed = parseDraftNumber(endRaw, empty)
@@ -268,6 +284,34 @@ export function validateClipSecondsDraft(
     endParsed.value - startParsed.value,
     durationMs,
   )
+}
+
+/**
+ * Keep absolute Start after / Move for wall-clock times when project Duration
+ * changes (same approach as continue-path remapping).
+ */
+export function remapClipAbsoluteTimes(
+  clip: ActorClip,
+  fromDurationMs: number,
+  toDurationMs: number,
+): ActorClip {
+  if (
+    fromDurationMs <= 0 ||
+    toDurationMs <= 0 ||
+    Math.abs(fromDurationMs - toDurationMs) < 1e-9
+  ) {
+    return cloneClip(clip)
+  }
+  const absStart = clip.start * fromDurationMs
+  const absEnd = clip.end * fromDurationMs
+  return clampClip({
+    ...cloneClip(clip),
+    start: absStart / toDurationMs,
+    end: Math.max(
+      absStart / toDurationMs + MIN_CLIP_SPAN,
+      absEnd / toDurationMs,
+    ),
+  })
 }
 
 export function clipToSeconds(

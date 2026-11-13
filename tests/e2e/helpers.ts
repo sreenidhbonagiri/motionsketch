@@ -820,6 +820,8 @@ export async function applyClipSeconds(
   await page.getByTestId('clip-move-for-input').fill(String(moveFor))
   await page.getByTestId('btn-apply-clip-times').click()
   await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+  // Successful Apply closes Timing and returns focus to the opener.
+  await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
 }
 
 /** Expand Timing → More options so visibility radios are interactable. */
@@ -852,6 +854,7 @@ export async function applyClipVisibility(
   }
   await page.getByTestId('btn-apply-clip-times').click()
   await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+  await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
 }
 
 /** @deprecated use openPanel */

@@ -211,6 +211,24 @@ describe('motion presets', () => {
     expect(useEditorStore.getState().presetUndoStack).toHaveLength(0)
   })
 
+  it('cancel restores playhead and does not push undo history', () => {
+    useEditorStore.setState({ playbackHead: 0.42 })
+    const presetUndoBefore = useEditorStore.getState().presetUndoStack.length
+    const actorOrderBefore = [...useEditorStore.getState().actorEditOrder]
+    expect(useEditorStore.getState().beginPresetPreview('slide-in')).toBe(true)
+    expect(useEditorStore.getState().presetSession?.resumePlaybackHead).toBe(
+      0.42,
+    )
+    expect(useEditorStore.getState().playbackHead).toBe(0)
+    useEditorStore.getState().setPlaybackHead(0.7)
+    useEditorStore.getState().cancelPreset()
+    expect(useEditorStore.getState().playbackHead).toBeCloseTo(0.42)
+    expect(useEditorStore.getState().presetUndoStack).toHaveLength(
+      presetUndoBefore,
+    )
+    expect(useEditorStore.getState().actorEditOrder).toEqual(actorOrderBefore)
+  })
+
   describe('review regressions', () => {
     it('apply clears orphaned transform/clip/glide history kinds', () => {
       const prior = actorWithPriorMotion()
@@ -231,7 +249,12 @@ describe('motion presets', () => {
       useEditorStore.setState({
         actorEditOrder: ['transform', 'clip', 'glide'],
         transformUndoStack: [prior.transform],
-        clipUndoStack: [prior.clip],
+        clipUndoStack: [
+          {
+            durationMs: prior.recording?.recordedDurationMs ?? 2000,
+            clips: [{ id: prior.id, clip: prior.clip }],
+          },
+        ],
         glideUndoStack: [0.3],
       })
 

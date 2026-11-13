@@ -281,7 +281,7 @@ export function CanvasStage() {
           0.85,
         )
       }
-    } else if (selected?.recording) {
+      } else if (selected?.recording) {
       if (polishSession) {
         const original = polishSession.baseline.samples
         const polished = polishSession.previewSamples
@@ -319,6 +319,53 @@ export function CanvasStage() {
             polished.length >= 2 ? polished : original,
             polishSession.roundingTargetIndex,
             polishSession.roundingNeighborhood,
+          )
+        }
+      } else if (presetSession && selectedRaw?.recording) {
+        // Keep the committed path visible as a dashed ghost while the
+        // proposed preset path plays — same compare language as Polish.
+        const original = selectedRaw.recording.samples
+        const proposedSamples = presetSession.proposed.recording?.samples ?? []
+        const showProposed = presetSession.compareMode === 'preset'
+        if (original.length >= 2) {
+          drawPath(
+            ctx,
+            size.width,
+            size.height,
+            original,
+            showProposed ? msPalette.pathCompare : msPalette.primary,
+            showProposed ? 2.25 : 2.75,
+            showProposed ? 0.75 : 0.95,
+            showProposed,
+          )
+        }
+        if (showProposed && proposedSamples.length >= 2) {
+          drawPath(
+            ctx,
+            size.width,
+            size.height,
+            proposedSamples,
+            msPalette.primary,
+            2.75,
+            0.95,
+          )
+          const localT = projectToLocal(
+            playbackHead,
+            presetSession.proposed.clip,
+          )
+          drawPlayhead(
+            ctx,
+            size.width,
+            size.height,
+            evaluate(proposedSamples, localT),
+          )
+        } else if (!showProposed && original.length >= 2) {
+          const localT = projectToLocal(playbackHead, selectedRaw.clip)
+          drawPlayhead(
+            ctx,
+            size.width,
+            size.height,
+            evaluate(original, localT),
           )
         }
       } else {
@@ -373,6 +420,8 @@ export function CanvasStage() {
     playbackHead,
     editing,
     polishSession,
+    presetSession,
+    selectedRaw,
     snapIndicator,
   ])
 

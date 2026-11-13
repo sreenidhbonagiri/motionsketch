@@ -9,15 +9,16 @@ import {
   type RefObject,
 } from 'react'
 import {
-  clampClip,
-  clipFromSeconds,
   clipToSeconds,
   isActorVisibleAt,
   validateClipStartMoveForDraft,
 } from '../core/clip'
 import type { ActorClip } from '../core/types'
+import { MAX_PLAYBACK_DURATION_MS } from '../core/types'
 import { useEditorStore } from '../state/store'
 import { HelpDisclosure } from './HelpDisclosure'
+
+const MAX_TIMING_SEC = MAX_PLAYBACK_DURATION_MS / 1000
 
 /** Display / spinner precision for Start after and Move for (seconds). */
 const SEQUENCE_TIME_STEP = 0.01
@@ -60,7 +61,7 @@ export function TimingDialog({
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const playbackHead = useEditorStore((s) => s.playbackHead)
   const mode = useEditorStore((s) => s.mode)
-  const commitActorClip = useEditorStore((s) => s.commitActorClip)
+  const commitActorClipSeconds = useEditorStore((s) => s.commitActorClipSeconds)
 
   const busy =
     mode === 'recording' || mode === 'armed' || mode === 'editing'
@@ -206,23 +207,22 @@ export function TimingDialog({
       setDraftError(parsed.error)
       return false
     }
-    const nextClip = clampClip({
-      ...clipFromSeconds(
-        parsed.startSec,
-        parsed.endSec,
-        durationMs,
-        selected.clip,
-      ),
-      hideBeforeStart: hideBeforeDraft,
-      hideAfterEnd: hideAfterDraft,
-    })
-    commitActorClip(selected.id, nextClip)
-    setStartDraft(formatSec(parsed.startSec))
-    setMoveForDraft(formatSec(parsed.endSec - parsed.startSec))
-    setHideBeforeDraft(!!nextClip.hideBeforeStart)
-    setHideAfterDraft(!!nextClip.hideAfterEnd)
+    const result = commitActorClipSeconds(
+      selected.id,
+      parsed.startSec,
+      parsed.endSec,
+      {
+        hideBeforeStart: hideBeforeDraft,
+        hideAfterEnd: hideAfterDraft,
+      },
+    )
+    if (!result.ok) {
+      setDraftError(result.error)
+      return false
+    }
     setDraftDirty(false)
     setDraftError(null)
+    onClose()
     return true
   }, [
     selected,
@@ -232,7 +232,8 @@ export function TimingDialog({
     hideBeforeDraft,
     hideAfterDraft,
     durationMs,
-    commitActorClip,
+    commitActorClipSeconds,
+    onClose,
   ])
 
   const requestCancel = () => {
@@ -350,7 +351,7 @@ export function TimingDialog({
               inputMode="decimal"
               step={SEQUENCE_TIME_STEP}
               min={0}
-              max={durationSec}
+              max={MAX_TIMING_SEC}
               disabled={busy}
               value={startDraft}
               aria-invalid={draftError ? true : undefined}
@@ -370,7 +371,7 @@ export function TimingDialog({
               inputMode="decimal"
               step={SEQUENCE_TIME_STEP}
               min={0}
-              max={durationSec}
+              max={MAX_TIMING_SEC}
               disabled={busy}
               value={moveForDraft}
               aria-invalid={draftError ? true : undefined}

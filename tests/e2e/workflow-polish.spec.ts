@@ -181,8 +181,10 @@ test.describe('editor workflow polish', () => {
     await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
 
-    // Apply commits both; close, undo, reopen.
+    // Apply commits, closes, and returns focus to the Timing opener.
     await applyClipSeconds(page, '0.40', '1.60')
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.40')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.20')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.60')
@@ -192,11 +194,13 @@ test.describe('editor workflow polish', () => {
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('2.00')
 
-    // Enter commits the pair.
+    // Enter commits the pair and closes.
     await page.getByTestId('clip-start-input').fill('0.20')
     await page.getByTestId('clip-move-for-input').fill('1.00')
     await page.getByTestId('clip-move-for-input').press('Enter')
-    await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.20')

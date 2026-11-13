@@ -21,10 +21,17 @@ const PRESET_SHORT: Record<MotionPresetId, string> = {
 /**
  * Compact Apply / Cancel bar while a Motion preset is previewing.
  * Switch presets and Original/Preset compare without touching the project.
+ * Apply/Cancel stay in the header so they remain reachable without scrolling
+ * past timing help on short dock heights.
  */
 export function PresetPanel() {
   const session = useEditorStore((s) => s.presetSession)
   const projectDurationMs = useEditorStore((s) => s.project.playback.durationMs)
+  const hasOriginalPath = useEditorStore((s) => {
+    const id = s.selectedActorId
+    const actor = s.project.actors.find((a) => a.id === id)
+    return (actor?.recording?.samples.length ?? 0) >= 2
+  })
   const applyPreset = useEditorStore((s) => s.applyPreset)
   const cancelPreset = useEditorStore((s) => s.cancelPreset)
   const setPresetTiming = useEditorStore((s) => s.setPresetTiming)
@@ -63,19 +70,58 @@ export function PresetPanel() {
       className="pointer-events-auto w-full max-w-xl rounded-xl border border-ms-border bg-white/90 px-3 py-2 shadow-[var(--ms-shadow)] outline-none backdrop-blur-xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-800">
-          Preview: {label}
-        </h2>
-        <p
-          data-testid="preset-panel-hint"
-          className="text-xs text-slate-500"
-        >
-          {comparingOriginal
-            ? 'Showing original — Apply still commits the selected preset'
-            : 'Playing a temporary preview — project unchanged until Apply'}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-slate-800">
+            Preview: {label}
+          </h2>
+          <p
+            data-testid="preset-panel-hint"
+            className="text-xs text-slate-500"
+          >
+            {comparingOriginal
+              ? 'Showing original — Apply still commits the selected preset'
+              : hasOriginalPath
+                ? 'Dashed original stays on stage — project unchanged until Apply'
+                : 'Playing a temporary preview — project unchanged until Apply'}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            data-testid="btn-preset-cancel"
+            onClick={() => cancelPreset()}
+            className="rounded-lg border border-ms-border bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="btn-preset-apply"
+            onClick={() => applyPreset()}
+            title={
+              comparingOriginal
+                ? `Applies “${label}” (the selected preset), not the original motion on screen`
+                : `Apply “${label}” to the selected element`
+            }
+            className="rounded-lg bg-ms-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-ms-primary-hover"
+          >
+            Apply {label}
+          </button>
+        </div>
       </div>
+
+      {hasOriginalPath && (
+        <p
+          data-testid="preset-compare-legend"
+          className="mt-1.5 text-xs text-slate-500"
+        >
+          <span className="font-medium text-slate-600">Dashed</span> Original
+          {' · '}
+          <span className="font-medium text-ms-primary-pressed">Solid</span>{' '}
+          Preset
+        </p>
+      )}
 
       <div
         data-testid="preset-switcher"
@@ -223,30 +269,6 @@ export function PresetPanel() {
         Start, so the element stays hidden until Start at. Values stay shared
         when you switch presets.
       </p>
-
-      <div className="mt-2.5 flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          data-testid="btn-preset-cancel"
-          onClick={() => cancelPreset()}
-          className="rounded-lg border border-ms-border bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          data-testid="btn-preset-apply"
-          onClick={() => applyPreset()}
-          title={
-            comparingOriginal
-              ? `Applies “${label}” (the selected preset), not the original motion on screen`
-              : `Apply “${label}” to the selected element`
-          }
-          className="rounded-lg bg-ms-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-ms-primary-hover"
-        >
-          Apply {label}
-        </button>
-      </div>
     </div>
   )
 }

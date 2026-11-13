@@ -92,8 +92,14 @@ describe('edit store', () => {
     const afterEditY =
       useEditorStore.getState().geometryEdit!.samples[mid].y
     useEditorStore.getState().undoEdit()
+    // Clean recording → undoing the only edit drops committed geometry so
+    // Smoothing unlocks; editSession keeps handles for the open session.
+    expect(useEditorStore.getState().geometryEdit).toBeNull()
     expect(
-      useEditorStore.getState().geometryEdit!.samples[mid].y,
+      useEditorStore.getState().project.actors[0].geometryEdit,
+    ).toBeNull()
+    expect(
+      useEditorStore.getState().editSession!.samples[mid].y,
     ).toBeCloseTo(session.samples[mid].y, 5)
     useEditorStore.getState().redoEdit()
     expect(

@@ -129,6 +129,71 @@ test.describe('full-ui-review regressions', () => {
     await page.getByTestId('btn-polish-cancel').click()
   })
 
+  test('desktop 1280×720: preset Apply/Cancel reachable without dock scroll', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    // Scrub away from 0 so Cancel/Escape can prove playhead restore.
+    await page.getByTestId('playback-scrubber').fill('0.35')
+    await expect(page.getByTestId('playback-scrubber')).toHaveValue('0.35')
+    const elapsedBefore = await page
+      .getByTestId('playback-elapsed')
+      .textContent()
+    await openPanel(page, 'adjust')
+    await page.getByTestId('motion-preset-slide-in').click()
+    await expect(page.getByTestId('preset-panel')).toBeVisible()
+    await expect(page.getByTestId('preset-compare-legend')).toBeVisible()
+    // Header actions — no toolbar scroll required.
+    await expect
+      .poll(async () => {
+        return page.getByTestId('toolbar-slot').evaluate((el) =>
+          el instanceof HTMLElement ? el.scrollTop : -1,
+        )
+      })
+      .toBe(0)
+    await assertSettledInsideClip(page, 'btn-preset-apply', 'toolbar-slot')
+    await assertSettledInsideClip(page, 'btn-preset-cancel', 'toolbar-slot')
+    await assertUnclippedClickable(page, 'btn-preset-apply')
+
+    const undoBefore = await page.getByTestId('btn-undo-transform').isEnabled()
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('preset-panel')).toHaveCount(0)
+    await expect(page.getByTestId('playback-scrubber')).toHaveValue('0.35')
+    await expect(page.getByTestId('playback-elapsed')).toHaveText(
+      elapsedBefore!,
+    )
+    expect(await page.getByTestId('btn-undo-transform').isEnabled()).toBe(
+      undoBefore,
+    )
+  })
+
+  test('phone 390×560: preset Apply reachable without dock scroll', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 560 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'adjust')
+    await page.getByTestId('motion-preset-slide-in').click()
+    await expect(page.getByTestId('preset-panel')).toBeVisible()
+    await expect(page.getByTestId('preset-compare-legend')).toBeVisible()
+    await expect
+      .poll(async () => {
+        return page.getByTestId('toolbar-slot').evaluate((el) =>
+          el instanceof HTMLElement ? el.scrollTop : -1,
+        )
+      })
+      .toBe(0)
+    await assertSettledInsideClip(page, 'btn-preset-apply', 'toolbar-slot')
+    await page.getByTestId('btn-preset-apply').click({ trial: true })
+    await page.getByTestId('btn-preset-cancel').click()
+    await expect(page.getByTestId('preset-panel')).toHaveCount(0)
+  })
+
   test('Timing visibility Cancel discards without undo; Apply commits', async ({
     page,
   }) => {
@@ -154,17 +219,138 @@ test.describe('full-ui-review regressions', () => {
     await ensureClipTimesOpen(page)
     await ensureTimingMoreOptionsOpen(page)
     await expect(page.getByTestId('clip-hide-before')).not.toBeChecked()
-    await expect(page.getByTestId('btn-undo-transform')).toBeDisabled()
+    // Recording is undoable; Cancel must not have added a Timing/clip entry.
+    await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
 
     await page.getByTestId('clip-hide-before').check()
     await page.getByTestId('btn-apply-clip-times').click()
-    await expect(page.getByTestId('clip-hide-before')).toBeChecked()
-    await dismissTimingDialogIfOpen(page)
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
     await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
+    // Top of stack is the visibility Apply — not the recording.
     await page.getByTestId('btn-undo-transform').click()
     await ensureClipTimesOpen(page)
     await ensureTimingMoreOptionsOpen(page)
     await expect(page.getByTestId('clip-hide-before')).not.toBeChecked()
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+  })
+
+  test('Start after 1 preserves Move for by extending Duration; wording; focus', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await closeOpenChromePanels(page)
+
+    await ensureClipTimesOpen(page)
+    const moveBefore = await page.getByTestId('clip-move-for-input').inputValue()
+    expect(Number(moveBefore)).toBeGreaterThan(0.2)
+
+    await page.getByTestId('clip-start-input').fill('1')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue(moveBefore)
+    await page.getByTestId('btn-apply-clip-times').click()
+    await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId('clip-start-input')).toHaveValue('1.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue(moveBefore)
+    const ends = await page.getByTestId('clip-ends-at').innerText()
+    expect(ends).toMatch(
+      new RegExp((1 + Number(moveBefore)).toFixed(2).replace('.', '\\.')),
+    )
+
+    // One undo restores prior Timing + Duration.
+    await page.getByTestId('btn-timing-cancel').click()
+    await page.getByTestId('btn-undo-transform').click()
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
+    await expect(page.getByTestId('clip-move-for-input')).toHaveValue(moveBefore)
+
+    // Invalid Apply keeps the dialog open with Start after wording.
+    await page.getByTestId('clip-start-input').fill('7.5')
+    await page.getByTestId('clip-move-for-input').fill('1')
+    await page.getByTestId('btn-apply-clip-times').click()
+    await expect(page.getByTestId('timing-dialog')).toBeVisible()
+    await expect(page.getByTestId('clip-times-error')).toContainText(
+      /Start after|cannot exceed|not shortened/i,
+    )
+  })
+
+  test('Export tab switch and reopen clear stale download announcements', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'export')
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByTestId('btn-download-web-package').click()
+    await downloadPromise
+    await expect(page.getByTestId('export-download-success')).toBeVisible()
+    await expect(page.getByTestId('action-live-region')).toContainText(
+      /Website package download started/i,
+    )
+
+    await page.getByTestId('btn-export-path-react').click()
+    await expect(page.getByTestId('export-download-success')).toHaveCount(0)
+    await expect(page.getByTestId('export-react-download-success')).toHaveCount(
+      0,
+    )
+    await expect(page.getByTestId('action-live-region')).not.toContainText(
+      /download started/i,
+    )
+
+    await page.getByTestId('btn-close-export').click()
+    await expect(page.getByTestId('export-panel-root')).toHaveCount(0)
+    await openPanel(page, 'export')
+    await expect(page.getByTestId('export-download-success')).toHaveCount(0)
+    await expect(page.getByTestId('action-live-region')).not.toContainText(
+      /download started/i,
+    )
+  })
+
+  test('Fit stage label is not text-clipped; Export may cover the control', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await openPanel(page, 'export')
+    await expect(page.getByTestId('export-panel-root')).toBeVisible()
+
+    const probe = await page.evaluate(() => {
+      const fit = document.querySelector('[data-testid="btn-fit-stage"]')
+      const panel = document.querySelector('[data-testid="export-panel-root"]')
+      if (!(fit instanceof HTMLElement) || !(panel instanceof HTMLElement)) {
+        return { ok: false, reason: 'missing' }
+      }
+      const fr = fit.getBoundingClientRect()
+      const pr = panel.getBoundingClientRect()
+      const textClipped = fit.scrollWidth > fit.clientWidth + 1
+      const overlaps =
+        fr.right > pr.left &&
+        fr.left < pr.right &&
+        fr.bottom > pr.top &&
+        fr.top < pr.bottom
+      return {
+        ok: !textClipped,
+        reason: textClipped ? 'text-overflow' : 'ok',
+        aria: fit.getAttribute('aria-label'),
+        text: fit.innerText.replace(/\s+/g, ' ').trim(),
+        overlapsPanel: overlaps,
+      }
+    })
+    expect(probe, probe.reason).toMatchObject({ ok: true })
+    expect(probe.aria).toBe('Fit stage')
+    // Visible label may read “Fit stage” under the panel; coverage ≠ clipping.
+    expect(probe.overlapsPanel).toBe(true)
   })
 
   test('shortcut sheet traps Tab and restores opener focus', async ({
@@ -202,5 +388,89 @@ test.describe('full-ui-review regressions', () => {
     await expect(opener).toBeFocused()
     // Background rename control must not have become the active element.
     await expect(page.getByTestId('btn-rename-project')).not.toBeFocused()
+  })
+
+  test('Undo restores first recording and a replaced take', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await closeOpenChromePanels(page)
+
+    await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
+    await page.getByTestId('btn-undo-transform').click()
+    await expect(page.getByTestId('btn-play')).toBeDisabled()
+    await expect(page.getByTestId('btn-undo-transform')).toBeDisabled()
+
+    await recordSimplePath(page)
+    const firstEnd = await page.getByTestId('actor').boundingBox()
+    expect(firstEnd).toBeTruthy()
+
+    // Replace the take.
+    await page.getByTestId('btn-record').click()
+    await page.getByTestId('btn-rerecord-confirm').click()
+    await expect(page.getByTestId('btn-stop')).toBeVisible()
+    const actor = page.getByTestId('actor')
+    const box = await actor.boundingBox()
+    expect(box).toBeTruthy()
+    const x = box!.x + box!.width / 2
+    const y = box!.y + box!.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + 80, y - 60, { steps: 10 })
+    await page.mouse.move(x + 200, y + 40, { steps: 12 })
+    await page.mouse.up()
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await expect(page.getByTestId('btn-undo-transform')).toBeEnabled()
+
+    await page.getByTestId('btn-undo-transform').click()
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    const afterUndo = await page.getByTestId('actor').boundingBox()
+    expect(afterUndo).toBeTruthy()
+    expect(Math.abs(afterUndo!.x - firstEnd!.x)).toBeLessThan(12)
+    expect(Math.abs(afterUndo!.y - firstEnd!.y)).toBeLessThan(12)
+
+    // Keyboard undo of the restored first take.
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+    await page.getByTestId('stage').focus()
+    await page.keyboard.press(`${mod}+z`)
+    await expect(page.getByTestId('btn-play')).toBeDisabled()
+  })
+
+  test('undo path edit clears Smoothing lock warning', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await closeOpenChromePanels(page)
+
+    await page.getByTestId('btn-edit-path').click()
+    await expect(page.getByTestId('path-handles')).toBeVisible()
+    const handle = page.getByTestId('path-handle-0')
+    const before = await handle.boundingBox()
+    expect(before).toBeTruthy()
+    await page.mouse.move(
+      before!.x + before!.width / 2,
+      before!.y + before!.height / 2,
+    )
+    await page.mouse.down()
+    await page.mouse.move(
+      before!.x + before!.width / 2 + 40,
+      before!.y + before!.height / 2 - 25,
+      { steps: 8 },
+    )
+    await page.mouse.up()
+
+    await openPanel(page, 'adjust')
+    await expect(page.getByTestId('smoothing-help')).toContainText(
+      /baked into your path edit/i,
+    )
+    await expect(page.getByTestId('smoothing-slider')).toBeDisabled()
+
+    await page.getByTestId('btn-undo-edit').click()
+    await expect(page.getByTestId('smoothing-slider')).toBeEnabled()
+    await expect(page.getByTestId('smoothing-help')).not.toContainText(
+      /baked into your path edit/i,
+    )
   })
 })
