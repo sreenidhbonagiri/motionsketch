@@ -4,6 +4,7 @@ import {
   readExportedCss,
   recordSimplePath,
   respondToConfirm,
+  openEditMore
 } from './helpers'
 
 test.describe('path editing', () => {
@@ -71,6 +72,7 @@ test.describe('path editing', () => {
       { steps: 6 },
     )
     await page.mouse.up()
+    await openEditMore(page)
     await page.getByTestId('btn-restore-path').click()
     await respondToConfirm(page, {
       dialogTestId: 'restore-path-confirm',
@@ -95,19 +97,17 @@ test.describe('path editing', () => {
     await page.getByTestId('btn-edit-path').click()
 
     const handle = page.locator('[data-testid^="path-handle-"]').nth(3)
-    const before = await handle.boundingBox()
-    expect(before).toBeTruthy()
-    // Overlapping handles can intercept hit-testing; focus via coordinates.
-    await page.mouse.click(
-      before!.x + before!.width / 2,
-      before!.y + before!.height / 2,
-    )
+    // Overlapping handles can intercept hit-testing; force selects this node.
+    await handle.click({ force: true })
     await expect(handle).toHaveAttribute('aria-pressed', 'true')
+    const beforeX = Number(await handle.getAttribute('data-sample-x'))
+    expect(Number.isFinite(beforeX)).toBe(true)
 
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowRight')
-    const after = await handle.boundingBox()
-    expect(after).toBeTruthy()
-    expect(after!.x).toBeGreaterThan(before!.x)
+    // Assert in normalized sample space — screen boxes can reflow with the dock.
+    await expect
+      .poll(async () => Number(await handle.getAttribute('data-sample-x')))
+      .toBeGreaterThan(beforeX + 0.005)
   })
 })

@@ -24,7 +24,7 @@ test.describe('starter examples', () => {
     await page.goto('/')
     await ensureEditor(page)
     await expect(page.getByTestId('first-use-headline')).toBeVisible()
-    await page.getByTestId('btn-dismiss-examples-hint').click()
+    await page.getByTestId('btn-dismiss-first-use').click()
     await expect(page.getByTestId('first-use-headline')).toHaveCount(0)
     await expect(page.getByTestId('stage-empty-hint')).toHaveClass(/sr-only/)
 

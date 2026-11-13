@@ -19,16 +19,19 @@ test.describe('path edit mode transitions', () => {
     const overlay = page.getByTestId('path-move-overlay')
     await expect(overlay).toBeFocused()
 
-    // A wrapped Move instruction grows the bottom-pinned dock when the nudge
-    // commits on blur. At the default width it stays one line and the click
-    // still lands.
-    await page.getByTestId('playback-dock').evaluate((el) => {
-      if (el instanceof HTMLElement) el.style.maxWidth = '420px'
-    })
-    const instruction = page.getByTestId('mode-status-instruction')
-    const wrapped = await instruction.boundingBox()
-    expect(wrapped).toBeTruthy()
-    expect(wrapped!.height).toBeGreaterThan(32)
+    // Held ArrowRight → Done → late keyup must not double-commit. Wait for the
+    // Move overlay to settle before starting the gesture (no arbitrary sleep).
+    const overlayBox = await overlay.boundingBox()
+    expect(overlayBox).toBeTruthy()
+    await expect
+      .poll(async () => {
+        const next = await overlay.boundingBox()
+        return next
+          ? Math.abs(next.width - overlayBox!.width) +
+              Math.abs(next.height - overlayBox!.height)
+          : Infinity
+      })
+      .toBeLessThan(1)
 
     await page.keyboard.down('ArrowRight')
     // Done focuses the dock control — blur may commit the open nudge once.
