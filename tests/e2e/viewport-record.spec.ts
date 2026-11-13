@@ -19,9 +19,9 @@ test.describe('full-viewport recording', () => {
     const stage = page.getByTestId('stage')
     const stageBox = await stage.boundingBox()
     expect(stageBox).toBeTruthy()
-    // Stage must own the viewport.
+    // Stage owns the docked workspace cell (toolbars take the rest).
     expect(stageBox!.width).toBeGreaterThan(1200)
-    expect(stageBox!.height).toBeGreaterThan(750)
+    expect(stageBox!.height).toBeGreaterThan(500)
 
     const start = await actor.boundingBox()
     expect(start).toBeTruthy()
@@ -121,11 +121,11 @@ test.describe('full-viewport recording', () => {
     })
     expect(afterResize!.aspect).toBeCloseTo(aspectLocked, 5)
 
-    // Pointer still maps into the full stage after resize.
+    // Pointer still maps into the workspace cell after resize.
     const stageAfter = await stage.boundingBox()
     expect(stageAfter).toBeTruthy()
-    expect(stageAfter!.width).toBeGreaterThan(850)
-    expect(stageAfter!.height).toBeGreaterThan(850)
+    expect(stageAfter!.width).toBeGreaterThan(700)
+    expect(stageAfter!.height).toBeGreaterThan(600)
 
     await page.setViewportSize({ width: 1280, height: 800 })
     const css = await readExportedCss(page)

@@ -1,11 +1,12 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react'
 import {
+  ArrowLeft,
   CircleHelp,
-  FolderKanban,
   PanelLeft,
   PanelRight,
   Upload,
@@ -32,12 +33,12 @@ import { projectHasAnyRecording } from '../core/sceneActor'
 import { projectHasMeaningfulWork } from '../examples/meaningfulWork'
 import {
   ACTORS_PANEL_OPEN_KEY,
+  INSPECTOR_PANEL_OPEN_KEY,
   readPanelOpenPref,
   writePanelOpenPref,
 } from '../lib/panelOpenPref'
 import { ActorList } from './ActorList'
 import { CanvasStage } from './CanvasStage'
-import { ClipTimeline } from './ClipTimeline'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
 import { FloatingPanel, type ChromePanel } from './FloatingPanel'
@@ -56,14 +57,14 @@ const EXAMPLES_HINT_KEY = 'motionsketch.examplesHintDismissed'
 const headerBtn =
   'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]'
 const headerBtnPrimary =
-  'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg bg-ms-primary px-2.5 text-xs font-medium text-white transition hover:bg-ms-primary-hover'
+  'inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg bg-ms-export px-2.5 text-xs font-medium text-white transition hover:bg-ms-export-hover'
 
 type MobilePane = 'elements' | 'inspector' | null
 
 /**
- * Docked editor: slim header, Elements sidebar, center stage, right inspector,
- * bottom Timing + transport. Layout uses CSS grid/flex — panels reserve space
- * instead of floating over the stage.
+ * Canvas-first docked editor: large stage by default; Elements and Inspector
+ * open on demand and reserve layout space (never float over the canvas).
+ * Timing is an on-demand dialog from the playback dock.
  */
 export function EditorShell() {
   usePlaybackClock()
@@ -78,6 +79,8 @@ export function EditorShell() {
   const polishSession = useEditorStore((s) => s.polishSession)
   const glideSession = useEditorStore((s) => s.glideSession)
   const presetSession = useEditorStore((s) => s.presetSession)
+  const motionPreviewSession =
+    !!polishSession || !!glideSession || !!presetSession
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
 
   const [openPanel, setOpenPanel] = useState<ChromePanel | null>(null)
@@ -92,17 +95,33 @@ export function EditorShell() {
       return false
     }
   })
+  // Fresh workspace: side panels closed so the canvas owns the first paint.
   const [actorsOpen, setActorsOpen] = useState(() =>
-    readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, true),
+    readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, false),
   )
+  const [inspectorOpen, setInspectorOpen] = useState(() =>
+    readPanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, false),
+  )
+  // Focused Elements/Inspector sheets when width is phone-like OR height is
+  // too short for canvas + Inspector together (no silent panel close).
   const [narrowViewport, setNarrowViewport] = useState(false)
+  const [shortViewport, setShortViewport] = useState(false)
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)')
-    const sync = () => setNarrowViewport(mq.matches)
+    const mqNarrow = window.matchMedia('(max-width: 767px)')
+    const mqShort = window.matchMedia('(max-height: 560px)')
+    const sync = () => {
+      setNarrowViewport(mqNarrow.matches)
+      setShortViewport(mqShort.matches)
+    }
     sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
+    mqNarrow.addEventListener('change', sync)
+    mqShort.addEventListener('change', sync)
+    return () => {
+      mqNarrow.removeEventListener('change', sync)
+      mqShort.removeEventListener('change', sync)
+    }
   }, [])
+  const useFocusedChrome = narrowViewport || shortViewport
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
@@ -114,9 +133,15 @@ export function EditorShell() {
     setExamplesOpen(false)
     setOpenPanel('export')
   }, [])
-  const openShortcuts = useCallback(() => {
+  const shortcutsReturnFocusRef = useRef<HTMLElement | null>(null)
+  const openShortcuts = useCallback((opener?: HTMLElement | null) => {
     setExamplesOpen(false)
-    setOpenPanel(null)
+    // Keep Help mounted so Keyboard shortcuts can receive focus on close.
+    // Prefer the explicit opener (Help button); otherwise the prior focus.
+    const active = document.activeElement
+    shortcutsReturnFocusRef.current =
+      opener ??
+      (active instanceof HTMLElement ? active : null)
     setShortcutsOpen(true)
   }, [])
   const closeShortcuts = useCallback(() => setShortcutsOpen(false), [])
@@ -133,18 +158,30 @@ export function EditorShell() {
     onCloseShortcuts: closeShortcuts,
   })
 
+  const isFocusedLayout = () =>
+    typeof window !== 'undefined' &&
+    (window.matchMedia('(max-width: 767px)').matches ||
+      window.matchMedia('(max-height: 560px)').matches)
+
   const openInspector = useCallback((tab: InspectorTab) => {
     setInspectorTab(tab)
-    setMobilePane('inspector')
     setOpenPanel(null)
     setExamplesOpen(false)
+    if (isFocusedLayout()) {
+      setMobilePane('inspector')
+      return
+    }
+    setInspectorOpen(true)
+    writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, true)
+  }, [])
+
+  const closeInspectorDesktop = useCallback(() => {
+    setInspectorOpen(false)
+    writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, false)
   }, [])
 
   const toggleActors = () => {
-    const narrow =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(max-width: 639px)').matches
-    if (narrow) {
+    if (isFocusedLayout()) {
       setMobilePane((prev) => {
         const next = prev === 'elements' ? null : 'elements'
         if (next === 'elements') {
@@ -163,7 +200,15 @@ export function EditorShell() {
   }
 
   const toggleInspectorPane = () => {
-    setMobilePane((prev) => (prev === 'inspector' ? null : 'inspector'))
+    if (isFocusedLayout()) {
+      setMobilePane((prev) => (prev === 'inspector' ? null : 'inspector'))
+      return
+    }
+    setInspectorOpen((prev) => {
+      const next = !prev
+      writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, next)
+      return next
+    })
   }
 
   const openExamples = () => {
@@ -207,6 +252,25 @@ export function EditorShell() {
     return () => window.removeEventListener('ms-open-inspector', onOpenInspector)
   }, [openInspector])
 
+  // Motion preview needs a visible stage and reachable Apply/Cancel. On focused
+  // chrome, leave the inspector sheet so the stage cell is not 0×0.
+  useEffect(() => {
+    if (!motionPreviewSession) return
+    if (useFocusedChrome) setMobilePane(null)
+    const id = window.requestAnimationFrame(() => {
+      const panel =
+        document.querySelector<HTMLElement>('[data-testid="polish-panel"]') ??
+        document.querySelector<HTMLElement>('[data-testid="glide-panel"]') ??
+        document.querySelector<HTMLElement>('[data-testid="preset-panel"]')
+      const focusTarget =
+        panel?.querySelector<HTMLElement>(
+          'input:not([disabled]), button:not([disabled])',
+        ) ?? panel
+      focusTarget?.focus()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [motionPreviewSession, useFocusedChrome])
+
   const coarsePointer = useCoarsePointer()
   const tipBusy =
     mode !== 'idle' ||
@@ -230,15 +294,33 @@ export function EditorShell() {
   const showEmptyBoardSrHint =
     !tipBusy && !hasRecording && !showFirstUseIntro && !tutorial.active
 
-  const sessionChrome = polishSession || glideSession || presetSession
   const showElementsDesktop = actorsOpen && !editing
+  const showInspectorDesktop = inspectorOpen
   const showElementsMobile = mobilePane === 'elements' && !editing
   const showInspectorMobile = mobilePane === 'inspector'
-  // Phone: mount only the explicit sheet. Desktop: mount the sidebar when open.
-  const showElementsPane = narrowViewport
+  // Focused chrome (phone or short height): one sheet at a time. Else docked.
+  const showElementsPane = useFocusedChrome
     ? showElementsMobile
     : showElementsDesktop
-  const showInspectorPane = !narrowViewport || showInspectorMobile
+  const showInspectorPane = useFocusedChrome
+    ? showInspectorMobile
+    : showInspectorDesktop
+  // When Elements or Inspector is open in focused mode, that pane owns the
+  // workspace — stage is hidden so the dock cannot crush a tiny canvas.
+  const phoneTaskPane =
+    useFocusedChrome && (showInspectorMobile || showElementsMobile)
+  const backToStage = () => setMobilePane(null)
+  // Static Tailwind class strings only (JIT will not emit dynamic templates).
+  const workspaceCols = showElementsDesktop
+    ? showInspectorDesktop
+      ? 'md:grid-cols-[minmax(0,min(14rem,24%))_minmax(0,1fr)_minmax(0,min(18rem,30%))]'
+      : 'md:grid-cols-[minmax(0,min(14rem,24%))_minmax(0,1fr)]'
+    : showInspectorDesktop
+      ? 'md:grid-cols-[minmax(0,1fr)_minmax(0,min(18rem,32%))]'
+      : 'md:grid-cols-[minmax(0,1fr)]'
+  const motionSummary = hasRecording
+    ? `${(durationMs / 1000).toFixed(1)}s`
+    : null
 
   return (
     <div
@@ -254,7 +336,11 @@ export function EditorShell() {
         {actionAnnouncement ?? ''}
       </div>
 
-      <ShortcutSheet open={shortcutsOpen} onClose={closeShortcuts} />
+      <ShortcutSheet
+        open={shortcutsOpen}
+        onClose={closeShortcuts}
+        returnFocusRef={shortcutsReturnFocusRef}
+      />
 
       {tutorial.active && tutorial.step && (
         <TutorialCoach
@@ -308,7 +394,7 @@ export function EditorShell() {
             type="button"
             data-testid="btn-toggle-elements-pane"
             aria-pressed={
-              narrowViewport ? showElementsMobile : showElementsDesktop
+              useFocusedChrome ? showElementsMobile : showElementsDesktop
             }
             aria-label="Elements"
             title="Elements"
@@ -316,42 +402,27 @@ export function EditorShell() {
             className={headerBtn}
           >
             <PanelLeft className="size-3.5" aria-hidden />
-            <span className="hidden sm:inline">Elements</span>
+            <span className="hidden md:inline">Elements</span>
           </button>
           <button
             type="button"
             data-testid="btn-toggle-inspector-pane"
-            aria-pressed={showInspectorMobile}
+            aria-pressed={
+              useFocusedChrome ? showInspectorMobile : showInspectorDesktop
+            }
             aria-label="Inspector"
             title="Inspector"
             onClick={toggleInspectorPane}
-            className={`${headerBtn} sm:hidden`}
-          >
-            <PanelRight className="size-3.5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            data-testid="btn-project"
-            aria-expanded={inspectorTab === 'project'}
-            onClick={() => openInspector('project')}
-            className={`${headerBtn} max-sm:hidden`}
-          >
-            <FolderKanban className="size-3.5" aria-hidden />
-            <span className="hidden sm:inline">Project</span>
-          </button>
-          <button
-            type="button"
-            data-testid="btn-examples"
-            aria-haspopup="dialog"
-            aria-expanded={examplesOpen}
-            onClick={openExamples}
             className={headerBtn}
           >
-            Examples
+            <PanelRight className="size-3.5" aria-hidden />
+            <span className="hidden md:inline">Inspector</span>
           </button>
           <button
             type="button"
             data-testid="btn-help"
+            aria-label="Help"
+            title="Help"
             aria-expanded={openPanel === 'help'}
             aria-controls="help-panel-root"
             onClick={() => {
@@ -361,33 +432,19 @@ export function EditorShell() {
             className={headerBtn}
           >
             <CircleHelp className="size-3.5" aria-hidden />
-            <span className="hidden sm:inline">Help</span>
+            <span className="hidden md:inline">Help</span>
           </button>
           <button
             type="button"
-            data-testid="btn-appearance"
-            aria-expanded={inspectorTab === 'style'}
-            onClick={() => openInspector('style')}
-            className={`${headerBtn} max-sm:hidden`}
+            data-testid="btn-examples"
+            aria-haspopup="dialog"
+            aria-expanded={examplesOpen}
+            onClick={openExamples}
+            className={`${headerBtn} max-md:px-1.5`}
+            title="Examples"
           >
-            Style
-          </button>
-          <button
-            type="button"
-            data-testid="btn-adjust"
-            aria-expanded={inspectorTab === 'motion'}
-            onClick={() => openInspector('motion')}
-            className={`${headerBtn} max-sm:hidden`}
-          >
-            Motion
-            {hasRecording && (
-              <span
-                data-testid="adjust-summary"
-                className="rounded-md bg-slate-900/[0.06] px-1 py-px text-xs font-medium tabular-nums text-ms-ink"
-              >
-                {(durationMs / 1000).toFixed(1)}s
-              </span>
-            )}
+            <span className="md:hidden">Ex.</span>
+            <span className="hidden md:inline">Examples</span>
           </button>
           <div className="relative">
             <button
@@ -444,10 +501,7 @@ export function EditorShell() {
                   closePanel()
                   restartTutorial()
                 }}
-                onOpenShortcuts={() => {
-                  closePanel()
-                  openShortcuts()
-                }}
+                onOpenShortcuts={openShortcuts}
               />
             </FloatingPanel>
           </div>
@@ -458,39 +512,55 @@ export function EditorShell() {
       <div
         data-testid="editor-workspace"
         className={`grid min-h-0 flex-1 overflow-hidden grid-cols-1 ${
-          showInspectorPane && narrowViewport
-            ? 'grid-rows-[minmax(10rem,1fr)_minmax(11rem,38%)_auto]'
-            : showElementsPane && narrowViewport
-              ? 'grid-rows-[minmax(8rem,40%)_minmax(10rem,1fr)_auto]'
-              : 'grid-rows-[minmax(10rem,1fr)_auto]'
-        } ${
-          showElementsDesktop
-            ? 'sm:grid-cols-[16rem_minmax(0,1fr)_minmax(16rem,20rem)]'
-            : 'sm:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]'
-        } sm:grid-rows-[minmax(0,1fr)_auto]`}
+          phoneTaskPane
+            ? 'grid-rows-[minmax(0,1fr)_auto]'
+            : 'grid-rows-[minmax(10rem,1fr)_auto]'
+        } ${workspaceCols} md:grid-rows-[minmax(0,1fr)_auto]`}
       >
-        {/* Elements — left sidebar on desktop; explicit sheet on phone */}
+        {/* Elements — left sidebar on desktop; full-height sheet on phone */}
         {showElementsPane && (
           <aside
             data-testid="actor-list-slot"
-            className="min-h-0 min-w-0 border-b border-ms-border bg-white/80 sm:row-span-2 sm:border-b-0 sm:border-r"
+            className={`flex min-h-0 min-w-0 flex-col bg-white/80 md:row-span-2 md:border-r md:border-ms-border ${
+              useFocusedChrome ? 'border-0' : 'border-b border-ms-border'
+            }`}
           >
-            <ActorList
-              variant="docked"
-              forceOpen
-              onOpenChange={(open) => {
-                setActorsOpen(open)
-                writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
-                if (!open) setMobilePane((p) => (p === 'elements' ? null : p))
-              }}
-            />
+            {useFocusedChrome && (
+              <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
+                <button
+                  type="button"
+                  data-testid="btn-elements-back-to-stage"
+                  onClick={backToStage}
+                  className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+                >
+                  <ArrowLeft className="size-3.5" aria-hidden />
+                  Stage
+                </button>
+              </div>
+            )}
+            <div className="min-h-0 flex-1">
+              <ActorList
+                variant="docked"
+                forceOpen
+                onOpenChange={(open) => {
+                  setActorsOpen(open)
+                  writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
+                  if (!open) setMobilePane((p) => (p === 'elements' ? null : p))
+                }}
+              />
+            </div>
           </aside>
         )}
 
         {/* Stage — measures this cell as its viewport */}
         <section
           data-testid="stage-viewport"
-          className="relative min-h-[10rem] min-w-0 overflow-hidden bg-[var(--ms-canvas)] sm:min-h-0"
+          className={
+            phoneTaskPane
+              ? 'hidden'
+              : 'relative min-h-[10rem] min-w-0 overflow-hidden bg-[var(--ms-canvas)] md:min-h-0'
+          }
+          aria-hidden={phoneTaskPane || undefined}
         >
           <CanvasStage />
           {showFirstUseIntro && (
@@ -505,16 +575,11 @@ export function EditorShell() {
                 {FIRST_USE_HEADLINE}
               </p>
               <p
-                data-testid="first-use-next-step"
+                id="stage-empty-hint"
+                data-testid="stage-empty-hint"
                 className="mt-1 text-sm text-slate-600"
               >
-                {firstUseNextStep}
-              </p>
-              <p
-                data-testid="stage-empty-hint"
-                className="mt-1 text-xs text-slate-500"
-              >
-                {emptyBoardHelp}
+                <span data-testid="first-use-next-step">{firstUseNextStep}</span>
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
@@ -538,7 +603,7 @@ export function EditorShell() {
           )}
           {showEmptyBoardSrHint && (
             <p
-              id="empty-board-sr-hint"
+              id="stage-empty-hint"
               data-testid="stage-empty-hint"
               className="sr-only"
             >
@@ -547,34 +612,54 @@ export function EditorShell() {
           )}
         </section>
 
-        {/* Inspector — right column on desktop; reserved sheet on phone */}
+        {/* Inspector — right column on desktop; full-height sheet on phone */}
         {showInspectorPane && (
           <div
             data-testid="inspector-slot"
-            className="min-h-0 min-w-0 border-ms-border bg-white/90 max-sm:border-t sm:row-span-2 sm:border-l"
+            className="min-h-0 min-w-0 bg-white/90 md:row-span-2 md:border-l md:border-ms-border"
           >
-            <InspectorPanel tab={inspectorTab} onTabChange={setInspectorTab} />
+            <InspectorPanel
+              tab={inspectorTab}
+              onTabChange={setInspectorTab}
+              onBackToStage={useFocusedChrome ? backToStage : undefined}
+              onClose={useFocusedChrome ? undefined : closeInspectorDesktop}
+              motionSummary={motionSummary}
+            />
           </div>
         )}
 
-        {/* Bottom Timing + transport — in normal flow, never covers the stage */}
+        {/* Bottom transport — compact dock; Timing is a dialog, not a panel. */}
         <div
           data-testid="toolbar-slot"
-          className={`col-span-full flex min-h-0 max-h-[min(48vh,22rem)] flex-col items-stretch gap-0 overflow-hidden border-t border-ms-border bg-white/92 sm:max-h-[min(42vh,20rem)] ${
+          className={`col-span-full flex flex-col items-stretch gap-0 border-t border-ms-border bg-white/95 ${
+            editing
+              ? 'min-h-0 shrink-0 overflow-visible max-h-[min(42vh,14rem)]'
+              : motionPreviewSession
+                ? 'min-h-0 shrink-0 overflow-x-hidden overflow-y-auto overscroll-contain max-h-[min(48vh,20rem)] md:max-h-[min(44vh,18rem)]'
+                : `min-h-0 overflow-hidden ${
+                    phoneTaskPane
+                      ? 'max-md:max-h-[min(22vh,9rem)] max-h-[min(26vh,10rem)]'
+                      : shortViewport
+                        ? 'max-h-[min(36vh,10rem)]'
+                        : 'max-h-[min(26vh,9rem)] md:max-h-[min(24vh,8.5rem)]'
+                  }`
+          } ${
             showElementsDesktop
-              ? 'sm:col-start-2 sm:col-end-3'
-              : 'sm:col-start-1 sm:col-end-2'
+              ? 'md:col-start-2 md:col-end-3'
+              : 'md:col-start-1 md:col-end-2'
           }`}
         >
-          {!editing && !sessionChrome && hasRecording && (
-            <div className="min-h-0 max-h-[min(40vh,18rem)] overflow-hidden border-b border-ms-border">
-              <ClipTimeline />
+          {(polishSession || glideSession || presetSession) && (
+            <div
+              data-testid="motion-preview-slot"
+              className="flex w-full shrink-0 justify-center px-2 pt-2"
+            >
+              {polishSession && <PolishPanel />}
+              {glideSession && <GlidePanel />}
+              {presetSession && <PresetPanel />}
             </div>
           )}
-          {polishSession && <PolishPanel />}
-          {glideSession && <GlidePanel />}
-          {presetSession && <PresetPanel />}
-          <div className="shrink-0 px-2 py-2 sm:px-3">
+          <div className="shrink-0">
             <PlaybackDock />
           </div>
         </div>

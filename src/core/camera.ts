@@ -14,8 +14,8 @@ export type ViewportSize = { width: number; height: number }
 
 export type StageLayoutSize = { width: number; height: number }
 
-/** Fraction of the viewport used when fitting the stage (leaves a visible frame). */
-export const FIT_VIEWPORT_PADDING = 0.9
+/** Fraction of the viewport used when fitting the stage (small margin for edges). */
+export const FIT_VIEWPORT_PADDING = 0.96
 
 export const MIN_CAMERA_ZOOM = 0.25
 export const MAX_CAMERA_ZOOM = 4

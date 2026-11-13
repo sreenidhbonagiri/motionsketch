@@ -7,6 +7,7 @@ import {
   recordSimplePath,
   respondToConfirm,
   closePanel,
+  clickResetMotion
 } from './helpers'
 
 async function waitForSaved(page: Page) {
@@ -132,6 +133,8 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('export-panel')).toBeVisible()
     const cssAfter = await readExportedCss(page)
     expect(cssAfter).toBe(cssBefore)
+    await page.getByTestId('btn-close-export').click()
+    await expect(page.getByTestId('export-panel-root')).toHaveCount(0)
     await ensureRefineMotionOpen(page)
     await expect(page.getByTestId('btn-restore-path')).toBeVisible()
   })
@@ -204,16 +207,16 @@ test.describe('project persistence', () => {
     await expect(page.getByTestId('duration-value')).toHaveText('3.00 s')
     await page.getByTestId('loop-toggle').check()
 
-    await page.getByTestId('btn-reset').click()
+    await clickResetMotion(page)
     await expect(page.getByTestId('reset-actor-confirm')).toBeVisible()
     await expect(page.getByTestId('reset-actor-confirm')).toContainText(
-      'Reset motion for “Actor 1”',
+      'Reset “Actor 1”',
     )
     await expect(page.getByTestId('reset-actor-confirm-copy')).toContainText(
       /Appearance, other elements, and project Duration \/ Loop stay the same/,
     )
     await expect(page.getByTestId('btn-reset-actor-confirm')).toHaveText(
-      'Reset motion',
+      'Reset',
     )
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',
@@ -236,7 +239,7 @@ test.describe('project persistence', () => {
     await openPanel(page, 'adjust')
     await page.getByTestId('duration-slider').fill('3000')
     await page.getByTestId('loop-toggle').check()
-    await page.getByTestId('btn-reset').click()
+    await clickResetMotion(page)
     await respondToConfirm(page, {
       dialogTestId: 'reset-actor-confirm',
       confirmTestId: 'btn-reset-actor-confirm',

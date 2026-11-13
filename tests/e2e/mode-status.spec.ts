@@ -118,7 +118,7 @@ test.describe('mode and path-tool status', () => {
     await page.getByTestId('btn-stop').click()
   })
 
-  test('short viewport keeps dock status readable without edit-mode-hint', async ({
+  test('short viewport keeps edit status for AT without edit-mode-hint chrome', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 700 })
@@ -127,16 +127,12 @@ test.describe('mode and path-tool status', () => {
     await recordSimplePath(page)
     await page.getByTestId('btn-edit-path').click()
     await expect(page.getByTestId('edit-mode-hint')).toHaveCount(0)
-    const dock = page.getByTestId('playback-dock')
     const status = page.getByTestId('dock-status')
-    await expect(status).toBeVisible()
-    const dockBox = await dock.boundingBox()
-    const statusBox = await status.boundingBox()
-    expect(dockBox).toBeTruthy()
-    expect(statusBox).toBeTruthy()
-    expect(statusBox!.y).toBeGreaterThanOrEqual(dockBox!.y - 1)
-    expect(statusBox!.y + statusBox!.height).toBeLessThanOrEqual(
-      dockBox!.y + dockBox!.height + 1,
-    )
+    await expect(status).toBeAttached()
+    await expect(status).toHaveAttribute('data-mode-status', 'edit-points')
+    await expect(page.getByTestId('mode-status-instruction')).toBeAttached()
+    // No persistent grey instruction paragraph in the compact dock.
+    const box = await status.boundingBox()
+    expect(box === null || box.height < 2 || box.width < 2).toBe(true)
   })
 })

@@ -12,7 +12,7 @@ describe('shouldReturnFocusOnClose', () => {
 
   it('does not steal focus when the stage (or another control) already has it', () => {
     const restore = document.createElement('button')
-    restore.setAttribute('data-testid', 'btn-project')
+    restore.setAttribute('data-testid', 'btn-help')
     const stage = document.createElement('div')
     stage.setAttribute('data-testid', 'stage')
     stage.tabIndex = -1

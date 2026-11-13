@@ -392,7 +392,15 @@ export function CanvasStage() {
       ref={viewportRef}
       data-testid="stage"
       tabIndex={-1}
-      className={`absolute inset-0 touch-none overflow-hidden bg-[#F8F9FC] outline-none ${cursorClass}`}
+      className={`absolute inset-0 touch-none overflow-hidden outline-none ${cursorClass}`}
+      style={{
+        // Continuous drawing field: same paper + lattice feel as the stage grid.
+        backgroundColor: msPalette.canvas,
+        backgroundImage:
+          'radial-gradient(rgba(71, 85, 105, 0.28) 1.1px, transparent 1.2px)',
+        backgroundSize: '22px 22px',
+        backgroundPosition: 'center',
+      }}
       onPointerDown={onViewportPointerDown}
       onPointerMove={onViewportPointerMove}
       onPointerUp={onViewportPointerUp}
@@ -412,7 +420,7 @@ export function CanvasStage() {
           data-path-add-mode={editing && pathAddMode ? 'true' : 'false'}
           data-path-tool={editing ? pathTool : undefined}
           data-path-gesture={editing && pathGestureActive ? 'true' : 'false'}
-          className="relative overflow-hidden bg-[#F8F9FC] shadow-[0_0_0_1px_rgba(15,23,42,0.10)]"
+          className="relative overflow-hidden bg-[#F8F9FC] shadow-[0_0_0_1px_rgba(15,23,42,0.18),0_0_0_3px_rgba(248,249,252,0.92)]"
           style={{
             width: layout.width > 0 ? layout.width : undefined,
             height: layout.height > 0 ? layout.height : undefined,

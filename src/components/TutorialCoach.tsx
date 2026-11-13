@@ -95,11 +95,11 @@ export function TutorialCoach({
       const plane = readElementRect(
         document.querySelector('[data-testid="actor"]'),
       )
-      const adjust = readElementRect(
-        document.querySelector('[data-testid="btn-adjust"]'),
+      const motionTab = readElementRect(
+        document.querySelector('[data-testid="btn-inspector-motion"]'),
       )
-      const appearance = readElementRect(
-        document.querySelector('[data-testid="btn-appearance"]'),
+      const styleTab = readElementRect(
+        document.querySelector('[data-testid="btn-inspector-style"]'),
       )
       const exportBtn = readElementRect(
         document.querySelector('[data-testid="btn-export"]'),
@@ -110,8 +110,8 @@ export function TutorialCoach({
         fit,
         cameraBar,
         plane,
-        adjust,
-        appearance,
+        motionTab,
+        styleTab,
         exportBtn,
       ].filter(Boolean) as NonNullable<ReturnType<typeof readElementRect>>[]
 
@@ -133,8 +133,8 @@ export function TutorialCoach({
       const chromeClearanceTop = Math.max(
         header?.bottom ?? 0,
         cameraBar?.bottom ?? 0,
-        adjust?.bottom ?? 0,
-        appearance?.bottom ?? 0,
+        motionTab?.bottom ?? 0,
+        styleTab?.bottom ?? 0,
         exportBtn?.bottom ?? 0,
       )
 
@@ -269,7 +269,7 @@ export function TutorialCoach({
             // Export: 3px white gap, 3px cobalt outline, restrained outer halo (no pulse).
             boxShadow:
               highlightTestId === 'btn-export'
-                ? '0 0 0 3px #ffffff, 0 0 0 6px #3048b8, 0 0 16px rgb(48 72 184 / 0.35)'
+                ? '0 0 0 3px #ffffff, 0 0 0 6px #2563eb, 0 0 16px rgb(37 99 235 / 0.35)'
                 : softHighlight
                   ? '0 0 0 2px rgb(48 72 184 / 0.35)'
                   : '0 0 0 9999px rgb(23 33 58 / 0.22)',

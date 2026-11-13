@@ -85,7 +85,7 @@ export function ActorList({
             onClick={() => setOpenPref(false)}
             className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
           >
-            <span data-testid="actors-collapse-label">Collapse</span>
+            <span data-testid="actors-collapse-label">Close</span>
             <span aria-hidden className="text-slate-400">
               ▾
             </span>

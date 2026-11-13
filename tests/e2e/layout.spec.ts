@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
+  assertUnclippedClickable,
+  ensureClipTimesOpen,
   ensureEditor,
+  ensureRefineMotionOpen,
   openCssDialog,
+  openDockMore,
   openPanel,
   recordSimplePath,
   expandExportOtherWays,
@@ -79,11 +83,13 @@ test.describe('workspace layout', () => {
       await recordSimplePath(page)
 
       await expect(page.getByTestId('app-shell')).toBeVisible()
-      await expect(page.getByTestId('btn-project')).toBeVisible()
-      await expect(page.getByTestId('btn-adjust')).toBeVisible()
-      await expect(page.getByTestId('btn-appearance')).toBeVisible()
+      await expect(page.getByTestId('btn-toggle-elements-pane')).toBeVisible()
+      await expect(page.getByTestId('btn-toggle-inspector-pane')).toBeVisible()
       await expect(page.getByTestId('btn-export')).toBeVisible()
       await expect(page.getByTestId('btn-settings')).toHaveCount(0)
+      // Canvas-first: side panels start closed on a fresh workspace.
+      await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+      await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
 
       // Stage fills its docked center viewport (not under sidebars / transport).
       const stageFill = await page.evaluate(() => {
@@ -108,13 +114,23 @@ test.describe('workspace layout', () => {
       expect(stageFill!.dx).toBeLessThan(2)
       expect(stageFill!.dw).toBeLessThan(2)
       expect(stageFill!.dh).toBeLessThan(2)
-      expect(stageFill!.width).toBeGreaterThan(viewport.width * 0.35)
-      expect(stageFill!.height).toBeGreaterThan(viewport.height * 0.4)
-      await expect(page.getByTestId('inspector-panel')).toBeVisible()
-      await expect(page.getByTestId('actor-list')).toBeVisible()
+      // With both side panels closed, the stage should own most of the width.
+      expect(stageFill!.width).toBeGreaterThan(viewport.width * 0.7)
+      expect(stageFill!.height).toBeGreaterThan(viewport.height * 0.45)
       await expect(page.getByTestId('toolbar-slot')).toBeVisible()
 
+      await page.getByTestId('btn-toggle-elements-pane').click()
+      await expect(page.getByTestId('actor-list')).toBeVisible()
+      await expect(page.getByTestId('actors-collapse-label')).toHaveText('Close')
+      await page.getByTestId('btn-toggle-actor-list').click()
+      await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+
       await openPanel(page, 'adjust')
+      await expect(page.getByTestId('inspector-panel')).toBeVisible()
+      await expect(page.getByTestId('btn-close-inspector')).toBeVisible()
+      await expect(page.getByTestId('btn-inspector-style')).toBeVisible()
+      await expect(page.getByTestId('btn-inspector-motion')).toBeVisible()
+      await expect(page.getByTestId('btn-inspector-project')).toBeVisible()
       await page.getByTestId('path-compare-toggle').check()
       await expect(page.getByTestId('path-compare-legend')).toBeVisible()
 
@@ -123,7 +139,8 @@ test.describe('workspace layout', () => {
       await assertFullyInViewport(page, 'playback-timeline')
 
       await page.getByTestId('btn-edit-path').click()
-      await expect(page.getByTestId('dock-status')).toBeVisible()
+      // Edit-path status is screen-reader only; keep AT copy without grey paragraphs.
+      await expect(page.getByTestId('dock-status')).toBeAttached()
       await expect(page.getByTestId('mode-status-label')).toHaveText('Edit points')
 
       const handle = page.locator('[data-testid^="path-handle-"]').first()
@@ -209,7 +226,7 @@ test.describe('workspace layout', () => {
     expect(fit.pageOverflowY).toBe(false)
   })
 
-  test('mobile 390x844: docked Motion inspector reserves space; Timing prefs survive', async ({
+  test('mobile 390x844: inspector takes priority; Stage returns; Timing button remains', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -217,17 +234,20 @@ test.describe('workspace layout', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
-    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
-    if ((await sequenceToggle.getAttribute('aria-expanded')) !== 'true') {
-      await sequenceToggle.click()
-    }
-    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeVisible()
+    await openDockMore(page)
+    await expect(page.getByTestId('btn-timing')).toBeVisible()
+    await page.keyboard.press('Escape')
 
     await openPanel(page, 'adjust')
     const sheet = page.getByTestId('inspector-motion-body')
     await expect(sheet).toBeVisible()
     await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await expect(page.getByTestId('btn-inspector-motion')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeVisible()
 
     const bounds = await page.evaluate(() => {
       const panel = document.querySelector('[data-testid="inspector-slot"]')
@@ -243,10 +263,12 @@ test.describe('workspace layout', () => {
         return null
       }
       const pr = panel.getBoundingClientRect()
-      const sr = stage.getBoundingClientRect()
       const br = body.getBoundingClientRect()
       const vh = window.innerHeight
       const vw = window.innerWidth
+      const stageHidden =
+        stage.classList.contains('hidden') ||
+        getComputedStyle(stage).display === 'none'
       return {
         panelInView:
           pr.top >= -1 &&
@@ -258,8 +280,8 @@ test.describe('workspace layout', () => {
           br.left >= -1 &&
           br.bottom <= vh + 1 &&
           br.right <= vw + 1,
-        stageAboveInspector: sr.bottom <= pr.top + 2,
-        stageHeight: sr.height,
+        stageHidden,
+        panelHeight: pr.height,
         dockInert: document
           .querySelector('[data-testid="toolbar-slot"]')
           ?.hasAttribute('inert'),
@@ -267,18 +289,17 @@ test.describe('workspace layout', () => {
     })
     expect(bounds).toBeTruthy()
     expect(bounds!.panelInView).toBe(true)
-    // Motion body may scroll inside the inspector; require a visible slice.
     expect(bounds!.bodyInView || bounds!.panelInView).toBe(true)
-    expect(bounds!.stageAboveInspector).toBe(true)
-    expect(bounds!.stageHeight).toBeGreaterThan(120)
+    expect(bounds!.stageHidden).toBe(true)
+    expect(bounds!.panelHeight).toBeGreaterThan(200)
     expect(bounds!.dockInert).toBeFalsy()
 
-    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
-
-    await closePanel(page, 'adjust')
+    await page.getByTestId('btn-inspector-back-to-stage').click()
     await expect(sheet).toHaveCount(0)
-    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+    await expect(page.getByTestId('stage-viewport')).toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeVisible()
+    await openDockMore(page)
+    await expect(page.getByTestId('btn-timing')).toBeVisible()
     await expect(page.getByTestId('toolbar-slot')).not.toHaveAttribute('inert')
   })
 
@@ -299,9 +320,12 @@ test.describe('workspace layout', () => {
       await expect(bar).toBeVisible()
       await expect(fit).toBeVisible()
 
+      // Scrub mid-path so Pause stays mounted while we measure Fit.
+      await page.getByTestId('playback-scrubber').fill('0.25')
       const before = await fit.boundingBox()
       await page.getByTestId('btn-play').click()
-      await expect(page.getByTestId('btn-pause')).toBeVisible()
+      const pauseBtn = page.getByTestId('btn-pause')
+      await expect(pauseBtn).toBeVisible()
       const during = await fit.boundingBox()
       expect(before).toBeTruthy()
       expect(during).toBeTruthy()
@@ -326,7 +350,8 @@ test.describe('workspace layout', () => {
       })
       expect(hit, `${width}px Fit/zoom hit`).toMatchObject({ ok: true })
 
-      await page.getByTestId('btn-pause').click()
+      // Playback may finish during the hit probe — don't block on Pause.
+      await pauseBtn.click({ timeout: 1000 }).catch(() => {})
       await fit.click()
       await expect(page.getByTestId('zoom-percent')).toBeVisible()
     }
@@ -352,7 +377,9 @@ test.describe('workspace layout', () => {
 
       await recordSimplePath(page)
       await expect(page.getByTestId('dock-editing')).toBeVisible()
+      await openDockMore(page)
       await expect(page.getByTestId('btn-continue-path')).toBeVisible()
+      await page.keyboard.press('Escape')
       await assertPlayCenteredInDock(page)
 
       await page.getByTestId('btn-record').click()
@@ -451,7 +478,7 @@ test.describe('workspace layout', () => {
       await page.reload()
       await ensureEditor(page)
       await recordSimplePath(page)
-      await page.getByTestId('btn-refine-motion').click()
+      await ensureRefineMotionOpen(page)
       const tools = page.getByTestId('refine-motion-tools')
       await expect(tools).toBeVisible()
       await expect(page.getByTestId('inspector-motion-body')).toBeVisible()
@@ -476,7 +503,7 @@ test.describe('workspace layout', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
-    await page.getByTestId('btn-refine-motion').click()
+    await ensureRefineMotionOpen(page)
     const tools = page.getByTestId('refine-motion-tools')
     await expect(tools).toBeVisible()
     await expect(page.getByTestId('inspector-panel')).toBeVisible()
@@ -515,7 +542,7 @@ test.describe('workspace layout', () => {
     await expect(snap).toContainText('Snap on')
   })
 
-  test('mobile 390x844: expanded Actors stays clear of Sequence and dock', async ({
+  test('mobile 390x844: expanded Actors stays clear of the transport dock', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -525,13 +552,9 @@ test.describe('workspace layout', () => {
 
     await page.getByTestId('btn-toggle-elements-pane').click()
     await expect(page.getByTestId('actor-list-body')).toBeVisible()
-
-    // Leave Sequence collapsed (header only) so the Elements sheet can scroll.
-    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
-    if ((await sequenceToggle.getAttribute('aria-expanded')) === 'true') {
-      await sequenceToggle.click()
-      await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'false')
-    }
+    await expect(page.getByTestId('btn-elements-back-to-stage')).toBeVisible()
+    // No persistent Timing panel — Elements owns the phone workspace.
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
 
     const controls = [
       'btn-add-actor',
@@ -547,7 +570,6 @@ test.describe('workspace layout', () => {
       const clear = await page.evaluate((testId) => {
         const el = document.querySelector(`[data-testid="${testId}"]`)
         const list = document.querySelector('[data-testid="actor-list"]')
-        const sequence = document.querySelector('[data-testid="clip-timeline"]')
         const dock = document.querySelector('[data-testid="playback-dock"]')
         if (!(el instanceof HTMLElement) || !(list instanceof HTMLElement)) {
           return { ok: false, reason: 'missing' }
@@ -563,26 +585,25 @@ test.describe('workspace layout', () => {
         ) {
           return { ok: false, reason: 'outside-list' }
         }
-        // Sequence / dock must not cover the control’s center.
+        // Transport must not cover the control’s center.
         const x = er.left + er.width / 2
         const y = er.top + er.height / 2
-        for (const overlay of [sequence, dock]) {
-          if (!(overlay instanceof HTMLElement)) continue
-          const or = overlay.getBoundingClientRect()
+        if (dock instanceof HTMLElement) {
+          const or = dock.getBoundingClientRect()
           if (x >= or.left && x <= or.right && y >= or.top && y <= or.bottom) {
             return { ok: false, reason: 'covered' }
           }
         }
         return { ok: true, reason: 'ok' }
       }, id)
-      expect(clear, `${id} reachable above Sequence/dock`).toEqual({
+      expect(clear, `${id} reachable above transport`).toEqual({
         ok: true,
         reason: 'ok',
       })
     }
   })
 
-  test('mobile 390x844: actor control reachable with Sequence expanded', async ({
+  test('mobile 390x844: Elements sheet prioritizes list; Stage restores Timing button', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -590,16 +611,12 @@ test.describe('workspace layout', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
+    await expect(page.getByTestId('btn-dock-more')).toBeVisible()
+
     await page.getByTestId('btn-toggle-elements-pane').click()
     await expect(page.getByTestId('actor-list-body')).toBeVisible()
-    const listToggle = page.getByTestId('btn-toggle-actor-list')
-    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
-    if ((await sequenceToggle.getAttribute('aria-expanded')) !== 'true') {
-      await sequenceToggle.click()
-    }
-    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+    await expect(page.getByTestId('btn-elements-back-to-stage')).toBeVisible()
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
 
     const bodyBox = await page.getByTestId('actor-list-body').boundingBox()
     expect(bodyBox).toBeTruthy()
@@ -615,8 +632,11 @@ test.describe('workspace layout', () => {
     await add.click()
     await expect(page.getByTestId('actor-list')).toContainText('2/8')
 
-    await expect(listToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
+    await page.getByTestId('btn-elements-back-to-stage').click()
+    await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
+    await expect(page.getByTestId('btn-dock-more')).toBeVisible()
+    await openDockMore(page)
+    await expect(page.getByTestId('btn-timing')).toBeVisible()
     await assertFullyInViewport(page, 'btn-play')
   })
 
@@ -634,31 +654,39 @@ test.describe('workspace layout', () => {
 
     // Sequence mounts only after a recording; collapse it so it cannot cover
     // the Export panel’s scrollable actions (View CSS sits near the bottom).
-    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
-    if (await sequenceToggle.isVisible().catch(() => false)) {
-      if ((await sequenceToggle.getAttribute('aria-expanded')) === 'true') {
-        await sequenceToggle.click()
-        await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'false')
-      }
+    // Timing is a dialog — ensure it is not left open over the menus.
+    const timingDialog = page.getByTestId('timing-dialog')
+    if (await timingDialog.isVisible().catch(() => false)) {
+      await page.getByTestId('btn-timing-cancel').click()
+      await expect(timingDialog).toHaveCount(0)
     }
 
     await expect(page.getByTestId('stage')).toBeVisible()
     await expect(page.getByTestId('toolbar')).toBeVisible()
     await assertFullyInViewport(page, 'toolbar')
 
-    // Continue path sits on the main dock after Record; keep touch height and
-    // avoid horizontal overflow when the longer label wraps.
+    // Continue path lives in More; keep touch height and no nested dock scroll.
+    await openDockMore(page)
     const continueBtn = page.getByTestId('btn-continue-path')
     await expect(continueBtn).toBeVisible()
     await assertFullyInViewport(page, 'btn-continue-path')
     const continueBox = await continueBtn.boundingBox()
     expect(continueBox).toBeTruthy()
     expect(continueBox!.height).toBeGreaterThanOrEqual(32)
+    await page.keyboard.press('Escape')
     const noOverflowX = await page.evaluate(() => {
       const root = document.documentElement
-      return root.scrollWidth <= root.clientWidth + 1
+      const editing = document.querySelector('[data-testid="dock-editing"]')
+      return {
+        page: root.scrollWidth <= root.clientWidth + 1,
+        editingScroll:
+          editing instanceof HTMLElement
+            ? editing.scrollWidth <= editing.clientWidth + 1
+            : true,
+      }
     })
-    expect(noOverflowX).toBe(true)
+    expect(noOverflowX.page).toBe(true)
+    expect(noOverflowX.editingScroll).toBe(true)
 
     await openPanel(page, 'export')
     await expandExportOtherWays(page)
@@ -670,7 +698,8 @@ test.describe('workspace layout', () => {
     await expect(viewCss).toBeInViewport()
 
     await openPanel(page, 'adjust')
-    await expect(page.getByTestId('duration-help')).toBeVisible()
+    await expect(page.getByTestId('duration-help')).toBeAttached()
+    await expect(page.getByText('About Duration')).toBeVisible()
 
     await openCssDialog(page)
     await expect(page.getByTestId('css-dialog')).toBeVisible()
@@ -683,7 +712,7 @@ test.describe('workspace layout', () => {
    * Export panel (header stacking at z-40). View CSS must remain clickable —
    * header rises to z-50 while a chrome panel is open.
    */
-  test('mobile 390x844: View CSS opens with Timing expanded', async ({
+  test('mobile 390x844: View CSS opens with Timing button present', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -697,17 +726,7 @@ test.describe('workspace layout', () => {
     await openPanel(page, 'export')
     await expandExportOtherWays(page)
     await expect(page.getByTestId('export-panel-root')).toBeVisible()
-
-    const sequenceToggle = page.getByTestId('btn-toggle-clip-timeline')
-    await expect(sequenceToggle).toBeVisible()
-    if ((await sequenceToggle.getAttribute('aria-expanded')) !== 'true') {
-      await sequenceToggle.evaluate((el) => {
-        ;(el as HTMLButtonElement).click()
-      })
-    }
-    await expect(sequenceToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
-    await expect(page.getByTestId('export-panel-root')).toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeVisible()
 
     const viewCss = page.getByTestId('btn-view-css')
     await scrollExportScrollerToCenterSafe(page, viewCss)
@@ -721,7 +740,7 @@ test.describe('workspace layout', () => {
     { width: 850, height: 650, label: '850x650' },
     { width: 1280, height: 720, label: '1280x720' },
   ]) {
-    test(`${viewport.label}: Elements and Timing collapse stay independent`, async ({
+    test(`${viewport.label}: Elements and Timing dialog stay independent`, async ({
       page,
     }) => {
       await page.setViewportSize({
@@ -732,39 +751,46 @@ test.describe('workspace layout', () => {
       await ensureEditor(page)
       await recordSimplePath(page)
 
-      const narrow = viewport.width < 640
+      const narrow = viewport.width < 768
       const short = viewport.height < 700
       if (narrow && !short) {
         await page.getByTestId('btn-toggle-elements-pane').click()
         await expect(page.getByTestId('actor-list-body')).toBeVisible()
         await expect(page.getByTestId('actors-collapse-label')).toBeVisible()
+        await expect(page.getByTestId('btn-elements-back-to-stage')).toBeVisible()
+        await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+        await page.getByTestId('btn-elements-back-to-stage').click()
+        await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
       } else if (!narrow) {
+        await page.getByTestId('btn-toggle-elements-pane').click()
         await expect(page.getByTestId('actor-list-body')).toBeVisible()
-        await expect(page.getByTestId('actors-collapse-label')).toBeVisible()
+        await expect(page.getByTestId('actors-collapse-label')).toHaveText(
+          'Close',
+        )
+        await page.getByTestId('btn-toggle-actor-list').click()
+        await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
       }
 
-      const timingToggle = page.getByTestId('btn-toggle-clip-timeline')
-      if ((await timingToggle.getAttribute('aria-expanded')) !== 'true') {
-        await timingToggle.click()
-      }
-      await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
-      await expect(page.getByTestId('sequence-collapse-label')).toBeVisible()
+      await openDockMore(page)
+      await page.getByTestId('btn-timing').click()
+      await expect(page.getByTestId('timing-dialog')).toBeVisible()
+
+      await page.getByTestId('btn-timing-cancel').click()
+      await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+      await expect(page.getByTestId('btn-dock-more')).toBeFocused()
       expect(await topTestIdAtCenter(page, 'btn-play')).toBe('btn-play')
 
-      await timingToggle.click()
-      await expect(timingToggle).toHaveAttribute('aria-expanded', 'false')
-      await expect(page.getByTestId('sequence-panel-body')).toHaveCount(0)
-
-      await timingToggle.click()
-      await expect(page.getByTestId('sequence-panel-body')).toBeVisible()
+      await openDockMore(page)
+      await page.getByTestId('btn-timing').click()
+      await expect(page.getByTestId('timing-dialog')).toBeVisible()
+      await page.getByTestId('btn-timing-cancel').click()
 
       if (!narrow) {
-        await page.getByTestId('btn-toggle-actor-list').click()
-        await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
-        await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
-      } else if (!short) {
         await page.getByTestId('btn-toggle-elements-pane').click()
-        await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
+        await expect(page.getByTestId('actor-list-body')).toBeVisible()
+        await page.getByTestId('btn-toggle-actor-list').click()
+        await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+        await expect(page.getByTestId('btn-dock-more')).toBeVisible()
       }
     })
   }
@@ -785,10 +811,7 @@ test.describe('workspace layout', () => {
       await ensureEditor(page)
       await recordSimplePath(page)
 
-      const timingToggle = page.getByTestId('btn-toggle-clip-timeline')
-      if ((await timingToggle.getAttribute('aria-expanded')) !== 'true') {
-        await timingToggle.click()
-      }
+      await expect(page.getByTestId('btn-dock-more')).toBeVisible()
 
       const clear = await page.evaluate(() => {
         const stage = document.querySelector('[data-testid="stage-viewport"]')
@@ -829,13 +852,11 @@ test.describe('workspace layout', () => {
         expect(await topTestIdAtCenter(page, id), id).toBe(id)
       }
 
-      await timingToggle.click()
-      await expect(timingToggle).toHaveAttribute('aria-expanded', 'false')
       expect(await topTestIdAtCenter(page, 'btn-fit-stage')).toBe('btn-fit-stage')
     })
   }
 
-  test('390x560: Timing fields apply; stage and Play stay reachable', async ({
+  test('390x560: Timing dialog applies; stage and Play stay reachable', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 560 })
@@ -843,13 +864,10 @@ test.describe('workspace layout', () => {
     await ensureEditor(page)
     await recordSimplePath(page)
 
-    // Keep Elements closed on a short phone so Timing + stage remain usable.
     await expect(page.getByTestId('actor-list-body')).toHaveCount(0)
-    const timingToggle = page.getByTestId('btn-toggle-clip-timeline')
-    if ((await timingToggle.getAttribute('aria-expanded')) !== 'true') {
-      await timingToggle.click()
-    }
-    await expect(timingToggle).toHaveAttribute('aria-expanded', 'true')
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId('timing-element-name')).toBeVisible()
+    await expect(page.getByTestId('timing-preview')).toBeVisible()
 
     await page.getByTestId('clip-start-input').fill('0.20')
     await page.getByTestId('clip-move-for-input').fill('0.80')
@@ -860,9 +878,509 @@ test.describe('workspace layout', () => {
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('0.80')
     await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
 
+    await page.getByTestId('btn-timing-cancel').click()
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+    await expect(page.getByTestId('snap-to-grid-toggle')).toBeVisible()
+    await expect(page.getByTestId('btn-edit-path')).toBeVisible()
     expect(await topTestIdAtCenter(page, 'btn-play')).toBe('btn-play')
     expect(await topTestIdAtCenter(page, 'btn-fit-stage')).toBe('btn-fit-stage')
+    await assertClickableInClip(page, 'snap-to-grid-toggle', 'playback-dock')
   })
+
+  /**
+   * True when the control’s center lies inside `clipTestId` and elementFromPoint
+   * resolves to that control (not a covering sibling).
+   */
+  async function assertClickableInClip(
+    page: Page,
+    testId: string,
+    clipTestId: string,
+  ) {
+    const result = await page.evaluate(
+      ({ id, clipId }) => {
+        const el = document.querySelector(`[data-testid="${id}"]`)
+        const clip = document.querySelector(`[data-testid="${clipId}"]`)
+        if (!(el instanceof HTMLElement) || !(clip instanceof HTMLElement)) {
+          return { ok: false, reason: 'missing' }
+        }
+        const er = el.getBoundingClientRect()
+        const cr = clip.getBoundingClientRect()
+        if (er.width < 4 || er.height < 4) return { ok: false, reason: 'zero-size' }
+        const cx = er.left + er.width / 2
+        const cy = er.top + er.height / 2
+        const insideClip =
+          cx >= cr.left - 1 &&
+          cx <= cr.right + 1 &&
+          cy >= cr.top - 1 &&
+          cy <= cr.bottom + 1
+        if (!insideClip) return { ok: false, reason: 'outside-clip' }
+        const top = document.elementFromPoint(cx, cy)
+        if (!(top instanceof Element)) return { ok: false, reason: 'no-hit' }
+        const hit =
+          el === top ||
+          el.contains(top) ||
+          top.closest(`[data-testid="${id}"]`) === el
+        return { ok: hit, reason: hit ? 'ok' : 'covered' }
+      },
+      { id: testId, clipId: clipTestId },
+    )
+    expect(result, `${testId} in ${clipTestId}: ${result.reason}`).toMatchObject({
+      ok: true,
+    })
+  }
+
+  for (const viewport of [
+    { width: 1280, height: 800, label: 'desktop 1280x800' },
+    { width: 390, height: 844, label: 'phone 390x844' },
+    { width: 390, height: 560, label: 'short 390x560' },
+  ]) {
+    test(`${viewport.label}: Timing dialog fits and scrolls; dock stays hittable`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      await page.goto('/')
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      await ensureClipTimesOpen(page)
+      await expect(page.getByTestId('timing-dialog')).toBeVisible()
+      await expect(page.getByTestId('timing-element-name')).toBeVisible()
+      await expect(page.getByTestId('timing-preview')).toBeVisible()
+      await expect(page.getByTestId('clip-start-input')).toBeVisible()
+      await expect(page.getByTestId('clip-move-for-input')).toBeVisible()
+      await expect(page.getByTestId('btn-apply-clip-times')).toBeVisible()
+
+      const chrome = await page.evaluate(() => {
+        const dialog = document.querySelector('[data-testid="timing-dialog"]')
+        const title = document.querySelector('[data-testid="timing-dialog-title"]')
+        const preview = document.querySelector('[data-testid="timing-preview"]')
+        if (
+          !(dialog instanceof HTMLElement) ||
+          !(title instanceof HTMLElement) ||
+          !(preview instanceof HTMLElement)
+        ) {
+          return { ok: false, reason: 'missing' }
+        }
+        const dr = dialog.getBoundingClientRect()
+        const vh = window.innerHeight
+        const vw = window.innerWidth
+        return {
+          ok:
+            dr.height > 0 &&
+            dr.top >= -2 &&
+            dr.bottom <= vh + 2 &&
+            dr.left >= -2 &&
+            dr.right <= vw + 2,
+          reason: 'ok',
+          dialogHeight: Math.round(dr.height),
+        }
+      })
+      expect(chrome, chrome.reason).toMatchObject({ ok: true })
+
+      await page.getByTestId('btn-timing-cancel').click()
+      await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+      await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+      await assertClickableInClip(page, 'btn-play', 'toolbar-slot')
+      await assertClickableInClip(page, 'btn-record', 'toolbar-slot')
+      await assertUnclippedClickable(page, 'btn-dock-more')
+      await assertUnclippedClickable(page, 'btn-edit-path')
+      // Timing lives in More — reopen proves it stays actionable.
+      await openDockMore(page)
+      const timingBtn = page.getByTestId('btn-timing')
+      await expect(timingBtn).toBeVisible()
+      await expect(timingBtn).toBeEnabled()
+      await timingBtn.click()
+      await expect(page.getByTestId('timing-dialog')).toBeVisible()
+      await page.getByTestId('btn-timing-cancel').click()
+      await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    })
+  }
+
+  test('canvas-first desktop: Elements and Inspector open on demand and return space', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+    await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+    const closed = await page.evaluate(() => {
+      const cell = document.querySelector('[data-testid="stage-viewport"]')
+      return cell instanceof HTMLElement
+        ? Math.round(cell.getBoundingClientRect().width)
+        : 0
+    })
+    expect(closed).toBeGreaterThan(1000)
+
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await expect(page.getByTestId('btn-close-inspector')).toBeVisible()
+    const withInspector = await page.evaluate(() => {
+      const cell = document.querySelector('[data-testid="stage-viewport"]')
+      return cell instanceof HTMLElement
+        ? Math.round(cell.getBoundingClientRect().width)
+        : 0
+    })
+    expect(withInspector).toBeLessThan(closed - 120)
+    await page.getByTestId('btn-close-inspector').click()
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+
+    await page.getByTestId('btn-toggle-elements-pane').click()
+    await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+    const withElements = await page.evaluate(() => {
+      const cell = document.querySelector('[data-testid="stage-viewport"]')
+      return cell instanceof HTMLElement
+        ? Math.round(cell.getBoundingClientRect().width)
+        : 0
+    })
+    expect(withElements).toBeLessThan(closed - 120)
+    await page.getByTestId('btn-toggle-actor-list').click()
+    await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+    const restored = await page.evaluate(() => {
+      const cell = document.querySelector('[data-testid="stage-viewport"]')
+      return cell instanceof HTMLElement
+        ? Math.round(cell.getBoundingClientRect().width)
+        : 0
+    })
+    expect(Math.abs(restored - closed)).toBeLessThan(8)
+  })
+
+  test('desktop: Inspector + Timing dialog leave a useful drawing stage', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId('timing-dialog')).toBeVisible()
+    await expect(page.getByTestId('clip-times-section')).toBeVisible()
+
+    const measure = await page.evaluate(() => {
+      const stage = document.querySelector('[data-testid="stage-viewport"]')
+      const dialog = document.querySelector('[data-testid="timing-dialog"]')
+      if (!(stage instanceof HTMLElement) || !(dialog instanceof HTMLElement)) {
+        return null
+      }
+      const sr = stage.getBoundingClientRect()
+      const dr = dialog.getBoundingClientRect()
+      return {
+        stageH: Math.round(sr.height),
+        stageW: Math.round(sr.width),
+        dialogH: Math.round(dr.height),
+      }
+    })
+    expect(measure).toBeTruthy()
+    // Stage stays tall — Timing is a compact dialog, not a reserved panel.
+    expect(measure!.stageH).toBeGreaterThan(400)
+    expect(measure!.stageW).toBeGreaterThan(700)
+    expect(measure!.dialogH).toBeLessThanOrEqual(520)
+    await page.getByTestId('btn-timing-cancel').click()
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    expect(await topTestIdAtCenter(page, 'btn-play')).toBe('btn-play')
+    expect(await topTestIdAtCenter(page, 'btn-record')).toBe('btn-record')
+  })
+
+  test('reduced layout 640×400: focused sheets, not three squeezed columns', async ({
+    page,
+  }) => {
+    // Layout viewport of a 1280×800 window at 200% browser zoom.
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await page.setViewportSize({ width: 640, height: 400 })
+    await page.waitForFunction(() => window.innerWidth === 640)
+
+    await expect(page.getByTestId('btn-toggle-inspector-pane')).toBeVisible()
+    // Below md: inspector is not mounted until the sheet opens.
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+    await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeVisible()
+    await assertClickableInClip(page, 'btn-inspector-style', 'inspector-panel')
+    await assertClickableInClip(page, 'btn-inspector-motion', 'inspector-panel')
+    await assertClickableInClip(page, 'btn-inspector-project', 'inspector-panel')
+
+    await page.getByTestId('btn-inspector-back-to-stage').click()
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+    await assertClickableInClip(page, 'btn-play', 'toolbar-slot')
+    await assertClickableInClip(page, 'btn-record', 'toolbar-slot')
+    await assertClickableInClip(page, 'btn-export', 'editor-header')
+
+    const layout = await page.evaluate(() => {
+      const root = document.documentElement
+      return {
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        pageOverflowX: root.scrollWidth > root.clientWidth + 1,
+        shellOverflowX: (() => {
+          const shell = document.querySelector('[data-testid="app-shell"]')
+          return shell instanceof HTMLElement
+            ? shell.scrollWidth > shell.clientWidth + 1
+            : true
+        })(),
+      }
+    })
+    expect(layout.innerWidth).toBe(640)
+    expect(layout.innerHeight).toBe(400)
+    expect(layout.pageOverflowX).toBe(false)
+    expect(layout.shellOverflowX).toBe(false)
+  })
+
+  for (const size of [
+    { width: 853, height: 533, label: 'reduced layout 853×533 (150% of 1280×800)' },
+    { width: 640, height: 400, label: 'reduced layout 640×400 (200% of 1280×800)' },
+  ]) {
+    test(`${size.label}: primary controls stay hittable in their clips`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1280, height: 800 })
+      await page.goto('/')
+      await ensureEditor(page)
+      await recordSimplePath(page)
+      await expect(page.getByTestId('btn-dock-more')).toBeVisible()
+
+      await page.setViewportSize({ width: size.width, height: size.height })
+      await page.waitForTimeout(120)
+
+      await assertClickableInClip(page, 'btn-play', 'toolbar-slot')
+      await assertClickableInClip(page, 'btn-record', 'toolbar-slot')
+      await assertClickableInClip(page, 'btn-export', 'editor-header')
+      await assertUnclippedClickable(page, 'btn-dock-more')
+      await assertUnclippedClickable(page, 'btn-edit-path')
+      // Record / Play / Edit path / Reset / More / Snap stay on the dock strip.
+      await expect(page.getByTestId('snap-to-grid-toggle')).toBeVisible()
+      await expect(page.getByTestId('btn-edit-path')).toBeVisible()
+      await expect(page.getByTestId('btn-reset')).toBeVisible()
+      await assertClickableInClip(page, 'snap-to-grid-toggle', 'toolbar-slot')
+      await assertClickableInClip(page, 'btn-edit-path', 'toolbar-slot')
+      await assertClickableInClip(page, 'btn-reset', 'toolbar-slot')
+      await openDockMore(page)
+      await assertUnclippedClickable(page, 'btn-timing')
+      await page.keyboard.press('Escape')
+
+      const dims = await page.evaluate(() => ({
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        pageOverflowX:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth + 1,
+      }))
+      expect(dims.innerWidth).toBe(size.width)
+      expect(dims.innerHeight).toBe(size.height)
+      expect(dims.pageOverflowX).toBe(false)
+    })
+  }
+
+  for (const viewport of [
+    { width: 1280, height: 800, label: 'resized-viewport desktop 1280x800' },
+    { width: 390, height: 844, label: 'resized-viewport phone 390x844' },
+    { width: 390, height: 560, label: 'resized-viewport short 390x560' },
+  ]) {
+    test(`${viewport.label}: no nested dock scroll; primary + More actions unclipped`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      await page.goto('/')
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      const nested = await page.evaluate(() => {
+        const transport = document.querySelector('[data-testid="dock-transport"]')
+        const editing = document.querySelector('[data-testid="dock-editing"]')
+        const check = (el: Element | null) => {
+          if (!(el instanceof HTMLElement)) return { overflowX: false, scroll: false }
+          const style = getComputedStyle(el)
+          return {
+            overflowX: /auto|scroll/.test(style.overflowX),
+            scroll: el.scrollWidth > el.clientWidth + 1,
+          }
+        }
+        return {
+          transport: check(transport),
+          editing: check(editing),
+          left: check(transport?.children[0] ?? null),
+          right: check(transport?.children[2] ?? null),
+        }
+      })
+      expect(nested.left.overflowX || nested.left.scroll).toBe(false)
+      expect(nested.right.overflowX || nested.right.scroll).toBe(false)
+      expect(nested.editing.overflowX || nested.editing.scroll).toBe(false)
+
+      for (const id of [
+        'btn-record',
+        'btn-play',
+        'btn-edit-path',
+        'btn-reset',
+        'btn-dock-more',
+        'snap-to-grid-toggle',
+      ] as const) {
+        await assertUnclippedClickable(page, id)
+      }
+
+      const historyOnStrip = viewport.width >= 768
+      if (historyOnStrip) {
+        for (const id of [
+          'btn-restart',
+          'btn-undo-transform',
+          'btn-redo-transform',
+        ] as const) {
+          await assertUnclippedClickable(page, id)
+        }
+      }
+
+      await openDockMore(page)
+      for (const id of [
+        'btn-continue-path',
+        'btn-timing',
+        'btn-refine-motion',
+      ] as const) {
+        await assertUnclippedClickable(page, id)
+      }
+      if (!historyOnStrip) {
+        for (const id of [
+          'btn-restart',
+          'btn-undo-transform',
+          'btn-redo-transform',
+        ] as const) {
+          await assertUnclippedClickable(page, id)
+        }
+      }
+      await page.keyboard.press('Escape')
+
+      await page.getByTestId('btn-edit-path').click()
+      await expect(page.getByTestId('dock-status')).toBeAttached()
+      await expect(page.getByTestId('mode-status-instruction')).toBeAttached()
+      await expect(page.getByTestId('mode-status-instruction')).not.toContainText(
+        '[ ] cycle',
+      )
+      await expect(page.getByTestId('mode-status-instruction')).toContainText(
+        '[ and ] move between points',
+      )
+      const guidance = await page.evaluate(() => {
+        const statusSlot = document.querySelector(
+          '[data-testid="dock-status-slot"]',
+        )
+        const help = document.querySelector('[data-testid="snap-to-grid-help"]')
+        const snap = document.querySelector('[data-testid="snap-to-grid-toggle"]')
+        const slot = document.querySelector('[data-testid="toolbar-slot"]')
+        const toolbar = document.querySelector('[data-testid="toolbar"]')
+        if (
+          !(statusSlot instanceof HTMLElement) ||
+          !(help instanceof HTMLElement) ||
+          !(snap instanceof HTMLElement) ||
+          !(slot instanceof HTMLElement) ||
+          !(toolbar instanceof HTMLElement)
+        ) {
+          return { ok: false, reason: 'missing' }
+        }
+        const sr = slot.getBoundingClientRect()
+        const tr = toolbar.getBoundingClientRect()
+        const snapR = snap.getBoundingClientRect()
+        const hr = help.getBoundingClientRect()
+        const statusVis =
+          statusSlot.getBoundingClientRect().width > 2 &&
+          statusSlot.getBoundingClientRect().height > 2 &&
+          !statusSlot.classList.contains('sr-only')
+        const helpVisible = hr.width > 2 && hr.height > 2
+        return {
+          ok:
+            !statusVis &&
+            !helpVisible &&
+            tr.bottom <= sr.bottom + 1 &&
+            snapR.bottom <= sr.bottom + 1 &&
+            snapR.width >= 24 &&
+            snapR.height >= 24,
+          reason: 'ok',
+          toolbarFits: tr.bottom <= sr.bottom + 1,
+        }
+      })
+      expect(guidance, guidance.reason).toMatchObject({ ok: true })
+      await assertUnclippedClickable(page, 'btn-done-edit')
+      await assertUnclippedClickable(page, 'btn-edit-more')
+      await assertUnclippedClickable(page, 'snap-to-grid-toggle')
+      await expect(page.getByTestId('btn-help')).toHaveAttribute(
+        'aria-label',
+        'Help',
+      )
+    })
+  }
+
+  for (const size of [
+    { width: 390, height: 844, label: 'phone 390×844' },
+    { width: 320, height: 844, label: 'narrow 320×844' },
+    { width: 390, height: 560, label: 'short 390×560' },
+  ] as const) {
+    test(`${size.label}: Play and Edit path bounds do not overlap; Edit left edge clicks Edit`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height })
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+      await recordSimplePath(page)
+
+      const measure = await page.evaluate(() => {
+        const play = document
+          .querySelector('[data-testid="btn-play"]')
+          ?.getBoundingClientRect()
+        const edit = document
+          .querySelector('[data-testid="btn-edit-path"]')
+          ?.getBoundingClientRect()
+        if (!play || !edit) return { ok: false, reason: 'missing' as const }
+        const overlap = !(
+          play.right <= edit.left ||
+          edit.right <= play.left ||
+          play.bottom <= edit.top ||
+          edit.bottom <= play.top
+        )
+        const top = document.elementFromPoint(
+          edit.left + 3,
+          edit.top + edit.height / 2,
+        )
+        const hit =
+          top instanceof Element
+            ? top.closest('[data-testid]')?.getAttribute('data-testid')
+            : null
+        return {
+          ok: !overlap && hit === 'btn-edit-path',
+          reason: overlap
+            ? `overlap:${Math.round(play.right - edit.left)}`
+            : hit !== 'btn-edit-path'
+              ? `hit:${hit}`
+              : ('ok' as const),
+          gap: Math.round(edit.left - play.right),
+        }
+      })
+      expect(measure, measure.reason).toMatchObject({ ok: true })
+
+      // Normal click on Edit path’s left edge must enter edit mode (not Play).
+      const edit = page.getByTestId('btn-edit-path')
+      const box = await edit.boundingBox()
+      expect(box).toBeTruthy()
+      await page.mouse.click(box!.x + 4, box!.y + box!.height / 2)
+      await expect(page.getByTestId('btn-done-edit')).toBeVisible()
+      await expect(page.getByTestId('btn-play')).toHaveCount(0)
+    })
+  }
+
+  // Actual browser zoom (chrome.tabs.setZoom) lives in browser-zoom.spec.ts.
+  // CSS zoom and viewport resize are not substitutes for that check.
 })
 
 async function scrollExportScrollerToCenterSafe(

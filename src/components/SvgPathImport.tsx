@@ -8,6 +8,7 @@ import {
 import { formatCssAspectRatio } from '../core/stageAspect'
 import { useEditorStore } from '../state/store'
 import { msPalette } from '../theme/palette'
+import { HelpDisclosure } from './HelpDisclosure'
 
 /** Stage preview drawn from samples only — never mounts uploaded SVG markup. */
 function PathPreview({
@@ -184,10 +185,10 @@ export function SvgPathImport() {
           onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
         />
       </div>
-      <p
+      <HelpDisclosure
         id={helpId}
-        data-testid="svg-path-import-help"
-        className="text-xs leading-relaxed text-slate-500"
+        testId="svg-path-import-help"
+        summary="About SVG import"
       >
         {hasExistingTake ? (
           <>
@@ -210,7 +211,7 @@ export function SvgPathImport() {
             even-speed by default.
           </>
         )}
-      </p>
+      </HelpDisclosure>
       {error ? (
         <p
           data-testid="svg-path-import-error"

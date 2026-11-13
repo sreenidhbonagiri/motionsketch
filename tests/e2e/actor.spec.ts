@@ -17,6 +17,15 @@ test.describe('actor customization', () => {
     await recordSimplePath(page)
 
     await page.getByTestId('playback-scrubber').fill('0.4')
+    // Open Inspector first so stage letterboxing is stable before measuring.
+    await openPanel(page, 'appearance')
+    await expect
+      .poll(async () => {
+        const box = await page.getByTestId('stage-frame').boundingBox()
+        return box?.width ?? 0
+      })
+      .toBeGreaterThan(100)
+
     const before = await page.getByTestId('actor').boundingBox()
     expect(before).toBeTruthy()
     const beforeCenter = {
@@ -24,7 +33,6 @@ test.describe('actor customization', () => {
       y: before!.y + before!.height / 2,
     }
 
-    await openPanel(page, 'appearance')
     await page.getByTestId('actor-size-slider').fill('0.28')
     await expect(page.getByTestId('actor-size-value')).toHaveText(
       '28% of stage',

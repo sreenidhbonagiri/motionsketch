@@ -29,6 +29,7 @@ import {
   readExportedCss,
   recordSimplePath,
   selectActorByIndex,
+  openDockMore
 } from './helpers'
 
 async function waitForSaved(page: Page) {
@@ -374,6 +375,7 @@ test.describe('Continue path', () => {
     )
     await page.getByTestId('btn-stop').click()
 
+    await openDockMore(page)
     const continueBtn = page.getByTestId('btn-continue-path')
     await expect(continueBtn).toBeVisible()
     // Main dock placement: after Record, before Play — not inside Refine.

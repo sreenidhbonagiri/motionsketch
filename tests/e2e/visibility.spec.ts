@@ -8,8 +8,11 @@ import {
 } from './animationHelpers'
 import {
   applyClipSeconds,
+  applyClipVisibility,
   clickAddActor,
   ensureActorListExpanded,
+  dismissTimingDialogIfOpen,
+  ensureClipTimesOpen,
   ensureEditor,
   expandExportOtherWays,
   loadHtmlDocument,
@@ -22,7 +25,11 @@ import {
 async function openClipTimeline(page: Page) {
   const options = page.getByTestId('clip-visibility-options')
   if (await options.isVisible().catch(() => false)) return
-  await page.getByTestId('btn-toggle-clip-timeline').click()
+  await ensureClipTimesOpen(page)
+  // Visibility lives under More options in the Timing dialog.
+  if (!(await options.isVisible().catch(() => false))) {
+    await page.getByText('More options').click()
+  }
   await expect(options).toBeVisible()
 }
 
@@ -84,8 +91,8 @@ test.describe('per-actor visibility timing', () => {
     await openClipTimeline(page)
     // 0.4s–1.6s of a 2s timeline → 0.2–0.8 normalized.
     await applyClipSeconds(page, '0.40', '1.60')
-    await page.getByTestId('clip-hide-before').check()
-    await page.getByTestId('clip-hide-after').check()
+    await applyClipVisibility(page, { hideBefore: true, hideAfter: true })
+    await dismissTimingDialogIfOpen(page)
 
     // Nearby samples (not exact keyframe times) — portable editor ↔ HTML.
     const nearby: Array<{ t: number; expectHidden: boolean }> = [
@@ -260,14 +267,20 @@ test.describe('per-actor visibility timing', () => {
     await selectActorByIndex(page, 1)
     await openClipTimeline(page)
     await applyClipSeconds(page, '0.30', '0.90')
-    await page.getByTestId('clip-hide-before').check()
-    await page.getByTestId('clip-hide-after').check()
+    // Each Apply is one undo step — commit flags separately.
+    await applyClipVisibility(page, { hideBefore: true })
     await expect(page.getByTestId('clip-hide-before')).toBeChecked()
+    await applyClipVisibility(page, { hideAfter: true })
+    await expect(page.getByTestId('clip-hide-after')).toBeChecked()
+    await dismissTimingDialogIfOpen(page)
 
     await page.getByTestId('btn-undo-transform').click()
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-hide-before')).toBeChecked()
     await expect(page.getByTestId('clip-hide-after')).not.toBeChecked()
+    await dismissTimingDialogIfOpen(page)
     await page.getByTestId('btn-undo-transform').click()
+    await openClipTimeline(page)
     await expect(page.getByTestId('clip-hide-before')).not.toBeChecked()
     await expect(page.getByTestId('clip-hide-after')).not.toBeChecked()
   })
@@ -281,8 +294,8 @@ test.describe('per-actor visibility timing', () => {
     await selectActorByIndex(page, 1)
     await openClipTimeline(page)
     await applyClipSeconds(page, '0.30', '0.90')
-    await page.getByTestId('clip-hide-before').check()
-    await page.getByTestId('clip-hide-after').check()
+    await applyClipVisibility(page, { hideBefore: true, hideAfter: true })
+    await dismissTimingDialogIfOpen(page)
 
     await openPanel(page, 'export')
     await expandExportOtherWays(page)
@@ -304,8 +317,9 @@ test.describe('per-actor visibility timing', () => {
 
     await openClipTimeline(page)
     await applyClipSeconds(page, '1.00', '2.00')
-    await page.getByTestId('clip-hide-before').check()
+    await applyClipVisibility(page, { hideBefore: true })
     await expect(page.getByTestId('clip-hide-after')).not.toBeChecked()
+    await dismissTimingDialogIfOpen(page)
 
     await page.getByTestId('playback-scrubber').fill('0.1')
     await ensureActorListExpanded(page)

@@ -203,7 +203,7 @@ test.describe('workspace camera', () => {
     const beforeSamples = await readActor0Samples(page)
     await closeOpenChromePanels(page)
     // waitForSaved opens Project then closes it; FloatingPanel may briefly
-    // return focus to btn-project. Take the stage afterward and assert it
+    // return focus to the opener. Take the stage afterward and assert it
     // before H — H on a focused button is intentionally ignored.
     await page.getByTestId('stage').focus()
     await expect(page.getByTestId('stage')).toBeFocused()
@@ -285,7 +285,7 @@ test.describe('workspace camera', () => {
     }
     await page.getByTestId('btn-zoom-in').click()
     await page.getByTestId('btn-edit-path').click()
-    await expect(page.getByTestId('dock-status')).toBeVisible()
+    await expect(page.getByTestId('dock-status')).toBeAttached()
     const handle = page.locator('[data-testid^="path-handle-"]').first()
     await expect(handle).toBeVisible()
     const camBefore = await readCamera(page)

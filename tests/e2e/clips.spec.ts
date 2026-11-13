@@ -5,6 +5,7 @@ import {
   actorIdsFromList,
   applyClipSeconds,
   clickAddActor,
+  ensureClipTimesOpen,
   ensureEditor,
   expandExportOtherWays,
   loadHtmlDocument,
@@ -16,21 +17,11 @@ import {
   closePanel,
 } from './helpers'
 
-async function ensureClipTimelineOpen(
-  page: import('@playwright/test').Page,
-) {
-  const toggle = page.getByTestId('btn-toggle-clip-timeline')
-  await expect(toggle).toBeVisible()
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-    await toggle.click()
-  }
-  await expect(page.getByTestId('clip-timeline-rows')).toBeVisible()
-}
-
-async function collapseClipTimeline(page: import('@playwright/test').Page) {
-  const toggle = page.getByTestId('btn-toggle-clip-timeline')
-  if ((await toggle.getAttribute('aria-expanded')) === 'true') {
-    await toggle.click()
+async function closeTimingDialog(page: import('@playwright/test').Page) {
+  const dialog = page.getByTestId('timing-dialog')
+  if (await dialog.isVisible().catch(() => false)) {
+    await page.getByTestId('btn-timing-cancel').click()
+    await expect(dialog).not.toBeVisible()
   }
 }
 
@@ -62,7 +53,7 @@ test.describe('per-actor clip timing', () => {
     const lateId = ids[1]
     const earlyId = ids[2]
 
-    await collapseClipTimeline(page)
+    await closeTimingDialog(page)
     await page.getByTestId('playback-scrubber').fill('0.2')
     const lateAt02 = await actorBox(page, lateId)
     await page.getByTestId('playback-scrubber').fill('0.45')
@@ -92,39 +83,41 @@ test.describe('per-actor clip timing', () => {
 
   test('Move for edit then undo restores prior duration', async ({ page }) => {
     await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
-    await ensureClipTimelineOpen(page)
     await selectActorByIndex(page, 2)
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.00')
     // Second actor (Late) begins at 1.00s for 1.00s.
     await selectActorByIndex(page, 1)
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('1.00')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
     await selectActorByIndex(page, 2)
     await applyClipSeconds(page, '0.00', '1.50')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.50')
     await expect(page.getByTestId('clip-ends-at')).toContainText('1.50')
+    await page.getByTestId('btn-timing-cancel').click()
     await page.getByTestId('btn-undo-transform').click()
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('1.00')
   })
 
-  test('three overlapping actors stay readable; first-use hint dismisses', async ({
+  test('Timing dialog shows selected element and preview; dock stays reachable', async ({
     page,
   }) => {
     await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
-    await ensureClipTimelineOpen(page)
-    await expect(page.getByTestId('sequence-first-use-hint')).toBeVisible()
-    await page.getByTestId('btn-dismiss-sequence-hint').click()
-    await expect(page.getByTestId('sequence-first-use-hint')).toHaveCount(0)
-    await expect(page.getByTestId('sequence-ruler')).toBeVisible()
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId('timing-element-name')).toBeVisible()
+    await expect(page.getByTestId('timing-preview')).toBeVisible()
+    await expect(page.getByTestId('timing-preview-move')).toBeVisible()
     const ids = await actorIdsFromList(page)
-    for (const id of ids) {
-      await expect(page.getByTestId(`clip-row-${id}`)).toBeVisible()
-      await expect(page.getByTestId(`clip-bar-${id}`)).toBeVisible()
-    }
+    expect(ids.length).toBeGreaterThanOrEqual(2)
+    await selectActorByIndex(page, 1)
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId('clip-start-input')).toHaveValue('1.00')
     await page.setViewportSize({ width: 390, height: 844 })
-    await expect(page.getByTestId('clip-timeline')).toBeVisible()
+    await expect(page.getByTestId('timing-dialog')).toBeVisible()
     await expect(page.getByTestId('btn-play')).toBeVisible()
   })
 
@@ -134,7 +127,7 @@ test.describe('per-actor clip timing', () => {
     await loadProjectSnapshot(page, buildClipsTimingFixtureJson())
     await selectActorByIndex(page, 1)
     await page.getByTestId('playback-scrubber').fill('0.75')
-    await collapseClipTimeline(page)
+    await closeTimingDialog(page)
     await openPanel(page, 'appearance')
     await page.getByTestId('transform-rotation-input').fill('90')
     await page.getByTestId('btn-set-transform-keyframe').click()
@@ -187,14 +180,21 @@ test.describe('per-actor clip timing', () => {
     await expect(page.locator('.ms-actor-3')).toBeVisible()
   })
 
-  test('clip row selection does not arm recording', async ({ page }) => {
+  test('opening Timing and selecting an element does not arm recording', async ({
+    page,
+  }) => {
     await page.goto('/')
     await ensureEditor(page)
     await recordSimplePath(page)
     await clickAddActor(page)
-    await ensureClipTimelineOpen(page)
+    await ensureClipTimesOpen(page)
     const ids = await actorIdsFromList(page)
-    await page.getByTestId(`clip-row-${ids[0]}`).click()
+    await selectActorByIndex(page, 0)
+    await ensureClipTimesOpen(page)
+    await expect(page.getByTestId(`actor-list-item-${ids[0]}`)).toHaveAttribute(
+      'data-selected',
+      'true',
+    )
     await expect(page.getByTestId('btn-record')).toBeVisible()
     await expect(page.getByTestId('btn-stop')).toHaveCount(0)
   })
