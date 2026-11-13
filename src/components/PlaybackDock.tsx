@@ -268,14 +268,21 @@ export function PlaybackDock() {
     }
   }, [timingOpen])
 
-  // Keep Reset on the strip; tuck Restart/Undo/Redo into More below md
-  // so 640-wide / 200% zoom layouts don’t crowd Play’s center column.
+  // Keep Reset on the strip; tuck Restart/Undo/Redo into More when the
+  // transport is narrow. Key off the toolbar slot width (not viewport): at
+  // ~900px with Inspector open the dock is ~560–640px while the viewport is
+  // still “md”, and viewport media queries left Edit path overlapping Play.
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const sync = () => setWideDock(mq.matches)
+    const slot = document.querySelector('[data-testid="toolbar-slot"]')
+    if (!(slot instanceof HTMLElement)) return
+    const WIDE_DOCK_MIN_PX = 700
+    const sync = () => {
+      setWideDock(slot.getBoundingClientRect().width >= WIDE_DOCK_MIN_PX)
+    }
     sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
+    const ro = new ResizeObserver(sync)
+    ro.observe(slot)
+    return () => ro.disconnect()
   }, [])
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -1229,7 +1236,7 @@ export function PlaybackDock() {
                       disabled={isRecordingLike || actorEditOrder.length === 0}
                       className={btnIcon}
                       aria-label="Undo"
-                      title="Undo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
+                      title="Undo placement, transform, timing, recording, Glide, extend path, stage resize, or a motion preset"
                     >
                       <span aria-hidden>↶</span>
                     </button>
@@ -1242,7 +1249,7 @@ export function PlaybackDock() {
                       }
                       className={btnIcon}
                       aria-label="Redo"
-                      title="Redo placement, transform, timing, Glide, extend path, stage resize, or a motion preset"
+                      title="Redo placement, transform, timing, recording, Glide, extend path, stage resize, or a motion preset"
                     >
                       <span aria-hidden>↷</span>
                     </button>

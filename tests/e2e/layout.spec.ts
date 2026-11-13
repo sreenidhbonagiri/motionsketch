@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   assertUnclippedClickable,
+  closeOpenChromePanels,
   ensureClipTimesOpen,
   ensureEditor,
   ensureRefineMotionOpen,
@@ -874,10 +875,12 @@ test.describe('workspace layout', () => {
     await page.getByTestId('btn-apply-clip-times').evaluate((el) => {
       ;(el as HTMLButtonElement).click()
     })
+    await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
+    await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    await expect(page.getByTestId('btn-dock-more')).toBeFocused()
+    await ensureClipTimesOpen(page)
     await expect(page.getByTestId('clip-start-input')).toHaveValue('0.20')
     await expect(page.getByTestId('clip-move-for-input')).toHaveValue('0.80')
-    await expect(page.getByTestId('clip-times-error')).toHaveCount(0)
-
     await page.getByTestId('btn-timing-cancel').click()
     await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
     await expect(page.getByTestId('btn-dock-more')).toBeFocused()
@@ -1376,6 +1379,91 @@ test.describe('workspace layout', () => {
       await page.mouse.click(box!.x + 4, box!.y + box!.height / 2)
       await expect(page.getByTestId('btn-done-edit')).toBeVisible()
       await expect(page.getByTestId('btn-play')).toHaveCount(0)
+    })
+  }
+
+  for (const size of [
+    { width: 850, height: 800, label: '850×800' },
+    { width: 900, height: 800, label: '900×800' },
+    { width: 950, height: 800, label: '950×800' },
+    { width: 900, height: 560, label: '900×560 short' },
+  ] as const) {
+    test(`${size.label}: Record/Play/Edit path/Reset stay clear with Inspector open or closed`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: size.width, height: size.height })
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+      await recordSimplePath(page)
+      await closeOpenChromePanels(page)
+
+      for (const inspectorOpen of [false, true] as const) {
+        const toggle = page.getByTestId('btn-toggle-inspector-pane')
+        const pressed = await toggle.getAttribute('aria-pressed')
+        if (inspectorOpen && pressed !== 'true') await toggle.click()
+        if (!inspectorOpen && pressed === 'true') await toggle.click()
+
+        // Short height uses a focused Inspector sheet — confirm it opens, then
+        // return to stage so Record/Play/Edit/Reset are the surface under test.
+        const focusedInspector = await page
+          .getByTestId('btn-inspector-back-to-stage')
+          .isVisible()
+          .catch(() => false)
+        if (focusedInspector) {
+          await expect(page.getByTestId('inspector-panel')).toBeVisible()
+          await page.getByTestId('btn-inspector-back-to-stage').click()
+          await expect(page.getByTestId('btn-play')).toBeVisible()
+        } else if (inspectorOpen) {
+          await expect(page.getByTestId('inspector-panel')).toBeVisible()
+        }
+
+        for (const id of [
+          'btn-record',
+          'btn-play',
+          'btn-edit-path',
+          'btn-reset',
+        ] as const) {
+          await assertClickableInClip(page, id, 'toolbar-slot')
+          await assertUnclippedClickable(page, id)
+        }
+
+        const measure = await page.evaluate(() => {
+          const play = document
+            .querySelector('[data-testid="btn-play"]')
+            ?.getBoundingClientRect()
+          const edit = document
+            .querySelector('[data-testid="btn-edit-path"]')
+            ?.getBoundingClientRect()
+          if (!play || !edit) return { ok: false, reason: 'missing' as const }
+          const overlap = !(
+            play.right <= edit.left ||
+            edit.right <= play.left ||
+            play.bottom <= edit.top ||
+            edit.bottom <= play.top
+          )
+          return {
+            ok: !overlap,
+            reason: overlap
+              ? `overlap:${Math.round(play.right - edit.left)}`
+              : ('ok' as const),
+            gap: Math.round(edit.left - play.right),
+            editLabel:
+              (
+                document.querySelector(
+                  '[data-testid="btn-edit-path"]',
+                ) as HTMLElement | null
+              )?.innerText?.trim() ?? '',
+          }
+        })
+        expect(
+          measure,
+          `${inspectorOpen ? 'insp-open' : 'insp-closed'}: ${measure.reason}`,
+        ).toMatchObject({ ok: true })
+        // Readable label — do not collapse to icon-only at these widths.
+        expect(measure.editLabel.length).toBeGreaterThan(0)
+      }
     })
   }
 
