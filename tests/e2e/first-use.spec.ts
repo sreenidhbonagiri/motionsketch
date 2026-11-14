@@ -160,11 +160,15 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-website-limits')).toHaveText(
       'Requires access to your website’s code.',
     )
+    await expect(page.getByTestId('export-about')).toContainText(/About export/i)
     await expect(page.getByTestId('export-website-platform-help')).toContainText(
       /WordPress or Webflow/i,
     )
     await expect(page.getByTestId('export-website-platform-help')).toContainText(
       /does not publish/i,
+    )
+    await expect(page.getByTestId('export-trigger-detail')).toContainText(
+      /prefers-reduced-motion|ms-trigger\.js/i,
     )
     await expect(page.getByTestId('btn-export-path-html')).toHaveAttribute(
       'aria-selected',
@@ -220,10 +224,7 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-trigger-select')).toBeVisible()
     await expect(page.getByTestId('btn-preview-trigger')).toBeVisible()
     await expect(page.getByTestId('export-trigger-help')).toContainText(
-      /CSS alone can start the motion/i,
-    )
-    await expect(page.getByTestId('export-trigger-help')).toContainText(
-      /ms-trigger\.js/i,
+      /Starts when the page loads/i,
     )
     await expect(page.getByTestId('btn-preview-trigger')).toHaveText(
       'Test playback behavior',
@@ -232,16 +233,19 @@ test.describe('first-use guidance and export wording', () => {
       /isolated preview of the selected start setting/i,
     )
     await expect(page.getByTestId('export-html-paste-order')).toContainText(
-      'Paste each section where its label indicates, in the order shown.',
+      /Paste each section where its label indicates/i,
     )
     await expect(page.getByTestId('export-html-section-scripts')).toContainText(
       /after the scene markup/i,
     )
     await expect(page.getByTestId('export-html-steps')).toContainText(
-      /self-contained preview page/i,
+      /preview/i,
     )
     await page.getByTestId('export-trigger-select').selectOption('click')
     await expect(page.getByTestId('export-trigger-help')).toContainText(
+      /Starts or restarts/i,
+    )
+    await expect(page.getByTestId('export-trigger-detail')).toContainText(
       /Download CSS is CSS-only[\s\S]*ms-trigger\.js/,
     )
     await page.getByTestId('export-trigger-select').selectOption('page-load')
@@ -295,7 +299,7 @@ test.describe('first-use guidance and export wording', () => {
       /not for embedding in your site/i,
     )
     await expect(page.getByTestId('export-css-help')).toContainText(
-      'Image assets are separate',
+      /Scoped CSS only/i,
     )
     await expect(page.getByTestId('export-own-element')).toContainText(
       'Animate your own element',
@@ -353,9 +357,9 @@ test.describe('first-use guidance and export wording', () => {
     } else {
       await expect(page.getByTestId('export-panel-root')).toBeFocused()
       await page.keyboard.press('Tab')
-      // Concise platform notes disclosure sits above the HTML/React path tabs.
+      // About export disclosure sits above the HTML/React path tabs.
       await expect(
-        page.getByTestId('export-website-platform-help').locator('summary'),
+        page.getByTestId('export-about').locator('summary'),
       ).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(page.getByTestId('btn-export-path-html')).toBeFocused()
