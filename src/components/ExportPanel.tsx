@@ -595,6 +595,15 @@ export function ExportPanel() {
               setting. It does not change the editor playhead, recording, or
               undo history.
             </p>
+            {websitePath === 'html' && websiteIntegration?.ok ? (
+              <p
+                id={playButtonHelpId}
+                data-testid="export-play-button-help"
+                className="mt-1.5"
+              >
+                {websiteIntegration.playButtonHelp}
+              </p>
+            ) : null}
           </HelpDisclosure>
           <p id={packageStatusId} className="sr-only" data-testid="export-web-package-help">
             ZIP with a working index.html preview and files to add the animation
@@ -810,15 +819,6 @@ export function ExportPanel() {
           >
             {triggerHelpText(trigger)}
           </p>
-          {websitePath === 'html' && websiteIntegration?.ok ? (
-            <p
-              id={playButtonHelpId}
-              data-testid="export-play-button-help"
-              className="text-sm leading-relaxed text-ms-muted"
-            >
-              {websiteIntegration.playButtonHelp}
-            </p>
-          ) : null}
           <button
             type="button"
             data-testid="btn-preview-trigger"
