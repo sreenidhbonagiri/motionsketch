@@ -599,6 +599,23 @@ describe('persistence controller', () => {
     controller.dispose()
   })
 
+  it('reportSaveFailure surfaces save-error without writing storage', () => {
+    const storage = createMemoryStorage()
+    const setSpy = vi.spyOn(storage, 'setItem')
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: null })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    setSpy.mockClear()
+    controller.reportSaveFailure()
+    expect(controller.getStatus()).toBe('save-error')
+    expect(setSpy).not.toHaveBeenCalled()
+    controller.dispose()
+  })
+
   it('debounces slider updates but saves recording completion immediately', () => {
     vi.useFakeTimers()
     const storage = createMemoryStorage()

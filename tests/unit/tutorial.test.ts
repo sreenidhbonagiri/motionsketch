@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { STORAGE_KEY } from '../../src/core/persist/document'
 import {
   buildTutorialPracticeProject,
+  clearTutorialBackup,
   clearTutorialProgress,
   hasSavedProjectInStorage,
+  hasTutorialBackup,
   loadTutorialPracticeSnapshot,
+  readTutorialBackup,
   readTutorialProgress,
   shouldAutoStartTutorial,
+  snapshotCurrentProject,
+  TUTORIAL_BACKUP_KEY,
   TUTORIAL_DRAW_DRAG,
   TUTORIAL_DRAW_RECORD,
   TUTORIAL_DRAW_TITLE,
@@ -18,6 +23,7 @@ import {
   TUTORIAL_PROGRESS_KEY,
   tutorialProgressLabel,
   tutorialTitleForStep,
+  writeTutorialBackup,
   writeTutorialProgress,
   HELP_RECORDING_BLURB,
 } from '../../src/lib/tutorial'
@@ -45,6 +51,7 @@ describe('tutorial practice project', () => {
 describe('tutorial progress + auto-start', () => {
   beforeEach(() => {
     clearTutorialProgress()
+    clearTutorialBackup()
     localStorage.removeItem(STORAGE_KEY)
   })
 
@@ -63,6 +70,53 @@ describe('tutorial progress + auto-start', () => {
     writeTutorialProgress('completed')
     expect(readTutorialProgress()).toEqual({ status: 'completed' })
     expect(localStorage.getItem(TUTORIAL_PROGRESS_KEY)).toContain('completed')
+  })
+
+  it('round-trips a pre-tutorial backup without touching the main project key', () => {
+    const practice = loadTutorialPracticeSnapshot()
+    practice.project.name = 'Pre-tutorial project'
+    const snap = snapshotCurrentProject(practice.project)
+    expect(writeTutorialBackup(snap)).toBe(true)
+    expect(hasTutorialBackup()).toBe(true)
+    expect(localStorage.getItem(TUTORIAL_BACKUP_KEY)).toContain(
+      'Pre-tutorial project',
+    )
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    const loaded = readTutorialBackup()
+    expect(loaded?.project.name).toBe('Pre-tutorial project')
+    clearTutorialBackup()
+    expect(hasTutorialBackup()).toBe(false)
+    expect(readTutorialBackup()).toBeNull()
+  })
+
+  it('refuses to overwrite an existing recoverable backup', () => {
+    const first = loadTutorialPracticeSnapshot()
+    first.project.name = 'First backup'
+    expect(writeTutorialBackup(snapshotCurrentProject(first.project))).toBe(true)
+    const second = loadTutorialPracticeSnapshot()
+    second.project.name = 'Second backup'
+    expect(writeTutorialBackup(snapshotCurrentProject(second.project))).toBe(
+      true,
+    )
+    expect(localStorage.getItem(TUTORIAL_BACKUP_KEY)).toContain('First backup')
+    expect(localStorage.getItem(TUTORIAL_BACKUP_KEY)).not.toContain(
+      'Second backup',
+    )
+  })
+
+  it('returns false when a required backup write throws', () => {
+    const snap = snapshotCurrentProject(loadTutorialPracticeSnapshot().project)
+    const proto = Object.getPrototypeOf(localStorage) as Storage
+    const original = proto.setItem
+    proto.setItem = () => {
+      throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+    }
+    try {
+      expect(writeTutorialBackup(snap)).toBe(false)
+      expect(hasTutorialBackup()).toBe(false)
+    } finally {
+      proto.setItem = original
+    }
   })
 })
 

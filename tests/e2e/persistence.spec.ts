@@ -210,7 +210,7 @@ test.describe('project persistence', () => {
     await clickResetMotion(page)
     await expect(page.getByTestId('reset-actor-confirm')).toBeVisible()
     await expect(page.getByTestId('reset-actor-confirm')).toContainText(
-      'Reset “Actor 1”',
+      'Reset “Element 1”',
     )
     await expect(page.getByTestId('reset-actor-confirm-copy')).toContainText(
       /Appearance, other elements, and project Duration \/ Loop stay the same/,

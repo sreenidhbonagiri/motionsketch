@@ -387,7 +387,7 @@ test.describe('first-use tutorial', () => {
     expect(progress).toContain('completed')
   })
 
-  test('does not auto-start over a saved project; Skip remembers preference', async ({
+  test('does not auto-start over a saved project; Skip keeps practice and backs up', async ({
     page,
   }) => {
     await clearAppStorage(page)
@@ -435,17 +435,32 @@ test.describe('first-use tutorial', () => {
     )
     await closePanel(page, 'project')
 
+    // Skip before recording — keeps practice board; original stays in backup.
     await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
-      'My real project',
-    )
-    await expect(page.getByTestId('header-save-status')).toHaveText(
-      'Saved in this browser',
+      'Tutorial practice',
     )
     const storedAfter = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',
     )
-    expect(storedAfter).toBe(storedBefore)
+    expect(storedAfter).toContain('Tutorial practice')
+    expect(storedAfter).not.toContain('My real project')
+    const backup = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(backup).toContain('My real project')
+
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('tutorial-backup-banner')).toBeVisible()
+    await page.getByTestId('btn-restore-tutorial-backup').click()
+    await expect(page.getByTestId('tutorial-backup-restore-confirm')).toBeVisible()
+    await page.getByTestId('btn-tutorial-backup-restore').click()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'My real project',
+    )
+    await expect(page.getByTestId('tutorial-backup-banner')).toHaveCount(0)
   })
 
   test('Examples/New during tutorial cannot overwrite a saved project', async ({
@@ -506,7 +521,7 @@ test.describe('first-use tutorial', () => {
     )
     expect(storedMid).toBe(storedBefore)
 
-    // Restart again; New project blocked; Skip restores; reload keeps original.
+    // Restart again; New project blocked; Skip keeps practice + backup.
     await openPanel(page, 'help')
     await page.getByTestId('btn-restart-tutorial').click()
     await expect(page.getByTestId('tutorial-coach')).toBeVisible()
@@ -524,16 +539,20 @@ test.describe('first-use tutorial', () => {
     await page.getByTestId('btn-tutorial-skip').click()
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
-      'Saved before tutorial',
+      'Tutorial practice',
     )
     await page.reload()
     await expect(page.getByTestId('btn-rename-project')).toHaveText(
-      'Saved before tutorial',
+      'Tutorial practice',
     )
     const storedAfter = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',
     )
-    expect(storedAfter).toBe(storedBefore)
+    expect(storedAfter).toContain('Tutorial practice')
+    const backupAfter = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(backupAfter).toContain('Saved before tutorial')
   })
 
   test('Export card stays near Export at 1280×720 closed and open', async ({
@@ -863,7 +882,7 @@ test.describe('first-use tutorial', () => {
     expect(progress).toContain('skipped')
   })
 
-  test('Watch it move: Space plays; Keep focuses Keep not Start fresh', async ({
+  test('Watch it move: Space plays; Skip keeps flight; Finish Keep focuses Keep', async ({
     page,
   }) => {
     await clearAppStorage(page)
@@ -891,17 +910,17 @@ test.describe('first-use tutorial', () => {
     await expect(page.getByTestId('btn-pause')).toBeVisible()
     await page.getByTestId('btn-pause').click({ timeout: 1500 }).catch(() => {})
 
+    // Skip ends the tutorial and keeps the practice flight (no dialog).
     await page.getByTestId('btn-tutorial-skip').click()
-    await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
-    await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
-    // Accidental Space keeps the practice flight — does not activate Start fresh.
-    await page.keyboard.press(' ')
     await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
     await expect(page.getByTestId('btn-play')).toBeEnabled()
   })
 
-  test('Escape on Keep/Restore dismisses without discarding; Restore still restores', async ({
+  test('Escape on Finish Keep/Restore dismisses without discarding; Restore still restores', async ({
     page,
   }) => {
     await clearAppStorage(page)
@@ -935,8 +954,14 @@ test.describe('first-use tutorial', () => {
       'data-tutorial-step',
       'play',
     )
-
-    await page.getByTestId('btn-tutorial-skip').click()
+    await page.getByTestId('btn-play').click()
+    await page.getByTestId('btn-pause').click({ timeout: 2000 }).catch(() => {})
+    await page.getByTestId('btn-tutorial-next').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'export',
+    )
+    await page.getByTestId('btn-tutorial-finish').click()
     await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
     await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
     await expect(page.getByTestId('btn-tutorial-restore')).toBeVisible()
@@ -948,15 +973,14 @@ test.describe('first-use tutorial', () => {
       'Tutorial practice',
     )
     await expect(page.getByTestId('btn-play')).toBeEnabled()
-    // Focus returns to the Skip control that opened the choice.
-    await expect(page.getByTestId('btn-tutorial-skip')).toBeFocused()
+    await expect(page.getByTestId('btn-tutorial-finish')).toBeFocused()
     const storedMid = await page.evaluate(
       () => localStorage.getItem('motionsketch.project.v1') || '',
     )
     expect(storedMid).toBe(storedBefore)
 
-    // Reopen and Restore explicitly.
-    await page.getByTestId('btn-tutorial-skip').click()
+    // Reopen Finish and Restore explicitly.
+    await page.getByTestId('btn-tutorial-finish').click()
     await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
     await page.getByTestId('btn-tutorial-restore').click()
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
@@ -969,7 +993,7 @@ test.describe('first-use tutorial', () => {
     expect(storedAfter).toBe(storedBefore)
   })
 
-  test('Escape on Keep/Start fresh dismisses; Keep then Start fresh still work', async ({
+  test('Escape on Finish Keep/Start fresh dismisses; Keep then Start fresh still work', async ({
     page,
   }) => {
     await clearAppStorage(page)
@@ -981,8 +1005,10 @@ test.describe('first-use tutorial', () => {
       'data-tutorial-step',
       'play',
     )
-
-    await page.getByTestId('btn-tutorial-skip').click()
+    await page.getByTestId('btn-play').click()
+    await page.getByTestId('btn-pause').click({ timeout: 2000 }).catch(() => {})
+    await page.getByTestId('btn-tutorial-next').click()
+    await page.getByTestId('btn-tutorial-finish').click()
     await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
     await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
     await expect(page.getByTestId('btn-tutorial-start-fresh')).toBeVisible()
@@ -994,10 +1020,10 @@ test.describe('first-use tutorial', () => {
       'Tutorial practice',
     )
     await expect(page.getByTestId('btn-play')).toBeEnabled()
-    await expect(page.getByTestId('btn-tutorial-skip')).toBeFocused()
+    await expect(page.getByTestId('btn-tutorial-finish')).toBeFocused()
 
     // Reopen and Keep.
-    await page.getByTestId('btn-tutorial-skip').click()
+    await page.getByTestId('btn-tutorial-finish').click()
     await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
     await page.getByTestId('btn-tutorial-keep').click()
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
@@ -1006,15 +1032,287 @@ test.describe('first-use tutorial', () => {
     )
     await expect(page.getByTestId('btn-play')).toBeEnabled()
 
-    // Explicit Start fresh on a clean empty-previous flight.
+    // Explicit Start fresh on a clean empty-previous flight via Finish.
     await clearAppStorage(page)
     await awaitAutoTutorial(page)
     await page.getByTestId('btn-record').click()
     await dragActor(page, { x: 20, y: -15 }, { x: 120, y: 25 })
-    await page.getByTestId('btn-tutorial-skip').click()
+    await page.getByTestId('btn-play').click()
+    await page.getByTestId('btn-pause').click({ timeout: 2000 }).catch(() => {})
+    await page.getByTestId('btn-tutorial-next').click()
+    await page.getByTestId('btn-tutorial-finish').click()
     await expect(page.getByTestId('btn-tutorial-start-fresh')).toBeVisible()
     await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
-    await page.getByTestId('btn-tutorial-start-fresh').click()
+    // Accidental Space keeps the practice flight — does not activate Start fresh.
+    await page.keyboard.press(' ')
+    await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+  })
+
+  test('Skip after recording keeps path; reload persists; empty previous has no backup', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await awaitAutoTutorial(page)
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 25, y: -20 }, { x: 140, y: 30 })
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'play',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    const progress = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      TUTORIAL_PROGRESS_KEY,
+    )
+    expect(progress).toContain('skipped')
+    const backupEmpty = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1'),
+    )
+    expect(backupEmpty).toBeNull()
+
+    await page.reload()
+    await expect(page.getByTestId('app-shell')).toBeVisible()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('tutorial-backup-banner')).toHaveCount(0)
+  })
+
+  test('Skip after recording with existing project backs up; restore is explicit', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await skipTutorialIfPresent(page)
+    await ensureEditor(page, 'Original flight')
+    await recordSimplePath(page)
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await closePanel(page, 'project')
+    const storedBefore = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedBefore).toContain('Original flight')
+
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 40, y: -15 }, { x: 170, y: 45 })
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    const storedPractice = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedPractice).toContain('Tutorial practice')
+    const backup = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(backup).toContain('Original flight')
+
+    // Reload — practice and backup both survive.
+    await page.reload()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('tutorial-backup-banner')).toBeVisible()
+    await expect(page.getByTestId('tutorial-backup-hint')).toContainText(
+      /before the tutorial/i,
+    )
+
+    // Cancel restore — practice stays; backup remains.
+    await page.getByTestId('btn-restore-tutorial-backup').click()
+    await page.getByTestId('btn-tutorial-backup-restore-cancel').click()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('tutorial-backup-banner')).toBeVisible()
+
+    // Explicit restore.
+    await page.getByTestId('btn-restore-tutorial-backup').click()
+    await page.getByTestId('btn-tutorial-backup-restore').click()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Original flight',
+    )
+    await expect(page.getByTestId('tutorial-backup-banner')).toHaveCount(0)
+    const storedRestored = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedRestored).toContain('Original flight')
+    const backupGone = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1'),
+    )
+    expect(backupGone).toBeNull()
+  })
+
+  test('failed backup write blocks overwrite; practice stays; download recovery', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await skipTutorialIfPresent(page)
+    await ensureEditor(page, 'Protected original')
+    await recordSimplePath(page)
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await closePanel(page, 'project')
+    const storedBefore = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedBefore).toContain('Protected original')
+
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 30, y: -20 }, { x: 150, y: 35 })
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+
+    await page.evaluate(() => {
+      const proto = Object.getPrototypeOf(localStorage) as Storage
+      const original = proto.setItem.bind(localStorage)
+      proto.setItem = (key: string, value: string) => {
+        if (key === 'motionsketch.tutorial.backup.v1') {
+          throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+        }
+        return original(key, value)
+      }
+    })
+
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await expect(page.getByTestId('action-live-region')).toContainText(
+      /Couldn't preserve your previous project/i,
+    )
+
+    const storedAfter = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedAfter).toBe(storedBefore)
+    const backupMissing = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1'),
+    )
+    expect(backupMissing).toBeNull()
+
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-error-banner')).toBeVisible()
+    await expect(page.getByTestId('save-status')).toContainText(/Couldn't save/i)
+    await expect(
+      page.getByTestId('btn-download-project-save-error'),
+    ).toBeVisible()
+  })
+
+  test('Restore save failure keeps backup available', async ({ page }) => {
+    await clearAppStorage(page)
+    await skipTutorialIfPresent(page)
+    await ensureEditor(page, 'Restore-safe original')
+    await recordSimplePath(page)
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await closePanel(page, 'project')
+
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 25, y: -18 }, { x: 130, y: 40 })
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    const backedUp = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(backedUp).toContain('Restore-safe original')
+
+    await page.evaluate(() => {
+      const proto = Object.getPrototypeOf(localStorage) as Storage
+      const original = proto.setItem.bind(localStorage)
+      proto.setItem = (key: string, value: string) => {
+        if (key === 'motionsketch.project.v1') {
+          throw new DOMException('QuotaExceededError', 'QuotaExceededError')
+        }
+        return original(key, value)
+      }
+    })
+
+    await openPanel(page, 'project')
+    await page.getByTestId('btn-restore-tutorial-backup').click()
+    await page.getByTestId('btn-tutorial-backup-restore').click()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Restore-safe original',
+    )
+    await expect(page.getByTestId('project-action-status')).toContainText(
+      /Couldn't save the restored project/i,
+    )
+    await expect(page.getByTestId('tutorial-backup-banner')).toBeVisible()
+    const backupStill = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(backupStill).toContain('Restore-safe original')
+  })
+
+  test('re-entry Skip does not overwrite an existing recoverable backup', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await skipTutorialIfPresent(page)
+    await ensureEditor(page, 'First recoverable')
+    await recordSimplePath(page)
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await closePanel(page, 'project')
+
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 20, y: -10 }, { x: 110, y: 25 })
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    const firstBackup = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(firstBackup).toContain('First recoverable')
+
+    // Second tutorial from the kept practice — must not clobber First recoverable.
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    const stillFirst = await page.evaluate(
+      () => localStorage.getItem('motionsketch.tutorial.backup.v1') || '',
+    )
+    expect(stillFirst).toBe(firstBackup)
+    expect(stillFirst).toContain('First recoverable')
   })
 })

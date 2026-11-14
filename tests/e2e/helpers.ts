@@ -7,8 +7,10 @@ export async function loadHtmlDocument(page: Page, html: string) {
 }
 
 /**
- * Skip an auto-started tutorial if the coach is visible (marks skipped locally).
- * If a keep/restore dialog appears, choose Start fresh / Restore.
+ * Skip an auto-started tutorial if the coach is visible.
+ * Product Skip keeps the practice project; this helper then starts a fresh
+ * untitled board so unrelated suites stay on a blank canvas, and clears any
+ * tutorial backup so it does not leak into later steps.
  */
 export async function skipTutorialIfPresent(page: Page) {
   const coach = page.getByTestId('tutorial-coach')
@@ -19,17 +21,31 @@ export async function skipTutorialIfPresent(page: Page) {
     return
   }
   await page.getByTestId('btn-tutorial-skip').click()
-  const keep = page.getByTestId('tutorial-keep-confirm')
-  if (await keep.isVisible().catch(() => false)) {
-    const fresh = page.getByTestId('btn-tutorial-start-fresh')
-    const restore = page.getByTestId('btn-tutorial-restore')
-    if (await fresh.isVisible().catch(() => false)) {
-      await fresh.click()
-    } else if (await restore.isVisible().catch(() => false)) {
-      await restore.click()
-    }
-  }
   await expect(coach).toHaveCount(0)
+  await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
+
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('motionsketch.tutorial.backup.v1')
+    } catch {
+      /* ignore */
+    }
+  })
+
+  const rename = page.getByTestId('btn-rename-project')
+  if (!(await rename.isVisible().catch(() => false))) return
+  if (!/Tutorial practice/i.test(await rename.innerText())) return
+
+  await openPanel(page, 'project')
+  await page.getByTestId('btn-new-project').click()
+  const confirm = page.getByTestId('new-project-confirm')
+  if (await confirm.isVisible().catch(() => false)) {
+    await page.getByTestId('btn-new-project-confirm').click()
+  }
+  await expect(page.getByTestId('btn-rename-project')).not.toHaveText(
+    /Tutorial practice/i,
+  )
+  await closePanel(page, 'project')
 }
 
 /** @deprecated Prefer {@link skipTutorialIfPresent}. */

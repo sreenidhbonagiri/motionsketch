@@ -124,6 +124,11 @@ export interface PersistenceController {
   saveNow: () => void
   discardStoredAndUnblock: () => void
   afterSuccessfulReplace: () => void
+  /**
+   * Surface the existing save-error UI without writing storage (e.g. tutorial
+   * backup could not be written, so the practice flight must not overwrite).
+   */
+  reportSaveFailure: () => void
   downloadCurrentProject: () => boolean
   downloadQuarantine: () => boolean
   dispose: () => void
@@ -415,6 +420,12 @@ export function createPersistenceController(
       } else {
         clearActiveSaveKeepingCanvas()
       }
+    },
+
+    reportSaveFailure: () => {
+      if (disposed) return
+      dropPendingTimer()
+      setStatus('save-error')
     },
 
     downloadCurrentProject: () => {

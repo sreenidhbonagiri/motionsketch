@@ -18,6 +18,12 @@ const TUTORIAL_STAGE_ASPECT = 16 / 10
 
 /** localStorage — completion or skip survives reloads. */
 export const TUTORIAL_PROGRESS_KEY = 'motionsketch.tutorial.v1'
+/**
+ * Pre-tutorial project snapshot retained when Skip/Keep saves the practice
+ * flight over the main project key. Cleared only by explicit restore or
+ * discard — never by Escape / passive dismiss.
+ */
+export const TUTORIAL_BACKUP_KEY = 'motionsketch.tutorial.backup.v1'
 
 export type TutorialProgressStatus = 'completed' | 'skipped'
 
@@ -57,6 +63,20 @@ export const TUTORIAL_KEEP_CONFIRM = 'Keep this animation'
 export const TUTORIAL_KEEP_RESTORE = 'Restore previous project'
 export const TUTORIAL_KEEP_FRESH = 'Start fresh'
 
+/** Project panel — explicit restore after Skip/Keep retained a backup. */
+export const TUTORIAL_BACKUP_RESTORE_LABEL = 'Restore previous project'
+export const TUTORIAL_BACKUP_RESTORE_TITLE = 'Restore previous project?'
+export const TUTORIAL_BACKUP_RESTORE_BODY =
+  'This replaces the current project with the one saved before the tutorial. Download the current project first if you want to keep a copy.'
+export const TUTORIAL_BACKUP_RESTORE_CONFIRM = 'Restore previous project'
+export const TUTORIAL_BACKUP_HINT =
+  'A project from before the tutorial is still available to restore.'
+/** Announced when Skip/Keep cannot stash the prior project before saving practice. */
+export const TUTORIAL_BACKUP_WRITE_FAILED =
+  "Couldn't preserve your previous project in this browser. The practice flight is still open — download it, or free storage and try again. Your original save was not overwritten."
+export const TUTORIAL_BACKUP_RESTORE_SAVE_FAILED =
+  "Couldn't save the restored project in this browser. The previous-project backup is still available — download a copy or free storage and restore again."
+
 export const HELP_RECORDING_BLURB =
   'Click Record, drag an element, then release to finish. Short or zero-motion drags are ignored. Try again.'
 export const HELP_TIMING_BLURB =
@@ -73,7 +93,7 @@ export const TUTORIAL_BLOCKS_REPLACE_CONFIRM = 'OK'
 
 /** Shown instead of the normal saved label while practice autosave is suspended. */
 export const TUTORIAL_PRACTICE_SAVE_STATUS =
-  'Practice animation. Choose Keep to save.'
+  'Practice animation. Skip keeps it; Finish asks before saving.'
 
 export function tutorialTitleForStep(step: TutorialStep): string {
   if (step === 'draw') return TUTORIAL_DRAW_TITLE
@@ -181,6 +201,53 @@ export function clearTutorialProgress(): void {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Persist a pre-tutorial backup. Refuses to overwrite an existing recoverable
+ * backup (re-entry must not silently destroy earlier recovery).
+ * @returns false only when a new backup was required and the write failed.
+ */
+export function writeTutorialBackup(snapshot: PersistedSnapshot): boolean {
+  try {
+    const existing = localStorage.getItem(TUTORIAL_BACKUP_KEY)
+    if (typeof existing === 'string' && existing.length > 0) {
+      // Keep the first recoverable backup; do not clobber it on re-entry.
+      return true
+    }
+    localStorage.setItem(TUTORIAL_BACKUP_KEY, serializeSnapshot(snapshot))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function readTutorialBackup(): PersistedSnapshot | null {
+  try {
+    const raw = localStorage.getItem(TUTORIAL_BACKUP_KEY)
+    if (!raw) return null
+    const parsed = parseSnapshotJson(raw)
+    if (!parsed.ok) return null
+    return {
+      formatVersion: parsed.snapshot.formatVersion,
+      savedAt: parsed.snapshot.savedAt,
+      project: cloneExampleProject(parsed.snapshot.project),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function clearTutorialBackup(): void {
+  try {
+    localStorage.removeItem(TUTORIAL_BACKUP_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export function hasTutorialBackup(): boolean {
+  return readTutorialBackup() !== null
 }
 
 /** True when localStorage already holds a project blob (returning visitor). */
