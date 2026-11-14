@@ -29,6 +29,7 @@ import {
 } from '../lib/modeStatus'
 import { stopFromUi } from '../lib/recordingController'
 import { useEditorStore } from '../state/store'
+import { focusOpener, isFocusNavigationKey } from './FloatingPanel'
 import { TimingDialog } from './TimingDialog'
 
 function PlayIcon() {
@@ -90,7 +91,7 @@ function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-/** Placement snap. Same control before a path (dock) and after one (editing row). */
+/** Placement snap — compact on the transport row in play mode; labeled in edit. */
 function SnapGridToggle({
   pressed,
   onToggle,
@@ -151,8 +152,6 @@ const menuItem =
   'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-900/[0.06] disabled:cursor-not-allowed disabled:opacity-40'
 const menuItemQuiet =
   'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-slate-500 transition hover:bg-slate-900/[0.05] disabled:cursor-not-allowed disabled:opacity-40'
-const menuItemMotion =
-  'flex w-full items-center px-3 py-2 text-left text-sm font-medium text-ms-motion transition hover:bg-ms-motion/10 disabled:cursor-not-allowed disabled:opacity-40'
 
 /** Labeled overflow menu for occasional dock actions — no nested horizontal scroll. */
 function DockMoreMenu({
@@ -175,6 +174,12 @@ function DockMoreMenu({
   const rootRef = useRef<HTMLDivElement>(null)
   const localBtnRef = useRef<HTMLButtonElement>(null)
   const btnRef = buttonRef ?? localBtnRef
+  /**
+   * Close-time keyboard intent: false after a pointer open; true after
+   * keyboard open or Tab/Arrow while the menu is open.
+   */
+  const restoreFocusVisibleRef = useRef(false)
+  const pointerOpenedRef = useRef(false)
 
   useEffect(() => {
     if (!open) {
@@ -192,10 +197,21 @@ function DockMoreMenu({
     }
     place()
     const onKey = (e: KeyboardEvent) => {
+      if (isFocusNavigationKey(e.key)) {
+        restoreFocusVisibleRef.current = true
+      }
       if (e.key !== 'Escape') return
       e.stopPropagation()
+      const showRing = restoreFocusVisibleRef.current
+      const btn = btnRef.current
       setOpen(false)
-      btnRef.current?.focus()
+      // Defer past the Escape keydown — WebKit treats sync focus() during
+      // that event as keyboard-visible even with focusVisible: false.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (btn?.isConnected) focusOpener(btn, showRing)
+        })
+      })
     }
     const onPtr = (e: PointerEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
@@ -224,7 +240,15 @@ function DockMoreMenu({
         aria-expanded={open}
         aria-label={label}
         title={label}
-        onClick={() => setOpen((v) => !v)}
+        onPointerDown={(e) => {
+          if (e.button === 0) pointerOpenedRef.current = true
+        }}
+        onClick={() => {
+          const fromPointer = pointerOpenedRef.current
+          pointerOpenedRef.current = false
+          restoreFocusVisibleRef.current = !fromPointer
+          setOpen((v) => !v)
+        }}
         className={`${btnSecondary} px-2`}
       >
         <span className="max-[360px]:hidden">{label}</span>
@@ -459,16 +483,17 @@ export function PlaybackDock() {
       : null
 
   // Edit-path copy stays available to AT/help; not a persistent grey paragraph.
-  // After a take, keep a reserved status row so armed/recording doesn't grow the dock.
+  // Always reserve the compact status row in play mode so empty → armed → first
+  // take does not grow the dock (armed copy fills the same min-h-8 slot).
   const editStatusScreenReaderOnly = editing
-  const reservePostTakeStatus = !editing && hasAnyRecording
+  const reservePlayStatus = !editing
   const dockStatusSlot = (modeStatus || !editing) ? (
         <div
           data-testid="dock-status-slot"
           className={
             editStatusScreenReaderOnly
               ? 'sr-only'
-              : modeStatus || reservePostTakeStatus
+              : modeStatus || reservePlayStatus
                 ? 'flex min-h-8 flex-wrap items-center justify-center gap-x-1.5 overflow-hidden text-center text-xs leading-snug'
                 : 'hidden'
           }
@@ -578,14 +603,17 @@ export function PlaybackDock() {
       }`}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {hasAnyRecording && !editing && (
+      {/* Always mount the compact timeline so the first take does not grow the
+          dock vertically. Disabled until a path exists; markers still only
+          appear when keyframes exist. */}
+      {!editing && (
         <div
           data-testid="playback-timeline"
           className="flex flex-col gap-0.5"
         >
           <div
             data-testid="playback-time-labels"
-            className="flex items-center justify-between gap-2 text-[11px] tabular-nums text-slate-500"
+            className="ms-caption flex items-center justify-between gap-2 tabular-nums"
           >
             <span data-testid="playback-elapsed">
               {goingBack
@@ -641,11 +669,14 @@ export function PlaybackDock() {
             max={1}
             step={0.001}
             value={playbackHead}
-            disabled={isRecordingLike}
+            disabled={!hasAnyRecording || isRecordingLike}
             aria-valuemin={0}
             aria-valuemax={1}
             aria-valuenow={Number(playbackHead.toFixed(3))}
             aria-valuetext={valueText}
+            aria-describedby={
+              !hasAnyRecording ? emptyBoardHintId : undefined
+            }
             onChange={(e) => {
               selectTransformKeyframe(null)
               scrubPlayback(Number(e.target.value))
@@ -934,10 +965,11 @@ export function PlaybackDock() {
           </>
         ) : (
           <>
-            {/* Transport: three-column grid so Play never overlays Edit/Reset. */}
+            {/* Transport: three-column grid so Play never overlays Edit/Reset.
+                gap-x-2 (≥8px) keeps Play centered while separating Edit path. */}
             <div
               data-testid="dock-transport"
-              className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-1"
+              className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2"
             >
               <div className="flex min-w-0 flex-nowrap items-center justify-end gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {isRecordingLike ? (
@@ -994,21 +1026,13 @@ export function PlaybackDock() {
                     </span>
                   </button>
                 )}
-                {/* After a take, Snap sits on the transport row (no extra dock row). */}
-                {hasAnyRecording &&
-                  (isRecordingLike ? (
-                    <span
-                      aria-hidden
-                      data-testid="dock-snap-spacer"
-                      className="inline-flex h-8 min-h-8 min-w-8 shrink-0"
-                    />
-                  ) : (
-                    <SnapGridToggle
-                      pressed={snapToGrid}
-                      onToggle={() => setSnapToGrid(!snapToGrid)}
-                      compact
-                    />
-                  ))}
+                {/* Snap stays on the transport row from the empty board onward
+                    so Record does not shift when the first take lands. */}
+                <SnapGridToggle
+                  pressed={snapToGrid}
+                  onToggle={() => setSnapToGrid(!snapToGrid)}
+                  compact
+                />
               </div>
 
               <div className="flex shrink-0 items-center justify-center">
@@ -1040,183 +1064,197 @@ export function PlaybackDock() {
               </div>
 
               <div className="flex min-w-0 flex-nowrap items-center justify-start gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {hasAnyRecording && !isRecordingLike && (
-                  <div
-                    data-testid="dock-editing"
-                    className="flex shrink-0 flex-nowrap items-center justify-start gap-1"
-                  >
-                    <button
-                      type="button"
-                      data-testid="btn-edit-path"
-                      onClick={enterEditMode}
-                      disabled={editPathDisabled}
-                      aria-label="Edit path"
-                      aria-describedby={editDescribedBy}
-                      title={
-                        mode === 'playing'
-                          ? PLAYING_EDIT_PATH_HINT
+                <div
+                  data-testid="dock-editing"
+                  className="flex shrink-0 flex-nowrap items-center justify-start gap-1"
+                >
+                  <button
+                    type="button"
+                    data-testid="btn-edit-path"
+                    onClick={enterEditMode}
+                    disabled={editPathDisabled}
+                    aria-label="Edit path"
+                    aria-describedby={editDescribedBy}
+                    title={
+                      mode === 'playing'
+                        ? PLAYING_EDIT_PATH_HINT
+                        : !hasRecording
+                          ? 'Record a path first'
                           : editPathDisabled
                             ? undefined
                             : 'Edit path'
-                      }
-                      className={`${btnSecondary} px-2`}
-                    >
-                      {wideDock ? (
-                        <>
-                          <span className="max-[480px]:hidden">Edit path</span>
-                          <span className="min-[481px]:hidden">Edit</span>
-                        </>
-                      ) : (
-                        'Edit'
-                      )}
-                    </button>
+                    }
+                    className={`${btnSecondary} px-2`}
+                  >
+                    {wideDock ? (
+                      <>
+                        <span className="max-[480px]:hidden">Edit path</span>
+                        <span className="min-[481px]:hidden">Edit</span>
+                      </>
+                    ) : (
+                      'Edit'
+                    )}
+                  </button>
 
-                    <button
-                      type="button"
-                      data-testid="btn-reset"
-                      onClick={() => {
-                        void (async () => {
-                          if (recording) {
-                            const label =
-                              selectedActor?.name ?? 'this element'
-                            const ok = await confirm({
-                              title: `Reset “${label}”?`,
-                              body: 'Clears this element’s recorded path, path edits, and transform keyframes. Appearance, other elements, and project Duration / Loop stay the same.',
-                              confirmLabel: 'Reset',
-                              danger: true,
-                              testId: 'reset-actor-confirm',
-                              confirmTestId: 'btn-reset-actor-confirm',
-                              cancelTestId: 'btn-reset-actor-cancel',
-                              bodyTestId: 'reset-actor-confirm-copy',
-                            })
-                            if (!ok) return
+                  <button
+                    type="button"
+                    data-testid="btn-reset"
+                    onClick={() => {
+                      void (async () => {
+                        if (recording) {
+                          const label =
+                            selectedActor?.name ?? 'this element'
+                          const ok = await confirm({
+                            title: `Reset “${label}”?`,
+                            body: 'Clears this element’s recorded path, path edits, and transform keyframes. Appearance, other elements, and project Duration / Loop stay the same.',
+                            confirmLabel: 'Reset',
+                            danger: true,
+                            testId: 'reset-actor-confirm',
+                            confirmTestId: 'btn-reset-actor-confirm',
+                            cancelTestId: 'btn-reset-actor-cancel',
+                            bodyTestId: 'reset-actor-confirm-copy',
+                          })
+                          if (!ok) return
+                        }
+                        resetRecording()
+                      })()
+                    }}
+                    disabled={resetDisabled}
+                    aria-label="Reset"
+                    aria-describedby={resetDescribedBy}
+                    title={
+                      !hasRecording
+                        ? 'Record a path first'
+                        : 'Reset this element’s recorded path'
+                    }
+                    className={`${btnSecondary} gap-1.5`}
+                  >
+                    <EraserIcon />
+                    <span className={wideDock ? 'max-[420px]:sr-only' : 'sr-only'}>
+                      Reset
+                    </span>
+                  </button>
+
+                  <DockMoreMenu
+                    testId="btn-dock-more"
+                    menuTestId="dock-more-menu"
+                    label="More"
+                    buttonRef={moreBtnRef}
+                  >
+                    {({ close }) => (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-testid="btn-continue-path"
+                          onClick={() => {
+                            armContinuePath()
+                            close()
+                          }}
+                          disabled={!continueAvail.enabled}
+                          title={
+                            continueAvail.reason ??
+                            (!hasRecording
+                              ? 'Record a path first'
+                              : CONTINUE_PATH_HELP)
                           }
-                          resetRecording()
-                        })()
-                      }}
-                      disabled={resetDisabled}
-                      aria-label="Reset"
-                      aria-describedby={resetDescribedBy}
-                      title="Reset this element’s recorded path"
-                      className={`${btnSecondary} gap-1.5`}
-                    >
-                      <EraserIcon />
-                      <span className={wideDock ? 'max-[420px]:sr-only' : 'sr-only'}>
-                        Reset
-                      </span>
-                    </button>
-
-                    <DockMoreMenu
-                      testId="btn-dock-more"
-                      menuTestId="dock-more-menu"
-                      label="More"
-                      buttonRef={moreBtnRef}
-                    >
-                      {({ close }) => (
-                        <>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            data-testid="btn-continue-path"
-                            onClick={() => {
-                              armContinuePath()
-                              close()
-                            }}
-                            disabled={!continueAvail.enabled}
-                            title={continueAvail.reason ?? CONTINUE_PATH_HELP}
-                            aria-describedby="continue-path-help"
-                            className={menuItem}
-                          >
-                            Extend path
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            data-testid="btn-timing"
-                            aria-haspopup="dialog"
-                            aria-expanded={timingOpen}
-                            title="When this element moves"
-                            onClick={() => {
-                              close()
-                              setTimingOpen(true)
-                            }}
-                            className={menuItem}
-                          >
-                            Timing
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            data-testid="btn-refine-motion"
-                            title="Open Motion tools in the inspector"
-                            onClick={() => {
-                              close()
-                              window.dispatchEvent(
-                                new CustomEvent('ms-open-inspector', {
-                                  detail: 'motion',
-                                }),
-                              )
-                            }}
-                            className={menuItemMotion}
-                          >
-                            Motion tools
-                          </button>
-                          {!wideDock ? (
-                            <>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                data-testid="btn-restart"
-                                onClick={() => {
-                                  restartPlayback()
-                                  close()
-                                }}
-                                disabled={playbackDisabled}
-                                className={menuItem}
-                              >
-                                Restart
-                              </button>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                data-testid="btn-undo-transform"
-                                onClick={() => {
-                                  undoActorEdit()
-                                  close()
-                                }}
-                                disabled={actorEditOrder.length === 0}
-                                className={menuItem}
-                              >
-                                Undo
-                              </button>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                data-testid="btn-redo-transform"
-                                onClick={() => {
-                                  redoActorEdit()
-                                  close()
-                                }}
-                                disabled={actorEditRedoOrder.length === 0}
-                                className={menuItem}
-                              >
-                                Redo
-                              </button>
-                            </>
-                          ) : null}
-                        </>
-                      )}
-                    </DockMoreMenu>
-                  </div>
-                )}
+                          aria-describedby="continue-path-help"
+                          className={menuItem}
+                        >
+                          Extend path
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-testid="btn-timing"
+                          aria-haspopup="dialog"
+                          aria-expanded={timingOpen}
+                          disabled={!hasRecording || isRecordingLike}
+                          title={
+                            !hasRecording
+                              ? 'Record a path first'
+                              : isRecordingLike
+                                ? 'Finish or cancel recording first'
+                                : 'When this element moves'
+                          }
+                          onClick={() => {
+                            close()
+                            setTimingOpen(true)
+                          }}
+                          className={menuItem}
+                        >
+                          Timing
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-testid="btn-refine-motion"
+                          title="Open Motion tools in the inspector"
+                          onClick={() => {
+                            close()
+                            window.dispatchEvent(
+                              new CustomEvent('ms-open-inspector', {
+                                detail: 'motion',
+                              }),
+                            )
+                          }}
+                          className={menuItem}
+                        >
+                          Motion tools
+                        </button>
+                        {!wideDock ? (
+                          <>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              data-testid="btn-restart"
+                              onClick={() => {
+                                restartPlayback()
+                                close()
+                              }}
+                              disabled={playbackDisabled}
+                              className={menuItem}
+                            >
+                              Restart
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              data-testid="btn-undo-transform"
+                              onClick={() => {
+                                undoActorEdit()
+                                close()
+                              }}
+                              disabled={actorEditOrder.length === 0}
+                              className={menuItem}
+                            >
+                              Undo
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              data-testid="btn-redo-transform"
+                              onClick={() => {
+                                redoActorEdit()
+                                close()
+                              }}
+                              disabled={actorEditRedoOrder.length === 0}
+                              className={menuItem}
+                            >
+                              Redo
+                            </button>
+                          </>
+                        ) : null}
+                      </>
+                    )}
+                  </DockMoreMenu>
+                </div>
                 {(wideDock || !hasAnyRecording || isRecordingLike) && (
                   <>
-                    {hasAnyRecording && !isRecordingLike ? (
-                      <span
-                        aria-hidden
-                        className="mx-0.5 h-4 w-px shrink-0 bg-slate-900/10"
-                      />
-                    ) : null}
+                    <span
+                      aria-hidden
+                      className="mx-0.5 h-4 w-px shrink-0 bg-slate-900/10"
+                    />
                     <button
                       type="button"
                       data-testid="btn-restart"
@@ -1261,20 +1299,6 @@ export function PlaybackDock() {
         )}
       </div>
 
-      {/* Empty board only: Snap on its own centered row. After a take it sits
-          next to Record. Help text stays screen-reader / title only. */}
-      {!hasAnyRecording && !isRecordingLike && (
-        <div
-          data-testid="dock-snap-row"
-          className="flex h-8 w-full items-center justify-center"
-        >
-          <SnapGridToggle
-            pressed={snapToGrid}
-            onToggle={() => setSnapToGrid(!snapToGrid)}
-          />
-        </div>
-      )}
-
       <p
         id="snap-to-grid-help"
         data-testid="snap-to-grid-help"
@@ -1283,25 +1307,23 @@ export function PlaybackDock() {
         Align placement and path edits to the dots. Recording stays freehand.
       </p>
 
-      {hasRecording && !editing && !isRecordingLike && (
-        <p
-          id="continue-path-help"
-          data-testid="continue-path-help"
-          className="sr-only"
-        >
-          {continueAvail.reason ?? CONTINUE_PATH_BAKE_NOTE}
-        </p>
-      )}
+      <p
+        id="continue-path-help"
+        data-testid="continue-path-help"
+        className="sr-only"
+      >
+        {!hasRecording
+          ? 'Record a path first.'
+          : (continueAvail.reason ?? CONTINUE_PATH_BAKE_NOTE)}
+      </p>
 
-      {hasAnyRecording && (
-        <p
-          id={playingEditHintId}
-          data-testid="playing-edit-path-hint"
-          className="sr-only"
-        >
-          {PLAYING_EDIT_PATH_HINT}
-        </p>
-      )}
+      <p
+        id={playingEditHintId}
+        data-testid="playing-edit-path-hint"
+        className="sr-only"
+      >
+        {PLAYING_EDIT_PATH_HINT}
+      </p>
 
       {/* Idle/armed/recording: status under transport (height reserved). */}
       {!editing ? dockStatusSlot : null}
