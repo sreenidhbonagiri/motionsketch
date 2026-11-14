@@ -562,12 +562,39 @@ export function ExportPanel() {
           >
             Requires access to your website’s code.
           </p>
-          <HelpDisclosure
-            testId="export-website-platform-help"
-            summary="Website platform notes"
-          >
-            Does not install into WordPress or Webflow. Downloading does not
-            publish your website.
+          <HelpDisclosure testId="export-about" summary="About export">
+            <p data-testid="export-website-platform-help">
+              Does not install into WordPress or Webflow. Downloading does not
+              publish your website.
+            </p>
+            <p
+              id="export-trigger-detail"
+              data-testid="export-trigger-detail"
+              className="mt-1.5"
+            >
+              {triggerNeedsJavaScript(trigger)
+                ? 'Download CSS is CSS-only. This trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
+                : 'For page-load, CSS alone can start the motion when prefers-reduced-motion is off. The documented website integration still includes ms-trigger.js so Play/Replay and reduced-motion controls work; Download CSS alone skips that controller.'}{' '}
+              Loop / alternate still apply after the scene starts.
+            </p>
+            <p
+              id={triggerRegenHelpId}
+              data-testid="export-trigger-regen-help"
+              className="mt-1.5"
+            >
+              Changing the trigger updates the generated embed code below. Copy
+              the sections again (and download a fresh ZIP if you need the
+              package files) after you change it.
+            </p>
+            <p
+              id={previewTriggerHelpId}
+              data-testid="export-preview-trigger-help"
+              className="mt-1.5"
+            >
+              Test playback opens an isolated preview of the selected start
+              setting. It does not change the editor playhead, recording, or
+              undo history.
+            </p>
           </HelpDisclosure>
           <p id={packageStatusId} className="sr-only" data-testid="export-web-package-help">
             ZIP with a working index.html preview and files to add the animation
@@ -672,8 +699,8 @@ export function ExportPanel() {
               data-testid="export-html-download-blurb"
               className="text-sm leading-relaxed text-ms-muted"
             >
-              ZIP with a working <code>{WEB_PACKAGE_HTML_NAME}</code> preview
-              plus <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
+              ZIP with a working <code>{WEB_PACKAGE_HTML_NAME}</code> preview,{' '}
+              <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
               <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
               {websiteIntegration?.ok &&
               websiteIntegration.assetHrefs.length > 0
@@ -741,9 +768,8 @@ export function ExportPanel() {
               data-testid="export-react-package-help"
               className="text-sm leading-relaxed text-ms-muted"
             >
-              ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images,
-              trigger script, and a Vite React README. Same motion as the HTML
-              package.
+              ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, trigger
+              script, and a Vite React README.
             </p>
           </div>
         )}
@@ -756,7 +782,11 @@ export function ExportPanel() {
             <select
               data-testid="export-trigger-select"
               value={trigger}
-              aria-describedby={describedBy(triggerHelpId, triggerRegenHelpId)}
+              aria-describedby={describedBy(
+                triggerHelpId,
+                'export-trigger-detail',
+                triggerRegenHelpId,
+              )}
               onChange={(e) => onTriggerChange(e.target.value)}
               className="w-full rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs text-slate-800"
             >
@@ -779,19 +809,6 @@ export function ExportPanel() {
             className="text-sm leading-relaxed text-ms-muted"
           >
             {triggerHelpText(trigger)}
-            {triggerNeedsJavaScript(trigger)
-              ? ' Download CSS is CSS-only. This trigger needs the HTML demo, web package, or React package (includes ms-trigger.js).'
-              : ' For page-load, CSS alone can start the motion when prefers-reduced-motion is off. The documented website integration still includes ms-trigger.js so Play/Replay and reduced-motion controls work; Download CSS alone skips that controller.'}{' '}
-            Loop / alternate still apply after the scene starts.
-          </p>
-          <p
-            id={triggerRegenHelpId}
-            data-testid="export-trigger-regen-help"
-            className="text-sm leading-relaxed text-ms-muted"
-          >
-            Changing the trigger updates the generated embed code below.
-            Copy the sections again (and download a fresh ZIP if you need the
-            package files) after you change it.
           </p>
           {websitePath === 'html' && websiteIntegration?.ok ? (
             <p
@@ -815,14 +832,6 @@ export function ExportPanel() {
           >
             Test playback behavior
           </button>
-          <p
-            id={previewTriggerHelpId}
-            data-testid="export-preview-trigger-help"
-            className="text-sm leading-relaxed text-ms-muted"
-          >
-            Opens an isolated preview of the selected start setting. Does not
-            change the editor playhead, recording, or undo history.
-          </p>
         </div>
 
         {websitePath === 'html' && (
@@ -836,7 +845,7 @@ export function ExportPanel() {
               className="list-decimal space-y-1.5 pl-4 text-sm leading-relaxed text-ms-muted"
             >
               <li>
-                Unzip the package. Keep <code>{WEB_PACKAGE_HTML_NAME}</code>,{' '}
+                Unzip and keep <code>{WEB_PACKAGE_HTML_NAME}</code>,{' '}
                 <code>{WEB_PACKAGE_CSS_NAME}</code>,{' '}
                 <code>{WEB_PACKAGE_TRIGGER_JS_NAME}</code>
                 {websiteIntegration?.ok &&
@@ -846,19 +855,16 @@ export function ExportPanel() {
                 together as shown above.
               </li>
               <li>
-                Open <code>{WEB_PACKAGE_HTML_NAME}</code> for a self-contained
-                preview page (layout and controls). To embed in an existing page,
-                copy those files beside your HTML and paste the three sections
-                below
+                Open <code>{WEB_PACKAGE_HTML_NAME}</code> to preview, or paste
+                the three sections below into your page
                 {websiteIntegration?.ok
                   ? ` (stage aspect ${websiteIntegration.aspectCss})`
                   : ''}
-                — the snippets are the equivalent integration pieces.
+                .
               </li>
               <li>
-                <code>README.txt</code> is instructions;{' '}
-                <code>project.json</code> reopens the project in MotionSketch.
-                Neither is required to run the embedded animation.
+                <code>README.txt</code> and <code>project.json</code> are
+                optional — not required to run the animation.
               </li>
             </ol>
             <p
@@ -878,9 +884,8 @@ export function ExportPanel() {
               data-testid="export-html-paste-order"
               className="text-sm leading-relaxed text-ms-muted"
             >
-              Paste each section where its label indicates, in the order shown.
-              Initialization goes after the scene markup, before{' '}
-              <code>{'</body>'}</code>.
+              Paste each section where its label indicates, in order. Scripts go
+              after the scene markup, before <code>{'</body>'}</code>.
             </p>
             {websiteIntegration?.ok ? (
               (
@@ -927,23 +932,20 @@ export function ExportPanel() {
               className="list-decimal space-y-1.5 pl-4 text-sm leading-relaxed text-ms-muted"
             >
               <li>
-                Unzip <strong>all</strong> files into a folder in your Vite React
-                app (for example <code>src/motionsketch/</code>). The archive is
-                flat — do not leave <code>{REACT_PACKAGE_COMPONENT_NAME}</code>{' '}
-                at the project root.
+                Unzip all files into a folder in your Vite React app (for example{' '}
+                <code>src/motionsketch/</code>). Keep{' '}
+                <code>{REACT_PACKAGE_COMPONENT_NAME}</code> out of the project
+                root.
               </li>
               <li>
                 Keep <code>{REACT_PACKAGE_CSS_NAME}</code>,{' '}
                 <code>{REACT_PACKAGE_TRIGGER_JS_NAME}</code>, and any{' '}
-                <code>assets/</code> files beside the component.
+                <code>assets/</code> beside the component.
               </li>
               <li>
-                Add the import at the top of an existing component file directly
-                in <code>src/</code> (next to <code>src/motionsketch/</code>).
-                Put <code>{'<MotionSketchScene />'}</code> inside that
-                component’s returned JSX. This path assumes that file is
-                directly in <code>src/</code>; a deeper file needs an adjusted
-                relative path.
+                Import from a component in <code>src/</code> next to that folder
+                and render <code>{'<MotionSketchScene />'}</code> in its JSX.
+                Deeper files need an adjusted relative path.
               </li>
             </ol>
             <IntegrationSnippet
@@ -1015,11 +1017,9 @@ export function ExportPanel() {
                 data-testid="export-css-help"
                 className="text-sm leading-relaxed text-ms-muted"
               >
-                Scoped CSS only (scene root + keyframes). You supply the HTML.
-                Image assets are separate. See the header comments for reduced
-                motion, triggers, and instance prefixes.
+                Scoped CSS only — you supply the HTML.
                 {triggerNeedsJavaScript(trigger)
-                  ? ' This project’s trigger requires JavaScript (not included in Download CSS).'
+                  ? ' This project’s trigger requires JavaScript (not included here).'
                   : ''}
               </p>
 
@@ -1049,10 +1049,10 @@ export function ExportPanel() {
                 data-testid="export-css-code-help"
                 className="text-sm leading-relaxed text-ms-muted"
               >
-                Copy CSS and View CSS provide the same scoped scene code
+                Copy CSS and View CSS use the same scoped scene code
                 {project.actors.length > 1
-                  ? ' (unique classes per element inside the scene root).'
-                  : ' (wrap in the documented scene root).'}
+                  ? ' (unique classes per element).'
+                  : '.'}
               </p>
 
               <button
@@ -1073,8 +1073,7 @@ export function ExportPanel() {
                 data-testid="export-html-help"
                 className="text-sm leading-relaxed text-ms-muted"
               >
-                Single-file offline preview. Open in a browser; not for
-                embedding in your site.
+                Single-file offline preview — not for embedding in your site.
               </p>
             </div>
           </section>

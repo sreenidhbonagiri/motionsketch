@@ -900,4 +900,121 @@ test.describe('first-use tutorial', () => {
     await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
     await expect(page.getByTestId('btn-play')).toBeEnabled()
   })
+
+  test('Escape on Keep/Restore dismisses without discarding; Restore still restores', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await skipTutorialIfPresent(page)
+    await ensureEditor(page, 'Pre-tutorial project')
+    await recordSimplePath(page)
+    await page.getByTestId('btn-toggle-elements-pane').click()
+    await page.getByTestId('btn-add-actor').click()
+    await page.getByTestId('btn-toggle-actor-list').click().catch(() => {})
+    await openPanel(page, 'project')
+    await expect(page.getByTestId('save-status')).toHaveText(
+      'Saved in this browser',
+      { timeout: 4000 },
+    )
+    await closePanel(page, 'project')
+    const storedBefore = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedBefore).toContain('Pre-tutorial project')
+
+    await openPanel(page, 'help')
+    await page.getByTestId('btn-restart-tutorial').click()
+    await expect(page.getByTestId('tutorial-coach')).toBeVisible()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 30, y: -20 }, { x: 150, y: 40 })
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'play',
+    )
+
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
+    await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
+    await expect(page.getByTestId('btn-tutorial-restore')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
+    await expect(page.getByTestId('tutorial-coach')).toBeVisible()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    // Focus returns to the Skip control that opened the choice.
+    await expect(page.getByTestId('btn-tutorial-skip')).toBeFocused()
+    const storedMid = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedMid).toBe(storedBefore)
+
+    // Reopen and Restore explicitly.
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
+    await page.getByTestId('btn-tutorial-restore').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Pre-tutorial project',
+    )
+    const storedAfter = await page.evaluate(
+      () => localStorage.getItem('motionsketch.project.v1') || '',
+    )
+    expect(storedAfter).toBe(storedBefore)
+  })
+
+  test('Escape on Keep/Start fresh dismisses; Keep then Start fresh still work', async ({
+    page,
+  }) => {
+    await clearAppStorage(page)
+    await awaitAutoTutorial(page)
+
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 35, y: -25 }, { x: 160, y: 35 })
+    await expect(page.getByTestId('tutorial-coach')).toHaveAttribute(
+      'data-tutorial-step',
+      'play',
+    )
+
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
+    await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
+    await expect(page.getByTestId('btn-tutorial-start-fresh')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('tutorial-keep-confirm')).toHaveCount(0)
+    await expect(page.getByTestId('tutorial-coach')).toBeVisible()
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+    await expect(page.getByTestId('btn-tutorial-skip')).toBeFocused()
+
+    // Reopen and Keep.
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('tutorial-keep-confirm')).toBeVisible()
+    await page.getByTestId('btn-tutorial-keep').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+    await expect(page.getByTestId('btn-rename-project')).toHaveText(
+      'Tutorial practice',
+    )
+    await expect(page.getByTestId('btn-play')).toBeEnabled()
+
+    // Explicit Start fresh on a clean empty-previous flight.
+    await clearAppStorage(page)
+    await awaitAutoTutorial(page)
+    await page.getByTestId('btn-record').click()
+    await dragActor(page, { x: 20, y: -15 }, { x: 120, y: 25 })
+    await page.getByTestId('btn-tutorial-skip').click()
+    await expect(page.getByTestId('btn-tutorial-start-fresh')).toBeVisible()
+    await expect(page.getByTestId('btn-tutorial-keep')).toBeFocused()
+    await page.getByTestId('btn-tutorial-start-fresh').click()
+    await expect(page.getByTestId('tutorial-coach')).toHaveCount(0)
+  })
 })

@@ -18,6 +18,11 @@ export type ConfirmDialogProps = {
   initialFocus?: 'confirm' | 'cancel'
   onConfirm: () => void
   onCancel: () => void
+  /**
+   * Escape and backdrop. Defaults to `onCancel`. Pass a distinct handler when
+   * passive dismissal must not equal the Cancel button (tutorial Keep/Restore).
+   */
+  onPassiveDismiss?: () => void
   testId?: string
   confirmTestId?: string
   cancelTestId?: string
@@ -28,7 +33,8 @@ export type ConfirmDialogProps = {
 
 /**
  * Accessible modal confirmation using the native &lt;dialog&gt; element.
- * Escape and backdrop click cancel; focus returns to the prior control.
+ * Escape and backdrop use onPassiveDismiss (or onCancel); focus returns to the
+ * prior control.
  */
 export function ConfirmDialog({
   open,
@@ -40,6 +46,7 @@ export function ConfirmDialog({
   initialFocus = 'cancel',
   onConfirm,
   onCancel,
+  onPassiveDismiss,
   testId = 'app-confirm',
   confirmTestId = 'btn-app-confirm',
   cancelTestId = 'btn-app-confirm-cancel',
@@ -57,11 +64,43 @@ export function ConfirmDialog({
     const dialog = dialogRef.current
     if (!dialog) return
 
+    const restoreOpener = () => {
+      let target = returnFocus.current
+      returnFocus.current = null
+      if (
+        !target ||
+        target === document.body ||
+        target === document.documentElement
+      ) {
+        return
+      }
+      // Remounted openers (portal coach) — re-resolve by test id.
+      if (!document.contains(target)) {
+        const testId = target.getAttribute('data-testid')
+        const fresh = testId
+          ? document.querySelector(`[data-testid="${testId}"]`)
+          : null
+        if (!(fresh instanceof HTMLElement)) return
+        target = fresh
+      }
+      const el = target
+      // Defer past Escape / dialog teardown — WebKit ignores sync focus() here.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!document.contains(el)) return
+          el.focus()
+        })
+      })
+    }
+
     if (!open) {
       if (dialog.open) dialog.close()
+      restoreOpener()
       return
     }
 
+    // Prefer the opener captured when confirm() was called (more reliable than
+    // activeElement after React re-render). Fall back to the live focus.
     returnFocus.current =
       returnFocusRef?.current ??
       (document.activeElement instanceof HTMLElement
@@ -74,24 +113,16 @@ export function ConfirmDialog({
     else cancelBtnRef.current?.focus()
 
     const onNativeCancel = (event: Event) => {
-      // Escape — route through onCancel; keep React as the source of close.
+      // Escape — React owns close (preventDefault so the dialog stays open
+      // until the provider settles and sets open=false).
       event.preventDefault()
-      onCancel()
+      ;(onPassiveDismiss ?? onCancel)()
     }
     dialog.addEventListener('cancel', onNativeCancel)
     return () => {
       dialog.removeEventListener('cancel', onNativeCancel)
     }
-  }, [open, onCancel, returnFocusRef, initialFocus])
-
-  useEffect(() => {
-    if (open) return
-    const target = returnFocus.current
-    returnFocus.current = null
-    if (target && document.contains(target)) {
-      target.focus()
-    }
-  }, [open])
+  }, [open, onCancel, onPassiveDismiss, returnFocusRef, initialFocus])
 
   const requestConfirm = () => {
     onConfirm()
@@ -99,6 +130,10 @@ export function ConfirmDialog({
 
   const requestCancel = () => {
     onCancel()
+  }
+
+  const requestPassiveDismiss = () => {
+    ;(onPassiveDismiss ?? onCancel)()
   }
 
   return (
@@ -109,7 +144,7 @@ export function ConfirmDialog({
       aria-describedby={bodyId}
       className="confirm-dialog fixed inset-0 z-[100] m-auto w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-ms-border bg-white p-0 text-slate-900 shadow-[0_16px_48px_rgba(15,23,42,0.16)]"
       onClick={(e) => {
-        if (e.target === dialogRef.current) requestCancel()
+        if (e.target === dialogRef.current) requestPassiveDismiss()
       }}
     >
       <div className="space-y-3 p-4">

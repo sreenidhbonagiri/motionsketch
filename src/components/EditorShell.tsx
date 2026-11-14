@@ -51,7 +51,7 @@ import { InspectorPanel, type InspectorTab } from './InspectorPanel'
 import { PlaybackDock } from './PlaybackDock'
 import {
   canFloatBothWorkspaceCards,
-  FLOATING_ELEMENTS_WIDTH_CLASS,
+  FLOATING_ELEMENTS_SLOT_CLASS,
   FLOATING_INSPECTOR_WIDTH_CLASS,
   floatingWorkspaceCardClass,
   floatingWorkspaceCardSlotClass,
@@ -669,7 +669,7 @@ export function EditorShell() {
           {showElementsFloating && (
             <div
               data-testid="actor-list-slot"
-              className={`${floatingWorkspaceCardSlotClass} ${FLOATING_ELEMENTS_WIDTH_CLASS}`}
+              className={FLOATING_ELEMENTS_SLOT_CLASS}
             >
               <div className={floatingWorkspaceCardClass}>
                 <ActorList
@@ -750,19 +750,32 @@ export function EditorShell() {
           )}
         </section>
 
-        {/* Inspector — focused sheet on phone/short; desktop uses floating card above */}
+        {/* Inspector — focused sheet on phone/short; desktop uses floating card above.
+            Stage back lives in the same outer chrome as Elements (not buried in tabs). */}
         {showInspectorSheet && (
           <div
             data-testid="inspector-slot"
             className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white"
           >
-            <InspectorPanel
-              tab={inspectorTab}
-              onTabChange={setInspectorTab}
-              onBackToStage={backToStage}
-              motionSummary={motionSummary}
-              fillHeight
-            />
+            <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
+              <button
+                type="button"
+                data-testid="btn-inspector-back-to-stage"
+                onClick={backToStage}
+                className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+              >
+                <ArrowLeft className="size-3.5" aria-hidden />
+                Stage
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <InspectorPanel
+                tab={inspectorTab}
+                onTabChange={setInspectorTab}
+                motionSummary={motionSummary}
+                fillHeight
+              />
+            </div>
           </div>
         )}
 

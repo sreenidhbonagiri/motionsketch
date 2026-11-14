@@ -117,7 +117,7 @@ export function useTutorial(opts: {
   const restoreOrKeep = useCallback(
     async (
       progress: 'completed' | 'skipped',
-      options?: { fromExport?: boolean },
+      options?: { fromExport?: boolean; returnFocus?: HTMLElement | null },
     ) => {
       if (leavingRef.current) return
       leavingRef.current = true
@@ -131,7 +131,7 @@ export function useTutorial(opts: {
 
         let keep = false
         if (hadFlight) {
-          keep = await confirm({
+          const choice = await confirm({
             title: TUTORIAL_KEEP_TITLE,
             body: previousEmpty
               ? TUTORIAL_KEEP_BODY_FRESH
@@ -142,12 +142,20 @@ export function useTutorial(opts: {
               : TUTORIAL_KEEP_RESTORE,
             // Cancel discards the practice flight — do not focus it for Space.
             initialFocus: 'confirm',
+            // Escape / backdrop leave the tutorial and practice flight intact.
+            passiveDismiss: 'abort',
+            returnFocus: options?.returnFocus ?? null,
             testId: 'tutorial-keep-confirm',
             confirmTestId: 'btn-tutorial-keep',
             cancelTestId: previousEmpty
               ? 'btn-tutorial-start-fresh'
               : 'btn-tutorial-restore',
           })
+          if (choice === null) {
+            // Passive dismiss — stay on the practice project; backup untouched.
+            return
+          }
+          keep = choice
         }
 
         cancelRecordingChrome()
@@ -183,19 +191,25 @@ export function useTutorial(opts: {
     [applyPersistedSnapshot, closePanels, confirm, ensureExportOpen],
   )
 
-  const skipTutorial = useCallback(() => {
-    void restoreOrKeep('skipped')
-  }, [restoreOrKeep])
+  const skipTutorial = useCallback(
+    (returnFocus?: HTMLElement | null) => {
+      void restoreOrKeep('skipped', { returnFocus })
+    },
+    [restoreOrKeep],
+  )
 
-  const goNext = useCallback(() => {
-    if (step === 'play') {
-      setStep('export')
-      return
-    }
-    if (step === 'export') {
-      void restoreOrKeep('completed', { fromExport: true })
-    }
-  }, [step, restoreOrKeep])
+  const goNext = useCallback(
+    (returnFocus?: HTMLElement | null) => {
+      if (step === 'play') {
+        setStep('export')
+        return
+      }
+      if (step === 'export') {
+        void restoreOrKeep('completed', { fromExport: true, returnFocus })
+      }
+    },
+    [step, restoreOrKeep],
+  )
 
   const restartTutorial = useCallback(() => {
     // Reset practice without replacing the stashed pre-tutorial project.

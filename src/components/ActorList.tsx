@@ -56,6 +56,9 @@ export function ActorList({
   const [open, setOpen] = useState(() =>
     forceOpen || readPanelOpenPref(ACTORS_PANEL_OPEN_KEY, variant === 'docked'),
   )
+  // Floating card only: collapse body to header without dismissing the panel.
+  // Kept mounted (hidden) so list scroll / selection / edits survive expand.
+  const [bodyExpanded, setBodyExpanded] = useState(true)
   const docked = variant === 'docked'
   const showBody = docked || open
   const busy =
@@ -80,21 +83,60 @@ export function ActorList({
             {actors.length}/{MAX_ACTORS}
           </span>
         </span>
-        <button
-          type="button"
-          data-testid="btn-toggle-actor-list"
-          aria-expanded="true"
-          aria-controls="actor-list-body"
-          onClick={() => setOpenPref(false)}
-          className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
-        >
-          <span data-testid="actors-collapse-label">Close</span>
-          <ChevronDown
-            className="size-3.5 text-slate-400"
-            aria-hidden
-            strokeWidth={2}
-          />
-        </button>
+        {fillHeight ? (
+          <button
+            type="button"
+            data-testid="btn-toggle-actor-list"
+            aria-expanded="true"
+            aria-controls="actor-list-body"
+            onClick={() => setOpenPref(false)}
+            className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+          >
+            <span data-testid="actors-collapse-label">Close</span>
+            <ChevronDown
+              className="size-3.5 text-slate-400"
+              aria-hidden
+              strokeWidth={2}
+            />
+          </button>
+        ) : (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              data-testid="btn-collapse-actor-list"
+              aria-expanded={bodyExpanded}
+              aria-controls="actor-list-body"
+              onClick={() => setBodyExpanded((v) => !v)}
+              className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+            >
+              <span data-testid="actors-collapse-label">
+                {bodyExpanded ? 'Collapse' : 'Expand'}
+              </span>
+              {bodyExpanded ? (
+                <ChevronDown
+                  className="size-3.5 text-slate-400"
+                  aria-hidden
+                  strokeWidth={2}
+                />
+              ) : (
+                <ChevronRight
+                  className="size-3.5 text-slate-400"
+                  aria-hidden
+                  strokeWidth={2}
+                />
+              )}
+            </button>
+            <button
+              type="button"
+              data-testid="btn-toggle-actor-list"
+              aria-label="Close Elements"
+              onClick={() => setOpenPref(false)}
+              className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+            >
+              <span data-testid="actors-close-label">Close</span>
+            </button>
+          </div>
+        )}
       </div>
     )
     const body = (
@@ -262,6 +304,9 @@ export function ActorList({
       <div
         data-testid="actor-list"
         data-actors-open="true"
+        data-actors-body-expanded={
+          fillHeight ? 'true' : bodyExpanded ? 'true' : 'false'
+        }
         className={
           fillHeight
             ? 'flex h-full min-h-0 w-full flex-col'
@@ -276,10 +321,12 @@ export function ActorList({
         <div
           id="actor-list-body"
           data-testid="actor-list-body"
+          hidden={!fillHeight && !bodyExpanded}
           className={
             fillHeight
               ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-              : 'min-h-0'
+              : // Own the scrollport so collapse-to-header (hidden) keeps scrollTop.
+                'min-h-0 max-h-[min(22rem,calc(100dvh-8rem))] overflow-y-auto overscroll-contain'
           }
         >
           {fillHeight ? (

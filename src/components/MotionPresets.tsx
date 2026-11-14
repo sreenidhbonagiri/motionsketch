@@ -21,10 +21,9 @@ export function MotionPresets() {
 
   return (
     <div data-testid="motion-presets" className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-800">Motion presets</h3>
-        <p className="ms-caption">Preview, then Apply</p>
-      </div>
+      <h3 className="text-sm font-semibold text-slate-800 whitespace-nowrap">
+        Motion presets
+      </h3>
       <ul className="space-y-1.5" role="list">
         {MOTION_PRESETS.map((preset) => {
           const active = presetSession?.presetId === preset.id

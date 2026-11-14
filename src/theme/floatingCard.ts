@@ -31,16 +31,18 @@ export const FLOATING_ELEMENTS_WIDTH_PX = 256
 export const FLOATING_INSPECTOR_WIDTH_PX = 260
 /** left-2 + right-2 outer gaps */
 export const FLOATING_SIDE_GAP_PX = 16
-/** Minimum clear stage width between both floating cards. */
-export const MIN_FLOATING_CLEAR_STAGE_PX = 300
 
-/** Viewport must be at least this wide to float both cards together. */
-export const MIN_WIDTH_FOR_BOTH_FLOATING_CARDS_PX =
-  FLOATING_ELEMENTS_WIDTH_PX +
-  FLOATING_INSPECTOR_WIDTH_PX +
-  FLOATING_SIDE_GAP_PX +
-  MIN_FLOATING_CLEAR_STAGE_PX
+/**
+ * Viewport must be at least this wide to float both cards together.
+ * Below this (with both open), use focused Stage / Elements / Inspector sheets
+ * so the drawing surface is not squeezed — ~1100px leaves usable clear stage.
+ */
+export const MIN_WIDTH_FOR_BOTH_FLOATING_CARDS_PX = 1100
 
 export function canFloatBothWorkspaceCards(viewportWidthPx: number): boolean {
   return viewportWidthPx >= MIN_WIDTH_FOR_BOTH_FLOATING_CARDS_PX
 }
+
+/** Elements floating slot: hug content (supports collapse-to-header). */
+export const FLOATING_ELEMENTS_SLOT_CLASS =
+  'pointer-events-none absolute top-2 left-2 z-[40] flex max-h-[calc(100%-1rem)] w-[min(16rem,calc(100%-1rem))] flex-col justify-start'

@@ -39,8 +39,8 @@ interface TutorialCoachProps {
   exportOpen?: boolean
   showNext: boolean
   nextIsFinish?: boolean
-  onSkip: () => void
-  onNext?: () => void
+  onSkip: (returnFocus?: HTMLElement | null) => void
+  onNext?: (returnFocus?: HTMLElement | null) => void
 }
 
 /**
@@ -324,7 +324,7 @@ export function TutorialCoach({
           <button
             type="button"
             data-testid="btn-tutorial-skip"
-            onClick={onSkip}
+            onClick={(e) => onSkip(e.currentTarget)}
             className="rounded-lg px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-900/[0.05] hover:text-slate-900"
           >
             {TUTORIAL_SKIP_LABEL}
@@ -335,7 +335,7 @@ export function TutorialCoach({
               data-testid={
                 nextIsFinish ? 'btn-tutorial-finish' : 'btn-tutorial-next'
               }
-              onClick={onNext}
+              onClick={(e) => onNext(e.currentTarget)}
               className="rounded-lg bg-ms-primary px-2.5 py-1 text-xs font-medium text-white transition hover:bg-ms-primary-hover active:bg-ms-primary-pressed"
             >
               {nextIsFinish ? TUTORIAL_FINISH_LABEL : TUTORIAL_NEXT_LABEL}
