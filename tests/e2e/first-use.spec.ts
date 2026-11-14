@@ -353,6 +353,11 @@ test.describe('first-use guidance and export wording', () => {
     } else {
       await expect(page.getByTestId('export-panel-root')).toBeFocused()
       await page.keyboard.press('Tab')
+      // Concise platform notes disclosure sits above the HTML/React path tabs.
+      await expect(
+        page.getByTestId('export-website-platform-help').locator('summary'),
+      ).toBeFocused()
+      await page.keyboard.press('Tab')
       await expect(page.getByTestId('btn-export-path-html')).toBeFocused()
 
       const tabOrder: string[] = ['btn-export-path-html']
