@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   cameraCssTransform,
+  clearViewportRect,
   fitCamera,
   fitStageLayoutSize,
   formatZoomPercent,
   isBackgroundPanTarget,
   isSpacePanBlockedTarget,
+  normalizeViewportInsets,
   panCamera,
   preserveCameraCenterOnLayoutChange,
   zoomCameraAt,
@@ -40,6 +42,32 @@ describe('workspace camera', () => {
     expect(cam.zoom).toBe(1)
     expect(cam.panX).toBeCloseTo((viewport.width - layout.width) / 2)
     expect(cam.panY).toBeCloseTo((viewport.height - layout.height) / 2)
+  })
+
+  it('fits inside clear insets so floating cards do not cover the stage', () => {
+    const insets = { left: 260, right: 270, top: 40, bottom: 0 }
+    const clear = clearViewportRect(viewport, insets)
+    expect(clear.size.width).toBe(viewport.width - 530)
+    expect(clear.originX).toBe(260)
+    const layout = fitStageLayoutSize(viewport, 16 / 10, undefined, insets)
+    expect(layout.width).toBeLessThanOrEqual(clear.size.width * 0.96 + 1e-6)
+    expect(layout.height).toBeLessThanOrEqual(clear.size.height * 0.96 + 1e-6)
+    const cam = fitCamera(viewport, layout, insets)
+    expect(cam.zoom).toBe(1)
+    expect(cam.panX).toBeGreaterThanOrEqual(insets.left - 1e-6)
+    expect(cam.panX + layout.width).toBeLessThanOrEqual(
+      viewport.width - insets.right + 1e-6,
+    )
+    expect(cam.panY).toBeGreaterThanOrEqual(insets.top - 1e-6)
+  })
+
+  it('normalizes insets that would consume the whole viewport', () => {
+    const safe = normalizeViewportInsets(
+      { left: 800, right: 800, top: 10, bottom: 10 },
+      viewport,
+    )
+    expect(safe.left + safe.right).toBeLessThan(viewport.width)
+    expect(safe.top + safe.bottom).toBeLessThan(viewport.height)
   })
 
   it('zooms around a pointer without drifting that world point', () => {

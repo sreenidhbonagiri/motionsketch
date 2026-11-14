@@ -47,7 +47,7 @@ export function WorkspaceCameraBar({
       </button>
       <span
         data-testid="zoom-percent"
-        className="min-w-[2.75rem] px-0.5 text-center text-xs tabular-nums text-slate-600"
+        className="ms-caption min-w-[2.75rem] px-0.5 text-center tabular-nums text-slate-700"
         aria-live="polite"
       >
         {formatZoomPercent(zoom)}

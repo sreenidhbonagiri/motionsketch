@@ -21,7 +21,10 @@
   --ms-canvas: #ffffff;
   --ms-panel: #ffffff;
   --ms-ink: #17213a;
-  --ms-muted: #647089;
+  /* Secondary labels on white — ≥4.5:1 (was #647089 ≈4.97; prefer clearer). */
+  --ms-muted: #4f5c75;
+  --ms-label: 0.8125rem; /* 13px — default readable caption */
+  --ms-label-min: 0.75rem; /* 12px — floor for chrome captions */
   --ms-selected: #eff6ff;
   --ms-border: #e2e8f0;
   --ms-danger: #e11d48;
@@ -88,7 +91,8 @@
   --color-slate-800: #243049;
   --color-slate-700: #3a4660;
   --color-slate-600: #4f5c75;
-  --color-slate-500: #647089;
+  /* Align “500” secondary with muted so text-slate-500 stays ≥4.5:1 on white. */
+  --color-slate-500: #4f5c75;
   --color-slate-400: #8b95a8;
   --color-slate-300: #b8c0ce;
   --color-slate-200: #dfe4ee;
@@ -172,6 +176,30 @@ textarea:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--ms-primary);
   outline-offset: 2px;
+}
+
+/*
+ * Readable chrome captions (save status, About/help, presets, scrubber times,
+ * zoom %). Prefer 13px; 12px is the floor. Color uses --ms-muted (≥4.5:1 on white).
+ */
+.ms-caption {
+  font-size: var(--ms-label);
+  line-height: 1.35;
+  color: var(--ms-muted);
+}
+.ms-caption-strong {
+  font-size: var(--ms-label);
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--ms-ink);
+}
+.ms-wordmark {
+  font-size: var(--ms-label);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+  line-height: 1.3;
 }
 
 /* Override global textarea font inherit for readable CSS export */
