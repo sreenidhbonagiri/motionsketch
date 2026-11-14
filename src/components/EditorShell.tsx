@@ -53,6 +53,8 @@ import {
   canFloatBothWorkspaceCards,
   FLOATING_ELEMENTS_SLOT_CLASS,
   FLOATING_INSPECTOR_WIDTH_CLASS,
+  FOCUSED_SHEET_CHROME_CLASS,
+  FOCUSED_SHEET_CONTENT_CLASS,
   floatingWorkspaceCardClass,
   floatingWorkspaceCardSlotClass,
 } from '../theme/floatingCard'
@@ -624,28 +626,35 @@ export function EditorShell() {
             data-testid="actor-list-slot"
             className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white"
           >
-            <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
-              <button
-                type="button"
-                data-testid="btn-elements-back-to-stage"
-                onClick={backToStage}
-                className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
-              >
-                <ArrowLeft className="size-3.5" aria-hidden />
-                Stage
-              </button>
+            <div className="flex shrink-0 border-b border-ms-border">
+              <div className={FOCUSED_SHEET_CHROME_CLASS}>
+                <button
+                  type="button"
+                  data-testid="btn-elements-back-to-stage"
+                  onClick={backToStage}
+                  className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+                >
+                  <ArrowLeft className="size-3.5" aria-hidden />
+                  Stage
+                </button>
+              </div>
             </div>
-            <div className="min-h-0 flex-1">
-              <ActorList
-                variant="docked"
-                forceOpen
-                fillHeight
-                onOpenChange={(open) => {
-                  setActorsOpen(open)
-                  writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
-                  if (!open) setMobilePane((p) => (p === 'elements' ? null : p))
-                }}
-              />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <div
+                data-testid="focused-sheet-content"
+                className={FOCUSED_SHEET_CONTENT_CLASS}
+              >
+                <ActorList
+                  variant="docked"
+                  forceOpen
+                  fillHeight
+                  onOpenChange={(open) => {
+                    setActorsOpen(open)
+                    writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
+                    if (!open) setMobilePane((p) => (p === 'elements' ? null : p))
+                  }}
+                />
+              </div>
             </div>
           </aside>
         )}
@@ -757,24 +766,31 @@ export function EditorShell() {
             data-testid="inspector-slot"
             className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white"
           >
-            <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
-              <button
-                type="button"
-                data-testid="btn-inspector-back-to-stage"
-                onClick={backToStage}
-                className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
-              >
-                <ArrowLeft className="size-3.5" aria-hidden />
-                Stage
-              </button>
+            <div className="flex shrink-0 border-b border-ms-border">
+              <div className={FOCUSED_SHEET_CHROME_CLASS}>
+                <button
+                  type="button"
+                  data-testid="btn-inspector-back-to-stage"
+                  onClick={backToStage}
+                  className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+                >
+                  <ArrowLeft className="size-3.5" aria-hidden />
+                  Stage
+                </button>
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-hidden">
-              <InspectorPanel
-                tab={inspectorTab}
-                onTabChange={setInspectorTab}
-                motionSummary={motionSummary}
-                fillHeight
-              />
+              <div
+                data-testid="focused-sheet-content"
+                className={FOCUSED_SHEET_CONTENT_CLASS}
+              >
+                <InspectorPanel
+                  tab={inspectorTab}
+                  onTabChange={setInspectorTab}
+                  motionSummary={motionSummary}
+                  fillHeight
+                />
+              </div>
             </div>
           </div>
         )}
