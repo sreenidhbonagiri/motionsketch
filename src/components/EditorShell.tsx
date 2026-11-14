@@ -456,8 +456,8 @@ export function EditorShell() {
                   title={saveLabel}
                   className={
                     status === 'save-error' || status === 'restore-error'
-                      ? 'ms-caption inline-flex min-w-0 shrink items-center gap-1 font-medium text-amber-800'
-                      : 'ms-caption inline-flex min-w-0 shrink items-center gap-1'
+                      ? 'ms-caption ms-caption-lg inline-flex min-w-0 shrink items-center gap-1 font-medium text-amber-800'
+                      : 'ms-caption ms-caption-lg inline-flex min-w-0 shrink items-center gap-1'
                   }
                 >
                   {status === 'saved' && !practiceSuspended ? (

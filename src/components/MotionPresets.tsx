@@ -48,8 +48,8 @@ export function MotionPresets() {
                 <span
                   className={
                     active
-                      ? 'ms-caption mt-0.5 leading-snug text-slate-700'
-                      : 'ms-caption mt-0.5 leading-snug'
+                      ? 'ms-caption ms-caption-lg mt-0.5 leading-snug text-slate-700'
+                      : 'ms-caption ms-caption-lg mt-0.5 leading-snug'
                   }
                 >
                   {preset.summary}
