@@ -76,10 +76,7 @@ export function PresetPanel() {
           <h2 className="text-sm font-semibold text-slate-800">
             Preview: {label}
           </h2>
-          <p
-            data-testid="preset-panel-hint"
-            className="text-xs text-slate-500"
-          >
+          <p data-testid="preset-panel-hint" className="ms-caption">
             {comparingOriginal
               ? 'Showing original — Apply still commits the selected preset'
               : hasOriginalPath
@@ -115,9 +112,9 @@ export function PresetPanel() {
       {hasOriginalPath && (
         <p
           data-testid="preset-compare-legend"
-          className="mt-1.5 text-xs text-slate-500"
+          className="ms-caption mt-1.5"
         >
-          <span className="font-medium text-slate-600">Dashed</span> Original
+          <span className="font-medium text-slate-700">Dashed</span> Original
           {' · '}
           <span className="font-medium text-ms-primary-pressed">Solid</span>{' '}
           Preset

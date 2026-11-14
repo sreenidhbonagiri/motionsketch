@@ -16,14 +16,11 @@ export function HelpDisclosure({
   children: ReactNode
 }) {
   return (
-    <details
-      data-testid={testId}
-      className="group text-xs text-slate-500"
-    >
-      <summary className="cursor-pointer select-none text-slate-600 outline-none hover:text-slate-800 focus-visible:text-slate-800">
+    <details data-testid={testId} className="group ms-caption">
+      <summary className="cursor-pointer select-none font-medium text-slate-700 outline-none hover:text-slate-900 focus-visible:text-slate-900">
         {summary}
       </summary>
-      <div id={id} className="mt-1 leading-relaxed text-slate-500">
+      <div id={id} className="mt-1 leading-relaxed text-slate-600">
         {children}
       </div>
     </details>

@@ -11,7 +11,12 @@ function formatOffset(deg: number): string {
  * Optional path-facing controls under Appearance.
  * Heading is evaluated from the same processed path as playback/export.
  */
-export function FaceAlongPathSection() {
+export function FaceAlongPathSection({
+  showHelp = true,
+}: {
+  /** When false, Style-tab About Style owns the explanations. */
+  showHelp?: boolean
+}) {
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
@@ -23,7 +28,6 @@ export function FaceAlongPathSection() {
   const toggleId = useId()
   const offsetId = useId()
   const helpId = useId()
-  const offsetHelpId = useId()
 
   if (!selectedActor) return null
 
@@ -38,17 +42,6 @@ export function FaceAlongPathSection() {
       data-testid="face-along-path-section"
       className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm font-medium text-slate-800">Face along path</p>
-          <HelpDisclosure id={helpId} summary="About facing">
-            {recording
-              ? 'Turns the element to follow its movement. Path heading is a base rotation; transform keyframes and Direction offset add to it. With Alternate loop, poses reverse along the same angles. The element does not turn around to face backward travel.'
-              : 'Record a path first to enable facing. Turns the element to follow its movement once a path exists.'}
-          </HelpDisclosure>
-        </div>
-      </div>
-
       {enabled && recording && (
         <p
           data-testid="face-along-continue-note"
@@ -61,7 +54,7 @@ export function FaceAlongPathSection() {
 
       <label
         htmlFor={toggleId}
-        className="flex cursor-pointer items-center gap-2 text-sm text-slate-700"
+        className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-800"
       >
         <input
           id={toggleId}
@@ -69,12 +62,19 @@ export function FaceAlongPathSection() {
           type="checkbox"
           checked={enabled}
           disabled={disabled}
-          aria-describedby={helpId}
+          aria-describedby={showHelp ? helpId : undefined}
           onChange={(e) => setFaceAlongPath(e.target.checked)}
           className="size-3.5 accent-ms-primary disabled:opacity-40"
         />
         <span>Face along path</span>
       </label>
+      {showHelp && (
+        <HelpDisclosure id={helpId} summary="About facing">
+          {recording
+            ? 'Turns the element to follow its movement. Path heading is a base rotation; transform keyframes and Direction offset add to it. With Alternate loop, poses reverse along the same angles. The element does not turn around to face backward travel.'
+            : 'Record a path first to enable facing. Turns the element to follow its movement once a path exists.'}
+        </HelpDisclosure>
+      )}
 
       {enabled && recording && (
         <div className="space-y-2 pt-0.5">
@@ -87,9 +87,6 @@ export function FaceAlongPathSection() {
               {formatOffset(offset)}
             </span>
           </label>
-          <HelpDisclosure id={offsetHelpId} summary="About direction offset">
-            Align images that face up, right, or another direction (degrees).
-          </HelpDisclosure>
           <input
             id={offsetId}
             data-testid="direction-offset-slider"
@@ -100,7 +97,7 @@ export function FaceAlongPathSection() {
             value={Math.min(180, Math.max(-180, offset))}
             disabled={disabled}
             aria-valuetext={formatOffset(offset)}
-            aria-describedby={offsetHelpId}
+            aria-label="Direction offset in degrees"
             onChange={(e) => setDirectionOffsetDeg(Number(e.target.value))}
             className="w-full accent-ms-primary disabled:opacity-40"
           />
@@ -113,7 +110,6 @@ export function FaceAlongPathSection() {
             value={offset}
             disabled={disabled}
             aria-label="Direction offset in degrees"
-            aria-describedby={offsetHelpId}
             onChange={(e) => setDirectionOffsetDeg(Number(e.target.value))}
             className="w-full rounded-md border border-ms-border bg-white px-2 py-1 text-sm tabular-nums text-slate-800 disabled:opacity-40"
           />

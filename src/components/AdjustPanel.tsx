@@ -11,7 +11,15 @@ function formatDurationSeconds(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(2)} s`
 }
 
-export function AdjustPanel() {
+export function AdjustPanel({
+  showHelp = true,
+  motionHelpId,
+}: {
+  /** When false, the Motion-tab Help disclosure owns the explanations. */
+  showHelp?: boolean
+  /** Optional shared Motion help id for aria-describedby. */
+  motionHelpId?: string
+}) {
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -39,34 +47,24 @@ export function AdjustPanel() {
     steadySpeed <= 0 ? 'Off' : `${Math.round(steadySpeed * 100)}%`
   const smoothingLocked = !!geometryEdit || !!selectedActor?.geometryEdit
   const editing = mode === 'editing'
+  const describedBy = motionHelpId
 
   return (
     <div data-testid="adjust-panel" className="space-y-2.5 px-2.5 py-2">
-      <HelpDisclosure testId="adjust-panel-help" summary="About Adjust">
-        Adjusting{' '}
-        <span className="font-medium text-slate-700">
-          {selectedActor?.name ?? 'the selected element'}
-        </span>
-        . Duration is shared project playback time (scales Timing). Smoothing
-        reduces path wobble. Steady Speed evens movement while keeping pauses —
-        Glide eases starts/stops afterward. Loop Repeat restarts (may jump);
-        Back and forth alternates with no jump.
-      </HelpDisclosure>
-      <p id="duration-help" data-testid="duration-help" className="sr-only">
-        Total playback time for the project. Changing Duration scales Timing
-        proportionally.
-      </p>
-      <p
-        id="steady-speed-help"
-        data-testid="steady-speed-help"
-        className="sr-only"
-      >
-        {selectedHasRecording
-          ? 'Evens out movement speed while keeping pauses. Glide adds ease-in/out after this.'
-          : 'Create a path for this element to adjust Steady Speed.'}
-      </p>
+      {showHelp && (
+        <HelpDisclosure testId="adjust-panel-help" summary="About Adjust">
+          Adjusting{' '}
+          <span className="font-medium text-slate-700">
+            {selectedActor?.name ?? 'the selected element'}
+          </span>
+          . Duration is shared project playback time (scales Timing). Smoothing
+          reduces path wobble. Steady Speed evens movement while keeping pauses —
+          Glide eases starts/stops afterward. Loop Repeat restarts (may jump);
+          Back and forth alternates with no jump.
+        </HelpDisclosure>
+      )}
 
-      <SvgPathImport />
+      <SvgPathImport showHelp={showHelp} motionHelpId={motionHelpId} />
 
       <MotionPresets />
 
@@ -89,7 +87,8 @@ export function AdjustPanel() {
           step={50}
           value={durationMs}
           disabled={!hasAnyRecording}
-          aria-describedby="duration-help"
+          aria-valuetext={formatDurationSeconds(durationMs)}
+          aria-describedby={describedBy}
           onChange={(e) => setDurationMs(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
@@ -114,11 +113,13 @@ export function AdjustPanel() {
           step={0.01}
           value={smoothing}
           disabled={!selectedHasRecording || smoothingLocked}
-          aria-describedby="smoothing-help"
+          aria-describedby={
+            smoothingLocked ? 'smoothing-help' : describedBy
+          }
           onChange={(e) => setSmoothing(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
-        {smoothingLocked ? (
+        {smoothingLocked && (
           <p
             id="smoothing-help"
             data-testid="smoothing-help"
@@ -126,10 +127,6 @@ export function AdjustPanel() {
           >
             Smoothing is baked into your path edit. Restore recorded path to
             change it.
-          </p>
-        ) : (
-          <p id="smoothing-help" data-testid="smoothing-help" className="sr-only">
-            Reduces wobble in your drawn path.
           </p>
         )}
       </div>
@@ -151,10 +148,22 @@ export function AdjustPanel() {
           step={0.01}
           value={steadySpeed}
           disabled={!selectedHasRecording}
-          aria-describedby="steady-speed-help"
+          aria-valuetext={steadySpeedLabel}
+          aria-describedby={
+            selectedHasRecording ? describedBy : 'steady-speed-help'
+          }
           onChange={(e) => setSteadySpeed(Number(e.target.value))}
           className="w-full accent-ms-primary disabled:opacity-40"
         />
+        {!selectedHasRecording && (
+          <p
+            id="steady-speed-help"
+            data-testid="steady-speed-help"
+            className="text-xs leading-relaxed text-slate-500"
+          >
+            Create a path for this element to adjust Steady Speed.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">

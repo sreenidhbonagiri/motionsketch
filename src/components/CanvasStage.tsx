@@ -14,6 +14,7 @@ import { useWorkspaceCamera } from '../hooks/useWorkspaceCamera'
 import { selectProcessedPathForActor } from '../state/selectors'
 import { useEditorStore } from '../state/store'
 import { msPalette } from '../theme/palette'
+import { FLOATING_INSPECTOR_CAMERA_BAR_RIGHT_CLASS } from '../theme/floatingCard'
 import { Actor } from './Actor'
 import { PathHandles } from './PathHandles'
 import { PathMoveOverlay } from './PathMoveOverlay'
@@ -612,7 +613,7 @@ export function CanvasStage({
       <div
         className={
           floatingInspector
-            ? 'pointer-events-none absolute top-2 z-[32] right-[min(19.25rem,calc(100%-0.25rem))] sm:top-3'
+            ? `pointer-events-none absolute top-2 z-[32] ${FLOATING_INSPECTOR_CAMERA_BAR_RIGHT_CLASS} sm:top-3`
             : 'pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3'
         }
       >

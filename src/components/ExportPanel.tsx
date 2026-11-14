@@ -40,6 +40,7 @@ import { copyText } from '../lib/clipboard'
 import { findActor, projectHasAnyRecording } from '../core/sceneActor'
 import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useEditorStore } from '../state/store'
+import { HelpDisclosure } from './HelpDisclosure'
 
 type OwnCopyKind = 'css' | 'html' | 'react' | 'trigger'
 type WebsitePath = 'html' | 'react'
@@ -559,12 +560,18 @@ export function ExportPanel() {
             data-testid="export-website-limits"
             className="text-sm leading-relaxed text-ms-muted"
           >
-            Needs access to your site’s code. Does not install into WordPress or
-            Webflow, and downloading does not publish anything.
+            Requires access to your website’s code.
           </p>
+          <HelpDisclosure
+            testId="export-website-platform-help"
+            summary="Website platform notes"
+          >
+            Does not install into WordPress or Webflow. Downloading does not
+            publish your website.
+          </HelpDisclosure>
           <p id={packageStatusId} className="sr-only" data-testid="export-web-package-help">
             ZIP with a working index.html preview and files to add the animation
-            to your site. Downloading does not publish anything.
+            to your site.
           </p>
         </div>
 
@@ -672,7 +679,7 @@ export function ExportPanel() {
               websiteIntegration.assetHrefs.length > 0
                 ? ', and assets/'
                 : ''}
-              . Downloading does not publish anything.
+              .
             </p>
             {websiteIntegration?.ok ? (
               <pre
@@ -736,7 +743,7 @@ export function ExportPanel() {
             >
               ZIP with {REACT_PACKAGE_COMPONENT_NAME}, scoped CSS, images,
               trigger script, and a Vite React README. Same motion as the HTML
-              package. Downloading does not publish anything.
+              package.
             </p>
           </div>
         )}

@@ -27,7 +27,12 @@ function formatTimePct(t: number): string {
  * Compact rotation/scale keyframe controls under Appearance.
  * Slider drags stay local until Add/Update (one history entry per commit).
  */
-export function TransformSection() {
+export function TransformSection({
+  showHelp = true,
+}: {
+  /** When false, Style-tab About Style owns the explanations. */
+  showHelp?: boolean
+}) {
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
@@ -108,9 +113,11 @@ export function TransformSection() {
         className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5"
       >
         <p className="text-sm font-medium text-slate-800">Transform</p>
-        <HelpDisclosure summary="About Transform">
-          Record a path first, then add rotation and scale keyframes.
-        </HelpDisclosure>
+        {showHelp && (
+          <HelpDisclosure summary="About Transform">
+            Record a path first, then add rotation and scale keyframes.
+          </HelpDisclosure>
+        )}
       </div>
     )
   }
@@ -123,11 +130,13 @@ export function TransformSection() {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 space-y-1">
           <p className="text-sm font-medium text-slate-800">Transform</p>
-          <HelpDisclosure summary="About Transform">
-            Rotation (unwrapped °) and uniform scale ({MIN_TRANSFORM_SCALE}–
-            {MAX_TRANSFORM_SCALE}) about the element center. Empty track → 0° /
-            1×. Times are progress along Duration.
-          </HelpDisclosure>
+          {showHelp && (
+            <HelpDisclosure summary="About Transform">
+              Rotation (unwrapped °) and uniform scale ({MIN_TRANSFORM_SCALE}–
+              {MAX_TRANSFORM_SCALE}) about the element center. Empty track → 0° /
+              1×. Times are progress along Duration.
+            </HelpDisclosure>
+          )}
         </div>
         {selected && (
           <button

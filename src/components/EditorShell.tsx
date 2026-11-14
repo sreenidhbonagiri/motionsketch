@@ -6,7 +6,10 @@ import {
 } from 'react'
 import {
   ArrowLeft,
+  Check,
+  CircleAlert,
   CircleHelp,
+  Library,
   PanelLeft,
   PanelRight,
   Upload,
@@ -47,6 +50,9 @@ import { HelpPanel } from './HelpPanel'
 import { InspectorPanel, type InspectorTab } from './InspectorPanel'
 import { PlaybackDock } from './PlaybackDock'
 import {
+  canFloatBothWorkspaceCards,
+  FLOATING_ELEMENTS_WIDTH_CLASS,
+  FLOATING_INSPECTOR_WIDTH_CLASS,
   floatingWorkspaceCardClass,
   floatingWorkspaceCardSlotClass,
 } from '../theme/floatingCard'
@@ -108,24 +114,38 @@ export function EditorShell() {
   )
   // Focused Elements/Inspector sheets when width is phone-like OR height is
   // too short for canvas + Inspector together (no silent panel close).
+  // Also when both floating cards would leave too little clear stage width.
   const [narrowViewport, setNarrowViewport] = useState(false)
   const [shortViewport, setShortViewport] = useState(false)
+  const [viewportWidthPx, setViewportWidthPx] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1280,
+  )
   useEffect(() => {
     const mqNarrow = window.matchMedia('(max-width: 767px)')
     const mqShort = window.matchMedia('(max-height: 560px)')
     const sync = () => {
       setNarrowViewport(mqNarrow.matches)
       setShortViewport(mqShort.matches)
+      setViewportWidthPx(window.innerWidth)
     }
     sync()
     mqNarrow.addEventListener('change', sync)
     mqShort.addEventListener('change', sync)
+    window.addEventListener('resize', sync)
     return () => {
       mqNarrow.removeEventListener('change', sync)
       mqShort.removeEventListener('change', sync)
+      window.removeEventListener('resize', sync)
     }
   }, [])
-  const useFocusedChrome = narrowViewport || shortViewport
+  // Both cards open + not enough clear stage → focused sheets (not squeeze /
+  // silent close). Single-card floating still allowed at mid widths.
+  const bothCardsCrowded =
+    actorsOpen &&
+    inspectorOpen &&
+    !canFloatBothWorkspaceCards(viewportWidthPx)
+  const useFocusedChrome =
+    narrowViewport || shortViewport || bothCardsCrowded
 
   const closePanel = useCallback(() => setOpenPanel(null), [])
   const closeExamples = useCallback(() => setExamplesOpen(false), [])
@@ -162,22 +182,39 @@ export function EditorShell() {
     onCloseShortcuts: closeShortcuts,
   })
 
-  const isFocusedLayout = () =>
-    typeof window !== 'undefined' &&
-    (window.matchMedia('(max-width: 767px)').matches ||
-      window.matchMedia('(max-height: 560px)').matches)
+  const isFocusedLayout = () => {
+    if (typeof window === 'undefined') return false
+    if (
+      window.matchMedia('(max-width: 767px)').matches ||
+      window.matchMedia('(max-height: 560px)').matches
+    ) {
+      return true
+    }
+    // Crowded both-cards mode uses the same sheet toggles as phone.
+    return (
+      actorsOpen &&
+      inspectorOpen &&
+      !canFloatBothWorkspaceCards(window.innerWidth)
+    )
+  }
 
   const openInspector = useCallback((tab: InspectorTab) => {
     setInspectorTab(tab)
     setOpenPanel(null)
     setExamplesOpen(false)
-    if (isFocusedLayout()) {
+    // Opening Inspector while Elements is already open on a crowded width
+    // must use focused sheets — not float both.
+    const wouldCrowdBoth =
+      actorsOpen && !canFloatBothWorkspaceCards(window.innerWidth)
+    if (isFocusedLayout() || wouldCrowdBoth) {
+      setInspectorOpen(true)
+      writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, true)
       setMobilePane('inspector')
       return
     }
     setInspectorOpen(true)
     writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, true)
-  }, [])
+  }, [actorsOpen])
 
   const closeInspectorDesktop = useCallback(() => {
     setInspectorOpen(false)
@@ -185,12 +222,20 @@ export function EditorShell() {
   }, [])
 
   const toggleActors = () => {
-    if (isFocusedLayout()) {
+    const wouldCrowdBoth =
+      !actorsOpen &&
+      inspectorOpen &&
+      !canFloatBothWorkspaceCards(window.innerWidth)
+    if (isFocusedLayout() || wouldCrowdBoth) {
       setMobilePane((prev) => {
         const next = prev === 'elements' ? null : 'elements'
         if (next === 'elements') {
           setActorsOpen(true)
           writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, true)
+        } else if (prev === 'elements') {
+          // Closing the focused sheet keeps the other panel's pref intact.
+          setActorsOpen(false)
+          writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, false)
         }
         return next
       })
@@ -204,8 +249,22 @@ export function EditorShell() {
   }
 
   const toggleInspectorPane = () => {
-    if (isFocusedLayout()) {
-      setMobilePane((prev) => (prev === 'inspector' ? null : 'inspector'))
+    const wouldCrowdBoth =
+      !inspectorOpen &&
+      actorsOpen &&
+      !canFloatBothWorkspaceCards(window.innerWidth)
+    if (isFocusedLayout() || wouldCrowdBoth) {
+      setMobilePane((prev) => {
+        const next = prev === 'inspector' ? null : 'inspector'
+        if (next === 'inspector') {
+          setInspectorOpen(true)
+          writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, true)
+        } else if (prev === 'inspector') {
+          setInspectorOpen(false)
+          writePanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, false)
+        }
+        return next
+      })
       return
     }
     setInspectorOpen((prev) => {
@@ -274,6 +333,22 @@ export function EditorShell() {
     })
     return () => window.cancelAnimationFrame(id)
   }, [motionPreviewSession, useFocusedChrome])
+
+  // When the viewport becomes focused/crowded while both panels were floating,
+  // show one sheet — do not silently clear prefs. Stage-back still leaves
+  // mobilePane null until the user opens a panel again.
+  const wasFocusedChromeRef = useRef(useFocusedChrome)
+  useEffect(() => {
+    const enteredFocused = useFocusedChrome && !wasFocusedChromeRef.current
+    wasFocusedChromeRef.current = useFocusedChrome
+    if (!enteredFocused) return
+    if (mobilePane) return
+    if (inspectorOpen) {
+      setMobilePane('inspector')
+      return
+    }
+    if (actorsOpen) setMobilePane('elements')
+  }, [useFocusedChrome, mobilePane, inspectorOpen, actorsOpen])
 
   const coarsePointer = useCoarsePointer()
   const tipBusy =
@@ -365,7 +440,7 @@ export function EditorShell() {
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="min-w-0">
-            <div className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <div data-testid="app-wordmark" className="ms-wordmark">
               MotionSketch
             </div>
             <div className="flex min-w-0 flex-nowrap items-baseline gap-x-1.5">
@@ -379,11 +454,35 @@ export function EditorShell() {
                   title={saveLabel}
                   className={
                     status === 'save-error' || status === 'restore-error'
-                      ? 'min-w-0 shrink truncate text-xs font-medium text-amber-800'
-                      : 'min-w-0 shrink truncate text-xs text-ms-muted'
+                      ? 'ms-caption inline-flex min-w-0 shrink items-center gap-1 font-medium text-amber-800'
+                      : 'ms-caption inline-flex min-w-0 shrink items-center gap-1'
                   }
                 >
-                  {saveLabel}
+                  {status === 'saved' && !practiceSuspended ? (
+                    <>
+                      <Check
+                        className="size-3.5 shrink-0 text-ms-success md:hidden"
+                        aria-hidden
+                        strokeWidth={2.25}
+                      />
+                      <span className="min-w-0 truncate max-md:sr-only">
+                        {saveLabel}
+                      </span>
+                    </>
+                  ) : status === 'save-error' || status === 'restore-error' ? (
+                    <>
+                      <CircleAlert
+                        className="size-3.5 shrink-0 text-amber-800 md:hidden"
+                        aria-hidden
+                        strokeWidth={2.25}
+                      />
+                      <span className="min-w-0 truncate max-md:sr-only">
+                        {saveLabel}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="min-w-0 truncate">{saveLabel}</span>
+                  )}
                 </p>
               )}
             </div>
@@ -438,13 +537,14 @@ export function EditorShell() {
           <button
             type="button"
             data-testid="btn-examples"
+            aria-label="Examples"
             aria-haspopup="dialog"
             aria-expanded={examplesOpen}
             onClick={openExamples}
-            className={`${headerBtn} max-md:px-1.5`}
+            className={headerBtn}
             title="Examples"
           >
-            <span className="md:hidden">Ex.</span>
+            <Library className="size-3.5 md:hidden" aria-hidden />
             <span className="hidden md:inline">Examples</span>
           </button>
           <div className="relative">
@@ -569,7 +669,7 @@ export function EditorShell() {
           {showElementsFloating && (
             <div
               data-testid="actor-list-slot"
-              className={`${floatingWorkspaceCardSlotClass} left-2 w-[min(16rem,calc(100%-1rem))]`}
+              className={`${floatingWorkspaceCardSlotClass} ${FLOATING_ELEMENTS_WIDTH_CLASS}`}
             >
               <div className={floatingWorkspaceCardClass}>
                 <ActorList
@@ -588,7 +688,7 @@ export function EditorShell() {
           {showInspectorFloating && (
             <div
               data-testid="inspector-slot"
-              className={`${floatingWorkspaceCardSlotClass} right-2 w-[min(18rem,calc(100%-1rem))]`}
+              className={`${floatingWorkspaceCardSlotClass} ${FLOATING_INSPECTOR_WIDTH_CLASS}`}
             >
               <div className={floatingWorkspaceCardClass}>
                 <InspectorPanel

@@ -137,6 +137,162 @@ test.describe('recording dock UX', () => {
     await expect(page.getByTestId('mode-status-label')).toHaveCount(0)
   })
 
+  test('first-take: Edit/Reset/More/Snap/scrubber bounds stay stable empty → armed → recorded', async ({
+    page,
+  }) => {
+    const cases: Array<{
+      label: string
+      width: number
+      height: number
+      openPanels?: boolean
+    }> = [
+      { label: 'desktop', width: 1280, height: 800 },
+      { label: '900 panels', width: 900, height: 800, openPanels: true },
+      { label: '390x560', width: 390, height: 560 },
+    ]
+
+    async function controlBounds() {
+      return page.evaluate(() => {
+        const ids = [
+          'btn-record',
+          'btn-stop',
+          'btn-play',
+          'btn-edit-path',
+          'btn-reset',
+          'btn-dock-more',
+          'snap-to-grid-toggle',
+          'btn-undo-transform',
+          'btn-redo-transform',
+          'playback-scrubber',
+          'playback-timeline',
+          'dock-transport',
+          'playback-dock',
+        ] as const
+        const out: Record<
+          string,
+          { x: number; y: number; w: number; h: number } | null
+        > = {}
+        for (const id of ids) {
+          const el = document.querySelector(`[data-testid="${id}"]`)
+          if (!(el instanceof HTMLElement)) {
+            out[id] = null
+            continue
+          }
+          const r = el.getBoundingClientRect()
+          out[id] = {
+            x: Math.round(r.x),
+            y: Math.round(r.y),
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+          }
+        }
+        return out
+      })
+    }
+
+    function assertStable(
+      a: Awaited<ReturnType<typeof controlBounds>>,
+      b: Awaited<ReturnType<typeof controlBounds>>,
+      keys: string[],
+      tol = 2,
+    ) {
+      for (const key of keys) {
+        const left = a[key]
+        const right = b[key]
+        expect(left, key).toBeTruthy()
+        expect(right, key).toBeTruthy()
+        expect(Math.abs(left!.x - right!.x), `${key}.x`).toBeLessThanOrEqual(tol)
+        expect(Math.abs(left!.y - right!.y), `${key}.y`).toBeLessThanOrEqual(tol)
+        expect(Math.abs(left!.w - right!.w), `${key}.w`).toBeLessThanOrEqual(tol)
+        expect(Math.abs(left!.h - right!.h), `${key}.h`).toBeLessThanOrEqual(tol)
+      }
+    }
+
+    for (const viewport of cases) {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      })
+      await page.goto('/')
+      await page.evaluate(() => localStorage.clear())
+      await page.reload()
+      await ensureEditor(page)
+
+      if (viewport.openPanels) {
+        await page.getByTestId('btn-toggle-elements-pane').click()
+        await expect(page.getByTestId('actor-list-body')).toBeVisible()
+        await page.getByTestId('btn-toggle-inspector-pane').click()
+        await expect(page.getByTestId('inspector-panel')).toBeVisible()
+      }
+
+      await expect(page.getByTestId('dock-editing')).toBeVisible()
+      await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
+      await expect(page.getByTestId('btn-reset')).toBeDisabled()
+      await expect(page.getByTestId('snap-to-grid-toggle')).toBeEnabled()
+      await expect(page.getByTestId('playback-scrubber')).toBeDisabled()
+      await expect(page.getByTestId('playback-timeline')).toBeVisible()
+
+      const empty = await controlBounds()
+      await assertPlayCenteredInDock(page)
+
+      await page.getByTestId('btn-record').click()
+      await expect(page.getByTestId('btn-stop')).toBeVisible()
+      await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
+      await expect(page.getByTestId('snap-to-grid-toggle')).toBeEnabled()
+      const armed = await controlBounds()
+      assertStable(empty, armed, [
+        'btn-play',
+        'btn-edit-path',
+        'btn-reset',
+        'btn-dock-more',
+        'snap-to-grid-toggle',
+        'playback-scrubber',
+        'playback-timeline',
+        'dock-transport',
+      ])
+      // Record ↔ Cancel may differ in label width; Play column stays put.
+      expect(Math.abs(empty['btn-play']!.x - armed['btn-play']!.x)).toBeLessThanOrEqual(
+        2,
+      )
+      expect(
+        Math.abs((empty['playback-dock']?.h ?? 0) - (armed['playback-dock']?.h ?? 0)),
+      ).toBeLessThanOrEqual(2)
+
+      const actor = page.getByTestId('actor')
+      const box = await actor.boundingBox()
+      expect(box).toBeTruthy()
+      const x = box!.x + box!.width / 2
+      const y = box!.y + box!.height / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x + 40, y - 16, { steps: 8 })
+      await page.mouse.move(x + 140, y + 36, { steps: 10 })
+      await page.waitForTimeout(60)
+      await page.mouse.up()
+      await expect(page.getByTestId('btn-record')).toBeVisible()
+      await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
+      await expect(page.getByTestId('playback-scrubber')).toBeEnabled()
+
+      const recorded = await controlBounds()
+      assertStable(empty, recorded, [
+        'btn-play',
+        'btn-edit-path',
+        'btn-reset',
+        'btn-dock-more',
+        'snap-to-grid-toggle',
+        'playback-scrubber',
+        'playback-timeline',
+        'dock-transport',
+      ])
+      expect(
+        Math.abs(
+          (empty['playback-dock']?.h ?? 0) - (recorded['playback-dock']?.h ?? 0),
+        ),
+      ).toBeLessThanOrEqual(2)
+      await assertPlayCenteredInDock(page)
+    }
+  })
+
   test('dock bounds and Play stay stable across idle / armed / recording / playing', async ({
     page,
   }) => {
@@ -210,13 +366,15 @@ test.describe('recording dock UX', () => {
     await expect(restart).toHaveAttribute('title', /Restart/i)
     await expect(undo).toHaveAttribute('title', /Undo placement/i)
     await expect(redo).toHaveAttribute('title', /Redo placement/i)
-    await expect(undo).toBeDisabled()
+    // A completed take is undoable; redo stays empty.
+    await expect(undo).toBeEnabled()
     await expect(redo).toBeDisabled()
 
     await page.getByTestId('btn-record').click()
     const confirm = page.getByTestId('btn-rerecord-confirm')
     if (await confirm.isVisible().catch(() => false)) await confirm.click()
     await expect(restart).toBeDisabled()
+    await expect(undo).toBeDisabled()
     await expect(restart).toHaveAccessibleName('Restart')
     await expect(restart).toHaveAttribute('title', /Restart/i)
     await page.getByTestId('btn-stop').click()

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   MAX_IMAGE_BYTES,
   MAX_IMAGE_EDGE_PX,
@@ -37,6 +37,7 @@ export function AppearancePanel() {
       s.project.actors[0]?.appearance
     )
   })
+  const selectedActorId = useEditorStore((s) => s.selectedActorId)
   const selectedName = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id)?.name ?? 'Element'
@@ -57,7 +58,15 @@ export function AppearancePanel() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** Image radio selected before a valid asset exists — does not change kind yet. */
+  const [imageIntent, setImageIntent] = useState(false)
   const kindGroupId = useId()
+  const styleHelpId = useId()
+
+  useEffect(() => {
+    setImageIntent(false)
+    setStatus(null)
+  }, [selectedActorId])
 
   if (!actor) {
     return (
@@ -68,12 +77,15 @@ export function AppearancePanel() {
   }
 
   const actorSize = actor.width
+  const showImageUi = actor.kind === 'image' || imageIntent
+  const imageSelected = actor.kind === 'image' || imageIntent
 
   const pickFile = () => {
     fileRef.current?.click()
   }
 
   const onFile = async (file: File | undefined) => {
+    // Cancel / empty picker — leave appearance and kind unchanged.
     if (!file) return
     setBusy(true)
     setStatus('Loading image…')
@@ -84,6 +96,7 @@ export function AppearancePanel() {
       return
     }
     setActorImage(result.asset)
+    setImageIntent(false)
     setStatus(`Loaded “${result.asset.label}”.`)
   }
 
@@ -100,8 +113,9 @@ export function AppearancePanel() {
               data-testid="actor-kind-shape"
               type="radio"
               name={kindGroupId}
-              checked={actor.kind === 'shape'}
+              checked={actor.kind === 'shape' && !imageIntent}
               onChange={() => {
+                setImageIntent(false)
                 setActorKind('shape')
                 setStatus(null)
               }}
@@ -114,17 +128,18 @@ export function AppearancePanel() {
               data-testid="actor-kind-image"
               type="radio"
               name={kindGroupId}
-              checked={actor.kind === 'image'}
-              disabled={!actor.image && actor.kind !== 'image'}
-              aria-describedby={
-                !actor.image && actor.kind !== 'image'
-                  ? 'actor-image-type-help'
-                  : undefined
-              }
+              checked={imageSelected}
               onChange={() => {
-                if (actor.image) setActorKind('image')
+                if (actor.image) {
+                  setImageIntent(false)
+                  setActorKind('image')
+                } else {
+                  // Intent only — keep current appearance until a valid upload.
+                  setImageIntent(true)
+                }
+                setStatus(null)
               }}
-              className="size-3.5 accent-ms-primary disabled:opacity-40"
+              className="size-3.5 accent-ms-primary"
             />
             Image
           </label>
@@ -133,8 +148,9 @@ export function AppearancePanel() {
               data-testid="actor-kind-text"
               type="radio"
               name={kindGroupId}
-              checked={actor.kind === 'text'}
+              checked={actor.kind === 'text' && !imageIntent}
               onChange={() => {
+                setImageIntent(false)
                 setActorKind('text')
                 setStatus(null)
               }}
@@ -143,20 +159,39 @@ export function AppearancePanel() {
             Text
           </label>
         </div>
-        <HelpDisclosure testId="appearance-style-help" summary="About Style">
-          Shape, Image, and Text keep each other’s settings when you switch.
-          Size is the longer edge (or text wrap width) as a fraction of the
-          stage’s shorter side — center stays fixed.
-        </HelpDisclosure>
-        {!actor.image && actor.kind !== 'image' && (
-          <p
-            id="actor-image-type-help"
-            data-testid="actor-image-type-help"
-            className="text-xs leading-relaxed text-slate-500"
-          >
-            Upload an image below to enable the Image type.
+        <HelpDisclosure
+          id={styleHelpId}
+          testId="appearance-style-help"
+          summary="About Style"
+        >
+          <p>
+            Shape, Image, and Text keep each other’s settings when you switch.
+            Size is the longer edge (or text wrap width) as a fraction of the
+            stage’s shorter side — center stays fixed. Color fills the shape or
+            letters; Corners go from square to fully round.
           </p>
-        )}
+          <p className="mt-1.5">
+            Text: up to {MAX_ACTOR_TEXT_LENGTH} characters (Enter for a new
+            line). Built-in system fonts stay offline — letter shapes can vary
+            between devices.
+          </p>
+          <p className="mt-1.5">
+            Image: PNG, JPEG, WebP, or SVG from this device. Max{' '}
+            {(MAX_IMAGE_BYTES / (1024 * 1024)).toFixed(1)} MB and{' '}
+            {MAX_IMAGE_EDGE_PX}×{MAX_IMAGE_EDGE_PX}px. SVGs must be static (no
+            scripts or external links) and render as an image, not live markup.
+            The previous look stays until a valid file loads.
+          </p>
+          <p className="mt-1.5">
+            Face along path turns the element to follow its movement once a path
+            exists. Path heading is a base rotation; transform keyframes and
+            Direction offset add to it. With Alternate loop, poses reverse along
+            the same angles. The element does not turn around to face backward
+            travel. Direction offset aligns art that faces another way.
+            Transform adds rotation and scale keyframes along Duration after you
+            record.
+          </p>
+        </HelpDisclosure>
       </fieldset>
 
       <div data-testid="actor-panel" className="space-y-3">
@@ -179,18 +214,14 @@ export function AppearancePanel() {
             max={MAX_ACTOR_SIZE}
             step={0.01}
             value={actorSize}
-            aria-describedby="actor-size-help"
+            aria-valuetext={formatSizePercent(actorSize)}
+            aria-describedby={styleHelpId}
             onChange={(e) => setActorSize(Number(e.target.value))}
             className="w-full accent-ms-primary"
           />
-          <p id="actor-size-help" data-testid="actor-size-help" className="sr-only">
-            {actor.kind === 'text'
-              ? 'Width of the text wrap box, as a fraction of the stage’s shorter side. Height follows your lines. Center stays fixed.'
-              : 'Longer edge of the element box, as a fraction of the stage’s shorter side. Images keep their proportions inside that box. Center stays fixed.'}
-          </p>
         </div>
 
-        {(actor.kind === 'shape' || actor.kind === 'text') && (
+        {(actor.kind === 'shape' || actor.kind === 'text') && !imageIntent && (
           <div className="space-y-2">
             <label
               htmlFor="actor-color"
@@ -209,19 +240,17 @@ export function AppearancePanel() {
               data-testid="actor-color"
               type="color"
               value={actor.color}
-              aria-describedby="actor-color-help"
+              aria-label={
+                actor.kind === 'text' ? 'Text color' : 'Fill color'
+              }
+              aria-describedby={styleHelpId}
               onChange={(e) => setActorColor(e.target.value)}
               className="h-9 w-full cursor-pointer rounded-md border border-ms-border bg-white p-0.5"
             />
-            <span id="actor-color-help" className="sr-only">
-              {actor.kind === 'text'
-                ? 'Color of the letters.'
-                : 'Fill color of the tile.'}
-            </span>
           </div>
         )}
 
-        {actor.kind === 'shape' && (
+        {actor.kind === 'shape' && !imageIntent && (
           <div className="space-y-2">
             <label
               htmlFor="actor-radius-slider"
@@ -240,17 +269,15 @@ export function AppearancePanel() {
               max={1}
               step={0.01}
               value={actor.borderRadius}
-              aria-describedby="actor-radius-help"
+              aria-valuetext={formatCornerLabel(actor.borderRadius)}
+              aria-describedby={styleHelpId}
               onChange={(e) => setActorBorderRadius(Number(e.target.value))}
               className="w-full accent-ms-primary"
             />
-            <span id="actor-radius-help" className="sr-only">
-              Square through fully round.
-            </span>
           </div>
         )}
 
-        {actor.kind === 'text' && actor.text && (
+        {actor.kind === 'text' && actor.text && !imageIntent && (
           <div
             data-testid="actor-text-section"
             className="space-y-2 p-0.5"
@@ -271,17 +298,8 @@ export function AppearancePanel() {
                 value={actor.text.content}
                 onChange={(e) => setActorTextContent(e.target.value)}
                 className="w-full resize-y rounded-md border border-ms-border bg-white px-2 py-1.5 text-sm text-slate-800"
-                aria-describedby="actor-text-content-help"
+                aria-describedby={styleHelpId}
               />
-              <HelpDisclosure
-                id="actor-text-content-help"
-                testId="actor-text-font-help"
-                summary="About text"
-              >
-                Short multiline copy (up to {MAX_ACTOR_TEXT_LENGTH} characters;
-                Enter for a new line). Built-in system fonts stay offline —
-                letter shapes can vary between devices.
-              </HelpDisclosure>
             </div>
 
             <div className="space-y-2">
@@ -386,18 +404,23 @@ export function AppearancePanel() {
           </div>
         )}
 
-        <div
+        {showImageUi && (
+          <div
             data-testid="actor-image-section"
             className="space-y-2 p-0.5"
           >
             <p className="text-sm font-medium text-slate-800">Image</p>
-            <HelpDisclosure summary="About image files">
-              PNG, JPEG, WebP, or SVG from this device. Max{' '}
-              {(MAX_IMAGE_BYTES / (1024 * 1024)).toFixed(1)} MB and{' '}
-              {MAX_IMAGE_EDGE_PX}×{MAX_IMAGE_EDGE_PX}px. SVGs must be static
-              (no scripts or external links) and render as an image, not live
-              markup.
-            </HelpDisclosure>
+
+            {!actor.image && (
+              <p
+                id="actor-image-upload-help"
+                data-testid="actor-image-upload-help"
+                className="text-xs leading-relaxed text-slate-500"
+              >
+                Upload a PNG, JPEG, WebP, or SVG from this device. Your current
+                look stays until a valid file loads.
+              </p>
+            )}
 
             {actor.image && (
               <div className="flex items-center gap-3">
@@ -452,6 +475,9 @@ export function AppearancePanel() {
                 type="button"
                 data-testid="btn-upload-image"
                 disabled={busy}
+                aria-describedby={
+                  !actor.image ? 'actor-image-upload-help' : styleHelpId
+                }
                 onClick={(e) => {
                   e.stopPropagation()
                   pickFile()
@@ -468,6 +494,7 @@ export function AppearancePanel() {
                   onClick={(e) => {
                     e.stopPropagation()
                     clearActorImage()
+                    setImageIntent(false)
                     setStatus('Image removed. Back to shape.')
                   }}
                   className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
@@ -486,10 +513,11 @@ export function AppearancePanel() {
                 {status}
               </p>
             )}
-        </div>
+          </div>
+        )}
 
-        <FaceAlongPathSection />
-        <TransformSection />
+        <FaceAlongPathSection showHelp={false} />
+        <TransformSection showHelp={false} />
       </div>
     </div>
   )

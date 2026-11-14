@@ -28,7 +28,10 @@ test.describe('first-use guidance and export wording', () => {
     await expect(record).toHaveAttribute('aria-describedby', 'stage-empty-hint')
     await expect(page.getByTestId('btn-try-example')).toBeVisible()
     await expect(page.getByTestId('btn-help')).toBeVisible()
-    await expect(page.getByTestId('dock-editing')).toHaveCount(0)
+    await expect(page.getByTestId('dock-editing')).toBeVisible()
+    await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
+    await expect(page.getByTestId('btn-reset')).toBeDisabled()
+    await expect(page.getByTestId('snap-to-grid-toggle')).toBeEnabled()
 
     await record.click()
     await expect(page.getByTestId('stage-empty-hint')).toHaveCount(0)
@@ -83,9 +86,11 @@ test.describe('first-use guidance and export wording', () => {
       /Advanced exports/i,
     )
     await openPanel(page, 'adjust')
-    await expect(page.getByTestId('svg-path-import-help')).toContainText(
-      /Set the path for/i,
+    await page.getByTestId('inspector-motion-help').locator('summary').click()
+    await expect(page.getByTestId('inspector-motion-help')).toContainText(
+      /Import SVG path|local SVG file/i,
     )
+    await expect(page.getByTestId('svg-path-import-help')).toHaveCount(0)
     await expect(page.getByTestId('motion-presets')).toBeVisible()
   })
 
@@ -152,8 +157,14 @@ test.describe('first-use guidance and export wording', () => {
     await expect(page.getByTestId('export-primary')).toContainText(
       'Add to your website',
     )
-    await expect(page.getByTestId('export-website-limits')).toContainText(
-      /does not install into WordPress or Webflow/i,
+    await expect(page.getByTestId('export-website-limits')).toHaveText(
+      'Requires access to your website’s code.',
+    )
+    await expect(page.getByTestId('export-website-platform-help')).toContainText(
+      /WordPress or Webflow/i,
+    )
+    await expect(page.getByTestId('export-website-platform-help')).toContainText(
+      /does not publish/i,
     )
     await expect(page.getByTestId('btn-export-path-html')).toHaveAttribute(
       'aria-selected',
@@ -341,6 +352,11 @@ test.describe('first-use guidance and export wording', () => {
       await expect(page.getByTestId('btn-copy-own-element-css')).toBeHidden()
     } else {
       await expect(page.getByTestId('export-panel-root')).toBeFocused()
+      await page.keyboard.press('Tab')
+      // Concise platform notes disclosure sits above the HTML/React path tabs.
+      await expect(
+        page.getByTestId('export-website-platform-help').locator('summary'),
+      ).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(page.getByTestId('btn-export-path-html')).toBeFocused()
 

@@ -374,15 +374,16 @@ test.describe('workspace layout', () => {
       await ensureEditor(page)
 
       await expect(page.getByTestId('dock-transport')).toBeVisible()
-      // Empty board: hide motion-editing row so the dock stays compact.
-      await expect(page.getByTestId('dock-editing')).toHaveCount(0)
-
-      // Empty: no Continue; Record primary — Play must not shift.
+      // Empty board: Edit/Reset/More stay mounted (disabled) so Play does not shift.
+      await expect(page.getByTestId('dock-editing')).toBeVisible()
+      await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
+      await expect(page.getByTestId('btn-reset')).toBeDisabled()
       await expect(page.getByTestId('btn-continue-path')).toHaveCount(0)
       await assertPlayCenteredInDock(page)
 
       await recordSimplePath(page)
       await expect(page.getByTestId('dock-editing')).toBeVisible()
+      await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
       await openDockMore(page)
       await expect(page.getByTestId('btn-continue-path')).toBeVisible()
       await page.keyboard.press('Escape')
@@ -704,8 +705,10 @@ test.describe('workspace layout', () => {
     await expect(viewCss).toBeInViewport()
 
     await openPanel(page, 'adjust')
-    await expect(page.getByTestId('duration-help')).toBeAttached()
-    await expect(page.getByText('About Duration')).toBeVisible()
+    await expect(page.getByTestId('inspector-motion-help')).toBeAttached()
+    await expect(page.getByTestId('inspector-motion-help')).toContainText(
+      'About Motion',
+    )
 
     await openCssDialog(page)
     await expect(page.getByTestId('css-dialog')).toBeVisible()
@@ -1816,6 +1819,196 @@ test.describe('workspace layout', () => {
       }
     })
   }
+
+  test('1280 Inspector open: Fit keeps the stage clear of the floating card', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await page.evaluate(() => {
+      try {
+        sessionStorage.clear()
+        localStorage.clear()
+      } catch {
+        /* ignore */
+      }
+    })
+    await page.reload()
+    await ensureEditor(page)
+    const firstUse = page.getByTestId('btn-dismiss-first-use')
+    if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+    await recordSimplePath(page)
+
+    const camBeforeOpen = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await expect(page.getByTestId('inspector-slot')).toBeVisible()
+
+    const camAfterOpen = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+    // Opening a card must not auto pan/zoom.
+    expect(camAfterOpen).toBe(camBeforeOpen)
+
+    await assertUnclippedClickable(page, 'btn-fit-stage')
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(120)
+
+    const clearance = await page.evaluate(() => {
+      const stage = document.querySelector('[data-testid="stage-frame"]')
+      const slot = document.querySelector('[data-testid="inspector-slot"]')
+      if (!(stage instanceof HTMLElement) || !(slot instanceof HTMLElement)) {
+        return { ok: false, overlap: 0 }
+      }
+      const sr = stage.getBoundingClientRect()
+      const ir = slot.getBoundingClientRect()
+      const overlap = Math.max(
+        0,
+        Math.min(sr.right, ir.right) - Math.max(sr.left, ir.left),
+      )
+      // Allow 1px antialias; stage right edge should stay left of the card.
+      return {
+        ok: sr.right <= ir.left + 1,
+        overlap,
+        stageRight: sr.right,
+        cardLeft: ir.left,
+      }
+    })
+    expect(clearance.ok, JSON.stringify(clearance)).toBe(true)
+
+    // Recording / Edit path still map through the fitted stage-frame.
+    await page.getByTestId('btn-close-inspector').click()
+    await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
+    await page.getByTestId('btn-edit-path').click()
+    await expect(page.getByTestId('btn-done-edit')).toBeVisible()
+    await page.getByTestId('btn-done-edit').click()
+    await expect(page.getByTestId('btn-edit-path')).toBeVisible()
+  })
+
+  test('900 both cards: Fit clears Elements and Inspector; open/close preserves camera', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 900, height: 800 })
+    await page.goto('/')
+    await page.evaluate(() => {
+      try {
+        sessionStorage.clear()
+        localStorage.clear()
+      } catch {
+        /* ignore */
+      }
+    })
+    await page.reload()
+    await ensureEditor(page)
+    const firstUse = page.getByTestId('btn-dismiss-first-use')
+    if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+    await recordSimplePath(page)
+
+    await page.getByTestId('btn-toggle-elements-pane').click()
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+    await expect(page.getByTestId('inspector-slot')).toBeVisible()
+
+    const beforeFit = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(120)
+
+    const afterFit = await page.evaluate(() => {
+      const stage = document.querySelector('[data-testid="stage-frame"]')
+      const left = document.querySelector('[data-testid="actor-list-slot"]')
+      const right = document.querySelector('[data-testid="inspector-slot"]')
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      if (
+        !(stage instanceof HTMLElement) ||
+        !(left instanceof HTMLElement) ||
+        !(right instanceof HTMLElement)
+      ) {
+        return { ok: false, transform: world?.style.transform ?? '' }
+      }
+      const sr = stage.getBoundingClientRect()
+      const lr = left.getBoundingClientRect()
+      const rr = right.getBoundingClientRect()
+      return {
+        ok: sr.left >= lr.right - 1 && sr.right <= rr.left + 1,
+        transform: world?.style.transform ?? '',
+        stageLeft: sr.left,
+        elementsRight: lr.right,
+        stageRight: sr.right,
+        inspectorLeft: rr.left,
+      }
+    })
+    expect(afterFit.ok, JSON.stringify(afterFit)).toBe(true)
+    expect(afterFit.transform).not.toBe(beforeFit)
+
+    // Closing cards must not auto-fit / jump the camera.
+    const afterFitTransform = afterFit.transform
+    await page.getByTestId('btn-toggle-actor-list').click()
+    await page.getByTestId('btn-close-inspector').click()
+    const afterClose = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+    expect(afterClose).toBe(afterFitTransform)
+
+    await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
+    await page.getByTestId('btn-edit-path').click()
+    await expect(page.getByTestId('btn-done-edit')).toBeVisible()
+    await page.getByTestId('btn-done-edit').click()
+  })
+
+  test('800 both prefs: focused sheet instead of squeezing both floating cards', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 800, height: 800 })
+    await page.goto('/')
+    await page.evaluate(() => {
+      try {
+        sessionStorage.clear()
+        localStorage.clear()
+      } catch {
+        /* ignore */
+      }
+    })
+    await page.reload()
+    await ensureEditor(page)
+    const firstUse = page.getByTestId('btn-dismiss-first-use')
+    if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+
+    await page.getByTestId('btn-toggle-elements-pane').click()
+    await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+    // Second card at this width must switch to focused chrome, not float both.
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+    // Focused sheet reuses inspector-slot; floating marker must stay off.
+    await expect(page.getByTestId('stage-viewport')).not.toHaveAttribute(
+      'data-inspector-floating',
+      'true',
+    )
+    await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeVisible()
+    await expect(page.getByTestId('btn-close-inspector')).toHaveCount(0)
+    await page.getByTestId('btn-inspector-back-to-stage').click()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+  })
 
   // Actual browser zoom (chrome.tabs.setZoom) lives in browser-zoom.spec.ts.
   // CSS zoom and viewport resize are not substitutes for that check.

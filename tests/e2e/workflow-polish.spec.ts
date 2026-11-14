@@ -41,22 +41,27 @@ test.describe('editor workflow polish', () => {
       'stage-empty-hint',
     )
     await expect(page.getByTestId('stage-empty-hint')).toBeVisible()
-    // Fresh board: motion-editing row stays hidden until a path exists.
-    await expect(page.getByTestId('dock-editing')).toHaveCount(0)
+    // Fresh board: Edit/Reset stay mounted (disabled) so the dock does not jump.
+    await expect(page.getByTestId('dock-editing')).toBeVisible()
+    await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
+    await expect(page.getByTestId('btn-reset')).toBeDisabled()
 
     await page.getByTestId('btn-record').click()
     await expect(page.getByTestId('dock-status')).toContainText(/Ready|drag/i)
-    await expect(page.getByTestId('dock-editing')).toHaveCount(0)
+    await expect(page.getByTestId('dock-editing')).toBeVisible()
+    await expect(page.getByTestId('btn-edit-path')).toBeDisabled()
     await page.getByTestId('btn-stop').click()
 
     await openPanel(page, 'appearance')
-    await expect(page.getByTestId('actor-kind-image')).toBeDisabled()
-    await expect(page.getByTestId('actor-image-type-help')).toContainText(
-      'Upload an image',
+    await expect(page.getByTestId('actor-kind-image')).toBeEnabled()
+    await page.getByTestId('actor-kind-image').check()
+    await expect(page.getByTestId('actor-image-upload-help')).toContainText(
+      /Upload a PNG|valid file/i,
     )
-    await expect(page.getByTestId('actor-kind-image')).toHaveAttribute(
-      'aria-describedby',
-      'actor-image-type-help',
+    // Intent only — stage still shows the previous shape until upload succeeds.
+    await expect(page.getByTestId('actor')).toHaveAttribute(
+      'data-actor-kind',
+      'shape',
     )
     await closePanel(page, 'appearance')
 

@@ -62,6 +62,11 @@ test.describe('image actors', () => {
       y: before!.y + before!.height / 2,
     }
 
+    await page.getByTestId('actor-kind-image').check()
+    await expect(page.getByTestId('actor')).toHaveAttribute(
+      'data-actor-kind',
+      'shape',
+    )
     const png = await makePngBytes(page, 400, 100, '#94a3b8')
     await page.getByTestId('actor-image-input').setInputFiles({
       name: 'wide-logo.png',
@@ -117,6 +122,7 @@ test.describe('image actors', () => {
     await recordSimplePath(page)
 
     await openPanel(page, 'appearance')
+    await page.getByTestId('actor-kind-image').check()
     const png = await makePngBytes(page, 400, 100, '#94a3b8')
     await page.getByTestId('actor-image-input').setInputFiles({
       name: 'wide-logo.png',
@@ -161,12 +167,49 @@ test.describe('image actors', () => {
     }
   })
 
+  test('Image intent keeps prior look until a valid upload; invalid stays put', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await openPanel(page, 'appearance')
+    await expect(page.getByTestId('actor')).toHaveAttribute(
+      'data-actor-kind',
+      'shape',
+    )
+    await page.getByTestId('actor-kind-image').check()
+    await expect(page.getByTestId('actor-image-section')).toBeVisible()
+    await expect(page.getByTestId('actor')).toHaveAttribute(
+      'data-actor-kind',
+      'shape',
+    )
+    const evilSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`,
+      'utf8',
+    )
+    await page.getByTestId('actor-image-input').setInputFiles({
+      name: 'evil.svg',
+      mimeType: 'image/svg+xml',
+      buffer: evilSvg,
+    })
+    await expect(page.getByTestId('actor-image-status')).toContainText(
+      /script|not allowed/i,
+    )
+    await expect(page.getByTestId('actor')).toHaveAttribute(
+      'data-actor-kind',
+      'shape',
+    )
+    await page.getByTestId('actor-kind-shape').check()
+    await expect(page.getByTestId('actor-image-section')).toHaveCount(0)
+  })
+
   test('tall image and safe SVG upload; unsafe SVG rejected', async ({
     page,
   }) => {
     await page.goto('/')
     await ensureEditor(page)
     await openPanel(page, 'appearance')
+    await page.getByTestId('actor-kind-image').check()
 
     const tall = await makePngBytes(page, 80, 320, '#cbd5e1')
     await page.getByTestId('actor-image-input').setInputFiles({
@@ -225,6 +268,7 @@ test.describe('image actors', () => {
       }
     })
     await openPanel(page, 'appearance')
+    await page.getByTestId('actor-kind-image').check()
     const png = await makePngBytes(page, 64, 64, '#64748b')
     await page.getByTestId('actor-image-input').setInputFiles({
       name: 'icon.png',
