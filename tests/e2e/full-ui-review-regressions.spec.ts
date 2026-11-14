@@ -315,7 +315,7 @@ test.describe('full-ui-review regressions', () => {
     )
   })
 
-  test('Fit stage label is not text-clipped; Export may cover the control', async ({
+  test('Fit stage label is not text-clipped; Export clears the camera bar on desktop', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 720 })
@@ -327,30 +327,44 @@ test.describe('full-ui-review regressions', () => {
 
     const probe = await page.evaluate(() => {
       const fit = document.querySelector('[data-testid="btn-fit-stage"]')
+      const bar = document.querySelector('[data-testid="workspace-camera-bar"]')
       const panel = document.querySelector('[data-testid="export-panel-root"]')
-      if (!(fit instanceof HTMLElement) || !(panel instanceof HTMLElement)) {
+      if (
+        !(fit instanceof HTMLElement) ||
+        !(bar instanceof HTMLElement) ||
+        !(panel instanceof HTMLElement)
+      ) {
         return { ok: false, reason: 'missing' }
       }
       const fr = fit.getBoundingClientRect()
+      const br = bar.getBoundingClientRect()
       const pr = panel.getBoundingClientRect()
       const textClipped = fit.scrollWidth > fit.clientWidth + 1
-      const overlaps =
+      const overlapsFit =
         fr.right > pr.left &&
         fr.left < pr.right &&
         fr.bottom > pr.top &&
         fr.top < pr.bottom
+      const overlapsBar =
+        br.right > pr.left &&
+        br.left < pr.right &&
+        br.bottom > pr.top &&
+        br.top < pr.bottom
       return {
-        ok: !textClipped,
-        reason: textClipped ? 'text-overflow' : 'ok',
+        ok: !textClipped && !overlapsFit && !overlapsBar,
+        reason: textClipped
+          ? 'text-overflow'
+          : overlapsFit || overlapsBar
+            ? 'covers-camera'
+            : 'ok',
         aria: fit.getAttribute('aria-label'),
         text: fit.innerText.replace(/\s+/g, ' ').trim(),
-        overlapsPanel: overlaps,
+        overlapsPanel: overlapsFit,
       }
     })
     expect(probe, probe.reason).toMatchObject({ ok: true })
     expect(probe.aria).toBe('Fit stage')
-    // Visible label may read “Fit stage” under the panel; coverage ≠ clipping.
-    expect(probe.overlapsPanel).toBe(true)
+    expect(probe.overlapsPanel).toBe(false)
   })
 
   test('shortcut sheet traps Tab and restores opener focus', async ({
@@ -469,8 +483,6 @@ test.describe('full-ui-review regressions', () => {
 
     await page.getByTestId('btn-undo-edit').click()
     await expect(page.getByTestId('smoothing-slider')).toBeEnabled()
-    await expect(page.getByTestId('smoothing-help')).not.toContainText(
-      /baked into your path edit/i,
-    )
+    await expect(page.getByTestId('smoothing-help')).toHaveCount(0)
   })
 })
