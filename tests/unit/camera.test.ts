@@ -10,6 +10,7 @@ import {
   isSpacePanBlockedTarget,
   normalizeViewportInsets,
   panCamera,
+  parseZoomPercentInput,
   preserveCameraCenterOnLayoutChange,
   rectsOverlap,
   zoomCameraAt,
@@ -101,6 +102,19 @@ describe('workspace camera', () => {
     expect(cameraBarTopInsetForProposedStage(obstructing, proposed)).toBe(44)
   })
 
+  it('parses typed zoom percentages and rejects invalid or out-of-range', () => {
+    expect(parseZoomPercentInput('100')).toBe(1)
+    expect(parseZoomPercentInput('100%')).toBe(1)
+    expect(parseZoomPercentInput(' 75 % ')).toBe(0.75)
+    expect(parseZoomPercentInput('150')).toBe(1.5)
+    expect(parseZoomPercentInput('25')).toBe(0.25)
+    expect(parseZoomPercentInput('400')).toBe(4)
+    expect(parseZoomPercentInput('')).toBeNull()
+    expect(parseZoomPercentInput('abc')).toBeNull()
+    expect(parseZoomPercentInput('24')).toBeNull()
+    expect(parseZoomPercentInput('401')).toBeNull()
+    expect(parseZoomPercentInput('100px')).toBeNull()
+  })
 
   it('normalizes insets that would consume the whole viewport', () => {
     const safe = normalizeViewportInsets(

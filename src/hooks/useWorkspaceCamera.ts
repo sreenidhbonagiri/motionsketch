@@ -294,6 +294,15 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     [zoomBy],
   )
 
+  /** Absolute zoom at viewport center — same anchor as +/− buttons. */
+  const setZoomAtCenter = useCallback(
+    (nextZoom: number) => {
+      const cam = useEditorStore.getState().camera
+      setCamera(zoomCameraAtCenter(cam, nextZoom, viewportRefState.current))
+    },
+    [setCamera],
+  )
+
   // H = temporary pan-over-everything. Ignore while typing / form controls.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -391,6 +400,7 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     fitStage,
     zoomIn,
     zoomOut,
+    setZoomAtCenter,
     onViewportPointerDown,
     onViewportPointerMove,
     onViewportPointerUp,

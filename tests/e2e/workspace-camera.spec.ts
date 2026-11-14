@@ -338,6 +338,99 @@ test.describe('workspace camera', () => {
     expect(aspect).toBeCloseTo(before!.stageAspect, 1)
   })
 
+  test('typed zoom percent applies, rejects invalid, Escape/blur, then +/−/Fit', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await closeOpenChromePanels(page)
+
+    const zoomBtn = page.getByTestId('zoom-percent')
+    await expect(zoomBtn).toHaveText('100%')
+    await expect(zoomBtn).toHaveAttribute('aria-labelledby', /.+/)
+
+    await zoomBtn.click()
+    const input = page.getByTestId('zoom-percent-input')
+    await expect(input).toBeFocused()
+    await expect(input).toHaveAttribute('aria-labelledby', /.+/)
+    await input.fill('75')
+    await input.press('Enter')
+    await expect(page.getByTestId('zoom-percent')).toHaveText('75%')
+    let cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(0.75, 3)
+    expect(cam.zoomLabel).toBe('75%')
+
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('150%')
+    await page.getByTestId('zoom-percent-input').press('Enter')
+    await expect(page.getByTestId('zoom-percent')).toHaveText('150%')
+    cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(1.5, 3)
+
+    // Invalid — Enter keeps editing; camera unchanged.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('999')
+    await page.getByTestId('zoom-percent-input').press('Enter')
+    await expect(page.getByTestId('zoom-percent-input')).toBeVisible()
+    await expect(page.getByTestId('zoom-percent-input')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(1.5, 3)
+
+    // Escape restores live value.
+    await page.getByTestId('zoom-percent-input').press('Escape')
+    await expect(page.getByTestId('zoom-percent')).toHaveText('150%')
+    cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(1.5, 3)
+
+    // Blur with valid value applies.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('100')
+    await page.getByTestId('btn-zoom-in').click() // blur via other control
+    await expect(page.getByTestId('zoom-percent')).toHaveText('125%')
+    cam = await readCamera(page)
+    // Blur applied 100%, then zoom-in stepped to 125%.
+    expect(cam.zoom).toBeCloseTo(1.25, 3)
+
+    // Limits: below min rejected on blur.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('10')
+    await page.getByTestId('zoom-percent-input').blur()
+    await expect(page.getByTestId('zoom-percent')).toHaveText('125%')
+    expect((await readCamera(page)).zoom).toBeCloseTo(1.25, 3)
+
+    await page.getByTestId('btn-fit-stage').click()
+    await expect(page.getByTestId('zoom-percent')).toHaveText('100%')
+
+    // Pointer mapping after typed zoom still lands on the actor in-frame.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('150')
+    await page.getByTestId('zoom-percent-input').press('Enter')
+    const mapped = await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="stage-frame"]')
+      const actor = document.querySelector('[data-testid="actor"]')
+      if (!(frame instanceof HTMLElement) || !(actor instanceof HTMLElement)) {
+        return null
+      }
+      const fr = frame.getBoundingClientRect()
+      const ar = actor.getBoundingClientRect()
+      const cx = ar.left + ar.width / 2
+      const cy = ar.top + ar.height / 2
+      return {
+        nx: (cx - fr.left) / fr.width,
+        ny: (cy - fr.top) / fr.height,
+      }
+    })
+    expect(mapped).toBeTruthy()
+    expect(mapped!.nx).toBeGreaterThan(0)
+    expect(mapped!.nx).toBeLessThan(1)
+    expect(mapped!.ny).toBeGreaterThan(0)
+    expect(mapped!.ny).toBeLessThan(1)
+  })
+
   test('panels closed: Fit matches default size; repeated Fit stable; pointer maps', async ({
     page,
   }) => {

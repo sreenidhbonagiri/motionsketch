@@ -366,6 +366,25 @@ export function formatZoomPercent(zoom: number): string {
   return `${Math.round(clampCameraZoom(zoom) * 100)}%`
 }
 
+/**
+ * Parse a typed zoom field ("150", "150%", " 75 % ").
+ * Returns null for empty, non-numeric, or out-of-range values — callers must
+ * not change the camera when null.
+ */
+export function parseZoomPercentInput(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const match = /^([+-]?\d+(?:\.\d+)?)\s*%?$/.exec(trimmed)
+  if (!match) return null
+  const percent = Number(match[1])
+  if (!Number.isFinite(percent)) return null
+  const zoom = percent / 100
+  if (zoom < MIN_CAMERA_ZOOM - 1e-12 || zoom > MAX_CAMERA_ZOOM + 1e-12) {
+    return null
+  }
+  return clampCameraZoom(zoom)
+}
+
 /** Re-export: form/button targets that must keep native Space / typing. */
 export { isWorkspaceShortcutBlockedTarget as isSpacePanBlockedTarget } from '../lib/editorShortcuts'
 
