@@ -338,6 +338,126 @@ test.describe('workspace camera', () => {
     expect(aspect).toBeCloseTo(before!.stageAspect, 1)
   })
 
+  test('panels closed: Fit matches default size; repeated Fit stable; pointer maps', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await closeOpenChromePanels(page)
+    for (const id of [
+      'btn-toggle-elements-pane',
+      'btn-toggle-inspector-pane',
+    ] as const) {
+      const toggle = page.getByTestId(id)
+      if (
+        (await toggle.isVisible().catch(() => false)) &&
+        (await toggle.getAttribute('aria-pressed')) === 'true'
+      ) {
+        await toggle.click()
+      }
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    }
+
+    const readFrame = () =>
+      page.evaluate(() => {
+        const frame = document.querySelector('[data-testid="stage-frame"]')
+        const world = document.querySelector(
+          '[data-testid="workspace-world"]',
+        ) as HTMLElement | null
+        const zoom = document.querySelector('[data-testid="zoom-percent"]')
+        if (!(frame instanceof HTMLElement)) return null
+        const r = frame.getBoundingClientRect()
+        return {
+          w: r.width,
+          h: r.height,
+          top: r.top,
+          left: r.left,
+          transform: world?.style.transform ?? '',
+          zoom: zoom?.textContent?.trim() ?? '',
+        }
+      })
+
+    const before = await readFrame()
+    expect(before).toBeTruthy()
+    expect(before!.zoom).toBe('100%')
+    const obstructedBefore = await page.evaluate(() => {
+      const fr = document
+        .querySelector('[data-testid="stage-frame"]')
+        ?.getBoundingClientRect()
+      const br = document
+        .querySelector('[data-testid="workspace-camera-bar"]')
+        ?.getBoundingClientRect()
+      if (!fr || !br) return null
+      return !(
+        fr.right <= br.left ||
+        fr.left >= br.right ||
+        fr.bottom <= br.top ||
+        fr.top >= br.bottom
+      )
+    })
+
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(80)
+    const after1 = await readFrame()
+    expect(after1).toBeTruthy()
+    expect(after1!.zoom).toBe('100%')
+    const obstructedAfter = await page.evaluate(() => {
+      const fr = document
+        .querySelector('[data-testid="stage-frame"]')
+        ?.getBoundingClientRect()
+      const br = document
+        .querySelector('[data-testid="workspace-camera-bar"]')
+        ?.getBoundingClientRect()
+      if (!fr || !br) return null
+      return !(
+        fr.right <= br.left ||
+        fr.left >= br.right ||
+        fr.bottom <= br.top ||
+        fr.top >= br.bottom
+      )
+    })
+    expect(obstructedAfter).toBe(false)
+    if (!obstructedBefore) {
+      // Already clear of the camera bar — Fit must match default layout.
+      expect(Math.abs(after1!.w - before!.w)).toBeLessThan(2)
+      expect(Math.abs(after1!.h - before!.h)).toBeLessThan(2)
+      expect(Math.abs(after1!.top - before!.top)).toBeLessThan(2)
+      expect(Math.abs(after1!.left - before!.left)).toBeLessThan(2)
+    }
+
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(80)
+    const after2 = await readFrame()
+    expect(after2).toBeTruthy()
+    expect(after2!.zoom).toBe('100%')
+    expect(after2!.transform).toBe(after1!.transform)
+    expect(Math.abs(after2!.w - after1!.w)).toBeLessThan(2)
+    expect(Math.abs(after2!.h - after1!.h)).toBeLessThan(2)
+
+    // Pointer mapping: stage-frame client → normalized stays in range after Fit.
+    await recordSimplePath(page)
+    const mapped = await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="stage-frame"]')
+      const actor = document.querySelector('[data-testid="actor"]')
+      if (!(frame instanceof HTMLElement) || !(actor instanceof HTMLElement)) {
+        return null
+      }
+      const fr = frame.getBoundingClientRect()
+      const ar = actor.getBoundingClientRect()
+      const cx = ar.left + ar.width / 2
+      const cy = ar.top + ar.height / 2
+      return {
+        nx: (cx - fr.left) / fr.width,
+        ny: (cy - fr.top) / fr.height,
+      }
+    })
+    expect(mapped).toBeTruthy()
+    expect(mapped!.nx).toBeGreaterThan(0)
+    expect(mapped!.nx).toBeLessThan(1)
+    expect(mapped!.ny).toBeGreaterThan(0)
+    expect(mapped!.ny).toBeLessThan(1)
+  })
+
   test('camera bar sits below the measured header without overlap', async ({
     page,
   }) => {

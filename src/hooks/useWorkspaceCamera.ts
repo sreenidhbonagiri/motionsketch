@@ -268,7 +268,7 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     const vp = viewportSizeOf(el)
     // Explicit Fit only: clear floating cards + camera/transport chrome.
     // Opening/closing cards must not call this (no auto pan/zoom).
-    const insets = measureWorkspaceFitInsets(el)
+    const insets = measureWorkspaceFitInsets(el, stageAspect)
     const nextLayout = fitStageLayoutSize(vp, stageAspect, undefined, insets)
     setViewport(vp)
     setLayout(nextLayout)
