@@ -129,16 +129,23 @@ test.describe('export integration usability', () => {
       await page.getByTestId('btn-export-path-react').click()
       await expect(page.getByTestId('export-download-success')).toHaveCount(0)
       await expect(page.getByTestId('export-react-download-success')).toHaveCount(0)
+      // Steps guide: unzip into a Vite app folder, keep assets beside the
+      // component, import from an existing src/ file (not main.tsx).
       await expect(page.getByTestId('export-react-steps')).toContainText(
-        'top of an existing component file',
+        'Vite React app',
       )
       await expect(page.getByTestId('export-react-steps')).toContainText(
-        'returned JSX',
+        'src/motionsketch/',
+      )
+      await expect(page.getByTestId('export-react-steps')).toContainText(
+        'Import from a component in',
       )
       await expect(page.getByTestId('export-react-steps')).toContainText(
         'adjusted relative path',
       )
-      await expect(page.getByTestId('export-react-steps')).not.toContainText('main.tsx')
+      await expect(page.getByTestId('export-react-steps')).not.toContainText(
+        'main.tsx',
+      )
 
       const example = page.getByTestId('export-react-example-code')
       const exampleValue = await example.inputValue()

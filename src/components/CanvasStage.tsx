@@ -190,6 +190,7 @@ export function CanvasStage({
     fitStage,
     zoomIn,
     zoomOut,
+    setZoomAtCenter,
     onViewportPointerDown,
     onViewportPointerMove,
     onViewportPointerUp,
@@ -621,6 +622,7 @@ export function CanvasStage({
           zoomIn={zoomIn}
           zoomOut={zoomOut}
           fitStage={fitStage}
+          setZoomAtCenter={setZoomAtCenter}
         />
       </div>
     </div>

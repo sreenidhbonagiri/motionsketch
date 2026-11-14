@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cameraBarTopInsetForProposedStage,
   cameraCssTransform,
   clearViewportRect,
   fitCamera,
@@ -9,7 +10,9 @@ import {
   isSpacePanBlockedTarget,
   normalizeViewportInsets,
   panCamera,
+  parseZoomPercentInput,
   preserveCameraCenterOnLayoutChange,
+  rectsOverlap,
   zoomCameraAt,
   zoomCameraAtCenter,
 } from '../../src/core/camera'
@@ -59,6 +62,58 @@ describe('workspace camera', () => {
       viewport.width - insets.right + 1e-6,
     )
     expect(cam.panY).toBeGreaterThanOrEqual(insets.top - 1e-6)
+  })
+
+  it('camera-bar top inset uses proposed-stage overlap, not width heuristics', () => {
+    const plain = fitStageLayoutSize(viewport, 16 / 10)
+    const cam = fitCamera(viewport, plain)
+    const proposed = {
+      left: cam.panX,
+      top: cam.panY,
+      right: cam.panX + plain.width,
+      bottom: cam.panY + plain.height,
+    }
+    // Corner chrome to the right of the fitted stage — no top inset.
+    const cornerBar = {
+      left: proposed.right + 8,
+      right: viewport.width - 12,
+      top: 8,
+      bottom: 46,
+    }
+    expect(rectsOverlap(cornerBar, proposed)).toBe(false)
+    expect(cameraBarTopInsetForProposedStage(cornerBar, proposed)).toBe(0)
+    const withCorner = fitStageLayoutSize(viewport, 16 / 10, undefined, {
+      left: 0,
+      right: 0,
+      top: cameraBarTopInsetForProposedStage(cornerBar, proposed),
+      bottom: 0,
+    })
+    expect(withCorner.width).toBeCloseTo(plain.width, 5)
+    expect(withCorner.height).toBeCloseTo(plain.height, 5)
+
+    // Bar covering the top of the proposed stage — reserve clearance.
+    const obstructing = {
+      left: proposed.left + 20,
+      right: proposed.right - 20,
+      top: 0,
+      bottom: 40,
+    }
+    expect(rectsOverlap(obstructing, proposed)).toBe(true)
+    expect(cameraBarTopInsetForProposedStage(obstructing, proposed)).toBe(44)
+  })
+
+  it('parses typed zoom percentages and rejects invalid or out-of-range', () => {
+    expect(parseZoomPercentInput('100')).toBe(1)
+    expect(parseZoomPercentInput('100%')).toBe(1)
+    expect(parseZoomPercentInput(' 75 % ')).toBe(0.75)
+    expect(parseZoomPercentInput('150')).toBe(1.5)
+    expect(parseZoomPercentInput('25')).toBe(0.25)
+    expect(parseZoomPercentInput('400')).toBe(4)
+    expect(parseZoomPercentInput('')).toBeNull()
+    expect(parseZoomPercentInput('abc')).toBeNull()
+    expect(parseZoomPercentInput('24')).toBeNull()
+    expect(parseZoomPercentInput('401')).toBeNull()
+    expect(parseZoomPercentInput('100px')).toBeNull()
   })
 
   it('normalizes insets that would consume the whole viewport', () => {

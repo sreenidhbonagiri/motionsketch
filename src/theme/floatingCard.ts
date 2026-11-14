@@ -46,3 +46,16 @@ export function canFloatBothWorkspaceCards(viewportWidthPx: number): boolean {
 /** Elements floating slot: hug content (supports collapse-to-header). */
 export const FLOATING_ELEMENTS_SLOT_CLASS =
   'pointer-events-none absolute top-2 left-2 z-[40] flex max-h-[calc(100%-1rem)] w-[min(16rem,calc(100%-1rem))] flex-col justify-start'
+
+/**
+ * Focused Elements / Inspector content column.
+ * Caps mid-width sheets (~900px) so controls are not stretched edge-to-edge;
+ * `w-full` still uses the available width on phone. Bottom padding separates
+ * sheet content from the playback scrubber region boundary.
+ */
+export const FOCUSED_SHEET_CONTENT_MAX_PX = 420
+export const FOCUSED_SHEET_CONTENT_CLASS =
+  'mx-auto flex h-full min-h-0 w-full max-w-[26.25rem] flex-col px-3 pb-4 sm:px-4'
+/** Stage-back row: same column alignment; full-width border stays on the parent. */
+export const FOCUSED_SHEET_CHROME_CLASS =
+  'mx-auto flex w-full max-w-[26.25rem] items-center gap-1 px-3 py-1 sm:px-4'

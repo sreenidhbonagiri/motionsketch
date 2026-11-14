@@ -613,7 +613,7 @@ export function PlaybackDock() {
         >
           <div
             data-testid="playback-time-labels"
-            className="ms-caption flex items-center justify-between gap-2 tabular-nums"
+            className="ms-caption ms-caption-lg flex items-center justify-between gap-2 tabular-nums"
           >
             <span data-testid="playback-elapsed">
               {goingBack

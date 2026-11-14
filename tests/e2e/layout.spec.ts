@@ -2005,8 +2005,78 @@ test.describe('workspace layout', () => {
       'data-elements-floating',
       'true',
     )
+    // Content column capped (~420px) — not stretched across the full 900 sheet.
+    const focusedWidth = await page
+      .getByTestId('focused-sheet-content')
+      .evaluate((el) => el.getBoundingClientRect().width)
+    expect(focusedWidth).toBeLessThanOrEqual(420 + 1)
+    expect(focusedWidth).toBeGreaterThan(280)
+    const tablistWidth = await page
+      .getByRole('tablist', { name: 'Inspector' })
+      .evaluate((el) => el.getBoundingClientRect().width)
+    expect(tablistWidth).toBeLessThanOrEqual(focusedWidth + 1)
+
+    // Motion: normal scroll reveals Steady Speed and controls below it above transport.
+    await page.getByTestId('btn-inspector-motion').click()
+    await expect(page.getByTestId('steady-speed-slider')).toBeVisible()
+    const motionReach = await page.evaluate(() => {
+      const toolbar = document.querySelector('[data-testid="toolbar-slot"]')
+      const panel = document.querySelector('[data-testid="inspector-panel"]')
+      if (!(toolbar instanceof HTMLElement) || !(panel instanceof HTMLElement)) {
+        return { ok: false, reason: 'missing' as const }
+      }
+      let scrollRoot: HTMLElement | null = null
+      for (const el of [panel, ...panel.querySelectorAll('*')]) {
+        if (!(el instanceof HTMLElement)) continue
+        const cs = getComputedStyle(el)
+        if (
+          (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+          el.scrollHeight > el.clientHeight + 1
+        ) {
+          scrollRoot = el
+          break
+        }
+      }
+      if (!scrollRoot) return { ok: false, reason: 'no-scroll' as const }
+      scrollRoot.scrollTop = scrollRoot.scrollHeight
+      const toolTop = toolbar.getBoundingClientRect().top
+      const ids = [
+        'steady-speed-slider',
+        'loop-toggle',
+        'path-compare-toggle',
+        'btn-polish-motion',
+        'btn-glide',
+      ] as const
+      const rows = ids.map((id) => {
+        const el = document.querySelector(`[data-testid="${id}"]`)
+        if (!(el instanceof HTMLElement)) {
+          return { id, ok: false, reason: 'missing' as const }
+        }
+        const r = el.getBoundingClientRect()
+        const cx = r.left + r.width / 2
+        const cy = r.top + r.height / 2
+        const top = document.elementFromPoint(cx, cy)
+        const hit =
+          top === el || !!top?.closest?.(`[data-testid="${id}"]`)
+        return {
+          id,
+          ok: r.bottom <= toolTop - 1 && hit,
+          bottom: Math.round(r.bottom),
+          toolTop: Math.round(toolTop),
+          hit,
+        }
+      })
+      return { ok: rows.every((row) => row.ok), rows }
+    })
+    expect(motionReach, JSON.stringify(motionReach)).toMatchObject({ ok: true })
+    await assertUnclippedClickable(page, 'btn-inspector-style')
+    await assertUnclippedClickable(page, 'btn-inspector-back-to-stage')
     await page.screenshot({
       path: 'tmp/panel-obstruction/900-inspector-focused.png',
+      fullPage: false,
+    })
+    await page.screenshot({
+      path: 'tmp/focused-panel-width/900-motion-steady-revealed.png',
       fullPage: false,
     })
 

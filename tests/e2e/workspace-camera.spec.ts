@@ -338,6 +338,219 @@ test.describe('workspace camera', () => {
     expect(aspect).toBeCloseTo(before!.stageAspect, 1)
   })
 
+  test('typed zoom percent applies, rejects invalid, Escape/blur, then +/−/Fit', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await recordSimplePath(page)
+    await closeOpenChromePanels(page)
+
+    const zoomBtn = page.getByTestId('zoom-percent')
+    await expect(zoomBtn).toHaveText('100%')
+    await expect(zoomBtn).toHaveAttribute('aria-labelledby', /.+/)
+
+    await zoomBtn.click()
+    const input = page.getByTestId('zoom-percent-input')
+    await expect(input).toBeFocused()
+    await expect(input).toHaveAttribute('aria-labelledby', /.+/)
+    await input.fill('75')
+    await input.press('Enter')
+    await expect(page.getByTestId('zoom-percent')).toHaveText('75%')
+    let cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(0.75, 3)
+    expect(cam.zoomLabel).toBe('75%')
+
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('150%')
+    await page.getByTestId('zoom-percent-input').press('Enter')
+    await expect(page.getByTestId('zoom-percent')).toHaveText('150%')
+    cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(1.5, 3)
+
+    // Invalid — Enter keeps editing; camera unchanged.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('999')
+    await page.getByTestId('zoom-percent-input').press('Enter')
+    await expect(page.getByTestId('zoom-percent-input')).toBeVisible()
+    await expect(page.getByTestId('zoom-percent-input')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(1.5, 3)
+
+    // Escape restores live value.
+    await page.getByTestId('zoom-percent-input').press('Escape')
+    await expect(page.getByTestId('zoom-percent')).toHaveText('150%')
+    cam = await readCamera(page)
+    expect(cam.zoom).toBeCloseTo(1.5, 3)
+
+    // Blur with valid value applies.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('100')
+    await page.getByTestId('btn-zoom-in').click() // blur via other control
+    await expect(page.getByTestId('zoom-percent')).toHaveText('125%')
+    cam = await readCamera(page)
+    // Blur applied 100%, then zoom-in stepped to 125%.
+    expect(cam.zoom).toBeCloseTo(1.25, 3)
+
+    // Limits: below min rejected on blur.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('10')
+    await page.getByTestId('zoom-percent-input').blur()
+    await expect(page.getByTestId('zoom-percent')).toHaveText('125%')
+    expect((await readCamera(page)).zoom).toBeCloseTo(1.25, 3)
+
+    await page.getByTestId('btn-fit-stage').click()
+    await expect(page.getByTestId('zoom-percent')).toHaveText('100%')
+
+    // Pointer mapping after typed zoom still lands on the actor in-frame.
+    await page.getByTestId('zoom-percent').click()
+    await page.getByTestId('zoom-percent-input').fill('150')
+    await page.getByTestId('zoom-percent-input').press('Enter')
+    const mapped = await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="stage-frame"]')
+      const actor = document.querySelector('[data-testid="actor"]')
+      if (!(frame instanceof HTMLElement) || !(actor instanceof HTMLElement)) {
+        return null
+      }
+      const fr = frame.getBoundingClientRect()
+      const ar = actor.getBoundingClientRect()
+      const cx = ar.left + ar.width / 2
+      const cy = ar.top + ar.height / 2
+      return {
+        nx: (cx - fr.left) / fr.width,
+        ny: (cy - fr.top) / fr.height,
+      }
+    })
+    expect(mapped).toBeTruthy()
+    expect(mapped!.nx).toBeGreaterThan(0)
+    expect(mapped!.nx).toBeLessThan(1)
+    expect(mapped!.ny).toBeGreaterThan(0)
+    expect(mapped!.ny).toBeLessThan(1)
+  })
+
+  test('panels closed: Fit matches default size; repeated Fit stable; pointer maps', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await ensureEditor(page)
+    await closeOpenChromePanels(page)
+    for (const id of [
+      'btn-toggle-elements-pane',
+      'btn-toggle-inspector-pane',
+    ] as const) {
+      const toggle = page.getByTestId(id)
+      if (
+        (await toggle.isVisible().catch(() => false)) &&
+        (await toggle.getAttribute('aria-pressed')) === 'true'
+      ) {
+        await toggle.click()
+      }
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    }
+
+    const readFrame = () =>
+      page.evaluate(() => {
+        const frame = document.querySelector('[data-testid="stage-frame"]')
+        const world = document.querySelector(
+          '[data-testid="workspace-world"]',
+        ) as HTMLElement | null
+        const zoom = document.querySelector('[data-testid="zoom-percent"]')
+        if (!(frame instanceof HTMLElement)) return null
+        const r = frame.getBoundingClientRect()
+        return {
+          w: r.width,
+          h: r.height,
+          top: r.top,
+          left: r.left,
+          transform: world?.style.transform ?? '',
+          zoom: zoom?.textContent?.trim() ?? '',
+        }
+      })
+
+    const before = await readFrame()
+    expect(before).toBeTruthy()
+    expect(before!.zoom).toBe('100%')
+    const obstructedBefore = await page.evaluate(() => {
+      const fr = document
+        .querySelector('[data-testid="stage-frame"]')
+        ?.getBoundingClientRect()
+      const br = document
+        .querySelector('[data-testid="workspace-camera-bar"]')
+        ?.getBoundingClientRect()
+      if (!fr || !br) return null
+      return !(
+        fr.right <= br.left ||
+        fr.left >= br.right ||
+        fr.bottom <= br.top ||
+        fr.top >= br.bottom
+      )
+    })
+
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(80)
+    const after1 = await readFrame()
+    expect(after1).toBeTruthy()
+    expect(after1!.zoom).toBe('100%')
+    const obstructedAfter = await page.evaluate(() => {
+      const fr = document
+        .querySelector('[data-testid="stage-frame"]')
+        ?.getBoundingClientRect()
+      const br = document
+        .querySelector('[data-testid="workspace-camera-bar"]')
+        ?.getBoundingClientRect()
+      if (!fr || !br) return null
+      return !(
+        fr.right <= br.left ||
+        fr.left >= br.right ||
+        fr.bottom <= br.top ||
+        fr.top >= br.bottom
+      )
+    })
+    expect(obstructedAfter).toBe(false)
+    if (!obstructedBefore) {
+      // Already clear of the camera bar — Fit must match default layout.
+      expect(Math.abs(after1!.w - before!.w)).toBeLessThan(2)
+      expect(Math.abs(after1!.h - before!.h)).toBeLessThan(2)
+      expect(Math.abs(after1!.top - before!.top)).toBeLessThan(2)
+      expect(Math.abs(after1!.left - before!.left)).toBeLessThan(2)
+    }
+
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(80)
+    const after2 = await readFrame()
+    expect(after2).toBeTruthy()
+    expect(after2!.zoom).toBe('100%')
+    expect(after2!.transform).toBe(after1!.transform)
+    expect(Math.abs(after2!.w - after1!.w)).toBeLessThan(2)
+    expect(Math.abs(after2!.h - after1!.h)).toBeLessThan(2)
+
+    // Pointer mapping: stage-frame client → normalized stays in range after Fit.
+    await recordSimplePath(page)
+    const mapped = await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="stage-frame"]')
+      const actor = document.querySelector('[data-testid="actor"]')
+      if (!(frame instanceof HTMLElement) || !(actor instanceof HTMLElement)) {
+        return null
+      }
+      const fr = frame.getBoundingClientRect()
+      const ar = actor.getBoundingClientRect()
+      const cx = ar.left + ar.width / 2
+      const cy = ar.top + ar.height / 2
+      return {
+        nx: (cx - fr.left) / fr.width,
+        ny: (cy - fr.top) / fr.height,
+      }
+    })
+    expect(mapped).toBeTruthy()
+    expect(mapped!.nx).toBeGreaterThan(0)
+    expect(mapped!.nx).toBeLessThan(1)
+    expect(mapped!.ny).toBeGreaterThan(0)
+    expect(mapped!.ny).toBeLessThan(1)
+  })
+
   test('camera bar sits below the measured header without overlap', async ({
     page,
   }) => {

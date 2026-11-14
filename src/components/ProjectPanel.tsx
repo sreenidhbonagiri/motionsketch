@@ -7,6 +7,18 @@ import {
   useProjectPersistence,
 } from '../hooks/useProjectPersistence'
 import { isRecordingChromeAnnouncement } from '../lib/modeStatus'
+import { getAppPersistenceController } from '../lib/persistenceController'
+import {
+  clearTutorialBackup,
+  hasTutorialBackup,
+  readTutorialBackup,
+  TUTORIAL_BACKUP_HINT,
+  TUTORIAL_BACKUP_RESTORE_BODY,
+  TUTORIAL_BACKUP_RESTORE_CONFIRM,
+  TUTORIAL_BACKUP_RESTORE_LABEL,
+  TUTORIAL_BACKUP_RESTORE_SAVE_FAILED,
+  TUTORIAL_BACKUP_RESTORE_TITLE,
+} from '../lib/tutorial'
 import { blockProjectReplaceDuringTutorial } from '../lib/tutorialGuard'
 import { useEditorStore } from '../state/store'
 import { StageSizeSection } from './StageSizeSection'
@@ -17,6 +29,9 @@ export function ProjectPanel() {
   const confirm = useConfirm()
   const [importError, setImportError] = useState<string | null>(null)
   const [actionStatus, setActionStatus] = useState<string | null>(null)
+  const [backupAvailable, setBackupAvailable] = useState(() =>
+    hasTutorialBackup(),
+  )
 
   const project = useEditorStore((s) => s.project)
   const newProject = useEditorStore((s) => s.newProject)
@@ -51,6 +66,10 @@ export function ProjectPanel() {
     if (isRecordingChromeAnnouncement(storeAnnouncement)) return
     setActionStatus(storeAnnouncement)
   }, [storeAnnouncement])
+
+  useEffect(() => {
+    setBackupAvailable(hasTutorialBackup())
+  }, [project.name, status, practiceSuspended])
 
   const startFreshUntitled = () => {
     newProject()
@@ -108,6 +127,41 @@ export function ProjectPanel() {
 
   const handleOpenClick = () => {
     fileInputRef.current?.click()
+  }
+
+  const handleRestoreTutorialBackup = async () => {
+    if (await blockProjectReplaceDuringTutorial(confirm)) return
+    const backup = readTutorialBackup()
+    if (!backup) {
+      setBackupAvailable(false)
+      return
+    }
+    const ok = await confirm({
+      title: TUTORIAL_BACKUP_RESTORE_TITLE,
+      body: TUTORIAL_BACKUP_RESTORE_BODY,
+      confirmLabel: TUTORIAL_BACKUP_RESTORE_CONFIRM,
+      danger: true,
+      testId: 'tutorial-backup-restore-confirm',
+      confirmTestId: 'btn-tutorial-backup-restore',
+      cancelTestId: 'btn-tutorial-backup-restore-cancel',
+      bodyTestId: 'tutorial-backup-restore-copy',
+    })
+    if (!ok) return
+    applyPersistedSnapshot(backup)
+    afterSuccessfulReplace()
+    if (getAppPersistenceController().getStatus() === 'save-error') {
+      // Keep the durable backup until a successful save.
+      setBackupAvailable(true)
+      setImportError(null)
+      setActionStatus(TUTORIAL_BACKUP_RESTORE_SAVE_FAILED)
+      announceAction(TUTORIAL_BACKUP_RESTORE_SAVE_FAILED)
+      return
+    }
+    clearTutorialBackup()
+    setBackupAvailable(false)
+    setImportError(null)
+    setActionStatus('Previous project restored.')
+    announceAction('Previous project restored.')
   }
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -226,6 +280,28 @@ export function ProjectPanel() {
         <p data-testid="import-error" className="text-[11px] text-ms-danger">
           {importError}
         </p>
+      )}
+
+      {backupAvailable && (
+        <div
+          data-testid="tutorial-backup-banner"
+          className="space-y-2 rounded-xl border border-ms-border bg-slate-50/80 p-3"
+        >
+          <p
+            data-testid="tutorial-backup-hint"
+            className="text-[11px] leading-relaxed text-slate-600"
+          >
+            {TUTORIAL_BACKUP_HINT}
+          </p>
+          <button
+            type="button"
+            data-testid="btn-restore-tutorial-backup"
+            onClick={() => void handleRestoreTutorialBackup()}
+            className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50"
+          >
+            {TUTORIAL_BACKUP_RESTORE_LABEL}
+          </button>
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2">

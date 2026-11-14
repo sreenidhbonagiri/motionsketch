@@ -187,6 +187,10 @@ select:focus-visible {
   line-height: 1.35;
   color: var(--ms-muted);
 }
+/* Save status, preset subtitles, scrubber times — 14px (other captions stay 13px). */
+.ms-caption.ms-caption-lg {
+  font-size: 0.875rem; /* 14px — keeps .ms-caption color / line-height */
+}
 .ms-caption-strong {
   font-size: var(--ms-label);
   line-height: 1.35;

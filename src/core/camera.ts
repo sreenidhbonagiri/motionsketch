@@ -94,6 +94,37 @@ export function clearViewportRect(
   }
 }
 
+/** Axis-aligned rect overlap (any shared area). */
+export function rectsOverlap(
+  a: { left: number; right: number; top: number; bottom: number },
+  b: { left: number; right: number; top: number; bottom: number },
+): boolean {
+  return (
+    a.left < b.right &&
+    a.right > b.left &&
+    a.top < b.bottom &&
+    a.bottom > b.top
+  )
+}
+
+/**
+ * Top inset from the camera bar only when it overlaps the proposed fitted
+ * stage (viewport-local coords). Corner chrome that already clears the stage
+ * contributes 0 — matching default layout vs explicit Fit.
+ */
+export function cameraBarTopInsetForProposedStage(
+  barLocal: { left: number; right: number; top: number; bottom: number },
+  proposedStageLocal: {
+    left: number
+    right: number
+    top: number
+    bottom: number
+  },
+): number {
+  if (!rectsOverlap(barLocal, proposedStageLocal)) return 0
+  return Math.max(0, barLocal.bottom + 4)
+}
+
 /**
  * Layout size of the exported stage frame inside the viewport at zoom = 1.
  * Uses the project’s stored aspect — not the live window ratio — so the frame
@@ -144,9 +175,14 @@ export function fitCamera(
  * the camera bar relative to the stage viewport. Cards are siblings of the
  * camera root under `[data-testid="stage-viewport"]`, so search that host —
  * not only the camera root. Used only by explicit Fit — not on open/close.
+ *
+ * Camera-bar top inset is added only when the bar overlaps the proposed fitted
+ * stage (after card/transport insets), so default layout and Fit agree when
+ * the corner chrome already clears the stage.
  */
 export function measureWorkspaceFitInsets(
   viewportEl: HTMLElement,
+  stageAspect: number,
 ): ViewportInsets {
   const host =
     viewportEl.closest('[data-testid="stage-viewport"]') ?? viewportEl
@@ -190,15 +226,6 @@ export function measureWorkspaceFitInsets(
     }
   }
 
-  const cameraBar = host.querySelector('[data-testid="workspace-camera-bar"]')
-  if (cameraBar instanceof HTMLElement) {
-    const r = cameraBar.getBoundingClientRect()
-    if (r.bottom > vr.top && r.top < vr.bottom) {
-      // Keep Fit clear of Fit/zoom chrome (and any top transport overlap).
-      top = Math.max(top, r.bottom - vr.top + 4)
-    }
-  }
-
   // Transport lives outside the stage viewport cell; if a dock ever overlays
   // the cell, reserve the intersecting bottom band.
   const transport = document.querySelector('[data-testid="dock-transport"]')
@@ -211,10 +238,44 @@ export function measureWorkspaceFitInsets(
     }
   }
 
-  return normalizeViewportInsets({ left, right, top, bottom }, {
-    width: vr.width,
-    height: vr.height,
-  })
+  const vp: ViewportSize = { width: vr.width, height: vr.height }
+  const baseInsets = normalizeViewportInsets(
+    { left, right, top: 0, bottom },
+    vp,
+  )
+  const proposedLayout = fitStageLayoutSize(
+    vp,
+    stageAspect,
+    undefined,
+    baseInsets,
+  )
+  const proposedCam = fitCamera(vp, proposedLayout, baseInsets)
+  const proposedStage =
+    proposedLayout.width > 0 && proposedLayout.height > 0
+      ? {
+          left: proposedCam.panX,
+          top: proposedCam.panY,
+          right: proposedCam.panX + proposedLayout.width,
+          bottom: proposedCam.panY + proposedLayout.height,
+        }
+      : null
+
+  const cameraBar = host.querySelector('[data-testid="workspace-camera-bar"]')
+  if (cameraBar instanceof HTMLElement && proposedStage) {
+    const r = cameraBar.getBoundingClientRect()
+    const barLocal = {
+      left: r.left - vr.left,
+      right: r.right - vr.left,
+      top: r.top - vr.top,
+      bottom: r.bottom - vr.top,
+    }
+    top = Math.max(
+      top,
+      cameraBarTopInsetForProposedStage(barLocal, proposedStage),
+    )
+  }
+
+  return normalizeViewportInsets({ left, right, top, bottom }, vp)
 }
 
 export function panCamera(
@@ -303,6 +364,25 @@ export function cameraCssTransform(camera: WorkspaceCamera): string {
 
 export function formatZoomPercent(zoom: number): string {
   return `${Math.round(clampCameraZoom(zoom) * 100)}%`
+}
+
+/**
+ * Parse a typed zoom field ("150", "150%", " 75 % ").
+ * Returns null for empty, non-numeric, or out-of-range values — callers must
+ * not change the camera when null.
+ */
+export function parseZoomPercentInput(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const match = /^([+-]?\d+(?:\.\d+)?)\s*%?$/.exec(trimmed)
+  if (!match) return null
+  const percent = Number(match[1])
+  if (!Number.isFinite(percent)) return null
+  const zoom = percent / 100
+  if (zoom < MIN_CAMERA_ZOOM - 1e-12 || zoom > MAX_CAMERA_ZOOM + 1e-12) {
+    return null
+  }
+  return clampCameraZoom(zoom)
 }
 
 /** Re-export: form/button targets that must keep native Space / typing. */

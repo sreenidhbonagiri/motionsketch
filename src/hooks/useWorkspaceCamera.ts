@@ -268,7 +268,7 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     const vp = viewportSizeOf(el)
     // Explicit Fit only: clear floating cards + camera/transport chrome.
     // Opening/closing cards must not call this (no auto pan/zoom).
-    const insets = measureWorkspaceFitInsets(el)
+    const insets = measureWorkspaceFitInsets(el, stageAspect)
     const nextLayout = fitStageLayoutSize(vp, stageAspect, undefined, insets)
     setViewport(vp)
     setLayout(nextLayout)
@@ -292,6 +292,15 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
   const zoomOut = useCallback(
     () => zoomBy(1 / CAMERA_ZOOM_STEP, 'center'),
     [zoomBy],
+  )
+
+  /** Absolute zoom at viewport center — same anchor as +/− buttons. */
+  const setZoomAtCenter = useCallback(
+    (nextZoom: number) => {
+      const cam = useEditorStore.getState().camera
+      setCamera(zoomCameraAtCenter(cam, nextZoom, viewportRefState.current))
+    },
+    [setCamera],
   )
 
   // H = temporary pan-over-everything. Ignore while typing / form controls.
@@ -391,6 +400,7 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     fitStage,
     zoomIn,
     zoomOut,
+    setZoomAtCenter,
     onViewportPointerDown,
     onViewportPointerMove,
     onViewportPointerUp,
