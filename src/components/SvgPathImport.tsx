@@ -85,7 +85,15 @@ function PathPreview({
   )
 }
 
-export function SvgPathImport() {
+export function SvgPathImport({
+  showHelp = true,
+  motionHelpId,
+}: {
+  /** When false, Motion-tab About Motion owns the SVG import explanation. */
+  showHelp?: boolean
+  /** Shared Motion help id for aria-describedby when showHelp is false. */
+  motionHelpId?: string
+} = {}) {
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id) ?? s.project.actors[0]
@@ -170,7 +178,7 @@ export function SvgPathImport() {
           type="button"
           data-testid="btn-import-svg-path"
           disabled={busyModes || busy}
-          aria-describedby={helpId}
+          aria-describedby={showHelp ? helpId : motionHelpId}
           onClick={() => fileRef.current?.click()}
           className="rounded-lg border border-ms-border bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -185,33 +193,35 @@ export function SvgPathImport() {
           onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
         />
       </div>
-      <HelpDisclosure
-        id={helpId}
-        testId="svg-path-import-help"
-        summary="About SVG import"
-      >
-        {hasExistingTake ? (
-          <>
-            Replace the path for{' '}
-            <span className="font-medium text-slate-700">
-              {selectedActor?.name ?? 'the selected element'}
-            </span>{' '}
-            with one local SVG path. Preview on the stage, nudge if needed, then
-            confirm. Keeps Duration and appearance; movement is even-speed by
-            default.
-          </>
-        ) : (
-          <>
-            Set the path for{' '}
-            <span className="font-medium text-slate-700">
-              {selectedActor?.name ?? 'the selected element'}
-            </span>{' '}
-            from one local SVG file. Preview on the stage, nudge if needed, then
-            apply. Uses project Duration; appearance stays the same; movement is
-            even-speed by default.
-          </>
-        )}
-      </HelpDisclosure>
+      {showHelp && (
+        <HelpDisclosure
+          id={helpId}
+          testId="svg-path-import-help"
+          summary="About SVG import"
+        >
+          {hasExistingTake ? (
+            <>
+              Replace the path for{' '}
+              <span className="font-medium text-slate-700">
+                {selectedActor?.name ?? 'the selected element'}
+              </span>{' '}
+              with one local SVG path. Preview on the stage, nudge if needed, then
+              confirm. Keeps Duration and appearance; movement is even-speed by
+              default.
+            </>
+          ) : (
+            <>
+              Set the path for{' '}
+              <span className="font-medium text-slate-700">
+                {selectedActor?.name ?? 'the selected element'}
+              </span>{' '}
+              from one local SVG file. Preview on the stage, nudge if needed, then
+              apply. Uses project Duration; appearance stays the same; movement is
+              even-speed by default.
+            </>
+          )}
+        </HelpDisclosure>
+      )}
       {error ? (
         <p
           data-testid="svg-path-import-error"

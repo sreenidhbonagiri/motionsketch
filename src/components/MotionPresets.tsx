@@ -23,7 +23,7 @@ export function MotionPresets() {
     <div data-testid="motion-presets" className="space-y-2">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-slate-800">Motion presets</h3>
-        <p className="text-xs text-slate-500">Preview, then Apply</p>
+        <p className="ms-caption">Preview, then Apply</p>
       </div>
       <ul className="space-y-1.5" role="list">
         {MOTION_PRESETS.map((preset) => {
@@ -49,8 +49,8 @@ export function MotionPresets() {
                 <span
                   className={
                     active
-                      ? 'mt-0.5 text-xs leading-snug text-slate-600'
-                      : 'mt-0.5 text-xs leading-snug text-slate-500'
+                      ? 'ms-caption mt-0.5 leading-snug text-slate-700'
+                      : 'ms-caption mt-0.5 leading-snug'
                   }
                 >
                   {preset.summary}

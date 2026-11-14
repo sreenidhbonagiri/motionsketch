@@ -1,8 +1,11 @@
+import { useId } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { AdjustPanel } from './AdjustPanel'
 import { AppearancePanel } from './AppearancePanel'
+import { HelpDisclosure } from './HelpDisclosure'
 import { MotionToolsSection } from './MotionToolsSection'
 import { ProjectPanel } from './ProjectPanel'
+import { useEditorStore } from '../state/store'
 
 export type InspectorTab = 'style' | 'motion' | 'project'
 
@@ -39,6 +42,11 @@ export function InspectorPanel({
   motionSummary,
   fillHeight = true,
 }: InspectorPanelProps) {
+  const motionHelpId = useId()
+  const selectedName = useEditorStore((s) => {
+    const id = s.selectedActorId
+    return s.project.actors.find((a) => a.id === id)?.name ?? 'the selected element'
+  })
   const chrome = (
     <>
       {onBackToStage && (
@@ -157,7 +165,36 @@ export function InspectorPanel({
             aria-labelledby="inspector-tab-motion"
             className="divide-y divide-ms-border"
           >
-            <AdjustPanel />
+            <div className="space-y-2 px-2.5 pt-2">
+              <HelpDisclosure
+                id={motionHelpId}
+                testId="inspector-motion-help"
+                summary="About Motion"
+              >
+                <p>
+                  Adjusting{' '}
+                  <span className="font-medium text-slate-700">
+                    {selectedName}
+                  </span>
+                  . Duration is shared project playback time (scales Timing).
+                  Smoothing reduces path wobble. Steady Speed evens movement
+                  while keeping pauses — Glide eases starts/stops afterward.
+                  Loop Repeat restarts (may jump); Back and forth alternates
+                  with no jump.
+                </p>
+                <p className="mt-1.5">
+                  Polish keeps pauses and corners; Glide softens starts and
+                  stops. Snap stays next to Record and Play.
+                </p>
+                <p className="mt-1.5">
+                  Import SVG path sets or replaces the path for {selectedName}{' '}
+                  from one local SVG file. Preview on the stage, nudge if needed,
+                  then apply. Uses project Duration; appearance stays the same;
+                  movement is even-speed by default.
+                </p>
+              </HelpDisclosure>
+            </div>
+            <AdjustPanel showHelp={false} motionHelpId={motionHelpId} />
             <div
               data-testid="motion-tools-section-chrome"
               className="px-2.5 pb-2.5 pt-2"
@@ -173,7 +210,7 @@ export function InspectorPanel({
                   </span>
                 ) : null}
               </h3>
-              <MotionToolsSection />
+              <MotionToolsSection showHelp={false} />
             </div>
           </div>
         )}

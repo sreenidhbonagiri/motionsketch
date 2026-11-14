@@ -10,7 +10,12 @@ const toolBtn =
  * Polish / Glide / Restore — same store actions as the former dock Refine
  * popover. Snap stays on the transport dock. Presets live in AdjustPanel.
  */
-export function MotionToolsSection() {
+export function MotionToolsSection({
+  showHelp = true,
+}: {
+  /** When false, the Motion-tab Help disclosure owns the explanations. */
+  showHelp?: boolean
+}) {
   const mode = useEditorStore((s) => s.mode)
   const selectedActor = useEditorStore((s) => {
     const id = s.selectedActorId
@@ -41,14 +46,16 @@ export function MotionToolsSection() {
   return (
     <div data-testid="refine-motion-tools" className="space-y-3">
       <div className="space-y-1.5">
-        <HelpDisclosure testId="refine-motion-help" summary="About Motion tools">
-          Soften motion for{' '}
-          <span className="font-medium text-slate-700">
-            {selectedActor?.name ?? 'the selected element'}
-          </span>
-          . Polish keeps pauses and corners; Glide eases starts and stops. Snap
-          stays next to Record and Play.
-        </HelpDisclosure>
+        {showHelp && (
+          <HelpDisclosure testId="refine-motion-help" summary="About Motion tools">
+            Soften motion for{' '}
+            <span className="font-medium text-slate-700">
+              {selectedActor?.name ?? 'the selected element'}
+            </span>
+            . Polish keeps pauses and corners; Glide eases starts and stops. Snap
+            stays next to Record and Play.
+          </HelpDisclosure>
+        )}
         <button
           type="button"
           data-testid="btn-polish-motion"
