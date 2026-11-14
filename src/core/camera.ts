@@ -140,10 +140,10 @@ export function fitCamera(
 }
 
 /**
- * Measure floating Elements/Inspector slots and the camera bar relative to the
- * stage viewport. Cards are siblings of the camera root under
- * `[data-testid="stage-viewport"]`, so search that host — not only the
- * camera root. Used only by explicit Fit — not on open/close.
+ * Measure floating Elements/Inspector card bounds (expanded or collapsed) and
+ * the camera bar relative to the stage viewport. Cards are siblings of the
+ * camera root under `[data-testid="stage-viewport"]`, so search that host —
+ * not only the camera root. Used only by explicit Fit — not on open/close.
  */
 export function measureWorkspaceFitInsets(
   viewportEl: HTMLElement,
@@ -158,22 +158,34 @@ export function measureWorkspaceFitInsets(
   let top = 0
   let bottom = 0
 
-  const elements = host.querySelector('[data-testid="actor-list-slot"]')
-  if (elements instanceof HTMLElement) {
-    const r = elements.getBoundingClientRect()
+  // Prefer the visible card chrome (expanded or collapsed), not the full-height
+  // slot wrapper — collapse-to-header must shrink the measured obstruction.
+  const elementsCard =
+    host.querySelector(
+      '[data-testid="actor-list-slot"] [data-testid="actor-list"]',
+    ) ?? host.querySelector('[data-testid="actor-list-slot"]')
+  if (elementsCard instanceof HTMLElement) {
+    const r = elementsCard.getBoundingClientRect()
     const overlapLeft = Math.max(vr.left, r.left)
     const overlapRight = Math.min(vr.right, r.right)
-    if (overlapRight > overlapLeft) {
+    const overlapTop = Math.max(vr.top, r.top)
+    const overlapBottom = Math.min(vr.bottom, r.bottom)
+    if (overlapRight > overlapLeft && overlapBottom > overlapTop) {
       left = Math.max(left, overlapRight - vr.left)
     }
   }
 
-  const inspector = host.querySelector('[data-testid="inspector-slot"]')
-  if (inspector instanceof HTMLElement) {
-    const r = inspector.getBoundingClientRect()
+  const inspectorCard =
+    host.querySelector(
+      '[data-testid="inspector-slot"] [data-testid="inspector-panel"]',
+    ) ?? host.querySelector('[data-testid="inspector-slot"]')
+  if (inspectorCard instanceof HTMLElement) {
+    const r = inspectorCard.getBoundingClientRect()
     const overlapLeft = Math.max(vr.left, r.left)
     const overlapRight = Math.min(vr.right, r.right)
-    if (overlapRight > overlapLeft) {
+    const overlapTop = Math.max(vr.top, r.top)
+    const overlapBottom = Math.min(vr.bottom, r.bottom)
+    if (overlapRight > overlapLeft && overlapBottom > overlapTop) {
       right = Math.max(right, vr.right - overlapLeft)
     }
   }

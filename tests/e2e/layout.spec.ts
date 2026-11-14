@@ -4,6 +4,7 @@ import {
   assertUnclippedClickable,
   clickAddActor,
   closeOpenChromePanels,
+  dragActor,
   ensureActorListExpanded,
   ensureClipTimesOpen,
   ensureEditor,
@@ -17,6 +18,28 @@ import {
   respondToConfirm,
   selectActorByIndex,
 } from './helpers'
+
+/** Place an unrecorded element near the stage frame’s top-left for obstruction shots. */
+async function placeArtworkAtStageTopLeft(page: Page) {
+  await clickAddActor(page)
+  const ids = await actorIdsFromList(page)
+  await selectActorByIndex(page, ids.length - 1)
+  const delta = await page.evaluate(() => {
+    const frame = document.querySelector('[data-testid="stage-frame"]')
+    const actor = document.querySelector('[data-testid="actor"]')
+    if (!(frame instanceof HTMLElement) || !(actor instanceof HTMLElement)) {
+      return null
+    }
+    const fr = frame.getBoundingClientRect()
+    const ar = actor.getBoundingClientRect()
+    return {
+      dx: fr.left + 40 - (ar.left + ar.width / 2),
+      dy: fr.top + 40 - (ar.top + ar.height / 2),
+    }
+  })
+  expect(delta).toBeTruthy()
+  await dragActor(page, { x: 0, y: 0 }, { x: delta!.dx, y: delta!.dy })
+}
 
 /** Play/Pause center X should match the dock center (balanced transport columns). */
 async function assertPlayCenteredInDock(page: Page, tolerancePx = 6) {
@@ -127,7 +150,14 @@ test.describe('workspace layout', () => {
 
       await page.getByTestId('btn-toggle-elements-pane').click()
       await expect(page.getByTestId('actor-list')).toBeVisible()
-      await expect(page.getByTestId('actors-collapse-label')).toHaveText('Close')
+      await expect(page.getByTestId('actors-collapse-label')).toHaveText(
+        'Collapse',
+      )
+      await expect(page.getByTestId('actors-close-label')).toHaveText('Close')
+      await expect(page.getByTestId('btn-collapse-actor-list')).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
       await page.getByTestId('btn-toggle-actor-list').click()
       await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
 
@@ -774,8 +804,9 @@ test.describe('workspace layout', () => {
         await page.getByTestId('btn-toggle-elements-pane').click()
         await expect(page.getByTestId('actor-list-body')).toBeVisible()
         await expect(page.getByTestId('actors-collapse-label')).toHaveText(
-          'Close',
+          'Collapse',
         )
+        await expect(page.getByTestId('actors-close-label')).toHaveText('Close')
         await page.getByTestId('btn-toggle-actor-list').click()
         await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
       }
@@ -1504,7 +1535,7 @@ test.describe('workspace layout', () => {
       if ((await insp.getAttribute('aria-pressed')) !== 'true') await insp.click()
       await expect(page.getByTestId('inspector-panel')).toBeVisible()
 
-      const focused = await page
+      let focused = await page
         .getByTestId('btn-inspector-back-to-stage')
         .isVisible()
         .catch(() => false)
@@ -1514,7 +1545,17 @@ test.describe('workspace layout', () => {
         if ((await elements.getAttribute('aria-pressed')) !== 'true') {
           await elements.click()
         }
-        await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+        // Both-open below ~1100 uses focused sheets; stay on Inspector for tab checks.
+        focused = await page
+          .getByTestId('btn-elements-back-to-stage')
+          .isVisible()
+          .catch(() => false)
+        if (focused) {
+          await page.getByTestId('btn-toggle-inspector-pane').click()
+          await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeVisible()
+        } else {
+          await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+        }
       }
 
       const measure = await page.evaluate(() => {
@@ -1701,13 +1742,29 @@ test.describe('workspace layout', () => {
         if ((await insp.getAttribute('aria-pressed')) !== 'true') {
           await insp.click()
         }
-        await expect(page.getByTestId('inspector-panel')).toBeVisible()
-        await assertUnclippedClickable(page, 'btn-close-inspector')
+        // Both-open below ~1100 switches to focused chrome instead of floating.
+        const bothFocused = await page
+          .getByTestId('btn-inspector-back-to-stage')
+          .isVisible()
+          .catch(() => false)
+        if (bothFocused) {
+          await page.getByTestId('btn-toggle-elements-pane').click()
+          await expect(page.getByTestId('btn-elements-back-to-stage')).toBeVisible()
+          await assertUnclippedClickable(page, 'btn-elements-back-to-stage')
+        } else {
+          await expect(page.getByTestId('inspector-panel')).toBeVisible()
+          await assertUnclippedClickable(page, 'btn-close-inspector')
+        }
       } else {
         await assertUnclippedClickable(page, 'btn-elements-back-to-stage')
       }
 
-      // Title / count / Close stay available while the list scrolls.
+      const listFocused = await page
+        .getByTestId('btn-elements-back-to-stage')
+        .isVisible()
+        .catch(() => false)
+
+      // Title / count / Close (and Collapse on floating) stay while the list scrolls.
       await assertUnclippedClickable(page, 'btn-toggle-actor-list')
       await expect(page.getByTestId('actors-collapse-label')).toBeVisible()
 
@@ -1769,8 +1826,8 @@ test.describe('workspace layout', () => {
       expect(ids).toHaveLength(8)
       await expect(page.getByTestId('btn-add-actor')).toBeDisabled()
 
-      // Keyboard: Close (desktop) or Stage back (phone) via focus + Enter.
-      if (focused) {
+      // Keyboard: Close (desktop float) or Stage back (focused sheet) via focus + Enter.
+      if (listFocused) {
         const back = page.getByTestId('btn-elements-back-to-stage')
         await back.focus()
         await page.keyboard.press('Enter')
@@ -1894,7 +1951,7 @@ test.describe('workspace layout', () => {
     await expect(page.getByTestId('btn-edit-path')).toBeVisible()
   })
 
-  test('900 both cards: Fit clears Elements and Inspector; open/close preserves camera', async ({
+  test('900 both open: focused Stage / Elements / Inspector (no dual float)', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 900, height: 800 })
@@ -1912,67 +1969,339 @@ test.describe('workspace layout', () => {
     const firstUse = page.getByTestId('btn-dismiss-first-use')
     if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
     await recordSimplePath(page)
+    await ensureActorListExpanded(page)
+    await placeArtworkAtStageTopLeft(page)
+    await page.getByTestId('btn-toggle-actor-list').click()
+    await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+
+    const camBefore = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/900-stage-focused.png',
+      fullPage: false,
+    })
 
     await page.getByTestId('btn-toggle-elements-pane').click()
     await page.getByTestId('btn-toggle-inspector-pane').click()
-    await expect(page.getByTestId('actor-list-slot')).toBeVisible()
-    await expect(page.getByTestId('inspector-slot')).toBeVisible()
+    await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    // Same outer Stage chrome as focused Elements (not only an in-panel control).
+    const inspectorBack = page.getByTestId('btn-inspector-back-to-stage')
+    await expect(inspectorBack).toBeVisible()
+    await expect(inspectorBack).toHaveText(/Stage/)
+    await assertUnclippedClickable(page, 'btn-inspector-back-to-stage')
+    await expect(page.getByTestId('btn-close-inspector')).toHaveCount(0)
+    // Selection / edits survive focused Inspector.
+    await expect(page.getByTestId('inspector-panel')).toContainText('Element 2')
+    await expect(page.getByTestId('stage-viewport')).not.toHaveAttribute(
+      'data-inspector-floating',
+      'true',
+    )
+    await expect(page.getByTestId('stage-viewport')).not.toHaveAttribute(
+      'data-elements-floating',
+      'true',
+    )
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/900-inspector-focused.png',
+      fullPage: false,
+    })
 
-    const beforeFit = await page.evaluate(() => {
+    // Click Stage back — prefs stay; stage returns without camera jump.
+    await inspectorBack.click()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+    await expect(page.getByTestId('stage-viewport')).toBeVisible()
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+
+    // Keyboard: reopen Inspector, focus Stage back, activate with Enter.
+    await page.getByTestId('btn-toggle-inspector-pane').click()
+    await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeVisible()
+    await expect(page.getByTestId('inspector-panel')).toContainText('Element 2')
+    await page.getByTestId('btn-inspector-back-to-stage').focus()
+    await expect(page.getByTestId('btn-inspector-back-to-stage')).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
+
+    await page.getByTestId('btn-toggle-elements-pane').click()
+    await expect(page.getByTestId('btn-elements-back-to-stage')).toBeVisible()
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+    await assertUnclippedClickable(page, 'btn-elements-back-to-stage')
+    await expect(
+      page.locator('[data-testid^="actor-list-item-"][data-selected="true"]'),
+    ).toContainText('Element 2')
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/900-elements-focused.png',
+      fullPage: false,
+    })
+
+    await page.getByTestId('btn-elements-back-to-stage').click()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
+    await expect(page.getByTestId('stage-viewport')).toBeVisible()
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/900-stage-focused.png',
+      fullPage: false,
+    })
+
+    const camAfter = await page.evaluate(() => {
       const world = document.querySelector(
         '[data-testid="workspace-world"]',
       ) as HTMLElement | null
       return world?.style.transform ?? ''
     })
+    // Focused sheet switches must not auto-move the camera.
+    expect(camAfter).toBe(camBefore)
+  })
+
+  test('1280 Elements: collapse-to-header preserves scroll; Fit uses card bounds', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/')
+    await page.evaluate(() => {
+      try {
+        sessionStorage.clear()
+        localStorage.clear()
+      } catch {
+        /* ignore */
+      }
+    })
+    await page.reload()
+    await ensureEditor(page)
+    const firstUse = page.getByTestId('btn-dismiss-first-use')
+    if (await firstUse.isVisible().catch(() => false)) await firstUse.click()
+    await recordSimplePath(page)
+    await ensureActorListExpanded(page)
+    await placeArtworkAtStageTopLeft(page)
+
+    await expect(page.getByTestId('actor-list')).toBeVisible()
+    await expect(page.getByTestId('btn-collapse-actor-list')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+
+    for (let i = 0; i < 6; i++) await clickAddActor(page)
+    const ids = await actorIdsFromList(page)
+    expect(ids).toHaveLength(8)
+    const lastItem = page.getByTestId(`actor-list-item-${ids[ids.length - 1]}`)
+    const scrollBefore = await page.getByTestId('actor-list-body').evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+      return el.scrollTop
+    })
+    expect(scrollBefore).toBeGreaterThan(0)
+    await lastItem.click()
+    await expect(lastItem).toHaveAttribute('data-selected', 'true')
+
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/1280-elements-expanded.png',
+      fullPage: false,
+    })
+
+    const camBeforeCollapse = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+
+    await page.getByTestId('btn-collapse-actor-list').click()
+    await expect(page.getByTestId('btn-collapse-actor-list')).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    await expect(page.getByTestId('actors-collapse-label')).toHaveText('Expand')
+    await expect(page.getByTestId('actor-list-body')).toBeHidden()
+    await expect(page.getByTestId('actors-close-label')).toBeVisible()
+    await expect(page.getByTestId('actor-list')).toHaveAttribute(
+      'data-actors-body-expanded',
+      'false',
+    )
+    // Collapse must not dismiss the card or move the camera.
+    await expect(page.getByTestId('actor-list-slot')).toBeVisible()
+    const camAfterCollapse = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+    expect(camAfterCollapse).toBe(camBeforeCollapse)
+
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/1280-elements-collapsed.png',
+      fullPage: false,
+    })
+
+    const collapsedHeight = await page
+      .getByTestId('actor-list')
+      .evaluate((el) => el.getBoundingClientRect().height)
+    expect(collapsedHeight).toBeLessThan(64)
+
+    // Geometry relative to the stage frame (saved layout) before Fit.
+    const geomBefore = await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="stage-frame"]')
+      const actors = [
+        ...document.querySelectorAll('[data-testid="actor"]'),
+      ] as HTMLElement[]
+      if (!(frame instanceof HTMLElement) || actors.length === 0) return null
+      const fr = frame.getBoundingClientRect()
+      let corner: HTMLElement = actors[0]!
+      let best = Infinity
+      for (const a of actors) {
+        const r = a.getBoundingClientRect()
+        const score = Math.hypot(r.left - fr.left, r.top - fr.top)
+        if (score < best) {
+          best = score
+          corner = a
+        }
+      }
+      const ar = corner.getBoundingClientRect()
+      return {
+        aspect: fr.width / fr.height,
+        relX: (ar.left - fr.left) / fr.width,
+        relY: (ar.top - fr.top) / fr.height,
+        selectedId: document
+          .querySelector('[data-testid^="actor-list-item-"][data-selected="true"]')
+          ?.getAttribute('data-testid'),
+      }
+    })
+    expect(geomBefore).toBeTruthy()
 
     await page.getByTestId('btn-fit-stage').click()
     await page.waitForTimeout(120)
-
-    const afterFit = await page.evaluate(() => {
+    const fitCollapsed = await page.evaluate(() => {
       const stage = document.querySelector('[data-testid="stage-frame"]')
-      const left = document.querySelector('[data-testid="actor-list-slot"]')
-      const right = document.querySelector('[data-testid="inspector-slot"]')
-      const world = document.querySelector(
-        '[data-testid="workspace-world"]',
-      ) as HTMLElement | null
+      const card = document.querySelector('[data-testid="actor-list"]')
+      const actors = [
+        ...document.querySelectorAll('[data-testid="actor"]'),
+      ] as HTMLElement[]
       if (
         !(stage instanceof HTMLElement) ||
-        !(left instanceof HTMLElement) ||
-        !(right instanceof HTMLElement)
+        !(card instanceof HTMLElement) ||
+        actors.length === 0
       ) {
-        return { ok: false, transform: world?.style.transform ?? '' }
+        return { ok: false }
       }
       const sr = stage.getBoundingClientRect()
-      const lr = left.getBoundingClientRect()
-      const rr = right.getBoundingClientRect()
+      const cr = card.getBoundingClientRect()
+      let corner = actors[0]!
+      let best = Infinity
+      for (const a of actors) {
+        const r = a.getBoundingClientRect()
+        const score = Math.hypot(r.left - sr.left, r.top - sr.top)
+        if (score < best) {
+          best = score
+          corner = a
+        }
+      }
+      const ar = corner.getBoundingClientRect()
+      const overlapsHeader =
+        Math.max(0, Math.min(ar.right, cr.right) - Math.max(ar.left, cr.left)) >
+          0 &&
+        Math.max(0, Math.min(ar.bottom, cr.bottom) - Math.max(ar.top, cr.top)) >
+          0
       return {
-        ok: sr.left >= lr.right - 1 && sr.right <= rr.left + 1,
-        transform: world?.style.transform ?? '',
+        ok: sr.left >= cr.right - 1 && !overlapsHeader,
         stageLeft: sr.left,
-        elementsRight: lr.right,
-        stageRight: sr.right,
-        inspectorLeft: rr.left,
+        cardRight: cr.right,
+        cardHeight: cr.height,
+        actorLeft: ar.left,
+        actorTop: ar.top,
+        overlapsHeader,
       }
     })
-    expect(afterFit.ok, JSON.stringify(afterFit)).toBe(true)
-    expect(afterFit.transform).not.toBe(beforeFit)
+    expect(fitCollapsed.ok, JSON.stringify(fitCollapsed)).toBe(true)
 
-    // Closing cards must not auto-fit / jump the camera.
-    const afterFitTransform = afterFit.transform
-    await page.getByTestId('btn-toggle-actor-list').click()
-    await page.getByTestId('btn-close-inspector').click()
-    const afterClose = await page.evaluate(() => {
+    await page.screenshot({
+      path: 'tmp/panel-obstruction/1280-elements-collapsed-after-fit.png',
+      fullPage: false,
+    })
+
+    const camAfterFit = await page.evaluate(() => {
       const world = document.querySelector(
         '[data-testid="workspace-world"]',
       ) as HTMLElement | null
       return world?.style.transform ?? ''
     })
-    expect(afterClose).toBe(afterFitTransform)
 
-    await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
-    await page.getByTestId('btn-edit-path').click()
-    await expect(page.getByTestId('btn-done-edit')).toBeVisible()
-    await page.getByTestId('btn-done-edit').click()
+    // Expand / collapse after Fit must not auto-move the camera.
+    await page.getByTestId('btn-collapse-actor-list').click()
+    await expect(page.getByTestId('btn-collapse-actor-list')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+    await expect(lastItem).toHaveAttribute('data-selected', 'true')
+    const scrollAfter = await page
+      .getByTestId('actor-list-body')
+      .evaluate((el) => el.scrollTop)
+    expect(scrollAfter).toBe(scrollBefore)
+
+    await page.getByTestId('btn-collapse-actor-list').click()
+    await expect(page.getByTestId('btn-collapse-actor-list')).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    const camAfterToggle = await page.evaluate(() => {
+      const world = document.querySelector(
+        '[data-testid="workspace-world"]',
+      ) as HTMLElement | null
+      return world?.style.transform ?? ''
+    })
+    expect(camAfterToggle).toBe(camAfterFit)
+
+    const geomAfter = await page.evaluate(() => {
+      const frame = document.querySelector('[data-testid="stage-frame"]')
+      const actors = [
+        ...document.querySelectorAll('[data-testid="actor"]'),
+      ] as HTMLElement[]
+      if (!(frame instanceof HTMLElement) || actors.length === 0) return null
+      const fr = frame.getBoundingClientRect()
+      let corner: HTMLElement = actors[0]!
+      let best = Infinity
+      for (const a of actors) {
+        const r = a.getBoundingClientRect()
+        const score = Math.hypot(r.left - fr.left, r.top - fr.top)
+        if (score < best) {
+          best = score
+          corner = a
+        }
+      }
+      const ar = corner.getBoundingClientRect()
+      return {
+        aspect: fr.width / fr.height,
+        relX: (ar.left - fr.left) / fr.width,
+        relY: (ar.top - fr.top) / fr.height,
+      }
+    })
+    expect(geomAfter).toBeTruthy()
+    expect(geomAfter!.aspect).toBeCloseTo(geomBefore!.aspect, 3)
+    expect(geomAfter!.relX).toBeCloseTo(geomBefore!.relX, 2)
+    expect(geomAfter!.relY).toBeCloseTo(geomBefore!.relY, 2)
+
+    await page.getByTestId('btn-collapse-actor-list').click()
+    await expect(page.getByTestId('actor-list-body')).toBeVisible()
+    await page.getByTestId('btn-fit-stage').click()
+    await page.waitForTimeout(120)
+    const fitExpanded = await page.evaluate(() => {
+      const stage = document.querySelector('[data-testid="stage-frame"]')
+      const card = document.querySelector('[data-testid="actor-list"]')
+      if (!(stage instanceof HTMLElement) || !(card instanceof HTMLElement)) {
+        return { ok: false }
+      }
+      const sr = stage.getBoundingClientRect()
+      const cr = card.getBoundingClientRect()
+      return {
+        ok: sr.left >= cr.right - 1 && cr.height > 64,
+        stageLeft: sr.left,
+        cardRight: cr.right,
+        cardHeight: cr.height,
+      }
+    })
+    expect(fitExpanded.ok, JSON.stringify(fitExpanded)).toBe(true)
+    await expect(lastItem).toHaveAttribute('data-selected', 'true')
   })
 
   test('800 both prefs: focused sheet instead of squeezing both floating cards', async ({
