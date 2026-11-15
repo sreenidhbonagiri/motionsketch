@@ -187,9 +187,16 @@ describe('motion presets', () => {
       'Float',
       'Attention Pulse',
     ])
+    expect(MOTION_PRESETS.map((p) => p.summary)).toEqual([
+      'Slide upward',
+      'Scale entrance',
+      'Gentle drift',
+      'Draw attention',
+    ])
     for (const preset of MOTION_PRESETS) {
       const blob = `${preset.label} ${preset.summary} ${preset.behavior}`.toLowerCase()
       expect(blob).not.toMatch(/\bfade\b/)
+      expect(preset.behavior.length).toBeGreaterThan(preset.summary.length)
     }
   })
 

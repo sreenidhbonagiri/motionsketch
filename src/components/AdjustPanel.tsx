@@ -68,8 +68,7 @@ export function AdjustPanel({
 
       <SvgPathImport showHelp={showHelp} motionHelpId={motionHelpId} />
 
-      <MotionPresets />
-
+      {/* Core timing before presets so Duration/Easing stay reachable while watching. */}
       <div className="space-y-2">
         <label
           htmlFor="duration-slider"
@@ -169,6 +168,8 @@ export function AdjustPanel({
           </p>
         )}
       </div>
+
+      <MotionPresets />
 
       <div className="space-y-2">
         <label className="flex items-center justify-between text-sm text-slate-600">
