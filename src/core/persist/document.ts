@@ -628,7 +628,9 @@ function coerceStageSize(
   const hasHeight = heightRaw !== undefined && heightRaw !== null
 
   if (!hasWidth && !hasHeight) {
-    if (formatVersion >= PERSIST_FORMAT_VERSION) {
+    // v14+ always require explicit composition size (unchanged when format
+    // advances past 14 — compare against V14, not the current tip version).
+    if (formatVersion >= PERSIST_FORMAT_VERSION_V14) {
       return {
         ok: false,
         error: 'project.stageWidth and project.stageHeight are required.',
@@ -690,7 +692,7 @@ function coerceStageSize(
   const fromSize = clampStageAspect(w / h)
   const aspectMismatch =
     Math.abs(fromSize - clampStageAspect(stageAspect)) > 1e-3
-  if (aspectMismatch && formatVersion >= PERSIST_FORMAT_VERSION) {
+  if (aspectMismatch && formatVersion >= PERSIST_FORMAT_VERSION_V14) {
     return {
       ok: false,
       error:
