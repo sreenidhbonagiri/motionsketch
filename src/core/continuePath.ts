@@ -1,6 +1,7 @@
 import { clamp01 } from './coords'
 import { clampClip, cloneClip, MIN_CLIP_SPAN } from './clip'
 import { copyPath, makeGeometryEdit } from './edit'
+import { applyEasing } from './easing'
 import { applyGlide } from './glide'
 import {
   applyMotionStateToActor,
@@ -50,10 +51,12 @@ export function displayedPathSamples(
   const timingBaked = ge?.timingBaked === true
   const steady = timingBaked ? 0 : actor.steadySpeed
   const glide = timingBaked ? 0 : (actor.glide ?? 0)
+  const easing = timingBaked ? 'linear' : (actor.easing ?? 'linear')
   const afterSteady = spatial
     ? applySteadySpeed(spatial, steady, aspect)
     : processMotion(recording.samples, actor.smoothing, steady, aspect)
-  return applyGlide(afterSteady, glide, aspect).samples
+  const glided = applyGlide(afterSteady, glide, aspect).samples
+  return applyEasing(glided, easing, aspect).samples
 }
 
 /** @deprecated Use {@link displayedPathSamples} — kept for call-site clarity. */
@@ -332,7 +335,9 @@ export function planContinuePathCommit(args: {
 
   const priorSteady = actor.steadySpeed
   const priorGlide = actor.glide ?? 0
-  const bakedLiveTiming = priorSteady > 0 || priorGlide > 0
+  const priorEasing = actor.easing ?? 'linear'
+  const bakedLiveTiming =
+    priorSteady > 0 || priorGlide > 0 || priorEasing !== 'linear'
   // Prefer prior restore hints when continuing an already-baked path so
   // Restore still returns the pre-continue Steady/Glide, not zeros.
   const restoreSteady =

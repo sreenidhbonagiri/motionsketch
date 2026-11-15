@@ -177,14 +177,14 @@ export function InspectorPanel({
                     {selectedName}
                   </span>
                   . Duration is shared project playback time (scales Timing).
+                  Easing shapes moving sections after Steady Speed and Glide.
                   Smoothing reduces path wobble. Steady Speed evens movement
-                  while keeping pauses — Glide eases starts/stops afterward.
-                  Loop Repeat restarts (may jump); Back and forth alternates
-                  with no jump.
+                  while keeping pauses — Glide softens starts/stops. Loop Repeat
+                  restarts (may jump); Back and forth alternates with no jump.
                 </p>
                 <p className="mt-1.5">
-                  Polish keeps pauses and corners; Glide softens starts and
-                  stops. Snap stays next to Record and Play.
+                  Polish: gentler path; pauses and corners stay. Glide: softer
+                  starts/stops; path stays. Snap stays next to Record and Play.
                 </p>
                 <p className="mt-1.5">
                   Import SVG path sets or replaces the path for {selectedName}{' '}

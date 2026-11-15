@@ -91,6 +91,7 @@ export function isSliderOnlyChange(
         smoothing: a.smoothing,
         steadySpeed: a.steadySpeed,
         glide: a.glide,
+        easing: a.easing,
         restPosition: a.restPosition,
       })),
     ) !==
@@ -100,6 +101,7 @@ export function isSliderOnlyChange(
         smoothing: a.smoothing,
         steadySpeed: a.steadySpeed,
         glide: a.glide,
+        easing: a.easing,
         restPosition: a.restPosition,
       })),
     )

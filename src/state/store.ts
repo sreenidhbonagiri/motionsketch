@@ -27,6 +27,12 @@ import {
   smoothBendAtHandle,
   smoothBendAvailability,
 } from '../core/edit'
+import {
+  DEFAULT_MOTION_EASING,
+  isMotionEasing,
+  MOTION_EASING_LABELS,
+  type MotionEasing,
+} from '../core/easing'
 import { applyGlide, DEFAULT_GLIDE_STRENGTH } from '../core/glide'
 import {
   applyMotionStateToActor,
@@ -197,6 +203,7 @@ export type ActorEditKind =
   | 'clip'
   | 'placement'
   | 'glide'
+  | 'easing'
   | 'preset'
   | 'recording'
   | 'continuePath'
@@ -315,6 +322,9 @@ interface EditorStore {
   /** Previous glide amounts for undo (selected actor). */
   glideUndoStack: number[]
   glideRedoStack: number[]
+  /** Previous easing presets for undo (selected actor). */
+  easingUndoStack: MotionEasing[]
+  easingRedoStack: MotionEasing[]
 
   /** Non-destructive Motion preset preview (null when inactive). */
   presetSession: PresetSession | null
@@ -444,6 +454,10 @@ interface EditorStore {
   setDurationMs: (ms: number) => void
   setSmoothing: (value: number) => void
   setSteadySpeed: (value: number) => void
+  /** Per-element discrete easing; pushes undo when the value changes. */
+  setEasing: (easing: MotionEasing) => void
+  undoEasing: () => void
+  redoEasing: () => void
   setLoop: (loop: boolean) => void
   setLoopMode: (loopMode: LoopMode) => void
   setPlaybackTrigger: (trigger: PlaybackTrigger) => void
@@ -748,6 +762,8 @@ function clearHistoryForActorSwitch(
     ...clearPlacementEditState(),
     glideUndoStack: [] as number[],
     glideRedoStack: [] as number[],
+    easingUndoStack: [] as MotionEasing[],
+    easingRedoStack: [] as MotionEasing[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
     recordingUndoStack: [] as MotionPresetMotionState[],
@@ -774,6 +790,7 @@ function keepAfterReplaceRecording(k: ActorEditKind): boolean {
   return (
     k === 'clip' ||
     k === 'glide' ||
+    k === 'easing' ||
     k === 'continuePath' ||
     k === 'stageResize' ||
     k === 'recording'
@@ -872,6 +889,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     polishStrengthByActorId: {},
     glideUndoStack: [] as number[],
     glideRedoStack: [] as number[],
+    easingUndoStack: [] as MotionEasing[],
+    easingRedoStack: [] as MotionEasing[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
     recordingUndoStack: [] as MotionPresetMotionState[],
@@ -1809,6 +1828,76 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         ),
       })),
 
+    setEasing: (easing) => {
+      const state = get()
+      if (!isMotionEasing(easing)) return
+      const actor = getSelected(state)
+      const timingBaked =
+        state.geometryEdit?.timingBaked === true ||
+        actor.geometryEdit?.timingBaked === true
+      if (timingBaked) {
+        set({
+          actionAnnouncement:
+            'Easing unavailable while Extend has baked timing into this path. Restore recorded path to change Easing.',
+        })
+        return
+      }
+      const previous = actor.easing ?? DEFAULT_MOTION_EASING
+      if (previous === easing) return
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, easing }),
+        ),
+        easingUndoStack: [...state.easingUndoStack, previous].slice(-MAX_UNDO),
+        easingRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'easing'),
+        actorEditRedoOrder: [],
+        actionAnnouncement: `Easing: ${MOTION_EASING_LABELS[easing]}`,
+      })
+    },
+
+    undoEasing: () => {
+      const state = get()
+      if (state.easingUndoStack.length === 0) return
+      const previous = state.easingUndoStack[state.easingUndoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = actor.easing ?? DEFAULT_MOTION_EASING
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, easing: previous }),
+        ),
+        easingUndoStack: state.easingUndoStack.slice(0, -1),
+        easingRedoStack: [...state.easingRedoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'easing'),
+        actorEditRedoOrder: pushEditOrder(state.actorEditRedoOrder, 'easing'),
+        actionAnnouncement: 'Undo Easing',
+      })
+    },
+
+    redoEasing: () => {
+      const state = get()
+      if (state.easingRedoStack.length === 0) return
+      const next = state.easingRedoStack[state.easingRedoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = actor.easing ?? DEFAULT_MOTION_EASING
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          (a) => ({ ...a, easing: next }),
+        ),
+        easingRedoStack: state.easingRedoStack.slice(0, -1),
+        easingUndoStack: [...state.easingUndoStack, current].slice(-MAX_UNDO),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'easing'),
+        actorEditRedoOrder: popKindFromOrder(state.actorEditRedoOrder, 'easing'),
+        actionAnnouncement: 'Redo Easing',
+      })
+    },
+
     setLoop: (loop) =>
       set((state) => ({
         project: {
@@ -2650,6 +2739,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         get().undoGlide()
         return
       }
+      if (kind === 'easing') {
+        get().undoEasing()
+        return
+      }
       if (kind === 'preset') {
         get().undoPreset()
         return
@@ -2691,6 +2784,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'glide') {
         get().redoGlide()
+        return
+      }
+      if (kind === 'easing') {
+        get().redoEasing()
         return
       }
       if (kind === 'preset') {
@@ -3791,6 +3888,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         ...clearPlacementEditState(),
         glideUndoStack: [],
         glideRedoStack: [],
+        easingUndoStack: [],
+        easingRedoStack: [],
         recordingUndoStack: [],
         recordingRedoStack: [],
         pendingRecordingBaseline: null,

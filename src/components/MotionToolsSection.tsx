@@ -60,21 +60,37 @@ export function MotionToolsSection({
           type="button"
           data-testid="btn-polish-motion"
           disabled={!hasRecording || busy}
-          title="Preview a gentler path while keeping pauses and corners"
+          title="Gentler path; pauses and corners stay"
           onClick={() => beginPolishSession()}
           className={toolBtn}
         >
-          Polish motion
+          <span className="flex flex-col items-start gap-0.5 text-left">
+            <span>Polish motion</span>
+            <span
+              data-testid="polish-tool-desc"
+              className="text-[11px] font-normal leading-snug text-slate-500"
+            >
+              Gentler path; pauses and corners stay
+            </span>
+          </span>
         </button>
         <button
           type="button"
           data-testid="btn-glide"
           disabled={!hasRecording || busy}
-          title="Softens starts and stops while keeping your path and pauses"
+          title="Softer starts/stops; path stays"
           onClick={() => beginGlideSession()}
           className={toolBtn}
         >
-          Glide
+          <span className="flex flex-col items-start gap-0.5 text-left">
+            <span>Glide</span>
+            <span
+              data-testid="glide-tool-desc"
+              className="text-[11px] font-normal leading-snug text-slate-500"
+            >
+              Softer starts/stops; path stays
+            </span>
+          </span>
         </button>
         {(geometryEdit || selectedActor?.geometryEdit) && (
           <div className="border-t border-ms-border pt-2">

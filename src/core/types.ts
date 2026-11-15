@@ -1,3 +1,7 @@
+import type { MotionEasing } from './easing'
+
+export type { MotionEasing }
+
 export interface Vec2 {
   x: number
   y: number
@@ -159,6 +163,13 @@ export interface SceneActor {
    * in the shared playback/export path. Does not alter path geometry.
    */
   glide: number
+  /**
+   * Discrete motion easing preset (Linear / Ease out / Ease in-out / Spring /
+   * Bounce). Applied after Glide on the shared playback/export path. Default
+   * `linear` preserves legacy motion. Spring/Bounce may briefly leave the
+   * recorded polyline (tangent overshoot, stage-clamped).
+   */
+  easing: MotionEasing
   transform: TransformTrack
   /** Committed path edits; null → process live from recording */
   geometryEdit: GeometryEdit | null
