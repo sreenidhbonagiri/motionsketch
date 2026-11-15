@@ -510,7 +510,7 @@ export function EditorShell() {
             aria-label="Elements"
             title="Elements"
             onClick={toggleActors}
-            className={headerBtn}
+            className={`${headerBtn} select-none`}
           >
             <PanelLeft className="size-3.5" aria-hidden />
             <span className="hidden md:inline">Elements</span>
@@ -524,7 +524,7 @@ export function EditorShell() {
             aria-label="Inspector"
             title="Inspector"
             onClick={toggleInspectorPane}
-            className={headerBtn}
+            className={`${headerBtn} select-none`}
           >
             <PanelRight className="size-3.5" aria-hidden />
             <span className="hidden md:inline">Inspector</span>

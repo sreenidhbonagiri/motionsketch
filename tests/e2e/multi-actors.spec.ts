@@ -271,9 +271,19 @@ test.describe('multiple actors', () => {
     await selectActorByIndex(page, 1)
     await expect(page.getByTestId('btn-play')).toBeEnabled()
     await expect(page.getByTestId('btn-edit-path')).toBeEnabled()
-    await expect(
-      page.getByTestId(`actor-list-item-${ids[1]}`),
-    ).toContainText('path')
+    const recordedRow = page.getByTestId(`actor-list-item-${ids[1]}`)
+    await expect(recordedRow).toHaveAttribute('data-has-path', 'true')
+    await expect(recordedRow).toContainText('path')
+    await expect(recordedRow).toHaveAttribute(
+      'aria-label',
+      /has recorded path/i,
+    )
+    // No stacking-order ordinal before path (header still shows N/8).
+    expect(await recordedRow.innerText()).not.toMatch(/\d+\s*·\s*path/)
+    const clearedRow = page.getByTestId(`actor-list-item-${ids[0]}`)
+    await expect(clearedRow).toHaveAttribute('data-has-path', 'false')
+    expect(await clearedRow.innerText()).not.toMatch(/\bpath\b/)
+    await expect(clearedRow).toHaveAttribute('aria-label', /no recorded path/i)
   })
 
   test('multi-actor CSS and HTML demo use scoped selectors', async ({
@@ -516,4 +526,45 @@ test.describe('multiple actors', () => {
     await openPanel(page, 'appearance')
     await expect(page.getByTestId('actor-color-value')).toHaveText('#c2410c')
   })
+
+  for (const size of [
+    { width: 1280, height: 800, label: 'desktop' },
+    { width: 390, height: 844, label: 'phone' },
+  ] as const) {
+    test(`${size.label}: mixed path status without row stacking ordinal`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: size.width,
+        height: size.height,
+      })
+      await page.goto('/')
+      await ensureEditor(page)
+      await recordSimplePath(page)
+      await clickAddActor(page)
+      const ids = await actorIdsFromList(page)
+      expect(ids).toHaveLength(2)
+
+      await ensureActorListExpanded(page)
+      await expect(page.getByTestId('actor-list')).toContainText('2/8')
+
+      const withPath = page.getByTestId(`actor-list-item-${ids[0]}`)
+      const withoutPath = page.getByTestId(`actor-list-item-${ids[1]}`)
+      await expect(withPath).toHaveAttribute('data-has-path', 'true')
+      await expect(withPath).toContainText('path')
+      await expect(withPath).toHaveAttribute(
+        'aria-label',
+        /has recorded path/i,
+      )
+      expect(await withPath.innerText()).not.toMatch(/\d+\s*·\s*path/)
+
+      await expect(withoutPath).toHaveAttribute('data-has-path', 'false')
+      await expect(withoutPath).toHaveAttribute(
+        'aria-label',
+        /no recorded path/i,
+      )
+      expect(await withoutPath.innerText()).not.toMatch(/\bpath\b/)
+      expect(await withoutPath.innerText()).not.toMatch(/^\d+$/m)
+    })
+  }
 })

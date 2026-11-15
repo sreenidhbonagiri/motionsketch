@@ -10,7 +10,7 @@ import { useEditorStore } from '../state/store'
 export type InspectorTab = 'style' | 'motion' | 'project'
 
 const tabBtn =
-  'inline-flex h-8 min-h-8 flex-1 items-center justify-center rounded-lg px-2 text-xs font-medium whitespace-nowrap transition'
+  'inline-flex h-8 min-h-8 flex-1 select-none items-center justify-center rounded-lg px-2 text-xs font-medium whitespace-nowrap transition'
 const tabIdle = `${tabBtn} text-slate-600 hover:bg-slate-900/[0.06]`
 const tabActive = `${tabBtn} bg-ms-selected text-ms-primary`
 
@@ -106,7 +106,7 @@ export function InspectorPanel({
             type="button"
             data-testid="btn-inspector-back-to-stage"
             onClick={onBackToStage}
-            className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+            className="inline-flex h-8 min-h-8 select-none items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             Stage
@@ -121,7 +121,7 @@ export function InspectorPanel({
             aria-label="Close inspector"
             title="Close inspector"
             onClick={onClose}
-            className="inline-flex h-8 min-h-8 items-center rounded-lg px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+            className="inline-flex h-8 min-h-8 select-none items-center rounded-lg px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
           >
             Close
           </button>

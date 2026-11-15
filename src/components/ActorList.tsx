@@ -15,11 +15,32 @@ import { HelpDisclosure } from './HelpDisclosure'
 const panelSurface =
   'rounded-xl border border-ms-border bg-white/90 shadow-[var(--ms-shadow)] backdrop-blur-xl'
 const togglePill =
-  'pointer-events-auto inline-flex h-8 min-h-8 items-center gap-1.5 rounded-xl border border-ms-border bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white'
+  'pointer-events-auto inline-flex h-8 min-h-8 select-none items-center gap-1.5 rounded-xl border border-ms-border bg-white/85 px-2.5 text-xs font-medium text-slate-700 shadow-[var(--ms-shadow-sm)] backdrop-blur-xl transition hover:bg-white'
 // Desktop open list when the header-to-toolbar gap cannot hold it. Mirrors the
 // narrow fixed sheet: below the header, above Sequence (z-35), internally scrolled.
 const desktopFloatSheet =
   'sm:pointer-events-auto sm:fixed sm:top-[var(--ms-sheet-top,4.5rem)] sm:left-4 sm:z-[35] sm:h-auto sm:max-h-[min(24rem,calc(100dvh-var(--ms-sheet-top,4.5rem)-1rem))] sm:w-[min(16rem,calc(100vw-2rem))] sm:justify-start sm:gap-0 sm:overflow-hidden sm:rounded-xl sm:border sm:border-ms-border sm:bg-white/90 sm:shadow-[var(--ms-shadow)] sm:backdrop-blur-xl'
+
+/** Row chrome: name stays primary; path/hidden status has no stacking ordinal. */
+function actorListRowMeta(
+  name: string,
+  hasPath: boolean,
+  hiddenNow: boolean,
+): { ariaLabel: string; statusText: string } {
+  const statusParts: string[] = []
+  if (hasPath) statusParts.push('path')
+  if (hiddenNow) statusParts.push('hidden')
+  return {
+    ariaLabel: [
+      name,
+      hasPath ? 'has recorded path' : 'no recorded path',
+      hiddenNow ? 'hidden at this time' : null,
+    ]
+      .filter(Boolean)
+      .join(', '),
+    statusText: statusParts.join(' · '),
+  }
+}
 
 export function ActorList({
   floatOpen = false,
@@ -77,7 +98,7 @@ export function ActorList({
   if (docked) {
     const header = (
       <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-ms-border px-2">
-        <span className="truncate text-xs font-semibold text-slate-800">
+        <span className="truncate select-none text-xs font-semibold text-slate-800">
           Elements{' '}
           <span className="font-normal tabular-nums text-slate-500">
             {actors.length}/{MAX_ACTORS}
@@ -90,7 +111,7 @@ export function ActorList({
             aria-expanded="true"
             aria-controls="actor-list-body"
             onClick={() => setOpenPref(false)}
-            className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+            className="inline-flex h-7 select-none items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
           >
             <span data-testid="actors-collapse-label">Close</span>
             <ChevronDown
@@ -107,7 +128,7 @@ export function ActorList({
               aria-expanded={bodyExpanded}
               aria-controls="actor-list-body"
               onClick={() => setBodyExpanded((v) => !v)}
-              className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+              className="inline-flex h-7 select-none items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
             >
               <span data-testid="actors-collapse-label">
                 {bodyExpanded ? 'Collapse' : 'Expand'}
@@ -131,7 +152,7 @@ export function ActorList({
               data-testid="btn-toggle-actor-list"
               aria-label="Close Elements"
               onClick={() => setOpenPref(false)}
-              className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+              className="inline-flex h-7 select-none items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
             >
               <span data-testid="actors-close-label">Close</span>
             </button>
@@ -147,17 +168,25 @@ export function ActorList({
           role="listbox"
           aria-label="Elements"
         >
-          {actors.map((actor, index) => {
+          {actors.map((actor) => {
             const selectedRow = actor.id === selectedActorId
             const hiddenNow = !isActorVisibleAt(playbackHead, actor.clip)
+            const hasPath = !!actor.recording
+            const { ariaLabel, statusText } = actorListRowMeta(
+              actor.name,
+              hasPath,
+              hiddenNow,
+            )
             return (
               <li key={actor.id}>
                 <button
                   type="button"
                   role="option"
+                  aria-label={ariaLabel}
                   aria-selected={selectedRow}
                   data-testid={`actor-list-item-${actor.id}`}
                   data-selected={selectedRow ? 'true' : 'false'}
+                  data-has-path={hasPath ? 'true' : 'false'}
                   data-hidden-now={hiddenNow ? 'true' : 'false'}
                   disabled={busy && !selectedRow}
                   onClick={() => selectActor(actor.id)}
@@ -177,12 +206,17 @@ export function ActorList({
                     }}
                     aria-hidden
                   />
-                  <span className="min-w-0 flex-1 truncate">{actor.name}</span>
-                  <span className="shrink-0 text-xs text-ms-muted">
-                    {index + 1}
-                    {actor.recording ? ' · path' : ''}
-                    {hiddenNow ? ' · hidden' : ''}
+                  <span className="min-w-0 flex-1 truncate" aria-hidden>
+                    {actor.name}
                   </span>
+                  {statusText ? (
+                    <span
+                      className="shrink-0 text-xs text-ms-muted"
+                      aria-hidden
+                    >
+                      {statusText}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             )
@@ -373,17 +407,25 @@ export function ActorList({
               role="listbox"
               aria-label="Elements"
             >
-              {actors.map((actor, index) => {
+              {actors.map((actor) => {
                 const selectedRow = actor.id === selectedActorId
                 const hiddenNow = !isActorVisibleAt(playbackHead, actor.clip)
+                const hasPath = !!actor.recording
+                const { ariaLabel, statusText } = actorListRowMeta(
+                  actor.name,
+                  hasPath,
+                  hiddenNow,
+                )
                 return (
                   <li key={actor.id}>
                     <button
                       type="button"
                       role="option"
+                      aria-label={ariaLabel}
                       aria-selected={selectedRow}
                       data-testid={`actor-list-item-${actor.id}`}
                       data-selected={selectedRow ? 'true' : 'false'}
+                      data-has-path={hasPath ? 'true' : 'false'}
                       data-hidden-now={hiddenNow ? 'true' : 'false'}
                       disabled={busy && !selectedRow}
                       onClick={() => selectActor(actor.id)}
@@ -403,14 +445,17 @@ export function ActorList({
                         }}
                         aria-hidden
                       />
-                      <span className="min-w-0 flex-1 truncate">
+                      <span className="min-w-0 flex-1 truncate" aria-hidden>
                         {actor.name}
                       </span>
-                      <span className="shrink-0 text-xs text-ms-muted">
-                        {index + 1}
-                        {actor.recording ? ' · path' : ''}
-                        {hiddenNow ? ' · hidden' : ''}
-                      </span>
+                      {statusText ? (
+                        <span
+                          className="shrink-0 text-xs text-ms-muted"
+                          aria-hidden
+                        >
+                          {statusText}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 )
