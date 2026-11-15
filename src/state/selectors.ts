@@ -1,6 +1,8 @@
 import { projectToLocal } from '../core/clip'
+import { applyEasing, type MotionEasing } from '../core/easing'
 import { applyGlide } from '../core/glide'
 import {
+  cachedApplyEasing,
   cachedApplyGlide,
   cachedApplySteadySpeed,
   cachedProcessMotion,
@@ -25,6 +27,11 @@ export interface PathViewState {
    * `undefined` → use the actor field.
    */
   glideOverride?: number
+  /**
+   * When set, overrides {@link SceneActor.easing} for preview.
+   * `undefined` → use the actor field.
+   */
+  easingOverride?: MotionEasing
 }
 
 /**
@@ -51,17 +58,23 @@ export function selectProcessedPathForActor(
     typeof view.glideOverride === 'number'
       ? view.glideOverride
       : (actor.glide ?? 0)
+  const easingKind: MotionEasing =
+    view.easingOverride ?? actor.easing ?? 'linear'
 
   // Live drag preview changes every pointer move — do not fill the LRU
-  // (steady or glide). Committed paths use identity-keyed caches below.
+  // (steady, glide, or easing). Committed paths use identity-keyed caches.
   if (view.editPreview) {
     const steady = applySteadySpeed(
       view.editPreview,
       actor.steadySpeed,
       aspect,
     )
-    if (glideAmount <= 0) return steady
-    return applyGlide(steady, glideAmount, aspect).samples
+    const glided =
+      glideAmount <= 0
+        ? steady
+        : applyGlide(steady, glideAmount, aspect).samples
+    if (easingKind === 'linear') return glided
+    return applyEasing(glided, easingKind, aspect).samples
   }
 
   const spatialEdit =
@@ -71,6 +84,7 @@ export function selectProcessedPathForActor(
   const timingBaked = spatialEdit?.timingBaked === true
   const steadyAmount = timingBaked ? 0 : actor.steadySpeed
   const glideForPath = timingBaked ? 0 : glideAmount
+  const easingForPath: MotionEasing = timingBaked ? 'linear' : easingKind
 
   const processed = spatial
     ? cachedApplySteadySpeed(spatial, steadyAmount, aspect)
@@ -81,7 +95,8 @@ export function selectProcessedPathForActor(
         aspect,
       )
 
-  return cachedApplyGlide(processed, glideForPath, aspect)
+  const glided = cachedApplyGlide(processed, glideForPath, aspect)
+  return cachedApplyEasing(glided, easingForPath, aspect)
 }
 
 /** @deprecated Use selectProcessedPathForActor — kept for transitional call sites. */

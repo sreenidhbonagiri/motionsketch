@@ -3,6 +3,7 @@ import {
   MIN_PLAYBACK_DURATION_MS,
 } from '../core/types'
 import { useEditorStore } from '../state/store'
+import { EasingPicker } from './EasingPicker'
 import { HelpDisclosure } from './HelpDisclosure'
 import { MotionPresets } from './MotionPresets'
 import { SvgPathImport } from './SvgPathImport'
@@ -57,17 +58,17 @@ export function AdjustPanel({
           <span className="font-medium text-slate-700">
             {selectedActor?.name ?? 'the selected element'}
           </span>
-          . Duration is shared project playback time (scales Timing). Smoothing
-          reduces path wobble. Steady Speed evens movement while keeping pauses —
-          Glide eases starts/stops afterward. Loop Repeat restarts (may jump);
-          Back and forth alternates with no jump.
+          . Duration is shared project playback time (scales Timing). Easing
+          shapes moving sections after Steady Speed and Glide. Smoothing reduces
+          path wobble. Steady Speed evens movement while keeping pauses — Glide
+          softens starts/stops. Loop Repeat restarts (may jump); Back and forth
+          alternates with no jump.
         </HelpDisclosure>
       )}
 
       <SvgPathImport showHelp={showHelp} motionHelpId={motionHelpId} />
 
-      <MotionPresets />
-
+      {/* Core timing before presets so Duration/Easing stay reachable while watching. */}
       <div className="space-y-2">
         <label
           htmlFor="duration-slider"
@@ -93,6 +94,8 @@ export function AdjustPanel({
           className="w-full accent-ms-primary disabled:opacity-40"
         />
       </div>
+
+      <EasingPicker describedBy={describedBy} />
 
       <div className="space-y-2">
         <label
@@ -165,6 +168,8 @@ export function AdjustPanel({
           </p>
         )}
       </div>
+
+      <MotionPresets />
 
       <div className="space-y-2">
         <label className="flex items-center justify-between text-sm text-slate-600">

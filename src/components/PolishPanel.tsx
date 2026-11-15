@@ -42,7 +42,15 @@ export function PolishPanel() {
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-800">Polish motion</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">Polish motion</h2>
+          <p
+            data-testid="polish-help"
+            className="text-xs leading-relaxed text-slate-500"
+          >
+            Gentler path; pauses and corners stay.
+          </p>
+        </div>
         <p
           data-testid="polish-compare-legend"
           className="text-xs text-slate-500"

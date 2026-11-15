@@ -262,7 +262,7 @@ test.describe('workspace layout', () => {
     expect(fit.pageOverflowY).toBe(false)
   })
 
-  test('mobile 390x844: inspector takes priority; Stage returns; Timing button remains', async ({
+  test('mobile 390x844: inspector split keeps stage; Stage returns; Timing button remains', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -291,6 +291,9 @@ test.describe('workspace layout', () => {
       const body = document.querySelector(
         '[data-testid="inspector-motion-body"]',
       )
+      const workspace = document.querySelector(
+        '[data-testid="editor-workspace"]',
+      )
       if (
         !(panel instanceof HTMLElement) ||
         !(stage instanceof HTMLElement) ||
@@ -299,6 +302,7 @@ test.describe('workspace layout', () => {
         return null
       }
       const pr = panel.getBoundingClientRect()
+      const sr = stage.getBoundingClientRect()
       const br = body.getBoundingClientRect()
       const vh = window.innerHeight
       const vw = window.innerWidth
@@ -317,6 +321,10 @@ test.describe('workspace layout', () => {
           br.bottom <= vh + 1 &&
           br.right <= vw + 1,
         stageHidden,
+        stageVisible: !stageHidden && sr.height > 40 && sr.width > 40,
+        stageAboveInspector: sr.bottom <= pr.top + 2,
+        inspectorSplit:
+          workspace?.getAttribute('data-inspector-split') === 'true',
         panelHeight: pr.height,
         dockInert: document
           .querySelector('[data-testid="toolbar-slot"]')
@@ -326,8 +334,11 @@ test.describe('workspace layout', () => {
     expect(bounds).toBeTruthy()
     expect(bounds!.panelInView).toBe(true)
     expect(bounds!.bodyInView || bounds!.panelInView).toBe(true)
-    expect(bounds!.stageHidden).toBe(true)
-    expect(bounds!.panelHeight).toBeGreaterThan(200)
+    expect(bounds!.stageHidden).toBe(false)
+    expect(bounds!.stageVisible).toBe(true)
+    expect(bounds!.stageAboveInspector).toBe(true)
+    expect(bounds!.inspectorSplit).toBe(true)
+    expect(bounds!.panelHeight).toBeGreaterThan(120)
     expect(bounds!.dockInert).toBeFalsy()
 
     await page.getByTestId('btn-inspector-back-to-stage').click()
@@ -1951,7 +1962,7 @@ test.describe('workspace layout', () => {
     await expect(page.getByTestId('btn-edit-path')).toBeVisible()
   })
 
-  test('900 both open: focused Stage / Elements / Inspector (no dual float)', async ({
+  test('900 both open: focused Stage / Elements / Inspector split (no dual float)', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 900, height: 800 })
@@ -1989,6 +2000,14 @@ test.describe('workspace layout', () => {
     await page.getByTestId('btn-toggle-elements-pane').click()
     await page.getByTestId('btn-toggle-inspector-pane').click()
     await expect(page.getByTestId('inspector-panel')).toBeVisible()
+    // Explicit switch: Inspector replaces Elements (not two bottom sheets).
+    await expect(page.getByTestId('actor-list-slot')).toHaveCount(0)
+    await expect(page.getByTestId('editor-workspace')).toHaveAttribute(
+      'data-inspector-split',
+      'true',
+    )
+    // Stage stays mounted above the Inspector — not a full-screen sheet.
+    await expect(page.getByTestId('stage-viewport')).toBeVisible()
     // Same outer Stage chrome as focused Elements (not only an in-panel control).
     const inspectorBack = page.getByTestId('btn-inspector-back-to-stage')
     await expect(inspectorBack).toBeVisible()
@@ -2016,12 +2035,14 @@ test.describe('workspace layout', () => {
       .evaluate((el) => el.getBoundingClientRect().width)
     expect(tablistWidth).toBeLessThanOrEqual(focusedWidth + 1)
 
-    // Motion: normal scroll reveals Steady Speed and controls below it above transport.
+    // Motion: body scroll brings Steady Speed / tools into the split Inspector
+    // above transport (half-height sheet — scroll each control into view).
     await page.getByTestId('btn-inspector-motion').click()
     await expect(page.getByTestId('steady-speed-slider')).toBeVisible()
     const motionReach = await page.evaluate(() => {
       const toolbar = document.querySelector('[data-testid="toolbar-slot"]')
       const panel = document.querySelector('[data-testid="inspector-panel"]')
+      const stage = document.querySelector('[data-testid="stage-viewport"]')
       if (!(toolbar instanceof HTMLElement) || !(panel instanceof HTMLElement)) {
         return { ok: false, reason: 'missing' as const }
       }
@@ -2038,8 +2059,11 @@ test.describe('workspace layout', () => {
         }
       }
       if (!scrollRoot) return { ok: false, reason: 'no-scroll' as const }
-      scrollRoot.scrollTop = scrollRoot.scrollHeight
       const toolTop = toolbar.getBoundingClientRect().top
+      const stageBottom =
+        stage instanceof HTMLElement
+          ? stage.getBoundingClientRect().bottom
+          : 0
       const ids = [
         'steady-speed-slider',
         'loop-toggle',
@@ -2052,16 +2076,21 @@ test.describe('workspace layout', () => {
         if (!(el instanceof HTMLElement)) {
           return { id, ok: false, reason: 'missing' as const }
         }
+        el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
         const r = el.getBoundingClientRect()
         const cx = r.left + r.width / 2
         const cy = r.top + r.height / 2
         const top = document.elementFromPoint(cx, cy)
         const hit =
           top === el || !!top?.closest?.(`[data-testid="${id}"]`)
+        const inInspectorBand =
+          r.top >= stageBottom - 1 && r.bottom <= toolTop - 1
         return {
           id,
-          ok: r.bottom <= toolTop - 1 && hit,
+          ok: inInspectorBand && hit,
+          top: Math.round(r.top),
           bottom: Math.round(r.bottom),
+          stageBottom: Math.round(stageBottom),
           toolTop: Math.round(toolTop),
           hit,
         }

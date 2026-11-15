@@ -7,6 +7,7 @@ import {
   parseTransformTrack,
 } from './transform'
 import { clampDirectionOffsetDeg } from './faceAlongPath'
+import { parseMotionEasing } from './easing'
 import {
   DEFAULT_ACTOR,
   DEFAULT_ACTOR_SMOOTHING,
@@ -67,6 +68,7 @@ export function createSceneActor(
         : DEFAULT_ACTOR_STEADY_SPEED,
     glide:
       typeof partial?.glide === 'number' ? clamp01Local(partial.glide) : 0,
+    easing: parseMotionEasing(partial?.easing),
     transform: cloneTransformTrack(
       partial?.transform ?? emptyTransformTrack(),
     ),
@@ -111,6 +113,7 @@ export function cloneSceneActor(actor: SceneActor): SceneActor {
     smoothing: actor.smoothing,
     steadySpeed: actor.steadySpeed,
     glide: actor.glide,
+    easing: actor.easing,
     transform: actor.transform,
     geometryEdit: actor.geometryEdit,
     clip: actor.clip,
@@ -132,6 +135,7 @@ export function duplicateSceneActor(
     smoothing: actor.smoothing,
     steadySpeed: actor.steadySpeed,
     glide: actor.glide,
+    easing: actor.easing,
     transform: actor.transform,
     geometryEdit: actor.geometryEdit,
     clip: actor.clip,
@@ -354,6 +358,7 @@ export function parseSceneActor(
     typeof raw.glide === 'number' && Number.isFinite(raw.glide)
       ? clamp01Local(raw.glide)
       : 0
+  const easing = parseMotionEasing(raw.easing)
 
   // Appearance may use imageAssetId (resolved by caller) or inline image.
   const appearance = coerceActor(raw.appearance ?? raw)
@@ -374,6 +379,7 @@ export function parseSceneActor(
       smoothing,
       steadySpeed,
       glide,
+      easing,
       transform: transform.value,
       geometryEdit: geometryEdit.value,
       clip: clip.value,

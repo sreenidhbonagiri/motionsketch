@@ -1,3 +1,4 @@
+import { applyEasing, type MotionEasing } from './easing'
 import { applyGlide } from './glide'
 import { applySteadySpeed, processMotion } from './process'
 import type { MotionSample } from './types'
@@ -16,7 +17,7 @@ export interface ProcessedPathCacheStats {
   fingerprintTraversals: number
 }
 
-type CacheMode = 'pm' | 'ss' | 'gl'
+type CacheMode = 'pm' | 'ss' | 'gl' | 'ez'
 
 type LruEntry = {
   samples: MotionSample[]
@@ -51,12 +52,16 @@ function paramKey(
   steadySpeed: number,
   stageAspect: number,
   glide = 0,
+  easing: MotionEasing | '' = '',
 ): string {
   if (mode === 'pm') {
     return `pm:s${exactParam(smoothing)}:v${exactParam(steadySpeed)}:a${exactParam(stageAspect)}`
   }
   if (mode === 'gl') {
     return `gl:g${exactParam(glide)}:a${exactParam(stageAspect)}`
+  }
+  if (mode === 'ez') {
+    return `ez:e${easing}:a${exactParam(stageAspect)}`
   }
   return `ss:v${exactParam(steadySpeed)}:a${exactParam(stageAspect)}`
 }
@@ -96,8 +101,9 @@ function lookup(
   steadySpeed: number,
   stageAspect: number,
   glide = 0,
+  easing: MotionEasing | '' = '',
 ): MotionSample[] | null {
-  const key = paramKey(mode, smoothing, steadySpeed, stageAspect, glide)
+  const key = paramKey(mode, smoothing, steadySpeed, stageAspect, glide, easing)
   const entry = byIdentity.get(samples)?.get(key)
   if (!entry) return null
   hits += 1
@@ -113,9 +119,10 @@ function store(
   stageAspect: number,
   path: MotionSample[],
   glide = 0,
+  easing: MotionEasing | '' = '',
 ): MotionSample[] {
   sealSampleArray(samples)
-  const key = paramKey(mode, smoothing, steadySpeed, stageAspect, glide)
+  const key = paramKey(mode, smoothing, steadySpeed, stageAspect, glide, easing)
   let map = byIdentity.get(samples)
   if (!map) {
     map = new Map()
@@ -237,5 +244,29 @@ export function cachedApplyGlide(
     stageAspect,
     applyGlide(samples, amount, stageAspect).samples,
     amount,
+  )
+}
+
+/**
+ * Cached {@link applyEasing} keyed by processed-path identity + kind + aspect.
+ * `linear` returns the input array (same identity) without caching.
+ */
+export function cachedApplyEasing(
+  samples: MotionSample[],
+  kind: MotionEasing,
+  stageAspect: number,
+): MotionSample[] {
+  if (kind === 'linear' || samples.length < 2) return samples
+  const hit = lookup(samples, 'ez', 0, 0, stageAspect, 0, kind)
+  if (hit) return hit
+  return store(
+    samples,
+    'ez',
+    0,
+    0,
+    stageAspect,
+    applyEasing(samples, kind, stageAspect).samples,
+    0,
+    kind,
   )
 }

@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useLayoutEffect, useRef } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { AdjustPanel } from './AdjustPanel'
 import { AppearancePanel } from './AppearancePanel'
@@ -10,14 +10,14 @@ import { useEditorStore } from '../state/store'
 export type InspectorTab = 'style' | 'motion' | 'project'
 
 const tabBtn =
-  'inline-flex h-8 min-h-8 flex-1 items-center justify-center rounded-lg px-2 text-xs font-medium whitespace-nowrap transition'
+  'inline-flex h-8 min-h-8 flex-1 select-none items-center justify-center rounded-lg px-2 text-xs font-medium whitespace-nowrap transition'
 const tabIdle = `${tabBtn} text-slate-600 hover:bg-slate-900/[0.06]`
 const tabActive = `${tabBtn} bg-ms-selected text-ms-primary`
 
 interface InspectorPanelProps {
   tab: InspectorTab
   onTabChange: (tab: InspectorTab) => void
-  /** Phone: leave the inspector and return to the stage. */
+  /** Phone/focused: leave the inspector and return to the stage. */
   onBackToStage?: () => void
   /** Desktop: close the docked inspector and return space to the canvas. */
   onClose?: () => void
@@ -30,9 +30,29 @@ interface InspectorPanelProps {
   fillHeight?: boolean
 }
 
+function nearestVerticalScroller(from: HTMLElement): HTMLElement | null {
+  let node: HTMLElement | null = from
+  while (node) {
+    const cs = getComputedStyle(node)
+    if (
+      (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+      node.scrollHeight > node.clientHeight + 1
+    ) {
+      return node
+    }
+    node = node.parentElement
+  }
+  return null
+}
+
 /**
  * Inspector chrome: Style / Motion / Project.
- * Desktop hosts this inside a floating card; focused chrome uses a full sheet.
+ * Desktop hosts this inside a floating card; focused chrome uses a stage-above
+ * / Inspector-below split (not a full-screen sheet over the canvas).
+ *
+ * Sticky Stage-back / tabs share one chrome band. Measured height is applied as
+ * scroll-padding-top on the owning scroller so scrollIntoView / keyboard focus
+ * keep controls (e.g. Easing → Linear) clear of that chrome.
  */
 export function InspectorPanel({
   tab,
@@ -43,10 +63,41 @@ export function InspectorPanel({
   fillHeight = true,
 }: InspectorPanelProps) {
   const motionHelpId = useId()
+  const rootRef = useRef<HTMLElement>(null)
+  const chromeRef = useRef<HTMLDivElement>(null)
   const selectedName = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id)?.name ?? 'the selected element'
   })
+
+  useLayoutEffect(() => {
+    const chrome = chromeRef.current
+    const root = rootRef.current
+    if (!chrome || !root) return
+
+    const syncScrollPadding = () => {
+      const height = Math.ceil(chrome.getBoundingClientRect().height)
+      const scroller = fillHeight
+        ? root
+        : (nearestVerticalScroller(chrome) ?? root)
+      scroller.style.scrollPaddingTop = `${height}px`
+      // Keep a data attr for tests / layout probes (measured, not guessed).
+      scroller.dataset.inspectorScrollPadTop = String(height)
+    }
+
+    syncScrollPadding()
+    const ro = new ResizeObserver(syncScrollPadding)
+    ro.observe(chrome)
+    return () => {
+      ro.disconnect()
+      const scroller = fillHeight
+        ? root
+        : (nearestVerticalScroller(chrome) ?? root)
+      scroller.style.scrollPaddingTop = ''
+      delete scroller.dataset.inspectorScrollPadTop
+    }
+  }, [fillHeight, onBackToStage, onClose, tab])
+
   const chrome = (
     <>
       {onBackToStage && (
@@ -55,7 +106,7 @@ export function InspectorPanel({
             type="button"
             data-testid="btn-inspector-back-to-stage"
             onClick={onBackToStage}
-            className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+            className="inline-flex h-8 min-h-8 select-none items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             Stage
@@ -70,7 +121,7 @@ export function InspectorPanel({
             aria-label="Close inspector"
             title="Close inspector"
             onClick={onClose}
-            className="inline-flex h-8 min-h-8 items-center rounded-lg px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+            className="inline-flex h-8 min-h-8 select-none items-center rounded-lg px-2 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
           >
             Close
           </button>
@@ -126,26 +177,23 @@ export function InspectorPanel({
 
   return (
     <aside
+      ref={rootRef}
       data-testid="inspector-panel"
       data-inspector-tab={tab}
       className={
         fillHeight
-          ? 'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent'
+          ? 'flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overscroll-contain bg-transparent'
           : 'flex min-h-0 min-w-0 flex-col bg-transparent'
       }
     >
-      {fillHeight ? (
-        chrome
-      ) : (
-        <div className="sticky top-0 z-[1] shrink-0 bg-white">{chrome}</div>
-      )}
       <div
-        className={
-          fillHeight
-            ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain'
-            : 'min-h-0'
-        }
+        ref={chromeRef}
+        data-testid="inspector-sticky-chrome"
+        className="sticky top-0 z-[1] shrink-0 bg-white"
       >
+        {chrome}
+      </div>
+      <div className="min-h-0">
         {tab === 'style' && (
           <div
             role="tabpanel"
@@ -177,14 +225,14 @@ export function InspectorPanel({
                     {selectedName}
                   </span>
                   . Duration is shared project playback time (scales Timing).
+                  Easing shapes moving sections after Steady Speed and Glide.
                   Smoothing reduces path wobble. Steady Speed evens movement
-                  while keeping pauses — Glide eases starts/stops afterward.
-                  Loop Repeat restarts (may jump); Back and forth alternates
-                  with no jump.
+                  while keeping pauses — Glide softens starts/stops. Loop Repeat
+                  restarts (may jump); Back and forth alternates with no jump.
                 </p>
                 <p className="mt-1.5">
-                  Polish keeps pauses and corners; Glide softens starts and
-                  stops. Snap stays next to Record and Play.
+                  Polish: gentler path; pauses and corners stay. Glide: softer
+                  starts/stops; path stays. Snap stays next to Record and Play.
                 </p>
                 <p className="mt-1.5">
                   Import SVG path sets or replaces the path for {selectedName}{' '}
@@ -199,7 +247,7 @@ export function InspectorPanel({
               data-testid="motion-tools-section-chrome"
               className="px-2.5 pb-2.5 pt-2"
             >
-              <h3 className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-ms-motion">
+              <h3 className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-slate-800">
                 <span>Motion tools</span>
                 {motionSummary ? (
                   <span

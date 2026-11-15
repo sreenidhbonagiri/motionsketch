@@ -51,11 +51,12 @@ import {
  * v13: appearance.text + kind 'text' (older → text null; kind unchanged).
  * v14: project.stageWidth / stageHeight composition units (older → derive from
  *      stageAspect with default height 1000 so appearance is unchanged).
+ * v15: actor.easing (older → linear). Discrete motion easing after Glide.
  *
  * Additive (no version bump): geometryEdit.timingBaked / restoreSteadySpeed /
  * restoreGlide — older files omit them (treated as unset / not timing-baked).
  */
-export const PERSIST_FORMAT_VERSION = 14 as const
+export const PERSIST_FORMAT_VERSION = 15 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const
 export const PERSIST_FORMAT_VERSION_V2 = 2 as const
 export const PERSIST_FORMAT_VERSION_V3 = 3 as const
@@ -69,6 +70,7 @@ export const PERSIST_FORMAT_VERSION_V10 = 10 as const
 export const PERSIST_FORMAT_VERSION_V11 = 11 as const
 export const PERSIST_FORMAT_VERSION_V12 = 12 as const
 export const PERSIST_FORMAT_VERSION_V13 = 13 as const
+export const PERSIST_FORMAT_VERSION_V14 = 14 as const
 
 export const STORAGE_KEY = 'motionsketch.project.v1'
 
@@ -142,6 +144,7 @@ export function validateSnapshot(data: unknown): PersistParseResult {
   const formatVersion = data.formatVersion
   const supported = [
     PERSIST_FORMAT_VERSION,
+    PERSIST_FORMAT_VERSION_V14,
     PERSIST_FORMAT_VERSION_V13,
     PERSIST_FORMAT_VERSION_V12,
     PERSIST_FORMAT_VERSION_V11,
@@ -625,7 +628,9 @@ function coerceStageSize(
   const hasHeight = heightRaw !== undefined && heightRaw !== null
 
   if (!hasWidth && !hasHeight) {
-    if (formatVersion >= PERSIST_FORMAT_VERSION) {
+    // v14+ always require explicit composition size (unchanged when format
+    // advances past 14 — compare against V14, not the current tip version).
+    if (formatVersion >= PERSIST_FORMAT_VERSION_V14) {
       return {
         ok: false,
         error: 'project.stageWidth and project.stageHeight are required.',
@@ -687,7 +692,7 @@ function coerceStageSize(
   const fromSize = clampStageAspect(w / h)
   const aspectMismatch =
     Math.abs(fromSize - clampStageAspect(stageAspect)) > 1e-3
-  if (aspectMismatch && formatVersion >= PERSIST_FORMAT_VERSION) {
+  if (aspectMismatch && formatVersion >= PERSIST_FORMAT_VERSION_V14) {
     return {
       ok: false,
       error:

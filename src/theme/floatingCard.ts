@@ -59,3 +59,14 @@ export const FOCUSED_SHEET_CONTENT_CLASS =
 /** Stage-back row: same column alignment; full-width border stays on the parent. */
 export const FOCUSED_SHEET_CHROME_CLASS =
   'mx-auto flex w-full max-w-[26.25rem] items-center gap-1 px-3 py-1 sm:px-4'
+
+/**
+ * Focused Inspector split: stage above, Inspector below (~half usable height).
+ * Equal `1fr` rows share space after the transport; mins keep both usable on
+ * short viewports. Elements still uses a full sheet (stage hidden) instead.
+ */
+export const FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS =
+  'grid-rows-[minmax(6rem,1fr)_minmax(9rem,1fr)_auto]'
+/** Slightly tighter Inspector floor when height is already short. */
+export const FOCUSED_INSPECTOR_SPLIT_ROWS_SHORT_CLASS =
+  'grid-rows-[minmax(5rem,1fr)_minmax(7rem,1fr)_auto]'

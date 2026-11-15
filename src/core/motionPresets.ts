@@ -6,6 +6,7 @@ import {
   emptyTransformTrack,
   normalizeTransformKeyframe,
 } from './transform'
+import type { MotionEasing } from './easing'
 import {
   MIN_PLAYBACK_DURATION_MS,
   MIN_RECORDING_DURATION_MS,
@@ -38,6 +39,7 @@ export type MotionPresetMotionState = {
   smoothing: number
   steadySpeed: number
   glide: number
+  easing: MotionEasing
   faceAlongPath: boolean
   directionOffsetDeg: number
 }
@@ -63,7 +65,7 @@ export const MOTION_PRESETS: readonly MotionPresetDefinition[] = [
   {
     id: 'slide-in',
     label: 'Slide In',
-    summary: 'Slides up with a soft scale-in',
+    summary: 'Slide upward',
     behavior:
       'Slides up into the rest position while scaling from smaller to full size. Turns on Hide before Start so a delayed sequence Start stays hidden until then.',
     prefersLoop: false,
@@ -71,7 +73,7 @@ export const MOTION_PRESETS: readonly MotionPresetDefinition[] = [
   {
     id: 'pop-in',
     label: 'Pop In',
-    summary: 'Bouncy scale entrance at rest',
+    summary: 'Scale entrance',
     behavior:
       'Stays at the rest position and pops in with a short scale overshoot. Turns on Hide before Start so a delayed sequence Start stays hidden until then.',
     prefersLoop: false,
@@ -79,7 +81,7 @@ export const MOTION_PRESETS: readonly MotionPresetDefinition[] = [
   {
     id: 'float',
     label: 'Float',
-    summary: 'Gentle up-and-down drift',
+    summary: 'Gentle drift',
     behavior:
       'Drifts gently above and below the rest position for the Move for length. With Loop off it plays once and holds; turn on Loop to repeat.',
     prefersLoop: true,
@@ -87,7 +89,7 @@ export const MOTION_PRESETS: readonly MotionPresetDefinition[] = [
   {
     id: 'attention-pulse',
     label: 'Attention Pulse',
-    summary: 'Scale pulse to draw the eye',
+    summary: 'Draw attention',
     behavior:
       'Stays at the rest position and pulses scale to draw attention. With Loop off it pulses once and holds; turn on Loop to keep pulsing.',
     prefersLoop: true,
@@ -178,6 +180,7 @@ export function captureMotionState(actor: SceneActor): MotionPresetMotionState {
     smoothing: actor.smoothing,
     steadySpeed: actor.steadySpeed,
     glide: actor.glide,
+    easing: actor.easing,
     faceAlongPath: actor.faceAlongPath,
     directionOffsetDeg: actor.directionOffsetDeg,
   }
@@ -204,6 +207,7 @@ export function applyMotionStateToActor(
     smoothing: motion.smoothing,
     steadySpeed: motion.steadySpeed,
     glide: motion.glide,
+    easing: motion.easing,
     faceAlongPath: motion.faceAlongPath,
     directionOffsetDeg: motion.directionOffsetDeg,
   }
@@ -323,6 +327,7 @@ export function buildMotionPresetState(
         smoothing: 0,
         steadySpeed: 0,
         glide: 0,
+        easing: 'linear',
         faceAlongPath: false,
         directionOffsetDeg: 0,
       }
@@ -343,6 +348,7 @@ export function buildMotionPresetState(
         smoothing: 0,
         steadySpeed: 0,
         glide: 0,
+        easing: 'linear',
         faceAlongPath: false,
         directionOffsetDeg: 0,
       }
@@ -364,6 +370,7 @@ export function buildMotionPresetState(
         smoothing: 0,
         steadySpeed: 0,
         glide: 0,
+        easing: 'linear',
         faceAlongPath: false,
         directionOffsetDeg: 0,
       }
@@ -385,6 +392,7 @@ export function buildMotionPresetState(
         smoothing: 0,
         steadySpeed: 0,
         glide: 0,
+        easing: 'linear',
         faceAlongPath: false,
         directionOffsetDeg: 0,
       }
