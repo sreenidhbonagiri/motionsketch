@@ -4,6 +4,7 @@ import {
   cameraCssTransform,
   clearViewportRect,
   fitCamera,
+  fitCameraIntoClear,
   fitStageLayoutSize,
   formatZoomPercent,
   isBackgroundPanTarget,
@@ -52,16 +53,35 @@ describe('workspace camera', () => {
     const clear = clearViewportRect(viewport, insets)
     expect(clear.size.width).toBe(viewport.width - 530)
     expect(clear.originX).toBe(260)
-    const layout = fitStageLayoutSize(viewport, 16 / 10, undefined, insets)
-    expect(layout.width).toBeLessThanOrEqual(clear.size.width * 0.96 + 1e-6)
-    expect(layout.height).toBeLessThanOrEqual(clear.size.height * 0.96 + 1e-6)
-    const cam = fitCamera(viewport, layout, insets)
-    expect(cam.zoom).toBe(1)
+    // Explicit Fit keeps the full-viewport base layout and zooms/pans into clear.
+    const base = fitStageLayoutSize(viewport, 16 / 10)
+    const cam = fitCameraIntoClear(viewport, base, insets)
+    expect(cam.zoom).toBeLessThan(1)
+    expect(cam.zoom).toBeGreaterThanOrEqual(0.25)
+    const visualW = base.width * cam.zoom
+    const visualH = base.height * cam.zoom
+    expect(visualW).toBeLessThanOrEqual(clear.size.width * 0.96 + 1e-6)
+    expect(visualH).toBeLessThanOrEqual(clear.size.height * 0.96 + 1e-6)
     expect(cam.panX).toBeGreaterThanOrEqual(insets.left - 1e-6)
-    expect(cam.panX + layout.width).toBeLessThanOrEqual(
+    expect(cam.panX + visualW).toBeLessThanOrEqual(
       viewport.width - insets.right + 1e-6,
     )
     expect(cam.panY).toBeGreaterThanOrEqual(insets.top - 1e-6)
+    expect(formatZoomPercent(cam.zoom)).not.toBe('100%')
+  })
+
+  it('Fit into an unobstructed viewport keeps zoom 1 and the base layout size', () => {
+    const base = fitStageLayoutSize(viewport, 16 / 10)
+    const cam = fitCameraIntoClear(viewport, base, {
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+    })
+    expect(cam.zoom).toBe(1)
+    expect(cam.panX).toBeCloseTo((viewport.width - base.width) / 2)
+    expect(cam.panY).toBeCloseTo((viewport.height - base.height) / 2)
+    expect(formatZoomPercent(cam.zoom)).toBe('100%')
   })
 
   it('camera-bar top inset uses proposed-stage overlap, not width heuristics', () => {
@@ -70,8 +90,8 @@ describe('workspace camera', () => {
     const proposed = {
       left: cam.panX,
       top: cam.panY,
-      right: cam.panX + plain.width,
-      bottom: cam.panY + plain.height,
+      right: cam.panX + plain.width * cam.zoom,
+      bottom: cam.panY + plain.height * cam.zoom,
     }
     // Corner chrome to the right of the fitted stage — no top inset.
     const cornerBar = {
@@ -82,14 +102,14 @@ describe('workspace camera', () => {
     }
     expect(rectsOverlap(cornerBar, proposed)).toBe(false)
     expect(cameraBarTopInsetForProposedStage(cornerBar, proposed)).toBe(0)
-    const withCorner = fitStageLayoutSize(viewport, 16 / 10, undefined, {
+    const cleared = fitCameraIntoClear(viewport, plain, {
       left: 0,
       right: 0,
       top: cameraBarTopInsetForProposedStage(cornerBar, proposed),
       bottom: 0,
     })
-    expect(withCorner.width).toBeCloseTo(plain.width, 5)
-    expect(withCorner.height).toBeCloseTo(plain.height, 5)
+    expect(cleared.zoom).toBe(1)
+    expect(plain.width).toBeCloseTo(fitStageLayoutSize(viewport, 16 / 10).width, 5)
 
     // Bar covering the top of the proposed stage — reserve clearance.
     const obstructing = {
@@ -100,6 +120,14 @@ describe('workspace camera', () => {
     }
     expect(rectsOverlap(obstructing, proposed)).toBe(true)
     expect(cameraBarTopInsetForProposedStage(obstructing, proposed)).toBe(44)
+    const zoomed = fitCameraIntoClear(viewport, plain, {
+      left: 0,
+      right: 0,
+      top: 44,
+      bottom: 0,
+    })
+    expect(zoomed.zoom).toBeLessThan(1)
+    expect(formatZoomPercent(zoomed.zoom)).not.toBe('100%')
   })
 
   it('parses typed zoom percentages and rejects invalid or out-of-range', () => {

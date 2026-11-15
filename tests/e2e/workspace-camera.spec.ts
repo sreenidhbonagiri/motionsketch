@@ -132,7 +132,26 @@ test.describe('workspace camera', () => {
     ).toBeGreaterThan(5)
 
     await page.getByTestId('btn-fit-stage').click()
-    await expect(page.getByTestId('zoom-percent')).toHaveText('100%')
+    const fitted = await readCamera(page)
+    // 1280×800: camera bar may require zoom-out; % must match camera.zoom.
+    expect(fitted.zoom).toBeLessThanOrEqual(1 + 1e-6)
+    expect(fitted.zoomLabel).toBe(`${Math.round(fitted.zoom * 100)}%`)
+    const clearOfBar = await page.evaluate(() => {
+      const fr = document
+        .querySelector('[data-testid="stage-frame"]')
+        ?.getBoundingClientRect()
+      const br = document
+        .querySelector('[data-testid="workspace-camera-bar"]')
+        ?.getBoundingClientRect()
+      if (!fr || !br) return false
+      return (
+        fr.right <= br.left ||
+        fr.left >= br.right ||
+        fr.bottom <= br.top ||
+        fr.top >= br.bottom
+      )
+    })
+    expect(clearOfBar).toBe(true)
 
     const after = await readActor0Samples(page)
     expect(after!.sampleCount).toBe(before!.sampleCount)
@@ -403,7 +422,11 @@ test.describe('workspace camera', () => {
     expect((await readCamera(page)).zoom).toBeCloseTo(1.25, 3)
 
     await page.getByTestId('btn-fit-stage').click()
-    await expect(page.getByTestId('zoom-percent')).toHaveText('100%')
+    const fittedAfterTyped = await readCamera(page)
+    expect(fittedAfterTyped.zoom).toBeLessThanOrEqual(1 + 1e-6)
+    expect(fittedAfterTyped.zoomLabel).toBe(
+      `${Math.round(fittedAfterTyped.zoom * 100)}%`,
+    )
 
     // Pointer mapping after typed zoom still lands on the actor in-frame.
     await page.getByTestId('zoom-percent').click()
@@ -465,6 +488,8 @@ test.describe('workspace camera', () => {
           h: r.height,
           top: r.top,
           left: r.left,
+          layoutW: frame.offsetWidth,
+          layoutH: frame.offsetHeight,
           transform: world?.style.transform ?? '',
           zoom: zoom?.textContent?.trim() ?? '',
         }
@@ -493,7 +518,6 @@ test.describe('workspace camera', () => {
     await page.waitForTimeout(80)
     const after1 = await readFrame()
     expect(after1).toBeTruthy()
-    expect(after1!.zoom).toBe('100%')
     const obstructedAfter = await page.evaluate(() => {
       const fr = document
         .querySelector('[data-testid="stage-frame"]')
@@ -510,19 +534,32 @@ test.describe('workspace camera', () => {
       )
     })
     expect(obstructedAfter).toBe(false)
+    // Base letterbox CSS size stays consistent with the default layout.
+    expect(Math.abs(after1!.layoutW - before!.layoutW)).toBeLessThan(2)
+    expect(Math.abs(after1!.layoutH - before!.layoutH)).toBeLessThan(2)
     if (!obstructedBefore) {
-      // Already clear of the camera bar — Fit must match default layout.
+      // Already clear of the camera bar — Fit must match default layout + 100%.
+      expect(after1!.zoom).toBe('100%')
       expect(Math.abs(after1!.w - before!.w)).toBeLessThan(2)
       expect(Math.abs(after1!.h - before!.h)).toBeLessThan(2)
       expect(Math.abs(after1!.top - before!.top)).toBeLessThan(2)
       expect(Math.abs(after1!.left - before!.left)).toBeLessThan(2)
+    } else {
+      // Obstruction cleared by zooming the same base layout — % must drop.
+      expect(after1!.zoom).not.toBe('100%')
+      expect(after1!.w).toBeLessThan(before!.w - 1)
+      const cam = await readCamera(page)
+      expect(cam.zoom).toBeLessThan(1)
+      expect(after1!.zoom).toBe(`${Math.round(cam.zoom * 100)}%`)
+      expect(after1!.layoutW * cam.zoom).toBeCloseTo(after1!.w, 0)
+      expect(after1!.layoutH * cam.zoom).toBeCloseTo(after1!.h, 0)
     }
 
     await page.getByTestId('btn-fit-stage').click()
     await page.waitForTimeout(80)
     const after2 = await readFrame()
     expect(after2).toBeTruthy()
-    expect(after2!.zoom).toBe('100%')
+    expect(after2!.zoom).toBe(after1!.zoom)
     expect(after2!.transform).toBe(after1!.transform)
     expect(Math.abs(after2!.w - after1!.w)).toBeLessThan(2)
     expect(Math.abs(after2!.h - after1!.h)).toBeLessThan(2)

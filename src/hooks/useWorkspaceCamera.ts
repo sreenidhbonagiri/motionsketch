@@ -11,6 +11,7 @@ import {
   CAMERA_ZOOM_STEP,
   cameraCssTransform,
   fitCamera,
+  fitCameraIntoClear,
   fitStageLayoutSize,
   isBackgroundPanTarget,
   isSpacePanBlockedTarget,
@@ -266,13 +267,14 @@ export function useWorkspaceCamera(viewportRef: RefObject<HTMLElement | null>) {
     const el = viewportRef.current
     if (!el) return
     const vp = viewportSizeOf(el)
-    // Explicit Fit only: clear floating cards + camera/transport chrome.
-    // Opening/closing cards must not call this (no auto pan/zoom).
+    // Same base letterbox as resize/default — Fit only adjusts camera zoom/pan
+    // into the unobstructed clear rect (cards + camera chrome). Opening/closing
+    // cards must not call this (no auto pan/zoom).
+    const nextLayout = fitStageLayoutSize(vp, stageAspect)
     const insets = measureWorkspaceFitInsets(el, stageAspect)
-    const nextLayout = fitStageLayoutSize(vp, stageAspect, undefined, insets)
     setViewport(vp)
     setLayout(nextLayout)
-    setCamera(fitCamera(vp, nextLayout, insets))
+    setCamera(fitCameraIntoClear(vp, nextLayout, insets))
   }, [setCamera, stageAspect, viewportRef])
 
   const zoomBy = useCallback(
