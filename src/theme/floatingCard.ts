@@ -61,12 +61,20 @@ export const FOCUSED_SHEET_CHROME_CLASS =
   'mx-auto flex w-full max-w-[26.25rem] items-center gap-1 px-3 py-1 sm:px-4'
 
 /**
- * Focused Inspector split: stage above, Inspector below (~half usable height).
- * Equal `1fr` rows share space after the transport; mins keep both usable on
- * short viewports. Elements still uses a full sheet (stage hidden) instead.
+ * Focused phone/short panel split: stage above, Elements or Inspector below
+ * (~half usable height). Equal `1fr` rows share space after the transport;
+ * mins keep both usable on short viewports. Only one bottom panel at a time.
  */
 export const FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS =
   'grid-rows-[minmax(6rem,1fr)_minmax(9rem,1fr)_auto]'
-/** Slightly tighter Inspector floor when height is already short. */
+/** Slightly tighter panel floor when height is already short. */
 export const FOCUSED_INSPECTOR_SPLIT_ROWS_SHORT_CLASS =
   'grid-rows-[minmax(5rem,1fr)_minmax(7rem,1fr)_auto]'
+/** Shared alias — same row template for Elements and Inspector focused splits. */
+export const FOCUSED_PANEL_SPLIT_ROWS_CLASS = FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS
+export const FOCUSED_PANEL_SPLIT_ROWS_SHORT_CLASS =
+  FOCUSED_INSPECTOR_SPLIT_ROWS_SHORT_CLASS
+
+/** Compact camera chrome outside the drawing stage on focused phone/short layouts. */
+export const FOCUSED_CAMERA_CHROME_CLASS =
+  'flex shrink-0 items-center justify-end border-b border-ms-border bg-white/95 px-2 py-1 sm:px-3'

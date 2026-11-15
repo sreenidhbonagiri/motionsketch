@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { isActorVisibleAt, projectToLocal } from '../core/clip'
 import { gridLineCoords } from '../core/grid'
 import { evaluateActorRotationDeg } from '../core/faceAlongPath'
@@ -169,16 +170,31 @@ interface CanvasStageProps {
   floatingElements?: boolean
   /** Desktop floating inspector — keep Fit/zoom clear of the card. */
   floatingInspector?: boolean
+  /**
+   * Focused phone/short: render zoom/Fit into `#ms-workspace-camera-slot`
+   * outside the drawing stage instead of overlaying the canvas.
+   */
+  externalCameraChrome?: boolean
 }
 
 export function CanvasStage({
   floatingElements: _floatingElements = false,
   floatingInspector = false,
+  externalCameraChrome = false,
 }: CanvasStageProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const size = useStageSize(stageRef)
+  const [cameraSlot, setCameraSlot] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!externalCameraChrome) {
+      setCameraSlot(null)
+      return
+    }
+    setCameraSlot(document.getElementById('ms-workspace-camera-slot'))
+  }, [externalCameraChrome])
 
   const {
     layout,
@@ -610,21 +626,34 @@ export function CanvasStage({
         </div>
       </div>
 
-      {/* Camera chrome stays inside the stage viewport cell (not floating over chrome). */}
-      <div
-        className={
-          floatingInspector
-            ? `pointer-events-none absolute top-2 z-[32] ${FLOATING_INSPECTOR_CAMERA_BAR_RIGHT_CLASS} sm:top-3`
-            : 'pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3'
-        }
-      >
-        <WorkspaceCameraBar
-          zoomIn={zoomIn}
-          zoomOut={zoomOut}
-          fitStage={fitStage}
-          setZoomAtCenter={setZoomAtCenter}
-        />
-      </div>
+      {/* Desktop: camera chrome overlays the stage cell. Focused phone/short:
+          portal into reserved chrome above the workspace (outside drawing). */}
+      {externalCameraChrome && cameraSlot
+        ? createPortal(
+            <WorkspaceCameraBar
+              zoomIn={zoomIn}
+              zoomOut={zoomOut}
+              fitStage={fitStage}
+              setZoomAtCenter={setZoomAtCenter}
+            />,
+            cameraSlot,
+          )
+        : !externalCameraChrome && (
+            <div
+              className={
+                floatingInspector
+                  ? `pointer-events-none absolute top-2 z-[32] ${FLOATING_INSPECTOR_CAMERA_BAR_RIGHT_CLASS} sm:top-3`
+                  : 'pointer-events-none absolute right-2 top-2 z-[32] sm:right-3 sm:top-3'
+              }
+            >
+              <WorkspaceCameraBar
+                zoomIn={zoomIn}
+                zoomOut={zoomOut}
+                fitStage={fitStage}
+                setZoomAtCenter={setZoomAtCenter}
+              />
+            </div>
+          )}
     </div>
   )
 }

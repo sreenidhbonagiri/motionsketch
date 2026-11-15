@@ -47,6 +47,8 @@ export function ActorList({
   variant = 'floating',
   forceOpen = false,
   fillHeight = true,
+  /** Focused split: outer chrome owns Close elements — hide the inner Close. */
+  hideHeaderClose = false,
   onOpenChange,
 }: {
   floatOpen?: boolean
@@ -58,6 +60,11 @@ export function ActorList({
    * (capped by the card max-height) with sticky title/Close.
    */
   fillHeight?: boolean
+  /**
+   * When true (focused split), omit the inner Close — EditorShell already
+   * provides Close elements. Desktop floating Close/Collapse stay unchanged.
+   */
+  hideHeaderClose?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const actors = useEditorStore((s) => s.project.actors)
@@ -105,21 +112,23 @@ export function ActorList({
           </span>
         </span>
         {fillHeight ? (
-          <button
-            type="button"
-            data-testid="btn-toggle-actor-list"
-            aria-expanded="true"
-            aria-controls="actor-list-body"
-            onClick={() => setOpenPref(false)}
-            className="inline-flex h-7 select-none items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
-          >
-            <span data-testid="actors-collapse-label">Close</span>
-            <ChevronDown
-              className="size-3.5 text-slate-400"
-              aria-hidden
-              strokeWidth={2}
-            />
-          </button>
+          hideHeaderClose ? null : (
+            <button
+              type="button"
+              data-testid="btn-toggle-actor-list"
+              aria-expanded="true"
+              aria-controls="actor-list-body"
+              onClick={() => setOpenPref(false)}
+              className="inline-flex h-7 select-none items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-900/[0.06]"
+            >
+              <span data-testid="actors-collapse-label">Close</span>
+              <ChevronDown
+                className="size-3.5 text-slate-400"
+                aria-hidden
+                strokeWidth={2}
+              />
+            </button>
+          )
         ) : (
           <div className="flex shrink-0 items-center gap-0.5">
             <button

@@ -5,7 +5,6 @@ import {
   useState,
 } from 'react'
 import {
-  ArrowLeft,
   Check,
   CircleAlert,
   CircleHelp,
@@ -13,6 +12,7 @@ import {
   PanelLeft,
   PanelRight,
   Upload,
+  X,
 } from 'lucide-react'
 import { useCoarsePointer } from '../hooks/useCoarsePointer'
 import { useEditorShortcuts } from '../hooks/useEditorShortcuts'
@@ -53,8 +53,9 @@ import {
   canFloatBothWorkspaceCards,
   FLOATING_ELEMENTS_SLOT_CLASS,
   FLOATING_INSPECTOR_WIDTH_CLASS,
-  FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS,
-  FOCUSED_INSPECTOR_SPLIT_ROWS_SHORT_CLASS,
+  FOCUSED_CAMERA_CHROME_CLASS,
+  FOCUSED_PANEL_SPLIT_ROWS_CLASS,
+  FOCUSED_PANEL_SPLIT_ROWS_SHORT_CLASS,
   FOCUSED_SHEET_CHROME_CLASS,
   FOCUSED_SHEET_CONTENT_CLASS,
   floatingWorkspaceCardClass,
@@ -319,8 +320,8 @@ export function EditorShell() {
     return () => window.removeEventListener('ms-open-inspector', onOpenInspector)
   }, [openInspector])
 
-  // Motion preview needs a visible stage and reachable Apply/Cancel. Inspector
-  // split keeps the stage mounted — only leave a full Elements sheet.
+  // Motion preview needs a visible stage and reachable Apply/Cancel. Panel
+  // splits keep the stage mounted; leave Elements so Apply/Cancel stay clear.
   useEffect(() => {
     if (!motionPreviewSession) return
     if (useFocusedChrome && mobilePane === 'elements') setMobilePane(null)
@@ -383,28 +384,25 @@ export function EditorShell() {
   const showInspectorMobile = mobilePane === 'inspector'
   // Focused chrome (phone or short height): one pane at a time. Else docked.
   // Desktop: Elements + Inspector float over the stage (no reserved columns).
-  // Focused Elements: full sheet (stage hidden). Focused Inspector: stage above
-  // + Inspector below (~half usable height) so motion edits stay on-canvas.
+  // Focused Elements/Inspector: stage above + panel below (~half usable height).
   const showElementsFloating =
     !useFocusedChrome && showElementsDesktop
   const showElementsSheet = useFocusedChrome && showElementsMobile
   const showInspectorFloating =
     !useFocusedChrome && showInspectorDesktop
   const showInspectorSheet = useFocusedChrome && showInspectorMobile
-  // Elements full sheet still owns the workspace; Inspector never covers stage.
-  const elementsOwnsWorkspace = showElementsSheet
+  const elementsSplitLayout = showElementsSheet
   const inspectorSplitLayout = showInspectorSheet
+  const panelSplitLayout = elementsSplitLayout || inspectorSplitLayout
   const backToStage = () => setMobilePane(null)
   // Static Tailwind class strings only (JIT will not emit dynamic templates).
   // Neither side panel takes a desktop grid column (floating cards instead).
   const workspaceCols = 'md:grid-cols-[minmax(0,1fr)]'
-  const workspaceRows = elementsOwnsWorkspace
-    ? 'grid-rows-[minmax(0,1fr)_auto]'
-    : inspectorSplitLayout
-      ? shortViewport
-        ? FOCUSED_INSPECTOR_SPLIT_ROWS_SHORT_CLASS
-        : FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS
-      : 'grid-rows-[minmax(10rem,1fr)_auto] md:grid-rows-[minmax(0,1fr)_auto]'
+  const workspaceRows = panelSplitLayout
+    ? shortViewport
+      ? FOCUSED_PANEL_SPLIT_ROWS_SHORT_CLASS
+      : FOCUSED_PANEL_SPLIT_ROWS_CLASS
+    : 'grid-rows-[minmax(10rem,1fr)_auto] md:grid-rows-[minmax(0,1fr)_auto]'
   const motionSummary = hasRecording
     ? `${(durationMs / 1000).toFixed(1)}s`
     : null
@@ -620,69 +618,37 @@ export function EditorShell() {
         </div>
       </header>
 
+      {/* Focused phone/short: camera chrome outside the drawing stage cell. */}
+      {useFocusedChrome && (
+        <div
+          id="ms-workspace-camera-slot"
+          data-testid="workspace-camera-chrome"
+          className={FOCUSED_CAMERA_CHROME_CLASS}
+        />
+      )}
+
       {/* Main workspace grid */}
       <div
         data-testid="editor-workspace"
         data-inspector-split={inspectorSplitLayout ? 'true' : undefined}
-        data-elements-sheet={elementsOwnsWorkspace ? 'true' : undefined}
+        data-elements-split={elementsSplitLayout ? 'true' : undefined}
         className={`grid min-h-0 flex-1 overflow-hidden grid-cols-1 ${workspaceRows} ${workspaceCols}`}
       >
-        {/* Elements — focused sheet on phone/short; desktop uses floating card on stage */}
-        {showElementsSheet && (
-          <aside
-            data-testid="actor-list-slot"
-            className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white"
-          >
-            <div className="flex shrink-0 border-b border-ms-border">
-              <div className={FOCUSED_SHEET_CHROME_CLASS}>
-                <button
-                  type="button"
-                  data-testid="btn-elements-back-to-stage"
-                  onClick={backToStage}
-                  className="inline-flex h-8 min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
-                >
-                  <ArrowLeft className="size-3.5" aria-hidden />
-                  Stage
-                </button>
-              </div>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <div
-                data-testid="focused-sheet-content"
-                className={FOCUSED_SHEET_CONTENT_CLASS}
-              >
-                <ActorList
-                  variant="docked"
-                  forceOpen
-                  fillHeight
-                  onOpenChange={(open) => {
-                    setActorsOpen(open)
-                    writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
-                    if (!open) setMobilePane((p) => (p === 'elements' ? null : p))
-                  }}
-                />
-              </div>
-            </div>
-          </aside>
-        )}
-
-        {/* Stage — measures this cell as its viewport (kept mounted under Inspector split). */}
+        {/* Stage — measures this cell as its viewport (kept mounted under panel splits). */}
         <section
           data-testid="stage-viewport"
           className={
-            elementsOwnsWorkspace
-              ? 'hidden'
-              : inspectorSplitLayout
-                ? 'relative min-h-0 min-w-0 overflow-hidden bg-[var(--ms-canvas)]'
-                : 'relative min-h-[10rem] min-w-0 overflow-hidden bg-[var(--ms-canvas)] md:min-h-0'
+            panelSplitLayout
+              ? 'relative min-h-0 min-w-0 overflow-hidden bg-[var(--ms-canvas)]'
+              : 'relative min-h-[10rem] min-w-0 overflow-hidden bg-[var(--ms-canvas)] md:min-h-0'
           }
-          aria-hidden={elementsOwnsWorkspace || undefined}
           data-elements-floating={showElementsFloating ? 'true' : undefined}
           data-inspector-floating={showInspectorFloating ? 'true' : undefined}
         >
           <CanvasStage
             floatingElements={showElementsFloating}
             floatingInspector={showInspectorFloating}
+            externalCameraChrome={useFocusedChrome}
           />
           {showElementsFloating && (
             <div
@@ -768,9 +734,51 @@ export function EditorShell() {
           )}
         </section>
 
+        {/* Elements — focused split under stage; desktop uses floating card on stage. */}
+        {showElementsSheet && (
+          <aside
+            data-testid="actor-list-slot"
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden border-t border-ms-border bg-white"
+          >
+            <div className="flex shrink-0 justify-end border-b border-ms-border">
+              <div className={`${FOCUSED_SHEET_CHROME_CLASS} justify-end`}>
+                <button
+                  type="button"
+                  data-testid="btn-elements-back-to-stage"
+                  onClick={backToStage}
+                  aria-label="Close elements"
+                  title="Close elements"
+                  className="inline-flex h-8 min-h-8 select-none items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+                >
+                  <X className="size-3.5" aria-hidden strokeWidth={2} />
+                  Close elements
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <div
+                data-testid="focused-sheet-content"
+                className={FOCUSED_SHEET_CONTENT_CLASS}
+              >
+                <ActorList
+                  variant="docked"
+                  forceOpen
+                  fillHeight
+                  hideHeaderClose
+                  onOpenChange={(open) => {
+                    setActorsOpen(open)
+                    writePanelOpenPref(ACTORS_PANEL_OPEN_KEY, open)
+                    if (!open)
+                      setMobilePane((p) => (p === 'elements' ? null : p))
+                  }}
+                />
+              </div>
+            </div>
+          </aside>
+        )}
+
         {/* Inspector — focused split (stage above); desktop uses floating card on stage.
-            Stage back + tabs share sticky chrome inside the panel; measured height
-            becomes scroll-padding so easing tiles clear that band. */}
+            Close + tabs share sticky chrome; measured height becomes scroll-padding. */}
         {showInspectorSheet && (
           <div
             data-testid="inspector-slot"
@@ -802,8 +810,8 @@ export function EditorShell() {
               : motionPreviewSession
                 ? 'min-h-0 shrink-0 overflow-x-hidden overflow-y-auto overscroll-contain max-h-[min(48vh,20rem)] md:max-h-[min(44vh,18rem)]'
                 : `min-h-0 overflow-hidden ${
-                    elementsOwnsWorkspace
-                      ? 'max-md:max-h-[min(22vh,9rem)] max-h-[min(26vh,10rem)]'
+                    panelSplitLayout
+                      ? 'max-h-[min(26vh,9rem)] md:max-h-[min(24vh,8.5rem)]'
                       : shortViewport
                         ? 'max-h-[min(36vh,10rem)]'
                         : 'max-h-[min(26vh,9rem)] md:max-h-[min(24vh,8.5rem)]'
