@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { X } from 'lucide-react'
 import { AdjustPanel } from './AdjustPanel'
 import { AppearancePanel } from './AppearancePanel'
 import { HelpDisclosure } from './HelpDisclosure'
@@ -101,15 +101,17 @@ export function InspectorPanel({
   const chrome = (
     <>
       {onBackToStage && (
-        <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
+        <div className="flex shrink-0 items-center justify-end gap-1 border-b border-ms-border px-1.5 py-1">
           <button
             type="button"
             data-testid="btn-inspector-back-to-stage"
             onClick={onBackToStage}
+            aria-label="Close inspector"
+            title="Close inspector"
             className="inline-flex h-8 min-h-8 select-none items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
           >
-            <ArrowLeft className="size-3.5" aria-hidden />
-            Stage
+            <X className="size-3.5" aria-hidden strokeWidth={2} />
+            Close inspector
           </button>
         </div>
       )}
@@ -213,36 +215,41 @@ export function InspectorPanel({
             aria-labelledby="inspector-tab-motion"
             className="divide-y divide-ms-border"
           >
-            <div className="space-y-2 px-2.5 pt-2">
-              <HelpDisclosure
-                id={motionHelpId}
-                testId="inspector-motion-help"
-                summary="About Motion"
-              >
-                <p>
-                  Adjusting{' '}
-                  <span className="font-medium text-slate-700">
-                    {selectedName}
-                  </span>
-                  . Duration is shared project playback time (scales Timing).
-                  Easing shapes moving sections after Steady Speed and Glide.
-                  Smoothing reduces path wobble. Steady Speed evens movement
-                  while keeping pauses — Glide softens starts/stops. Loop Repeat
-                  restarts (may jump); Back and forth alternates with no jump.
-                </p>
-                <p className="mt-1.5">
-                  Polish: gentler path; pauses and corners stay. Glide: softer
-                  starts/stops; path stays. Snap stays next to Record and Play.
-                </p>
-                <p className="mt-1.5">
-                  Import SVG path sets or replaces the path for {selectedName}{' '}
-                  from one local SVG file. Preview on the stage, nudge if needed,
-                  then apply. Uses project Duration; appearance stays the same;
-                  movement is even-speed by default.
-                </p>
-              </HelpDisclosure>
-            </div>
-            <AdjustPanel showHelp={false} motionHelpId={motionHelpId} />
+            <AdjustPanel
+              showHelp={false}
+              motionHelpId={motionHelpId}
+              aboutMotion={
+                <HelpDisclosure
+                  id={motionHelpId}
+                  testId="inspector-motion-help"
+                  summary="About Motion"
+                >
+                  <p>
+                    Adjusting{' '}
+                    <span className="font-medium text-slate-700">
+                      {selectedName}
+                    </span>
+                    . Duration is shared project playback time (scales Timing).
+                    Easing shapes moving sections after Steady Speed and Glide.
+                    Smoothing reduces path wobble. Steady Speed evens movement
+                    while keeping pauses — Glide softens starts/stops. Loop
+                    Repeat restarts (may jump); Back and forth alternates with
+                    no jump.
+                  </p>
+                  <p className="mt-1.5">
+                    Polish: gentler path; pauses and corners stay. Glide: softer
+                    starts/stops; path stays. Snap stays next to Record and
+                    Play.
+                  </p>
+                  <p className="mt-1.5">
+                    Import SVG path sets or replaces the path for {selectedName}{' '}
+                    from one local SVG file. Preview on the stage, nudge if
+                    needed, then apply. Uses project Duration; appearance stays
+                    the same; movement is even-speed by default.
+                  </p>
+                </HelpDisclosure>
+              }
+            />
             <div
               data-testid="motion-tools-section-chrome"
               className="px-2.5 pb-2.5 pt-2"
