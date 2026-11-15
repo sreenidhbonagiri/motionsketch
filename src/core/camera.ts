@@ -154,19 +154,48 @@ export function fitStageLayoutSize(
 }
 
 /**
- * Centered Fit camera for the current viewport + stage layout size.
- * With insets, the stage is centered in the clear rect (not under cards).
+ * Centered Fit camera for the current viewport + stage layout size at zoom 1.
+ * Prefer {@link fitCameraIntoClear} when chrome insets may require zooming out.
  */
 export function fitCamera(
   viewport: ViewportSize,
   layout: StageLayoutSize,
   insets: ViewportInsets | null | undefined = ZERO_VIEWPORT_INSETS,
 ): WorkspaceCamera {
+  return fitCameraIntoClear(viewport, layout, insets)
+}
+
+/**
+ * Place a fixed base stage layout in the unobstructed clear rect.
+ * Keeps the same layout size as the default (full-viewport) letterbox; zooms
+ * out only when that layout cannot fit clear of insets. Never zooms in past 1
+ * on Fit — displayed % matches camera.zoom.
+ */
+export function fitCameraIntoClear(
+  viewport: ViewportSize,
+  layout: StageLayoutSize,
+  insets: ViewportInsets | null | undefined = ZERO_VIEWPORT_INSETS,
+  padding: number = FIT_VIEWPORT_PADDING,
+): WorkspaceCamera {
   const clear = clearViewportRect(viewport, insets)
+  if (layout.width <= 0 || layout.height <= 0) {
+    return { ...DEFAULT_CAMERA }
+  }
+  if (clear.size.width <= 0 || clear.size.height <= 0) {
+    return { ...DEFAULT_CAMERA }
+  }
+  const pad = clamp(padding, 0.5, 1)
+  const availW = clear.size.width * pad
+  const availH = clear.size.height * pad
+  const scale = Math.min(availW / layout.width, availH / layout.height)
+  // Fit never enlarges past the base letterbox (zoom 1).
+  const zoom = clampCameraZoom(Math.min(1, scale))
+  const scaledW = layout.width * zoom
+  const scaledH = layout.height * zoom
   return {
-    zoom: 1,
-    panX: clear.originX + (clear.size.width - layout.width) / 2,
-    panY: clear.originY + (clear.size.height - layout.height) / 2,
+    zoom,
+    panX: clear.originX + (clear.size.width - scaledW) / 2,
+    panY: clear.originY + (clear.size.height - scaledH) / 2,
   }
 }
 
@@ -176,9 +205,10 @@ export function fitCamera(
  * camera root under `[data-testid="stage-viewport"]`, so search that host —
  * not only the camera root. Used only by explicit Fit — not on open/close.
  *
- * Camera-bar top inset is added only when the bar overlaps the proposed fitted
- * stage (after card/transport insets), so default layout and Fit agree when
- * the corner chrome already clears the stage.
+ * Proposes the visual stage from the same full-viewport base layout as the
+ * default letterbox (camera zoom/pan into card/transport clear space). Camera
+ * bar top inset is added only when that proposal overlaps the bar — so
+ * unobstructed Fit keeps zoom 1 and matches the default size.
  */
 export function measureWorkspaceFitInsets(
   viewportEl: HTMLElement,
@@ -239,24 +269,19 @@ export function measureWorkspaceFitInsets(
   }
 
   const vp: ViewportSize = { width: vr.width, height: vr.height }
+  const baseLayout = fitStageLayoutSize(vp, stageAspect)
   const baseInsets = normalizeViewportInsets(
     { left, right, top: 0, bottom },
     vp,
   )
-  const proposedLayout = fitStageLayoutSize(
-    vp,
-    stageAspect,
-    undefined,
-    baseInsets,
-  )
-  const proposedCam = fitCamera(vp, proposedLayout, baseInsets)
+  const proposedCam = fitCameraIntoClear(vp, baseLayout, baseInsets)
   const proposedStage =
-    proposedLayout.width > 0 && proposedLayout.height > 0
+    baseLayout.width > 0 && baseLayout.height > 0
       ? {
           left: proposedCam.panX,
           top: proposedCam.panY,
-          right: proposedCam.panX + proposedLayout.width,
-          bottom: proposedCam.panY + proposedLayout.height,
+          right: proposedCam.panX + baseLayout.width * proposedCam.zoom,
+          bottom: proposedCam.panY + baseLayout.height * proposedCam.zoom,
         }
       : null
 
