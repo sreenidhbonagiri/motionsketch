@@ -3,8 +3,11 @@ import { useConfirm } from '../hooks/useConfirm'
 import { useEditorStore } from '../state/store'
 import { HelpDisclosure } from './HelpDisclosure'
 
+/** Content-sized: label + description; no fixed height that clips wrapping copy. */
 const toolBtn =
-  'inline-flex h-8 min-h-8 w-full items-center justify-start rounded-lg border border-ms-border bg-white px-2.5 text-xs font-medium text-slate-800 transition hover:bg-ms-selected disabled:opacity-40'
+  'inline-flex h-auto min-h-8 w-full items-start justify-start rounded-lg border border-ms-border bg-white px-2.5 py-2 text-xs font-medium leading-snug text-slate-800 transition hover:bg-ms-selected disabled:opacity-40'
+const toolBtnSingle =
+  'inline-flex h-auto min-h-8 w-full items-center justify-start rounded-lg border border-ms-border bg-white px-2.5 py-2 text-xs font-medium text-slate-800 transition hover:bg-ms-selected disabled:opacity-40'
 
 /**
  * Polish / Glide / Restore — same store actions as the former dock Refine
@@ -45,7 +48,7 @@ export function MotionToolsSection({
 
   return (
     <div data-testid="refine-motion-tools" className="space-y-3">
-      <div className="space-y-1.5">
+      <div className="flex flex-col gap-2">
         {showHelp && (
           <HelpDisclosure testId="refine-motion-help" summary="About Motion tools">
             Soften motion for{' '}
@@ -64,11 +67,11 @@ export function MotionToolsSection({
           onClick={() => beginPolishSession()}
           className={toolBtn}
         >
-          <span className="flex flex-col items-start gap-0.5 text-left">
-            <span>Polish motion</span>
+          <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
+            <span className="leading-snug">Polish motion</span>
             <span
               data-testid="polish-tool-desc"
-              className="text-[11px] font-normal leading-snug text-slate-500"
+              className="w-full whitespace-normal text-[11px] font-normal leading-snug text-slate-500"
             >
               Gentler path; pauses and corners stay
             </span>
@@ -82,11 +85,11 @@ export function MotionToolsSection({
           onClick={() => beginGlideSession()}
           className={toolBtn}
         >
-          <span className="flex flex-col items-start gap-0.5 text-left">
-            <span>Glide</span>
+          <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
+            <span className="leading-snug">Glide</span>
             <span
               data-testid="glide-tool-desc"
-              className="text-[11px] font-normal leading-snug text-slate-500"
+              className="w-full whitespace-normal text-[11px] font-normal leading-snug text-slate-500"
             >
               Softer starts/stops; path stays
             </span>
@@ -102,7 +105,7 @@ export function MotionToolsSection({
               onClick={() => {
                 void onRestoreRecordedPath()
               }}
-              className={toolBtn}
+              className={toolBtnSingle}
             >
               Restore recorded path
             </button>

@@ -247,7 +247,7 @@ export function InspectorPanel({
               data-testid="motion-tools-section-chrome"
               className="px-2.5 pb-2.5 pt-2"
             >
-              <h3 className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-ms-motion">
+              <h3 className="mb-1.5 flex items-baseline gap-2 text-xs font-semibold text-slate-800">
                 <span>Motion tools</span>
                 {motionSummary ? (
                   <span
