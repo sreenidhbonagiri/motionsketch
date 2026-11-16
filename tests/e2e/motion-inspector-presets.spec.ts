@@ -187,6 +187,8 @@ async function motionControlOrder(page: Page) {
     const ids = [
       'duration-slider',
       'easing-picker',
+      'inspector-motion-help',
+      'svg-path-import',
       'smoothing-slider',
       'steady-speed-slider',
       'motion-presets',
@@ -199,7 +201,9 @@ async function motionControlOrder(page: Page) {
     }
     const ordered =
       tops['duration-slider']! < tops['easing-picker']! &&
-      tops['easing-picker']! < tops['smoothing-slider']! &&
+      tops['easing-picker']! < tops['inspector-motion-help']! &&
+      tops['inspector-motion-help']! < tops['svg-path-import']! &&
+      tops['svg-path-import']! < tops['smoothing-slider']! &&
       tops['smoothing-slider']! < tops['steady-speed-slider']! &&
       tops['steady-speed-slider']! < tops['motion-presets']!
     return { ok: ordered, tops }
@@ -322,6 +326,10 @@ test.describe('motion inspector presets layout', () => {
       page.getByTestId('motion-preset-summary-attention-pulse'),
     ).toHaveText(/Draw attention/)
 
+    // Loop keeps Pause mounted while we reach Duration/Easing/Smoothing —
+    // without it a ~1.2s take ends before the mid-play assertions (same setup
+    // as the tablet split case below).
+    await page.getByTestId('loop-toggle').check()
     await page.getByTestId('btn-play').click()
     await expect(page.getByTestId('btn-pause')).toBeVisible()
     await expect(page.getByTestId('stage-viewport')).toBeVisible()
@@ -345,11 +353,8 @@ test.describe('motion inspector presets layout', () => {
       path: 'tmp/motion-presets-layout/1280-floating-260-presets.png',
       fullPage: false,
     })
-    // Playback may already have ended (no loop) — ignore if Pause raced away.
-    await page
-      .getByTestId('btn-pause')
-      .click({ timeout: 1500 })
-      .catch(() => undefined)
+    await page.getByTestId('btn-pause').click()
+    await expect(page.getByTestId('btn-play')).toBeVisible()
   })
 
   test('tablet split: presets grid + timing above while playing', async ({

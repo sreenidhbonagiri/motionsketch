@@ -651,7 +651,7 @@ test.describe('workspace layout', () => {
     }
   })
 
-  test('mobile 390x844: Elements sheet prioritizes list; Stage restores Timing button', async ({
+  test('mobile 390x844: Elements split keeps stage; Close restores Timing button', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -664,7 +664,20 @@ test.describe('workspace layout', () => {
     await page.getByTestId('btn-toggle-elements-pane').click()
     await expect(page.getByTestId('actor-list-body')).toBeVisible()
     await expect(page.getByTestId('btn-elements-back-to-stage')).toBeVisible()
+    await expect(page.getByTestId('btn-elements-back-to-stage')).toHaveText(
+      /Close elements/i,
+    )
+    await expect(page.getByTestId('editor-workspace')).toHaveAttribute(
+      'data-elements-split',
+      'true',
+    )
+    await expect(page.getByTestId('stage-viewport')).toBeVisible()
     await expect(page.getByTestId('timing-dialog')).not.toBeVisible()
+    // Camera chrome is reserved outside the drawing stage on focused phone.
+    await expect(page.getByTestId('workspace-camera-chrome')).toBeVisible()
+    await expect(
+      page.getByTestId('workspace-camera-chrome').getByTestId('btn-fit-stage'),
+    ).toBeVisible()
 
     const bodyBox = await page.getByTestId('actor-list-body').boundingBox()
     expect(bodyBox).toBeTruthy()
@@ -2011,7 +2024,7 @@ test.describe('workspace layout', () => {
     // Same outer Stage chrome as focused Elements (not only an in-panel control).
     const inspectorBack = page.getByTestId('btn-inspector-back-to-stage')
     await expect(inspectorBack).toBeVisible()
-    await expect(inspectorBack).toHaveText(/Stage/)
+    await expect(inspectorBack).toHaveText(/Close inspector/i)
     await assertUnclippedClickable(page, 'btn-inspector-back-to-stage')
     await expect(page.getByTestId('btn-close-inspector')).toHaveCount(0)
     // Selection / edits survive focused Inspector.
@@ -2151,8 +2164,13 @@ test.describe('workspace layout', () => {
       ) as HTMLElement | null
       return world?.style.transform ?? ''
     })
-    // Focused sheet switches must not auto-move the camera.
-    expect(camAfter).toBe(camBefore)
+    // Panel open/close may reletterbox the stage cell (reserved camera chrome /
+    // split rows) via preserve-center layout — zoom must not auto-Fit.
+    const parseScale = (t: string) => {
+      const m = /scale\(([^)]+)\)/.exec(t)
+      return m ? Number(m[1]) : NaN
+    }
+    expect(parseScale(camAfter)).toBeCloseTo(parseScale(camBefore), 5)
   })
 
   test('1280 Elements: collapse-to-header preserves scroll; Fit uses card bounds', async ({

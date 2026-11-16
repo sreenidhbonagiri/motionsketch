@@ -269,8 +269,18 @@ test.describe('inspector split layout (stage above)', () => {
       await expect(page.getByTestId('actor-list-body')).toBeVisible()
       await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
       await expect(page.getByTestId('editor-workspace')).toHaveAttribute(
-        'data-elements-sheet',
+        'data-elements-split',
         'true',
+      )
+      // Elements split keeps the stage mounted above the list (same as Inspector).
+      await expect(page.getByTestId('stage-viewport')).toBeVisible()
+      const stageWithElements = await page
+        .getByTestId('stage-viewport')
+        .boundingBox()
+      const elementsSlot = await page.getByTestId('actor-list-slot').boundingBox()
+      expect(stageWithElements?.height ?? 0).toBeGreaterThan(40)
+      expect(elementsSlot?.top ?? 0).toBeGreaterThan(
+        (stageWithElements?.bottom ?? 0) - 2,
       )
 
       await page.screenshot({

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import {
   MAX_PLAYBACK_DURATION_MS,
   MIN_PLAYBACK_DURATION_MS,
@@ -15,11 +16,17 @@ function formatDurationSeconds(durationMs: number): string {
 export function AdjustPanel({
   showHelp = true,
   motionHelpId,
+  aboutMotion,
 }: {
   /** When false, the Motion-tab Help disclosure owns the explanations. */
   showHelp?: boolean
   /** Optional shared Motion help id for aria-describedby. */
   motionHelpId?: string
+  /**
+   * Motion-tab “About Motion” disclosure — rendered after Duration/Easing so
+   * timing controls stay above help and SVG import.
+   */
+  aboutMotion?: ReactNode
 }) {
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
   const selectedActor = useEditorStore((s) => {
@@ -52,23 +59,7 @@ export function AdjustPanel({
 
   return (
     <div data-testid="adjust-panel" className="space-y-2.5 px-2.5 py-2">
-      {showHelp && (
-        <HelpDisclosure testId="adjust-panel-help" summary="About Adjust">
-          Adjusting{' '}
-          <span className="font-medium text-slate-700">
-            {selectedActor?.name ?? 'the selected element'}
-          </span>
-          . Duration is shared project playback time (scales Timing). Easing
-          shapes moving sections after Steady Speed and Glide. Smoothing reduces
-          path wobble. Steady Speed evens movement while keeping pauses — Glide
-          softens starts/stops. Loop Repeat restarts (may jump); Back and forth
-          alternates with no jump.
-        </HelpDisclosure>
-      )}
-
-      <SvgPathImport showHelp={showHelp} motionHelpId={motionHelpId} />
-
-      {/* Core timing before presets so Duration/Easing stay reachable while watching. */}
+      {/* Duration + Easing first so timing stays reachable while watching. */}
       <div className="space-y-2">
         <label
           htmlFor="duration-slider"
@@ -96,6 +87,24 @@ export function AdjustPanel({
       </div>
 
       <EasingPicker describedBy={describedBy} />
+
+      {aboutMotion}
+
+      {showHelp && (
+        <HelpDisclosure testId="adjust-panel-help" summary="About Adjust">
+          Adjusting{' '}
+          <span className="font-medium text-slate-700">
+            {selectedActor?.name ?? 'the selected element'}
+          </span>
+          . Duration is shared project playback time (scales Timing). Easing
+          shapes moving sections after Steady Speed and Glide. Smoothing reduces
+          path wobble. Steady Speed evens movement while keeping pauses — Glide
+          softens starts/stops. Loop Repeat restarts (may jump); Back and forth
+          alternates with no jump.
+        </HelpDisclosure>
+      )}
+
+      <SvgPathImport showHelp={showHelp} motionHelpId={motionHelpId} />
 
       <div className="space-y-2">
         <label

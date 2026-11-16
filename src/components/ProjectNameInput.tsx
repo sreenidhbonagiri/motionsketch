@@ -75,8 +75,9 @@ export function ProjectNameInput({
           type="button"
           data-testid="btn-rename-project"
           onClick={() => setEditing(true)}
-          className="block max-w-[min(10rem,36vw)] truncate text-left text-sm font-semibold tracking-tight text-slate-900 underline-offset-2 hover:underline sm:max-w-[min(16rem,50vw)]"
+          className="block max-w-[min(10rem,36vw)] select-none truncate text-left text-sm font-semibold tracking-tight text-slate-900 underline-offset-2 hover:underline sm:max-w-[min(16rem,50vw)]"
           title="Rename project"
+          aria-label="Rename project"
         >
           {committedName}
         </button>
