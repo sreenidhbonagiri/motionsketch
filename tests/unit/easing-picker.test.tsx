@@ -40,7 +40,9 @@ describe('EasingPicker', () => {
 
   it('uses readable label size (≥12px) without clipping class', () => {
     render(createElement(EasingPicker))
-    const label = screen.getByText('Ease in-out')
+    const option = screen.getByRole('radio', { name: 'Ease in-out', exact: true })
+    expect(option).toHaveAttribute('aria-label', 'Ease in-out')
+    const label = screen.getByText('In-out')
     expect(label.className).toMatch(/text-xs/)
     expect(label.className).not.toMatch(/text-\[10px\]/)
   })

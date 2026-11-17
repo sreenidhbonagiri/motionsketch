@@ -157,6 +157,8 @@ export function EasingPicker({
         {MOTION_EASING_VALUES.map((kind) => {
           const selected = value === kind
           const name = MOTION_EASING_LABELS[kind]
+          // Compact visible tile copy only — aria-label keeps the full name.
+          const tileLabel = kind === 'easeInOut' ? 'In-out' : name
           return (
             <button
               key={kind}
@@ -185,7 +187,7 @@ export function EasingPicker({
                     : 'line-clamp-2 max-w-full text-xs font-medium leading-none text-slate-600'
                 }
               >
-                {name}
+                {tileLabel}
               </span>
             </button>
           )

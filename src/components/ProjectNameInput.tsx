@@ -7,6 +7,8 @@ import {
 interface ProjectNameInputProps {
   committedName: string
   onCommit: (name: string) => void
+  /** Fires when rename editing begins or ends (header save-status chrome). */
+  onEditingChange?: (editing: boolean) => void
 }
 
 /** Shared box so button ↔ input swap does not shift the header/stage. */
@@ -21,6 +23,7 @@ const NAME_FIELD_BOX =
 export function ProjectNameInput({
   committedName,
   onCommit,
+  onEditingChange,
 }: ProjectNameInputProps) {
   const [draft, setDraft] = useState(committedName)
   const [editing, setEditing] = useState(false)
@@ -43,18 +46,28 @@ export function ProjectNameInput({
     el.select()
   }, [editing])
 
+  const beginEditing = () => {
+    setEditing(true)
+    onEditingChange?.(true)
+  }
+
+  const endEditing = () => {
+    setEditing(false)
+    onEditingChange?.(false)
+  }
+
   const commit = () => {
     const next = commitProjectName(draft, baselineRef.current)
     setDraft(next)
     baselineRef.current = next
-    setEditing(false)
+    endEditing()
     if (next !== committedName) onCommit(next)
   }
 
   const cancel = () => {
     setDraft(baselineRef.current)
     skipBlurRef.current = true
-    setEditing(false)
+    endEditing()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -100,7 +113,7 @@ export function ProjectNameInput({
         <button
           type="button"
           data-testid="btn-rename-project"
-          onClick={() => setEditing(true)}
+          onClick={beginEditing}
           className={`${NAME_FIELD_BOX} block w-full select-none truncate rounded-md border border-transparent px-1.5 leading-none underline-offset-2 hover:underline`}
           title="Rename project"
           aria-label="Rename project"

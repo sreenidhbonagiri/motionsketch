@@ -45,6 +45,40 @@ async function openMotionInspector(page: Page) {
   await expect(page.getByTestId('adjust-panel')).toBeVisible()
 }
 
+async function expectInOutOneLine(page: Page) {
+  const inOut = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="easing-option-easeInOut"]')
+    if (!(el instanceof HTMLElement)) return null
+    const label = el.querySelector('span')
+    if (!(label instanceof HTMLElement)) return null
+    const fs = Number.parseFloat(getComputedStyle(label).fontSize) || 12
+    const clientW = label.clientWidth
+    const prev = label.style.cssText
+    label.style.webkitLineClamp = 'unset'
+    label.style.display = 'inline-block'
+    label.style.overflow = 'visible'
+    label.style.maxHeight = 'none'
+    label.style.whiteSpace = 'nowrap'
+    const oneLineH = label.scrollHeight
+    const oneLineW = label.scrollWidth
+    label.style.cssText = prev
+    return {
+      text: label.textContent?.trim(),
+      aria: el.getAttribute('aria-label'),
+      fs,
+      oneLineH,
+      oneLineW,
+      clientW,
+      fitsOneLine: oneLineH <= fs + 2 && oneLineW <= clientW + 1,
+    }
+  })
+  expect(inOut).toBeTruthy()
+  expect(inOut!.text).toBe('In-out')
+  expect(inOut!.aria).toBe('Ease in-out')
+  expect(inOut!.fs).toBeGreaterThanOrEqual(12)
+  expect(inOut!.fitsOneLine, JSON.stringify(inOut)).toBe(true)
+}
+
 test.describe('five-issue local fixes', () => {
   async function probePhoneEasing(page: Page) {
     return page.evaluate((ids) => {
@@ -137,6 +171,7 @@ test.describe('five-issue local fixes', () => {
     expect(probe.allTilesVisible, JSON.stringify(probe)).toBe(true)
     expect(probe.allLabelsReadable, JSON.stringify(probe)).toBe(true)
     expect(probe.allClickable, JSON.stringify(probe)).toBe(true)
+    await expectInOutOneLine(page)
 
     for (const id of EASING_IDS) {
       await assertUnclippedClickable(page, id)
@@ -165,6 +200,7 @@ test.describe('five-issue local fixes', () => {
     expect(probe.allTilesVisible, JSON.stringify(probe)).toBe(true)
     expect(probe.allLabelsReadable, JSON.stringify(probe)).toBe(true)
     expect(probe.allClickable, JSON.stringify(probe)).toBe(true)
+    await expectInOutOneLine(page)
 
     for (const id of EASING_IDS) {
       await assertUnclippedClickable(page, id)
@@ -194,10 +230,44 @@ test.describe('five-issue local fixes', () => {
     await rename.click()
     const input = page.getByTestId('header-project-name-input')
     await expect(input).toBeFocused()
+    const selected = await input.evaluate((el) => {
+      if (!(el instanceof HTMLInputElement)) return false
+      return el.selectionStart === 0 && el.selectionEnd === el.value.length
+    })
+    expect(selected).toBe(true)
     const hEditing = await header.evaluate((el) => el.getBoundingClientRect().height)
     const fieldHEditing = await field.evaluate((el) => el.getBoundingClientRect().height)
     expect(Math.abs(hEditing - hBefore)).toBeLessThan(1)
     expect(fieldHEditing).toBe(24)
+
+    // While renaming: saved status is the check icon + full accessible label
+    // (not the long "Saved in this browser" visible text).
+    const statusWhile = page.getByTestId('header-save-status')
+    if (await statusWhile.isVisible().catch(() => false)) {
+      const probe = await statusWhile.evaluate((el) => {
+        const label = el.getAttribute('aria-label') || el.getAttribute('title') || ''
+        const text = (el.textContent || '').replace(/\s+/g, ' ').trim()
+        const svg = el.querySelector('svg')
+        const visibleText = [...el.querySelectorAll('span')].some((span) => {
+          const cs = getComputedStyle(span)
+          if (cs.position === 'absolute' && cs.width === '1px') return false
+          if (cs.clipPath?.includes('inset(50%)')) return false
+          if (cs.clip === 'rect(0px, 0px, 0px, 0px)') return false
+          return span.getClientRects().length > 0 && (span.textContent || '').trim().length > 0
+        })
+        return {
+          label,
+          text,
+          hasCheck: !!svg,
+          visibleText,
+        }
+      })
+      if (/Saved in this browser/i.test(probe.label)) {
+        expect(probe.hasCheck, JSON.stringify(probe)).toBe(true)
+        expect(probe.visibleText, JSON.stringify(probe)).toBe(false)
+        expect(probe.label).toMatch(/Saved in this browser/i)
+      }
+    }
 
     await input.fill('Stable rename')
     await input.press('Enter')
@@ -340,6 +410,8 @@ test.describe('five-issue local fixes', () => {
     await gotoFresh(page)
     await recordSimplePath(page)
     await openMotionInspector(page)
+
+    await expectInOutOneLine(page)
 
     const grid = await page.evaluate((ids) => {
       const picker = document.querySelector('[data-testid="easing-picker"]')
