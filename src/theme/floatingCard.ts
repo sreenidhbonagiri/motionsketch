@@ -67,9 +67,12 @@ export const FOCUSED_SHEET_CHROME_CLASS =
  */
 export const FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS =
   'grid-rows-[minmax(6rem,1fr)_minmax(9rem,1fr)_auto]'
-/** Slightly tighter panel floor when height is already short. */
+/**
+ * Short viewports: equal stage/panel share, with a slightly taller panel floor
+ * so Duration + compact easing can land in the first paint.
+ */
 export const FOCUSED_INSPECTOR_SPLIT_ROWS_SHORT_CLASS =
-  'grid-rows-[minmax(5rem,1fr)_minmax(7rem,1fr)_auto]'
+  'grid-rows-[minmax(5rem,1fr)_minmax(8.5rem,1fr)_auto]'
 /** Shared alias — same row template for Elements and Inspector focused splits. */
 export const FOCUSED_PANEL_SPLIT_ROWS_CLASS = FOCUSED_INSPECTOR_SPLIT_ROWS_CLASS
 export const FOCUSED_PANEL_SPLIT_ROWS_SHORT_CLASS =

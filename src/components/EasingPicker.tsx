@@ -25,9 +25,9 @@ function curvePath(kind: MotionEasing): string {
         return bounceProgress(u)
     }
   }
-  const w = 40
-  const h = 28
-  const pad = 3
+  const w = 32
+  const h = 18
+  const pad = 2
   const pts: string[] = []
   for (let i = 0; i <= 24; i++) {
     const u = i / 24
@@ -43,9 +43,9 @@ function curvePath(kind: MotionEasing): string {
 function EasingThumb({ kind, selected }: { kind: MotionEasing; selected: boolean }) {
   return (
     <svg
-      width="40"
-      height="28"
-      viewBox="0 0 40 28"
+      width="32"
+      height="18"
+      viewBox="0 0 32 18"
       aria-hidden="true"
       className={selected ? 'text-ms-primary' : 'text-slate-500'}
     >
@@ -63,7 +63,8 @@ function EasingThumb({ kind, selected }: { kind: MotionEasing; selected: boolean
 
 /**
  * Discrete per-element easing picker. Lives under Duration in Motion.
- * Curve thumbnails + readable names; radiogroup keyboard moves focus.
+ * Column count follows the Inspector container width (not the viewport),
+ * so a ~260px floating card does not force a cramped five-column row.
  */
 export function EasingPicker({
   describedBy,
@@ -130,8 +131,14 @@ export function EasingPicker({
       ? 'easing-help'
       : describedBy
 
+  const gridClass = interactive
+    ? // Follow Inspector/sheet width — not the viewport.
+      // ~238–255px floating card → 3 cols; ≥256px phone sheet (incl. 320) → 5.
+      'grid grid-cols-2 gap-1 @[12rem]:grid-cols-3 @[16rem]:grid-cols-5'
+    : 'grid grid-cols-2 gap-1 opacity-40 @[12rem]:grid-cols-3 @[16rem]:grid-cols-5'
+
   return (
-    <div data-testid="easing-picker" className="space-y-1.5">
+    <div data-testid="easing-picker" className="@container space-y-1">
       <div className="flex items-center justify-between gap-2 text-sm text-slate-600">
         <span id="easing-picker-label">Easing</span>
         <span data-testid="easing-value" className="font-medium text-slate-800">
@@ -145,11 +152,7 @@ export function EasingPicker({
         aria-disabled={!interactive}
         data-testid="easing-options"
         onKeyDown={onKeyDown}
-        className={
-          interactive
-            ? 'grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-5'
-            : 'grid grid-cols-2 gap-1.5 opacity-40 sm:grid-cols-3 md:grid-cols-5'
-        }
+        className={gridClass}
       >
         {MOTION_EASING_VALUES.map((kind) => {
           const selected = value === kind
@@ -170,16 +173,16 @@ export function EasingPicker({
               onClick={() => selectEasing(kind)}
               className={
                 selected
-                  ? 'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-ms-primary bg-ms-selected px-1 py-1.5 text-center outline-none ring-ms-primary focus-visible:ring-2'
-                  : 'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-ms-border bg-white px-1 py-1.5 text-center outline-none hover:bg-slate-900/[0.04] focus-visible:ring-2 focus-visible:ring-ms-primary disabled:pointer-events-none'
+                  ? 'flex min-h-8 flex-col items-center justify-center gap-0 rounded-md border-2 border-ms-primary bg-ms-selected px-0.5 py-0.5 text-center outline-none ring-ms-primary focus-visible:ring-2'
+                  : 'flex min-h-8 flex-col items-center justify-center gap-0 rounded-md border border-ms-border bg-white px-0.5 py-0.5 text-center outline-none hover:bg-slate-900/[0.04] focus-visible:ring-2 focus-visible:ring-ms-primary disabled:pointer-events-none'
               }
             >
               <EasingThumb kind={kind} selected={selected} />
               <span
                 className={
                   selected
-                    ? 'text-xs font-semibold leading-snug text-slate-800'
-                    : 'text-xs font-medium leading-snug text-slate-600'
+                    ? 'line-clamp-2 max-w-full text-xs font-semibold leading-none text-slate-800'
+                    : 'line-clamp-2 max-w-full text-xs font-medium leading-none text-slate-600'
                 }
               >
                 {name}

@@ -58,9 +58,9 @@ export function AdjustPanel({
   const describedBy = motionHelpId
 
   return (
-    <div data-testid="adjust-panel" className="space-y-2.5 px-2.5 py-2">
+    <div data-testid="adjust-panel" className="space-y-2 px-2.5 py-1.5">
       {/* Duration + Easing first so timing stays reachable while watching. */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <label
           htmlFor="duration-slider"
           className="flex items-center justify-between text-sm text-slate-600"

@@ -28,6 +28,11 @@ interface InspectorPanelProps {
    * (capped by max-height) so it does not look like an empty full-height rail.
    */
   fillHeight?: boolean
+  /**
+   * Scroll offset to re-apply after remount (e.g. Export temporarily hid the
+   * Inspector). Applied once on mount via layout effect.
+   */
+  restoreScrollTop?: number
 }
 
 function nearestVerticalScroller(from: HTMLElement): HTMLElement | null {
@@ -61,10 +66,12 @@ export function InspectorPanel({
   onClose,
   motionSummary,
   fillHeight = true,
+  restoreScrollTop,
 }: InspectorPanelProps) {
   const motionHelpId = useId()
   const rootRef = useRef<HTMLElement>(null)
   const chromeRef = useRef<HTMLDivElement>(null)
+  const restoredScrollRef = useRef(false)
   const selectedName = useEditorStore((s) => {
     const id = s.selectedActorId
     return s.project.actors.find((a) => a.id === id)?.name ?? 'the selected element'
@@ -98,23 +105,89 @@ export function InspectorPanel({
     }
   }, [fillHeight, onBackToStage, onClose, tab])
 
-  const chrome = (
+  useLayoutEffect(() => {
+    if (restoredScrollRef.current) return
+    if (restoreScrollTop == null || restoreScrollTop <= 0) return
+    const root = rootRef.current
+    const chrome = chromeRef.current
+    if (!root) return
+    const scroller = fillHeight
+      ? root
+      : chrome
+        ? (nearestVerticalScroller(chrome) ?? root)
+        : root
+    // DOM scroll offset — not React state.
+    scroller.scrollTo({ top: restoreScrollTop })
+    restoredScrollRef.current = true
+  }, [fillHeight, restoreScrollTop])
+
+  const tabs = (
+    <div
+      role="tablist"
+      aria-label="Inspector"
+      className="flex min-w-0 flex-1 items-center gap-0.5"
+    >
+      <button
+        type="button"
+        role="tab"
+        id="inspector-tab-style"
+        data-testid="btn-inspector-style"
+        aria-selected={tab === 'style'}
+        aria-controls="inspector-style-body"
+        tabIndex={tab === 'style' ? 0 : -1}
+        onClick={() => onTabChange('style')}
+        className={tab === 'style' ? tabActive : tabIdle}
+      >
+        Style
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="inspector-tab-motion"
+        data-testid="btn-inspector-motion"
+        aria-selected={tab === 'motion'}
+        aria-controls="inspector-motion-body"
+        tabIndex={tab === 'motion' ? 0 : -1}
+        onClick={() => onTabChange('motion')}
+        className={tab === 'motion' ? tabActive : tabIdle}
+      >
+        Motion
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="inspector-tab-project"
+        data-testid="btn-inspector-project"
+        aria-selected={tab === 'project'}
+        aria-controls="inspector-project-body"
+        tabIndex={tab === 'project' ? 0 : -1}
+        onClick={() => onTabChange('project')}
+        className={tab === 'project' ? tabActive : tabIdle}
+      >
+        Project
+      </button>
+    </div>
+  )
+
+  // Focused split: one chrome row (tabs + Close) to keep Duration/Easing in view.
+  const chrome = onBackToStage ? (
+    <div className="flex shrink-0 items-center gap-1 border-b border-ms-border px-1.5 py-1">
+      {tabs}
+      <button
+        type="button"
+        data-testid="btn-inspector-back-to-stage"
+        onClick={onBackToStage}
+        aria-label="Close inspector"
+        title="Close inspector"
+        className="inline-flex h-7 shrink-0 select-none items-center gap-1 rounded-md px-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
+      >
+        <X className="size-3.5" aria-hidden strokeWidth={2} />
+        <span className="hidden min-[22rem]:inline">Close inspector</span>
+        <span className="min-[22rem]:hidden">Close</span>
+      </button>
+    </div>
+  ) : (
     <>
-      {onBackToStage && (
-        <div className="flex shrink-0 items-center justify-end gap-1 border-b border-ms-border px-1.5 py-1">
-          <button
-            type="button"
-            data-testid="btn-inspector-back-to-stage"
-            onClick={onBackToStage}
-            aria-label="Close inspector"
-            title="Close inspector"
-            className="inline-flex h-8 min-h-8 select-none items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-900/[0.06]"
-          >
-            <X className="size-3.5" aria-hidden strokeWidth={2} />
-            Close inspector
-          </button>
-        </div>
-      )}
       {onClose && (
         <div className="flex shrink-0 items-center justify-end border-b border-ms-border px-1.5 py-1">
           <button
@@ -129,50 +202,8 @@ export function InspectorPanel({
           </button>
         </div>
       )}
-      <div
-        role="tablist"
-        aria-label="Inspector"
-        className="flex shrink-0 items-center gap-0.5 border-b border-ms-border p-1.5"
-      >
-        <button
-          type="button"
-          role="tab"
-          id="inspector-tab-style"
-          data-testid="btn-inspector-style"
-          aria-selected={tab === 'style'}
-          aria-controls="inspector-style-body"
-          tabIndex={tab === 'style' ? 0 : -1}
-          onClick={() => onTabChange('style')}
-          className={tab === 'style' ? tabActive : tabIdle}
-        >
-          Style
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="inspector-tab-motion"
-          data-testid="btn-inspector-motion"
-          aria-selected={tab === 'motion'}
-          aria-controls="inspector-motion-body"
-          tabIndex={tab === 'motion' ? 0 : -1}
-          onClick={() => onTabChange('motion')}
-          className={tab === 'motion' ? tabActive : tabIdle}
-        >
-          Motion
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="inspector-tab-project"
-          data-testid="btn-inspector-project"
-          aria-selected={tab === 'project'}
-          aria-controls="inspector-project-body"
-          tabIndex={tab === 'project' ? 0 : -1}
-          onClick={() => onTabChange('project')}
-          className={tab === 'project' ? tabActive : tabIdle}
-        >
-          Project
-        </button>
+      <div className="flex shrink-0 items-center border-b border-ms-border p-1.5">
+        {tabs}
       </div>
     </>
   )
