@@ -117,6 +117,32 @@ export function EditorShell() {
   const [inspectorOpen, setInspectorOpen] = useState(() =>
     readPanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, false),
   )
+  /** Scroll to re-apply after Export temporarily unmounts the Inspector. */
+  const [inspectorScrollRestore, setInspectorScrollRestore] = useState(0)
+  const captureInspectorScroll = () => {
+    const panel = document.querySelector('[data-testid="inspector-panel"]')
+    if (!(panel instanceof HTMLElement)) {
+      setInspectorScrollRestore(0)
+      return
+    }
+    if (panel.scrollHeight > panel.clientHeight + 1) {
+      setInspectorScrollRestore(panel.scrollTop)
+      return
+    }
+    let node: HTMLElement | null = panel.parentElement
+    while (node) {
+      const cs = getComputedStyle(node)
+      if (
+        (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+        node.scrollHeight > node.clientHeight + 1
+      ) {
+        setInspectorScrollRestore(node.scrollTop)
+        return
+      }
+      node = node.parentElement
+    }
+    setInspectorScrollRestore(panel.scrollTop)
+  }
   // Focused Elements/Inspector sheets when width is phone-like OR height is
   // too short for canvas + Inspector together (no silent panel close).
   // Also when both floating cards would leave too little clear stage width.
@@ -160,6 +186,7 @@ export function EditorShell() {
   }, [])
   const ensureExportOpen = useCallback(() => {
     setExamplesOpen(false)
+    captureInspectorScroll()
     setOpenPanel('export')
   }, [])
   const shortcutsReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -379,9 +406,12 @@ export function EditorShell() {
     !tipBusy && !hasRecording && !showFirstUseIntro && !tutorial.active
 
   const showElementsDesktop = actorsOpen && !editing
-  const showInspectorDesktop = inspectorOpen
+  // Export must not stack over Inspector — hide while Export is open; restore
+  // when it closes without clearing open prefs or moving the camera.
+  const exportOpen = openPanel === 'export'
+  const showInspectorDesktop = inspectorOpen && !exportOpen
   const showElementsMobile = mobilePane === 'elements' && !editing
-  const showInspectorMobile = mobilePane === 'inspector'
+  const showInspectorMobile = mobilePane === 'inspector' && !exportOpen
   // Focused chrome (phone or short height): one pane at a time. Else docked.
   // Desktop: Elements + Inspector float over the stage (no reserved columns).
   // Focused Elements/Inspector: stage above + panel below (~half usable height).
@@ -434,7 +464,7 @@ export function EditorShell() {
           body={tutorial.coachBody}
           highlightTestId={tutorial.highlightTestId}
           softHighlight={tutorial.softHighlight}
-          exportOpen={openPanel === 'export'}
+          exportOpen={exportOpen}
           showNext={tutorial.showNext}
           nextIsFinish={tutorial.nextIsFinish}
           onSkip={skipTutorial}
@@ -517,7 +547,9 @@ export function EditorShell() {
             type="button"
             data-testid="btn-toggle-inspector-pane"
             aria-pressed={
-              useFocusedChrome ? showInspectorMobile : showInspectorDesktop
+              useFocusedChrome
+                ? mobilePane === 'inspector'
+                : inspectorOpen
             }
             aria-label="Inspector"
             title="Inspector"
@@ -560,11 +592,14 @@ export function EditorShell() {
             <button
               type="button"
               data-testid="btn-export"
-              aria-expanded={openPanel === 'export'}
+              aria-expanded={exportOpen}
               aria-controls="export-panel-root"
               onClick={() => {
                 setExamplesOpen(false)
-                setOpenPanel((prev) => (prev === 'export' ? null : 'export'))
+                setOpenPanel((prev) => {
+                  if (prev !== 'export') captureInspectorScroll()
+                  return prev === 'export' ? null : 'export'
+                })
               }}
               className={hasRecording ? headerBtnPrimary : headerBtn}
             >
@@ -574,7 +609,7 @@ export function EditorShell() {
             <FloatingPanel
               id="export"
               title="Export"
-              open={openPanel === 'export'}
+              open={exportOpen}
               onClose={closePanel}
               align="right"
               summary={
@@ -681,6 +716,7 @@ export function EditorShell() {
                   onClose={closeInspectorDesktop}
                   motionSummary={motionSummary}
                   fillHeight={false}
+                  restoreScrollTop={inspectorScrollRestore}
                 />
               </div>
             </div>
@@ -795,6 +831,7 @@ export function EditorShell() {
                   onBackToStage={backToStage}
                   motionSummary={motionSummary}
                   fillHeight
+                  restoreScrollTop={inspectorScrollRestore}
                 />
               </div>
             </div>
