@@ -105,7 +105,14 @@ export function TutorialCoach({
         document.querySelector('[data-testid="btn-export"]'),
       )
       const header = readElementRect(document.querySelector('header'))
-      // Do not avoid the whole playback dock — the coach anchors next to Record/Play.
+      // Timeline/scrubber sit above Record/Play — clear them without avoiding
+      // the whole dock (card still anchors beside Record/Play).
+      const timeline = readElementRect(
+        document.querySelector('[data-testid="playback-timeline"]'),
+      )
+      const scrubber = readElementRect(
+        document.querySelector('[data-testid="playback-scrubber"]'),
+      )
       const avoidExtra = [
         fit,
         cameraBar,
@@ -113,6 +120,8 @@ export function TutorialCoach({
         motionTab,
         styleTab,
         exportBtn,
+        timeline,
+        scrubber,
       ].filter(Boolean) as NonNullable<ReturnType<typeof readElementRect>>[]
 
       if (exportOpen) {
@@ -137,6 +146,8 @@ export function TutorialCoach({
         styleTab?.bottom ?? 0,
         exportBtn?.bottom ?? 0,
       )
+      const transportTop =
+        timeline?.top ?? scrubber?.top ?? undefined
 
       const measuredH = cardRef.current?.offsetHeight
       setCardStyle(
@@ -151,6 +162,8 @@ export function TutorialCoach({
           avoidExtra,
           chromeClearanceTop:
             step === 'export' && !exportOpen ? chromeClearanceTop : undefined,
+          transportTop:
+            step === 'draw' || step === 'play' ? transportTop : undefined,
         }),
       )
     }

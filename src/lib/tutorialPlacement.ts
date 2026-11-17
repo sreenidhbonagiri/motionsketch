@@ -85,41 +85,52 @@ function candidatesNearDockControl(
   cardH: number,
   vw: number,
   vh: number,
+  /**
+   * Measured top of the timeline/scrubber band. Prefer clearing this edge so
+   * the card sits above the transport with GAP — not a fixed pixel offset.
+   */
+  transportTop?: number,
 ): Array<{ top: number; left: number }> {
   const centeredLeft = clamp(
     anchor.left + anchor.width / 2 - cardW / 2,
     MARGIN,
     vw - cardW - MARGIN,
   )
-  const aboveDock = anchor.top - cardH - GAP
+  // Clear the scrubber/timeline when measured; otherwise fall back to the
+  // control top (Record/Play). Card height is measured, so wraps stay clear.
+  const clearanceTop =
+    transportTop != null && Number.isFinite(transportTop)
+      ? Math.min(transportTop, anchor.top)
+      : anchor.top
+  const aboveTransport = clearanceTop - cardH - GAP
   // Phone: keep the card near Record (tests require <320px) while clearing Fit.
   if (vw < 640) {
     const side = clamp(vw - cardW - MARGIN, MARGIN, vw - cardW - MARGIN)
     return [
-      { top: aboveDock, left: MARGIN },
-      { top: aboveDock, left: side },
-      { top: aboveDock, left: centeredLeft },
-      { top: Math.max(MARGIN + 72, aboveDock - 36), left: MARGIN },
+      { top: aboveTransport, left: MARGIN },
+      { top: aboveTransport, left: side },
+      { top: aboveTransport, left: centeredLeft },
+      { top: Math.max(MARGIN + 72, aboveTransport - 36), left: MARGIN },
       { top: MARGIN + 72, left: MARGIN },
     ]
   }
   return [
-    // Above (preferred for dock controls)
-    { top: aboveDock, left: centeredLeft },
+    // Above the transport (preferred — clears scrubber + stays near Record)
+    { top: aboveTransport, left: centeredLeft },
     // Above, shifted left
     {
-      top: aboveDock,
+      top: aboveTransport,
       left: clamp(anchor.left - 8, MARGIN, vw - cardW - MARGIN),
     },
     // Above, shifted right
     {
-      top: aboveDock,
+      top: aboveTransport,
       left: clamp(anchor.right - cardW + 8, MARGIN, vw - cardW - MARGIN),
     },
-    // To the left of control
+    // To the left of control (still prefer clearing transport top)
     {
       top: clamp(
-        anchor.top + anchor.height / 2 - cardH / 2,
+        Math.min(anchor.top + anchor.height / 2 - cardH / 2, aboveTransport),
         MARGIN,
         vh - cardH - MARGIN,
       ),
@@ -128,7 +139,7 @@ function candidatesNearDockControl(
     // To the right
     {
       top: clamp(
-        anchor.top + anchor.height / 2 - cardH / 2,
+        Math.min(anchor.top + anchor.height / 2 - cardH / 2, aboveTransport),
         MARGIN,
         vh - cardH - MARGIN,
       ),
@@ -305,6 +316,11 @@ export function placeTutorialCard(opts: {
    * must clear (measured). Ignored for open-Export / non-export steps.
    */
   chromeClearanceTop?: number
+  /**
+   * Top edge of the playback timeline/scrubber. Draw/Play cards clear this
+   * measured edge (plus GAP) using the live card height.
+   */
+  transportTop?: number
 }): CardPlacement {
   const cardW = Math.min(opts.cardWidth ?? CARD_MAX, opts.vw - MARGIN * 2)
   const cardH = opts.cardHeight ?? 132
@@ -340,6 +356,7 @@ export function placeTutorialCard(opts: {
       cardH,
       opts.vw,
       opts.vh,
+      opts.transportTop,
     )
   } else {
     list = [{ top: MARGIN + 56, left: MARGIN }]

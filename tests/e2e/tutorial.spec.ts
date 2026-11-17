@@ -1316,3 +1316,97 @@ test.describe('first-use tutorial', () => {
     expect(stillFirst).toContain('First recoverable')
   })
 })
+
+test.describe('draw coach clears scrubber', () => {
+  for (const vp of [
+    { width: 1280, height: 800, label: 'desktop' },
+    { width: 1280, height: 640, label: 'short-desktop' },
+  ] as const) {
+    test(`Draw your flight card stays clear of the scrubber (${vp.label})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: vp.width, height: vp.height })
+      await clearAppStorage(page)
+      await awaitAutoTutorial(page)
+      await expect(page.getByTestId('tutorial-coach-title')).toHaveText(
+        'Draw your flight',
+      )
+      // Settle after measured card height / transport placement.
+      await expect
+        .poll(async () => {
+          return page.evaluate(() => {
+            const card = document.querySelector(
+              '[data-testid="tutorial-coach-card"]',
+            )
+            const scrub = document.querySelector(
+              '[data-testid="playback-scrubber"]',
+            )
+            const record = document.querySelector('[data-testid="btn-record"]')
+            if (
+              !(card instanceof HTMLElement) ||
+              !(scrub instanceof HTMLElement) ||
+              !(record instanceof HTMLElement)
+            ) {
+              return 'missing'
+            }
+            const cr = card.getBoundingClientRect()
+            const sr = scrub.getBoundingClientRect()
+            const rr = record.getBoundingClientRect()
+            const overlap =
+              cr.left < sr.right - 2 &&
+              cr.right > sr.left + 2 &&
+              cr.top < sr.bottom - 2 &&
+              cr.bottom > sr.top + 2
+            const gap = sr.top - cr.bottom
+            const cx = cr.left + cr.width / 2
+            const rx = rr.left + rr.width / 2
+            const nearRecord = Math.hypot(cx - rx, cr.bottom - rr.top) < 360
+            if (overlap) return `overlap:gap=${gap.toFixed(1)}`
+            if (gap < 6) return `tight:gap=${gap.toFixed(1)}`
+            if (!nearRecord) return 'far-from-record'
+            return 'ok'
+          })
+        })
+        .toBe('ok')
+
+      const scrub = page.getByTestId('playback-scrubber')
+      await expect(scrub).toBeVisible()
+      // Fresh draw step leaves the scrubber disabled — use a real mouse click at
+      // its center so Playwright does not wait on enabled, then confirm the hit
+      // target is the scrubber (card must not intercept).
+      const scrubBox = await scrub.boundingBox()
+      expect(scrubBox).toBeTruthy()
+      await page.mouse.click(
+        scrubBox!.x + Math.min(40, scrubBox!.width / 2),
+        scrubBox!.y + scrubBox!.height / 2,
+      )
+      const hit = await page.evaluate(() => {
+        const scrubEl = document.querySelector(
+          '[data-testid="playback-scrubber"]',
+        )
+        if (!(scrubEl instanceof HTMLElement)) return null
+        const r = scrubEl.getBoundingClientRect()
+        const el = document.elementFromPoint(
+          r.left + Math.min(40, r.width / 2),
+          r.top + r.height / 2,
+        )
+        return {
+          testId: el instanceof Element ? el.getAttribute('data-testid') : null,
+          id: el instanceof Element ? el.id : null,
+          tag: el && 'tagName' in el ? (el as Element).tagName : null,
+        }
+      })
+      expect(
+        hit?.testId === 'playback-scrubber' || hit?.id === 'playback-scrubber',
+        JSON.stringify(hit),
+      ).toBe(true)
+
+      if (vp.label === 'desktop') {
+        await page.screenshot({
+          path: join(SHOT_DIR, 'draw-clears-scrubber-1280.png'),
+          fullPage: false,
+        })
+      }
+    })
+  }
+})

@@ -159,6 +159,42 @@ describe('tutorial placement', () => {
     expect(placed.left + placed.width).toBeLessThanOrEqual(1270)
   })
 
+  it('clears the measured scrubber band above the transport', () => {
+    const anchor = {
+      top: 728,
+      left: 400,
+      width: 96,
+      height: 32,
+      right: 496,
+      bottom: 760,
+    }
+    const scrubber = {
+      top: 710,
+      left: 200,
+      width: 880,
+      height: 16,
+      right: 1080,
+      bottom: 726,
+    }
+    const cardHeight = 148
+    const placed = placeTutorialCard({
+      step: 'draw',
+      exportOpen: false,
+      vw: 1280,
+      vh: 800,
+      cardHeight,
+      anchor,
+      panel: null,
+      avoidExtra: [scrubber],
+      transportTop: scrubber.top,
+    })
+    expect(placed.top + cardHeight).toBeLessThanOrEqual(scrubber.top - 8)
+    // Still horizontally associated with Record.
+    const cardMid = placed.left + placed.width / 2
+    const recordMid = anchor.left + anchor.width / 2
+    expect(Math.abs(cardMid - recordMid)).toBeLessThan(160)
+  })
+
   it('keeps Export-open cards clear of the panel on desktop', () => {
     const panel = {
       top: 80,
