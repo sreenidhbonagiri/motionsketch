@@ -81,6 +81,9 @@ export function createSceneActor(
             ...(partial.geometryEdit.timingBaked
               ? { timingBaked: true }
               : {}),
+            ...(partial.geometryEdit.bringToLife
+              ? { bringToLife: true }
+              : {}),
             ...(typeof partial.geometryEdit.restoreSteadySpeed === 'number'
               ? {
                   restoreSteadySpeed: partial.geometryEdit.restoreSteadySpeed,
@@ -516,6 +519,7 @@ function parseGeometryEdit(
     handleIndices = parsed
   }
   const timingBaked = raw.timingBaked === true
+  const bringToLife = raw.bringToLife === true
   const restoreSteadySpeed =
     typeof raw.restoreSteadySpeed === 'number' &&
     Number.isFinite(raw.restoreSteadySpeed)
@@ -529,6 +533,7 @@ function parseGeometryEdit(
     ok: true,
     value: makeGeometryEdit(samples, baked, handleIndices, {
       ...(timingBaked ? { timingBaked: true } : {}),
+      ...(bringToLife ? { bringToLife: true } : {}),
       ...(restoreSteadySpeed !== undefined ? { restoreSteadySpeed } : {}),
       ...(restoreGlide !== undefined ? { restoreGlide } : {}),
     }),

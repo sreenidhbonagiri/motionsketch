@@ -228,6 +228,7 @@ export function CanvasStage({
   const polishSession = useEditorStore((s) => s.polishSession)
   const glideSession = useEditorStore((s) => s.glideSession)
   const presetSession = useEditorStore((s) => s.presetSession)
+  const bringToLifeSession = useEditorStore((s) => s.bringToLifeSession)
   const snapIndicator = useEditorStore((s) => s.snapIndicator)
 
   const {
@@ -262,16 +263,26 @@ export function CanvasStage({
   const selectedRaw = findActor(project.actors, selectedActorId)
   const presetPreviewActive =
     !!presetSession && presetSession.compareMode === 'preset'
+  const bringToLifePreviewActive =
+    !!bringToLifeSession && bringToLifeSession.compareMode === 'enhanced'
+  const enhancedPreviewActive =
+    presetPreviewActive || bringToLifePreviewActive
+  const enhancedProposed =
+    presetPreviewActive && presetSession
+      ? presetSession.proposed
+      : bringToLifePreviewActive && bringToLifeSession
+        ? bringToLifeSession.proposed
+        : null
   const selected =
-    selectedRaw && presetPreviewActive
-      ? applyMotionStateToActor(selectedRaw, presetSession.proposed)
+    selectedRaw && enhancedPreviewActive && enhancedProposed
+      ? applyMotionStateToActor(selectedRaw, enhancedProposed)
       : selectedRaw
   const pathView = {
-    geometryEdit: presetPreviewActive
+    geometryEdit: enhancedPreviewActive
       ? null
       : geometryEdit,
-    editSession: presetPreviewActive ? null : editSession,
-    editPreview: presetPreviewActive ? null : editPreview,
+    editSession: enhancedPreviewActive ? null : editSession,
+    editPreview: enhancedPreviewActive ? null : editPreview,
     // Glide preview: proposed strength. Original: committed actor.glide
     // (omit override — never force 0, which would hide an already-applied Glide).
     glideOverride:
@@ -348,12 +359,20 @@ export function CanvasStage({
             polishSession.roundingNeighborhood,
           )
         }
-      } else if (presetSession && selectedRaw?.recording) {
+      } else if (
+        (presetSession || bringToLifeSession) &&
+        selectedRaw?.recording
+      ) {
         // Keep the committed path visible as a dashed ghost while the
-        // proposed preset path plays — same compare language as Polish.
+        // proposed path plays — same compare language as Polish.
         const original = selectedRaw.recording.samples
-        const proposedSamples = presetSession.proposed.recording?.samples ?? []
-        const showProposed = presetSession.compareMode === 'preset'
+        const proposed =
+          presetSession?.proposed ?? bringToLifeSession?.proposed ?? null
+        const proposedSamples = proposed?.recording?.samples ?? []
+        const showProposed =
+          (presetSession?.compareMode === 'preset' ||
+            bringToLifeSession?.compareMode === 'enhanced') ??
+          false
         if (original.length >= 2) {
           drawPath(
             ctx,
@@ -366,7 +385,7 @@ export function CanvasStage({
             showProposed,
           )
         }
-        if (showProposed && proposedSamples.length >= 2) {
+        if (showProposed && proposedSamples.length >= 2 && proposed) {
           drawPath(
             ctx,
             size.width,
@@ -376,10 +395,7 @@ export function CanvasStage({
             2.75,
             0.95,
           )
-          const localT = projectToLocal(
-            playbackHead,
-            presetSession.proposed.clip,
-          )
+          const localT = projectToLocal(playbackHead, proposed.clip)
           drawPlayhead(
             ctx,
             size.width,
@@ -448,6 +464,7 @@ export function CanvasStage({
     editing,
     polishSession,
     presetSession,
+    bringToLifeSession,
     selectedRaw,
     snapIndicator,
   ])
@@ -527,8 +544,8 @@ export function CanvasStage({
             project.actors.map((actor, index) => {
               const isSelected = actor.id === selectedActorId
               const viewActor =
-                isSelected && presetPreviewActive && presetSession
-                  ? applyMotionStateToActor(actor, presetSession.proposed)
+                isSelected && enhancedPreviewActive && enhancedProposed
+                  ? applyMotionStateToActor(actor, enhancedProposed)
                   : actor
               // Recording/armed need the active actor visible for dragging.
               // Normal playback/idle never silently reveals a selected hidden actor.

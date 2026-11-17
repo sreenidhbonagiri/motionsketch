@@ -444,6 +444,7 @@ export function continuePathAvailability(args: {
   polishSession: unknown
   glideSession: unknown
   presetSession: unknown
+  bringToLifeSession?: unknown
   pathGestureActive?: boolean
 }): ContinuePathAvailability {
   const { actor } = args
@@ -480,6 +481,12 @@ export function continuePathAvailability(args: {
     return {
       enabled: false,
       reason: 'Apply or cancel the motion preset before extending the path.',
+    }
+  }
+  if (args.bringToLifeSession) {
+    return {
+      enabled: false,
+      reason: 'Apply or cancel Bring to life before extending the path.',
     }
   }
   if (args.pathGestureActive) {

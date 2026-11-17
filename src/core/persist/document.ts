@@ -53,8 +53,9 @@ import {
  *      stageAspect with default height 1000 so appearance is unchanged).
  * v15: actor.easing (older → linear). Discrete motion easing after Glide.
  *
- * Additive (no version bump): geometryEdit.timingBaked / restoreSteadySpeed /
- * restoreGlide — older files omit them (treated as unset / not timing-baked).
+ * Additive (no version bump): geometryEdit.timingBaked / bringToLife /
+ * restoreSteadySpeed / restoreGlide — older files omit them (treated as unset
+ * / not timing-baked / not a Bring to life stamp).
  */
 export const PERSIST_FORMAT_VERSION = 15 as const
 export const PERSIST_FORMAT_VERSION_LEGACY = 1 as const

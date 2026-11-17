@@ -106,6 +106,11 @@ export function InspectorPanel({
   }, [fillHeight, onBackToStage, onClose, tab])
 
   useLayoutEffect(() => {
+    // New restore target (Export / motion-preview remount) must re-apply.
+    restoredScrollRef.current = false
+  }, [restoreScrollTop])
+
+  useLayoutEffect(() => {
     if (restoredScrollRef.current) return
     if (restoreScrollTop == null || restoreScrollTop <= 0) return
     const root = rootRef.current
@@ -116,9 +121,14 @@ export function InspectorPanel({
       : chrome
         ? (nearestVerticalScroller(chrome) ?? root)
         : root
-    // DOM scroll offset — not React state.
+    // DOM scroll offset — not React state. Re-apply after paint in case a
+    // focus scroll raced the remount.
     scroller.scrollTo({ top: restoreScrollTop })
     restoredScrollRef.current = true
+    const id = window.requestAnimationFrame(() => {
+      scroller.scrollTo({ top: restoreScrollTop })
+    })
+    return () => window.cancelAnimationFrame(id)
   }, [fillHeight, restoreScrollTop])
 
   const tabs = (

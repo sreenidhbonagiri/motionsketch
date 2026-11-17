@@ -54,6 +54,7 @@ export function copyGeometryEdit(edit: GeometryEdit): GeometryEdit {
       edit.handleIndices,
     ),
     ...(edit.timingBaked ? { timingBaked: true } : {}),
+    ...(edit.bringToLife ? { bringToLife: true } : {}),
     ...(typeof edit.restoreSteadySpeed === 'number'
       ? { restoreSteadySpeed: edit.restoreSteadySpeed }
       : {}),
@@ -124,6 +125,8 @@ export function normalizeHandleIndices(
 export type GeometryEditOptions = {
   handleIndices?: number[] | null
   timingBaked?: boolean
+  /** Stamp an unchanged Bring to life Apply (cleared by later path edits). */
+  bringToLife?: boolean
   restoreSteadySpeed?: number
   restoreGlide?: number
 }
@@ -143,6 +146,7 @@ export function makeGeometryEdit(
       handleIndices ?? null,
     ),
     ...(options?.timingBaked ? { timingBaked: true } : {}),
+    ...(options?.bringToLife ? { bringToLife: true } : {}),
     ...(typeof options?.restoreSteadySpeed === 'number'
       ? { restoreSteadySpeed: options.restoreSteadySpeed }
       : {}),

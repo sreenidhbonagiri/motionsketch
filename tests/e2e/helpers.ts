@@ -532,6 +532,12 @@ export async function clickGlide(page: Page) {
   await page.getByTestId('btn-glide').click()
 }
 
+/** Open Motion tools if needed, then start Bring to life. */
+export async function clickBringToLife(page: Page) {
+  await ensureRefineMotionOpen(page)
+  await page.getByTestId('btn-bring-to-life').click()
+}
+
 /** Arm Continue path from the dock More menu. */
 export async function clickContinuePath(page: Page) {
   const btn = page.getByTestId('btn-continue-path')
