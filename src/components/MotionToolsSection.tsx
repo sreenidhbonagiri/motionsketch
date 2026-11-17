@@ -1,3 +1,4 @@
+import { bringToLifeAvailability } from '../core/bringToLife'
 import { RESTORE_RECORDED_PATH_HELP } from '../core/continuePath'
 import { useConfirm } from '../hooks/useConfirm'
 import { useEditorStore } from '../state/store'
@@ -28,11 +29,15 @@ export function MotionToolsSection({
   const hasRecording = !!recording
   const beginPolishSession = useEditorStore((s) => s.beginPolishSession)
   const beginGlideSession = useEditorStore((s) => s.beginGlideSession)
+  const beginBringToLifeSession = useEditorStore(
+    (s) => s.beginBringToLifeSession,
+  )
   const restoreRecordedPath = useEditorStore((s) => s.restoreRecordedPath)
   const geometryEdit = useEditorStore((s) => s.geometryEdit)
   const confirm = useConfirm()
   const busy =
     mode === 'recording' || mode === 'armed' || mode === 'editing'
+  const bringAvail = bringToLifeAvailability(selectedActor)
 
   const onRestoreRecordedPath = async () => {
     const ok = await confirm({
@@ -55,10 +60,31 @@ export function MotionToolsSection({
             <span className="font-medium text-slate-700">
               {selectedActor?.name ?? 'the selected element'}
             </span>
-            . Polish keeps pauses and corners; Glide eases starts and stops. Snap
-            stays next to Record and Play.
+            . Bring to life cleans a rough take; Polish and Glide tune one
+            aspect at a time. Snap stays next to Record and Play.
           </HelpDisclosure>
         )}
+        <button
+          type="button"
+          data-testid="btn-bring-to-life"
+          disabled={!bringAvail.enabled || busy}
+          title={
+            bringAvail.message ??
+            'Cleaner path and smoother arrival'
+          }
+          onClick={() => beginBringToLifeSession()}
+          className={toolBtn}
+        >
+          <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
+            <span className="leading-snug">Bring to life</span>
+            <span
+              data-testid="bring-to-life-tool-desc"
+              className="w-full whitespace-normal text-[11px] font-normal leading-snug text-slate-500"
+            >
+              {bringAvail.message ?? 'Cleaner path and smoother arrival'}
+            </span>
+          </span>
+        </button>
         <button
           type="button"
           data-testid="btn-polish-motion"

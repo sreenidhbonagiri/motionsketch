@@ -33,6 +33,11 @@ import {
   MOTION_EASING_LABELS,
   type MotionEasing,
 } from '../core/easing'
+import {
+  bringToLifeAvailability,
+  buildBringToLife,
+  type BringToLifeNotes,
+} from '../core/bringToLife'
 import { applyGlide, DEFAULT_GLIDE_STRENGTH } from '../core/glide'
 import {
   applyMotionStateToActor,
@@ -197,6 +202,18 @@ export type PresetSession = {
   resumePlaybackHead: number
 }
 
+/** Ephemeral Bring to life preview — never persisted until Apply. */
+export type BringToLifeSession = {
+  proposed: MotionPresetMotionState
+  /** Spatial path for dashed original / solid enhanced compare. */
+  previewSamples: MotionSample[]
+  compareMode: 'original' | 'enhanced'
+  resumePlaybackHead: number
+  changed: boolean
+  reason: string | null
+  notes: BringToLifeNotes
+}
+
 /** Chronological actor-edit kinds for unified placement/clip/transform undo. */
 export type ActorEditKind =
   | 'transform'
@@ -205,6 +222,7 @@ export type ActorEditKind =
   | 'glide'
   | 'easing'
   | 'preset'
+  | 'bringToLife'
   | 'recording'
   | 'continuePath'
   | 'stageResize'
@@ -331,6 +349,12 @@ interface EditorStore {
   /** Previous full motion snapshots for preset undo (selected actor). */
   presetUndoStack: MotionPresetMotionState[]
   presetRedoStack: MotionPresetMotionState[]
+
+  /** Non-destructive Bring to life preview (null when inactive). */
+  bringToLifeSession: BringToLifeSession | null
+  /** Previous full motion snapshots for Bring to life undo (selected actor). */
+  bringToLifeUndoStack: MotionPresetMotionState[]
+  bringToLifeRedoStack: MotionPresetMotionState[]
 
   /**
    * Completed replace-recording undo (selected actor). Snapshots are captured
@@ -575,6 +599,13 @@ interface EditorStore {
   undoPreset: () => void
   redoPreset: () => void
 
+  beginBringToLifeSession: () => boolean
+  setBringToLifeCompareMode: (mode: 'original' | 'enhanced') => void
+  applyBringToLife: () => boolean
+  cancelBringToLife: () => void
+  undoBringToLife: () => void
+  redoBringToLife: () => void
+
   selectTransformKeyframe: (id: string | null) => void
   upsertTransformAtPlayhead: (rotationDeg: number, scale: number) => void
   commitTransformKeyframe: (input: {
@@ -604,6 +635,7 @@ function clearEditState() {
     polishSession: null as PolishSession | null,
     glideSession: null as GlideSession | null,
     presetSession: null as PresetSession | null,
+    bringToLifeSession: null as BringToLifeSession | null,
   }
 }
 
@@ -766,6 +798,8 @@ function clearHistoryForActorSwitch(
     easingRedoStack: [] as MotionEasing[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
+    bringToLifeUndoStack: [] as MotionPresetMotionState[],
+    bringToLifeRedoStack: [] as MotionPresetMotionState[],
     recordingUndoStack: [] as MotionPresetMotionState[],
     recordingRedoStack: [] as MotionPresetMotionState[],
     pendingRecordingBaseline: null as MotionPresetMotionState | null,
@@ -893,6 +927,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     easingRedoStack: [] as MotionEasing[],
     presetUndoStack: [] as MotionPresetMotionState[],
     presetRedoStack: [] as MotionPresetMotionState[],
+    bringToLifeUndoStack: [] as MotionPresetMotionState[],
+    bringToLifeRedoStack: [] as MotionPresetMotionState[],
     recordingUndoStack: [] as MotionPresetMotionState[],
     recordingRedoStack: [] as MotionPresetMotionState[],
     pendingRecordingBaseline: null as MotionPresetMotionState | null,
@@ -938,6 +974,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         polishSession: state.polishSession,
         glideSession: state.glideSession,
         presetSession: state.presetSession,
+        bringToLifeSession: state.bringToLifeSession,
         pathGestureActive: state.pathGestureActive,
       })
       if (!availability.enabled) {
@@ -954,6 +991,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (state.polishSession) get().cancelPolish()
       if (state.glideSession) get().cancelGlide()
       if (state.presetSession) get().cancelPreset()
+      if (state.bringToLifeSession) get().cancelBringToLife()
       set({
         mode: 'armed',
         recordingIntent: 'continue',
@@ -2747,6 +2785,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         get().undoPreset()
         return
       }
+      if (kind === 'bringToLife') {
+        get().undoBringToLife()
+        return
+      }
       if (kind === 'recording') {
         get().undoRecording()
         return
@@ -2792,6 +2834,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       }
       if (kind === 'preset') {
         get().redoPreset()
+        return
+      }
+      if (kind === 'bringToLife') {
+        get().redoBringToLife()
         return
       }
       if (kind === 'recording') {
@@ -2854,6 +2900,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         polishSession: null,
         glideSession: null,
         presetSession: null,
+        bringToLifeSession: null,
         // Mode transition once; selected-point copy lives in handle-selection-status.
         actionAnnouncement: 'Edit points',
       })
@@ -3372,6 +3419,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (state.pathGestureActive || state.editPreview) return false
       if (state.glideSession) get().cancelGlide()
       if (state.presetSession) get().cancelPreset()
+      if (state.bringToLifeSession) get().cancelBringToLife()
       const actor = getSelected(state)
       if (!actor.recording) return false
 
@@ -3559,6 +3607,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (state.pathGestureActive || state.editPreview) return false
       if (state.polishSession) get().cancelPolish()
       if (state.presetSession) get().cancelPreset()
+      if (state.bringToLifeSession) get().cancelBringToLife()
       const actor = getSelected(state)
       if (!actor.recording) return false
 
@@ -3744,6 +3793,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (!getMotionPreset(presetId)) return false
       if (state.polishSession) get().cancelPolish()
       if (state.glideSession) get().cancelGlide()
+      if (state.bringToLifeSession) get().cancelBringToLife()
 
       const actor = getSelected(get())
       const projectDurationMs = state.project.playback.durationMs
@@ -3973,6 +4023,219 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           ? { x: first.x, y: first.y }
           : { ...next.restPosition },
         actionAnnouncement: 'Redo motion preset',
+      })
+    },
+
+    beginBringToLifeSession: () => {
+      const state = get()
+      if (
+        state.mode === 'armed' ||
+        state.mode === 'recording' ||
+        state.mode === 'playing' ||
+        state.mode === 'editing'
+      ) {
+        return false
+      }
+      if (state.pathGestureActive || state.editPreview) return false
+      if (state.polishSession) get().cancelPolish()
+      if (state.glideSession) get().cancelGlide()
+      if (state.presetSession) get().cancelPreset()
+
+      const actor = getSelected(get())
+      const avail = bringToLifeAvailability(actor)
+      if (!avail.enabled) {
+        set({
+          actionAnnouncement: avail.message ?? 'Bring to life is unavailable.',
+        })
+        return false
+      }
+
+      const built = buildBringToLife(actor, state.project.stageAspect)
+      if (!built.ok) {
+        set({ actionAnnouncement: built.reason })
+        return false
+      }
+
+      set({
+        mode: 'idle',
+        editSession: null,
+        bringToLifeSession: {
+          proposed: built.proposed,
+          previewSamples: built.previewSamples,
+          compareMode: 'enhanced',
+          resumePlaybackHead: state.playbackHead,
+          changed: built.changed,
+          reason: built.reason,
+          notes: built.notes,
+        },
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
+        editPreview: null,
+        pointerId: null,
+        actionAnnouncement: built.changed
+          ? 'Bring to life preview'
+          : (built.reason ?? 'Bring to life preview'),
+      })
+      if (built.changed) get().play()
+      return true
+    },
+
+    setBringToLifeCompareMode: (mode) => {
+      const state = get()
+      if (!state.bringToLifeSession) return
+      if (state.bringToLifeSession.compareMode === mode) return
+      set({
+        bringToLifeSession: {
+          ...state.bringToLifeSession,
+          compareMode: mode,
+        },
+      })
+      get().restartPlayback()
+    },
+
+    applyBringToLife: () => {
+      const state = get()
+      const session = state.bringToLifeSession
+      if (!session) return false
+      if (!session.changed) {
+        set({
+          bringToLifeSession: null,
+          playbackHead: session.resumePlaybackHead,
+          actionAnnouncement:
+            session.reason ?? 'Nothing to enhance — left unchanged.',
+        })
+        get().pause()
+        return false
+      }
+
+      const actor = getSelected(state)
+      const previous = captureMotionState(actor)
+      const nextActor = applyMotionStateToActor(actor, session.proposed)
+      const first = session.proposed.geometryEdit?.samples[0]
+        ?? session.proposed.recording?.samples[0]
+
+      const transformNote = session.notes.preservesTransformKeyframes
+        ? ' Existing rotation/scale keyframes keep their times.'
+        : ''
+
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => nextActor,
+        ),
+        geometryEdit: geometryMirror(session.proposed.geometryEdit),
+        bringToLifeSession: null,
+        mode: 'idle',
+        pointerId: null,
+        liveTrail: [],
+        playbackHead: 0,
+        editSession: null,
+        undoStack: [],
+        redoStack: [],
+        selectedHandleIndex: null,
+        editPreview: null,
+        pathAddMode: false,
+        pathAddCandidateIndex: null,
+        pathTool: 'edit-points',
+        pathGestureActive: false,
+        polishSession: null,
+        glideSession: null,
+        presetSession: null,
+        bringToLifeUndoStack: [...state.bringToLifeUndoStack, previous].slice(
+          -MAX_UNDO,
+        ),
+        bringToLifeRedoStack: [],
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'bringToLife'),
+        actorEditRedoOrder: [],
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...session.proposed.restPosition },
+        actionAnnouncement: `Brought to life.${transformNote}`,
+      })
+      get().pause()
+      return true
+    },
+
+    cancelBringToLife: () => {
+      const state = get()
+      const session = state.bringToLifeSession
+      if (!session) return
+      set({
+        bringToLifeSession: null,
+        mode: 'idle',
+        playbackHead: session.resumePlaybackHead,
+        playbackDirection: 1,
+        actionAnnouncement: 'Bring to life cancelled.',
+      })
+      get().pause()
+    },
+
+    undoBringToLife: () => {
+      const state = get()
+      if (state.bringToLifeUndoStack.length === 0) return
+      const previous =
+        state.bringToLifeUndoStack[state.bringToLifeUndoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = captureMotionState(actor)
+      const restored = applyMotionStateToActor(actor, previous)
+      const first =
+        previous.geometryEdit?.samples[0] ?? previous.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => restored,
+        ),
+        geometryEdit: geometryMirror(previous.geometryEdit),
+        selectedTransformId: null,
+        bringToLifeUndoStack: state.bringToLifeUndoStack.slice(0, -1),
+        bringToLifeRedoStack: [...state.bringToLifeRedoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: popKindFromOrder(state.actorEditOrder, 'bringToLife'),
+        actorEditRedoOrder: pushEditOrder(
+          state.actorEditRedoOrder,
+          'bringToLife',
+        ),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...previous.restPosition },
+        actionAnnouncement: 'Undo Bring to life',
+      })
+    },
+
+    redoBringToLife: () => {
+      const state = get()
+      if (state.bringToLifeRedoStack.length === 0) return
+      const next =
+        state.bringToLifeRedoStack[state.bringToLifeRedoStack.length - 1]!
+      const actor = getSelected(state)
+      const current = captureMotionState(actor)
+      const restored = applyMotionStateToActor(actor, next)
+      const first = next.geometryEdit?.samples[0] ?? next.recording?.samples[0]
+      set({
+        project: withSelectedActor(
+          state.project,
+          state.selectedActorId,
+          () => restored,
+        ),
+        geometryEdit: geometryMirror(next.geometryEdit),
+        selectedTransformId: null,
+        bringToLifeRedoStack: state.bringToLifeRedoStack.slice(0, -1),
+        bringToLifeUndoStack: [...state.bringToLifeUndoStack, current].slice(
+          -MAX_UNDO,
+        ),
+        actorEditOrder: pushEditOrder(state.actorEditOrder, 'bringToLife'),
+        actorEditRedoOrder: popKindFromOrder(
+          state.actorEditRedoOrder,
+          'bringToLife',
+        ),
+        livePosition: first
+          ? { x: first.x, y: first.y }
+          : { ...next.restPosition },
+        actionAnnouncement: 'Redo Bring to life',
       })
     },
 

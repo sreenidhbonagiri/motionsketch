@@ -246,6 +246,12 @@ export interface GeometryEdit {
    */
   timingBaked?: boolean
   /**
+   * When true, this geometry is an unchanged Bring to life Apply. Reopening
+   * Bring to life is a no-op until a new recording, Restore recorded path, or
+   * another path edit replaces this geometry (flag clears with the edit).
+   */
+  bringToLife?: boolean
+  /**
    * Steady Speed to reinstate when Restore recorded path clears this edit
    * (set when Continue bakes live timing into `samples`).
    */

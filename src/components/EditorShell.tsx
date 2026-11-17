@@ -45,6 +45,7 @@ import { CanvasStage } from './CanvasStage'
 import { ExampleGallery } from './ExampleGallery'
 import { ExportPanel } from './ExportPanel'
 import { FloatingPanel, type ChromePanel } from './FloatingPanel'
+import { BringToLifePanel } from './BringToLifePanel'
 import { GlidePanel } from './GlidePanel'
 import { HelpPanel } from './HelpPanel'
 import { InspectorPanel, type InspectorTab } from './InspectorPanel'
@@ -94,8 +95,12 @@ export function EditorShell() {
   const polishSession = useEditorStore((s) => s.polishSession)
   const glideSession = useEditorStore((s) => s.glideSession)
   const presetSession = useEditorStore((s) => s.presetSession)
+  const bringToLifeSession = useEditorStore((s) => s.bringToLifeSession)
   const motionPreviewSession =
-    !!polishSession || !!glideSession || !!presetSession
+    !!polishSession ||
+    !!glideSession ||
+    !!presetSession ||
+    !!bringToLifeSession
   const durationMs = useEditorStore((s) => s.project.playback.durationMs)
 
   const [openPanel, setOpenPanel] = useState<ChromePanel | null>(null)
@@ -358,7 +363,10 @@ export function EditorShell() {
       const panel =
         document.querySelector<HTMLElement>('[data-testid="polish-panel"]') ??
         document.querySelector<HTMLElement>('[data-testid="glide-panel"]') ??
-        document.querySelector<HTMLElement>('[data-testid="preset-panel"]')
+        document.querySelector<HTMLElement>('[data-testid="preset-panel"]') ??
+        document.querySelector<HTMLElement>(
+          '[data-testid="bring-to-life-panel"]',
+        )
       const focusTarget =
         panel?.querySelector<HTMLElement>(
           'input:not([disabled]), button:not([disabled])',
@@ -869,7 +877,10 @@ export function EditorShell() {
                   }`
           } md:col-start-1 md:col-end-2`}
         >
-          {(polishSession || glideSession || presetSession) && (
+          {(polishSession ||
+            glideSession ||
+            presetSession ||
+            bringToLifeSession) && (
             <div
               data-testid="motion-preview-slot"
               className="flex w-full shrink-0 justify-center px-2 pt-2"
@@ -877,6 +888,7 @@ export function EditorShell() {
               {polishSession && <PolishPanel />}
               {glideSession && <GlidePanel />}
               {presetSession && <PresetPanel />}
+              {bringToLifeSession && <BringToLifePanel />}
             </div>
           )}
           <div className="shrink-0">
