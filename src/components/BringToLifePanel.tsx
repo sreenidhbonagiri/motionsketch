@@ -3,9 +3,9 @@ import { useEditorStore } from '../state/store'
 import { HelpDisclosure } from './HelpDisclosure'
 
 /**
- * Bring to life preview. Cleaner path and smoother arrival (Glide + Ease out).
- * Apply writes one undoable motion snapshot and replaces Easing, Glide, and
- * Steady Speed; Cancel / Escape restores playhead with no history.
+ * Compact Bring to life preview. Primary controls stay in the header so they
+ * remain reachable with Play on short phones; secondary copy lives in the
+ * disclosure.
  */
 export function BringToLifePanel() {
   const session = useEditorStore((s) => s.bringToLifeSession)
@@ -42,8 +42,7 @@ export function BringToLifePanel() {
             data-testid="bring-to-life-help"
             className="text-xs leading-relaxed text-slate-500"
           >
-            Cleaner path and smoother arrival. Duration and the raw recording
-            stay.
+            Cleaner path and smoother arrival.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -102,45 +101,26 @@ export function BringToLifePanel() {
       </div>
 
       <p
-        data-testid="bring-to-life-compare-legend"
-        className="mt-1.5 text-xs text-slate-500"
-      >
-        <span className="font-medium text-slate-600">Dashed</span> Original
-        {' · '}
-        <span className="font-medium text-ms-primary-pressed">Solid</span>{' '}
-        Enhanced path
-      </p>
-
-      {session.changed && (
-        <p
-          data-testid="bring-to-life-replace-notice"
-          className="mt-2 text-xs leading-relaxed text-slate-600"
-        >
-          Apply replaces Easing, Glide, and Steady Speed. Cancel or Undo
-          restores the previous settings.
-        </p>
-      )}
-
-      <div className="mt-2">
-        <HelpDisclosure testId="bring-to-life-about" summary="What this changes">
-          Softens path wobble and steadies timing, then uses Glide and Ease out
-          for a smoother arrival. Pauses and the final position stay. Squash and
-          stretch are not part of this version. Existing rotation/scale
-          keyframes keep their times.
-        </HelpDisclosure>
-      </div>
-
-      <p
         data-testid="bring-to-life-status"
-        className="mt-2 text-xs leading-relaxed text-slate-600"
+        className="mt-1.5 text-xs leading-relaxed text-slate-600"
         role="status"
       >
         {session.changed
           ? session.notes.preservesTransformKeyframes
-            ? 'Preview ready. Transform keyframes keep their times; where they land on the path can shift.'
-            : 'Preview ready. Watch Original vs Enhanced, then Apply or Cancel.'
+            ? 'Preview ready. Transform keyframes keep their times.'
+            : 'Preview ready.'
           : (session.reason ?? 'Nothing to enhance.')}
       </p>
+
+      <div className="mt-1.5">
+        <HelpDisclosure testId="bring-to-life-about" summary="What this changes">
+          Softens path wobble. Steady Speed, Glide, and Ease out run once at
+          playback for a smoother arrival — Apply replaces those three settings;
+          Cancel or Undo restores them. Pauses and the final position stay.
+          Duration and the raw recording stay. Dashed path = Original; solid =
+          Enhanced. Squash and stretch are not part of this version.
+        </HelpDisclosure>
+      </div>
     </div>
   )
 }

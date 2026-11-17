@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -354,11 +355,89 @@ export function EditorShell() {
     return () => window.removeEventListener('ms-open-inspector', onOpenInspector)
   }, [openInspector])
 
-  // Motion preview needs a visible stage and reachable Apply/Cancel. Panel
-  // splits keep the stage mounted; leave Elements so Apply/Cancel stay clear.
+  // Motion preview needs stage + Apply/Cancel + Play together. On focused
+  // chrome, temporarily leave Inspector/Elements sheets (preserve tab/scroll)
+  // so the split does not crush the stage on short phones.
+  const previewSheetRestoreRef = useRef<{
+    mobilePane: Exclude<MobilePane, null>
+    inspectorTab: InspectorTab
+    scrollTop: number
+  } | null>(null)
+  const deferredPreviewSheetRef = useRef(false)
+  /** Scroll before a motion-tool click focuses/scrolls the control into view. */
+  const pendingPreviewScrollRef = useRef<number | null>(null)
+  const readInspectorScrollTop = () => {
+    const panel = document.querySelector('[data-testid="inspector-panel"]')
+    if (!(panel instanceof HTMLElement)) return 0
+    if (panel.scrollHeight > panel.clientHeight + 1) return panel.scrollTop
+    let node: HTMLElement | null = panel.parentElement
+    while (node) {
+      const cs = getComputedStyle(node)
+      if (
+        (cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+        node.scrollHeight > node.clientHeight + 1
+      ) {
+        return node.scrollTop
+      }
+      node = node.parentElement
+    }
+    return panel.scrollTop
+  }
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (
+        !target.closest(
+          '[data-testid="btn-bring-to-life"], [data-testid="btn-polish-motion"], [data-testid="btn-glide"]',
+        )
+      ) {
+        return
+      }
+      pendingPreviewScrollRef.current = readInspectorScrollTop()
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    return () => window.removeEventListener('pointerdown', onPointerDown, true)
+  }, [])
+  // Layout effect: capture + unmount before paint so click/focus scrolling
+  // inside the sheet does not become the restored offset.
+  useLayoutEffect(() => {
+    if (!motionPreviewSession) {
+      if (deferredPreviewSheetRef.current) {
+        deferredPreviewSheetRef.current = false
+        const restore = previewSheetRestoreRef.current
+        previewSheetRestoreRef.current = null
+        if (restore && useFocusedChrome) {
+          setInspectorTab(restore.inspectorTab)
+          // Explicit offset (not a nudge) so remount re-applies the captured
+          // scroll even if React state was cleared while the sheet was away.
+          const top = restore.scrollTop > 0 ? restore.scrollTop : 0.5
+          setInspectorScrollRestore(top)
+          setMobilePane(restore.mobilePane)
+        }
+      }
+      return
+    }
+    if (
+      useFocusedChrome &&
+      !deferredPreviewSheetRef.current &&
+      (mobilePane === 'inspector' || mobilePane === 'elements')
+    ) {
+      const scrollTop =
+        pendingPreviewScrollRef.current ?? readInspectorScrollTop()
+      pendingPreviewScrollRef.current = null
+      setInspectorScrollRestore(scrollTop > 0 ? scrollTop : 0.5)
+      previewSheetRestoreRef.current = {
+        mobilePane,
+        inspectorTab,
+        scrollTop,
+      }
+      deferredPreviewSheetRef.current = true
+      setMobilePane(null)
+    }
+  }, [motionPreviewSession, useFocusedChrome, mobilePane, inspectorTab])
   useEffect(() => {
     if (!motionPreviewSession) return
-    if (useFocusedChrome && mobilePane === 'elements') setMobilePane(null)
     const id = window.requestAnimationFrame(() => {
       const panel =
         document.querySelector<HTMLElement>('[data-testid="polish-panel"]') ??
@@ -371,26 +450,34 @@ export function EditorShell() {
         panel?.querySelector<HTMLElement>(
           'input:not([disabled]), button:not([disabled])',
         ) ?? panel
-      focusTarget?.focus()
+      focusTarget?.focus({ preventScroll: true })
     })
     return () => window.cancelAnimationFrame(id)
-  }, [motionPreviewSession, useFocusedChrome, mobilePane])
+  }, [motionPreviewSession])
 
   // When the viewport becomes focused/crowded while both panels were floating,
   // show one sheet — do not silently clear prefs. Stage-back still leaves
-  // mobilePane null until the user opens a panel again.
+  // mobilePane null until the user opens a panel again. Skip while a motion
+  // preview owns the short-phone layout.
   const wasFocusedChromeRef = useRef(useFocusedChrome)
   useEffect(() => {
     const enteredFocused = useFocusedChrome && !wasFocusedChromeRef.current
     wasFocusedChromeRef.current = useFocusedChrome
     if (!enteredFocused) return
+    if (motionPreviewSession) return
     if (mobilePane) return
     if (inspectorOpen) {
       setMobilePane('inspector')
       return
     }
     if (actorsOpen) setMobilePane('elements')
-  }, [useFocusedChrome, mobilePane, inspectorOpen, actorsOpen])
+  }, [
+    useFocusedChrome,
+    mobilePane,
+    inspectorOpen,
+    actorsOpen,
+    motionPreviewSession,
+  ])
 
   const coarsePointer = useCoarsePointer()
   const tipBusy =
@@ -398,6 +485,7 @@ export function EditorShell() {
     !!polishSession ||
     !!glideSession ||
     !!presetSession ||
+    !!bringToLifeSession ||
     tutorial.active
   const emptyBoardHelp = coarsePointer
     ? EMPTY_BOARD_RECORD_HINT_COARSE
@@ -867,7 +955,12 @@ export function EditorShell() {
             editing
               ? 'min-h-0 shrink-0 overflow-visible max-h-[min(42vh,14rem)]'
               : motionPreviewSession
-                ? 'min-h-0 shrink-0 overflow-x-hidden overflow-y-auto overscroll-contain max-h-[min(48vh,20rem)] md:max-h-[min(44vh,18rem)]'
+                ? // Cap height; keep Play pinned while the preview panel may scroll.
+                  `min-h-0 shrink-0 overflow-hidden ${
+                    shortViewport
+                      ? 'max-h-[min(42vh,13.5rem)]'
+                      : 'max-h-[min(48vh,20rem)] md:max-h-[min(44vh,18rem)]'
+                  }`
                 : `min-h-0 overflow-hidden ${
                     panelSplitLayout
                       ? 'max-h-[min(26vh,9rem)] md:max-h-[min(24vh,8.5rem)]'
@@ -883,7 +976,7 @@ export function EditorShell() {
             bringToLifeSession) && (
             <div
               data-testid="motion-preview-slot"
-              className="flex w-full shrink-0 justify-center px-2 pt-2"
+              className="flex min-h-0 w-full shrink justify-center overflow-x-hidden overflow-y-auto overscroll-contain px-2 pt-2"
             >
               {polishSession && <PolishPanel />}
               {glideSession && <GlidePanel />}

@@ -1,10 +1,10 @@
 /**
  * Bring to life — deterministic polish of one recorded entrance.
  *
- * Combines path cleanup (polishMotion), mild steady timing, and smoother
- * arrival via Glide + easeOut at playback. Raw recording samples are never
- * rewritten; Apply stores a geometryEdit (flagged bringToLife) plus processing
- * prefs. Squash/stretch is deferred (needs a new transform model).
+ * Spatial cleanup via polishMotion; Steady Speed, Glide, and Ease out are set
+ * as playback prefs and applied once by the existing path pipeline (selector).
+ * Raw recording samples are never rewritten; Apply stores a geometryEdit
+ * (flagged bringToLife) plus processing prefs.
  *
  * Idempotency: geometryEdit.bringToLife marks an unchanged applied result.
  * Cleared automatically when path geometry is replaced (new recording, Restore
@@ -17,15 +17,14 @@ import {
   type MotionPresetMotionState,
 } from './motionPresets'
 import { polishMotion } from './polish'
-import { applySteadySpeed } from './process'
 import { clampStageAspect } from './stageAspect'
 import type { MotionSample, SceneActor } from './types'
 
 /** Fixed polish strength for this first version (no gesture-speed inference). */
 export const BRING_TO_LIFE_POLISH_STRENGTH = 0.55
-/** Mild arc-length steadying after cleanup. */
+/** Mild arc-length steadying at playback (not baked into geometry). */
 export const BRING_TO_LIFE_STEADY = 0.28
-/** Soften starts/stops in moving sections. */
+/** Soften starts/stops in moving sections at playback. */
 export const BRING_TO_LIFE_GLIDE = 0.42
 /** Arrival curve applied at playback (not baked into geometry). */
 export const BRING_TO_LIFE_EASING = 'easeOut' as const
@@ -52,7 +51,7 @@ export type BringToLifeNotes = {
 export type BringToLifeResult =
   | {
       ok: true
-      /** Spatial path used for dashed/solid compare (after cleanup). */
+      /** Spatial path for dashed/solid compare (cleanup only; no Steady bake). */
       previewSamples: MotionSample[]
       /** Full motion snapshot to Apply (recording unchanged). */
       proposed: MotionPresetMotionState
@@ -148,21 +147,22 @@ export function buildBringToLife(
   let spatial = polished.samples
   let changed = polished.changed
 
-  // Mild steady-speed on the cleaned path (duration preserved).
-  const steadied = applySteadySpeed(spatial, BRING_TO_LIFE_STEADY, aspect)
-  if (steadied.length === spatial.length) {
-    let timingDelta = 0
-    for (let i = 0; i < steadied.length; i++) {
-      timingDelta = Math.max(
-        timingDelta,
-        Math.abs(steadied[i]!.t - spatial[i]!.t),
-      )
-    }
-    if (timingDelta > 1e-4) changed = true
-    spatial = steadied
+  // Pin duration + endpoints to the source (spatial cleanup only).
+  spatial = spatial.map((s) => ({ ...s }))
+  spatial[0] = {
+    t: 0,
+    x: sourceSamples[0]!.x,
+    y: sourceSamples[0]!.y,
+  }
+  const last = spatial.length - 1
+  const srcLast = sourceSamples[sourceSamples.length - 1]!
+  spatial[last] = {
+    t: srcLast.t,
+    x: srcLast.x,
+    y: srcLast.y,
   }
 
-  // Smoother arrival from Glide + easeOut at playback (not baked into path).
+  // Probe Glide on cleaned path — actual Glide runs once at playback.
   const glideProbe = applyGlide(spatial, BRING_TO_LIFE_GLIDE, aspect)
   if (glideProbe.changed) changed = true
 
@@ -184,20 +184,6 @@ export function buildBringToLife(
       changed: false,
       reason: 'Motion is already clean — nothing meaningful to enhance.',
     }
-  }
-
-  // Pin duration + endpoints to the source.
-  spatial[0] = {
-    t: 0,
-    x: sourceSamples[0]!.x,
-    y: sourceSamples[0]!.y,
-  }
-  const last = spatial.length - 1
-  const srcLast = sourceSamples[sourceSamples.length - 1]!
-  spatial[last] = {
-    t: srcLast.t,
-    x: srcLast.x,
-    y: srcLast.y,
   }
 
   const geometryEdit = makeGeometryEdit(
@@ -222,6 +208,7 @@ export function buildBringToLife(
     faceAlongPath: baselineMotion.faceAlongPath,
     directionOffsetDeg: baselineMotion.directionOffsetDeg,
     smoothing: actor.geometryEdit?.bakedSmoothing ?? actor.smoothing,
+    // Timing prefs — applied once by selectProcessedPathForActor.
     steadySpeed: BRING_TO_LIFE_STEADY,
     glide: BRING_TO_LIFE_GLIDE,
     easing: BRING_TO_LIFE_EASING,

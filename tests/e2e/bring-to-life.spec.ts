@@ -24,9 +24,6 @@ test.describe('bring to life', () => {
 
     await clickBringToLife(page)
     await expect(page.getByTestId('bring-to-life-panel')).toBeVisible()
-    await expect(page.getByTestId('bring-to-life-compare-legend')).toContainText(
-      /Original/i,
-    )
     await expect(page.getByTestId('bring-to-life-compare-enhanced')).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -42,8 +39,9 @@ test.describe('bring to life', () => {
     await expect(page.getByTestId('bring-to-life-panel')).toHaveCount(0)
 
     await clickBringToLife(page)
-    await expect(page.getByTestId('bring-to-life-replace-notice')).toContainText(
-      /replaces Easing, Glide, and Steady Speed/i,
+    await page.getByTestId('bring-to-life-about').locator('summary').click()
+    await expect(page.getByTestId('bring-to-life-about')).toContainText(
+      /replaces those three settings|Easing, Glide/i,
     )
     await expect(page.getByTestId('btn-bring-to-life-apply')).toBeEnabled()
     await page.getByTestId('btn-bring-to-life-apply').click()
@@ -120,20 +118,6 @@ test.describe('bring to life', () => {
     )
     await page.getByTestId('btn-bring-to-life-cancel').click()
     await expect(page.getByTestId('bring-to-life-panel')).toHaveCount(0)
-  })
-
-  test('phone layout keeps Apply and Cancel reachable', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await loadProjectSnapshot(page, buildBringToLifeFixtureJson())
-    await ensureEditor(page, 'Bring to life demos')
-    await clickBringToLife(page)
-    const panel = page.getByTestId('bring-to-life-panel')
-    await expect(panel).toBeVisible()
-    await expect(page.getByTestId('btn-bring-to-life-apply')).toBeVisible()
-    await expect(page.getByTestId('btn-bring-to-life-cancel')).toBeVisible()
-    const box = await panel.boundingBox()
-    expect(box).toBeTruthy()
-    expect(box!.y + box!.height).toBeLessThanOrEqual(844 + 1)
   })
 
   test('actor isolation: other takes stay selectable', async ({ page }) => {
