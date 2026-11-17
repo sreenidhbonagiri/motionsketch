@@ -807,6 +807,185 @@ describe('slider change detection', () => {
     })
     expect(isSliderOnlyChange(base, recolored)).toBe(true)
   })
+
+  it('treats easing-only edits as slider-only (debounced)', () => {
+    const base = pickPersistable({ project: makePersistProject() })
+    const eased = pickPersistable({
+      project: {
+        ...base.project,
+        actors: base.project.actors.map((a, i) =>
+          i === 0 ? { ...a, easing: 'spring' } : a,
+        ),
+      },
+    })
+    expect(isSliderOnlyChange(base, eased)).toBe(true)
+  })
+})
+
+describe('easing persistence debounce', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('keeps Spring in storage after undo/redo when the debounce timer fires', () => {
+    vi.useFakeTimers()
+    const storage = createMemoryStorage()
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: makeRecording(), easing: 'linear' })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Easing debounce')).toBe(
+      true,
+    )
+    useEditorStore.getState().finishRecording(makeRecording())
+
+    useEditorStore.getState().setEasing('spring')
+    useEditorStore.getState().undoEasing()
+    useEditorStore.getState().redoEasing()
+    expect(useEditorStore.getState().project.actors[0]!.easing).toBe('spring')
+
+    vi.advanceTimersByTime(350)
+    const raw = storage.getItem(STORAGE_KEY)
+    expect(raw).toBeTruthy()
+    const snap = JSON.parse(raw!)
+    expect(snap.project.actors[0].easing).toBe('spring')
+    controller.dispose()
+  })
+
+  it('cancels pending Linear when redo restores already-saved Spring', () => {
+    // Spring saved → Undo schedules Linear → Redo returns to Spring → pending
+    // debounce must not overwrite → reload retains Spring.
+    vi.useFakeTimers()
+    const storage = createMemoryStorage()
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: makeRecording(), easing: 'linear' })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Stale debounce')).toBe(
+      true,
+    )
+    useEditorStore.getState().finishRecording(makeRecording())
+
+    useEditorStore.getState().setEasing('spring')
+    vi.advanceTimersByTime(350)
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.actors[0].easing).toBe(
+      'spring',
+    )
+
+    useEditorStore.getState().undoEasing()
+    // Linear is pending on the debounce timer.
+    vi.advanceTimersByTime(200)
+    useEditorStore.getState().redoEasing()
+    expect(useEditorStore.getState().project.actors[0]!.easing).toBe('spring')
+
+    // Former bug: redo early-returned on fingerprint match and left Linear armed.
+    vi.advanceTimersByTime(350)
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.actors[0].easing).toBe(
+      'spring',
+    )
+
+    vi.advanceTimersByTime(1000)
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.actors[0].easing).toBe(
+      'spring',
+    )
+    controller.dispose()
+
+    // Reload from the same storage — Spring must still be what restores.
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: makeRecording(), easing: 'linear' })],
+      }),
+    )
+    const reloaded = createPersistenceController(storage)
+    reloaded.restoreOnStartup()
+    expect(useEditorStore.getState().project.actors[0]!.easing).toBe('spring')
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.actors[0].easing).toBe(
+      'spring',
+    )
+    reloaded.dispose()
+  })
+
+  it('debounced getState() write still respects autosave suspension', () => {
+    vi.useFakeTimers()
+    const storage = createMemoryStorage()
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: makeRecording(), easing: 'linear' })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Suspend debounce')).toBe(
+      true,
+    )
+    useEditorStore.getState().finishRecording(makeRecording())
+    const before = storage.getItem(STORAGE_KEY)
+
+    useEditorStore.getState().setEasing('spring')
+    vi.advanceTimersByTime(200)
+    controller.setAutosaveSuspended(true)
+    vi.advanceTimersByTime(1000)
+    expect(storage.getItem(STORAGE_KEY)).toBe(before)
+    expect(useEditorStore.getState().project.actors[0]!.easing).toBe('spring')
+    controller.dispose()
+  })
+
+  it('debounced getState() write still yields to project replacement', () => {
+    vi.useFakeTimers()
+    const storage = createMemoryStorage()
+    resetStore(
+      makePersistProject({
+        actors: [makeActor({ recording: makeRecording(), easing: 'linear' })],
+      }),
+    )
+    const controller = createPersistenceController(storage)
+    controller.restoreOnStartup()
+    expect(useEditorStore.getState().createNamedProject('Replace debounce')).toBe(
+      true,
+    )
+    useEditorStore.getState().finishRecording(makeRecording())
+
+    useEditorStore.getState().setEasing('spring')
+    vi.advanceTimersByTime(200)
+
+    const replacement = makePersistProject({
+      actors: [
+        makeActor({
+          id: 'replacement-actor',
+          recording: makeRecording(),
+          easing: 'bounce',
+        }),
+      ],
+    })
+    replacement.name = 'Replaced project'
+    useEditorStore
+      .getState()
+      .applyPersistedSnapshot(buildSnapshot(replacement, null))
+    controller.afterSuccessfulReplace()
+
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.name).toBe(
+      'Replaced project',
+    )
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.actors[0].easing).toBe(
+      'bounce',
+    )
+
+    // Any leaked pre-replace debounce must not rewrite Spring over the replace.
+    vi.advanceTimersByTime(1000)
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.name).toBe(
+      'Replaced project',
+    )
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).project.actors[0].easing).toBe(
+      'bounce',
+    )
+    controller.dispose()
+  })
 })
 
 describe('store applyPersistedSnapshot / newProject', () => {

@@ -117,6 +117,8 @@ export function EditorShell() {
   const [inspectorOpen, setInspectorOpen] = useState(() =>
     readPanelOpenPref(INSPECTOR_PANEL_OPEN_KEY, false),
   )
+  /** While renaming, compact the saved status to the check + accessible label. */
+  const [renamingProject, setRenamingProject] = useState(false)
   /** Scroll to re-apply after Export temporarily unmounts the Inspector. */
   const [inspectorScrollRestore, setInspectorScrollRestore] = useState(0)
   const captureInspectorScroll = () => {
@@ -486,11 +488,13 @@ export function EditorShell() {
               <ProjectNameInput
                 committedName={projectName}
                 onCommit={renameProject}
+                onEditingChange={setRenamingProject}
               />
               {saveLabel && (
                 <p
                   data-testid="header-save-status"
                   title={saveLabel}
+                  aria-label={saveLabel}
                   className={
                     status === 'save-error' || status === 'restore-error'
                       ? 'ms-caption ms-caption-lg inline-flex min-w-0 shrink items-center gap-1 font-medium text-amber-800'
@@ -500,11 +504,21 @@ export function EditorShell() {
                   {status === 'saved' && !practiceSuspended ? (
                     <>
                       <Check
-                        className="size-3.5 shrink-0 text-ms-success md:hidden"
+                        className={
+                          renamingProject
+                            ? 'size-3.5 shrink-0 text-ms-success'
+                            : 'size-3.5 shrink-0 text-ms-success md:hidden'
+                        }
                         aria-hidden
                         strokeWidth={2.25}
                       />
-                      <span className="min-w-0 truncate max-md:sr-only">
+                      <span
+                        className={
+                          renamingProject
+                            ? 'sr-only'
+                            : 'min-w-0 truncate max-md:sr-only'
+                        }
+                      >
                         {saveLabel}
                       </span>
                     </>
