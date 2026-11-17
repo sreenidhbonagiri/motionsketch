@@ -269,6 +269,15 @@ test.describe('phone / mid-width panel chrome', () => {
       await page.getByTestId('btn-inspector-back-to-stage').click()
       await expect(page.getByTestId('inspector-panel')).toHaveCount(0)
       await expect(page.getByTestId('btn-play')).toBeVisible()
+      // Wait for preserve-center layout to settle after the stage cell expands.
+      await page
+        .getByTestId('stage-viewport')
+        .evaluate(
+          () =>
+            new Promise<void>((resolve) => {
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            }),
+        )
 
       const afterClose = await stageCenterNorm(page)
       expect(afterClose).toBeTruthy()
