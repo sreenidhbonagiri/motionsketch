@@ -67,9 +67,12 @@ test.describe('easing picker', () => {
     // Wait for redo to land in storage before export/reload (UI "Saved" can lag).
     await expect.poll(readStoredEasing, { timeout: 8000 }).toBe('spring')
 
+    // Regression: Export + Inspector remount + Project must not let a stale
+    // Undo(Linear) debounce overwrite already-confirmed Spring.
     const css = await readExportedCss(page)
     expect(css).toContain('@keyframes')
     expect((css.match(/\{\s*transform:/g) ?? []).length).toBeGreaterThan(8)
+    await expect.poll(readStoredEasing, { timeout: 8000 }).toBe('spring')
 
     await openPanel(page, 'project')
     await expect(page.getByTestId('save-status')).toHaveText(
@@ -81,6 +84,7 @@ test.describe('easing picker', () => {
     await ensureEditor(page, 'Easing fixture')
     await openPanel(page, 'adjust')
     await expect(page.getByTestId('easing-value')).toHaveText('Spring')
+    await expect.poll(readStoredEasing, { timeout: 8000 }).toBe('spring')
 
     // Keyboard on radiogroup moves selection and focus together.
     await page.getByTestId('easing-option-spring').focus()

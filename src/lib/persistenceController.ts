@@ -229,9 +229,11 @@ export function createPersistenceController(
       writeSlice(slice)
       return
     }
+    // Always persist the latest store at fire time (same as flushPending).
+    // Capturing `slice` here lets a cancelled-too-late timer write stale easing.
     timer = setTimeout(() => {
       timer = null
-      writeSlice(slice)
+      writeSlice(pickPersistable(useEditorStore.getState()))
     }, SLIDER_DEBOUNCE_MS)
   }
 
@@ -283,7 +285,13 @@ export function createPersistenceController(
 
     if (autosaveSuspended) return
 
-    if (fingerprint(next) === lastWrittenFingerprint) return
+    // Matching disk must still cancel a pending debounce. Otherwise Undo→Redo
+    // of an already-saved value (e.g. Spring) returns here while Undo's stale
+    // Linear timer remains armed and overwrites storage after Export/panels.
+    if (fingerprint(next) === lastWrittenFingerprint) {
+      dropPendingTimer()
+      return
+    }
 
     const mode = isSliderOnlyChange(previous, next) ? 'debounce' : 'immediate'
     scheduleWrite(next, mode)
