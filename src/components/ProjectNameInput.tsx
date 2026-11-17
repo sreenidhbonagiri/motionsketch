@@ -9,6 +9,10 @@ interface ProjectNameInputProps {
   onCommit: (name: string) => void
 }
 
+/** Shared box so button ↔ input swap does not shift the header/stage. */
+const NAME_FIELD_BOX =
+  'box-border h-6 max-w-[min(10rem,36vw)] text-left text-sm font-semibold tracking-tight text-slate-900 sm:max-w-[min(16rem,50vw)]'
+
 /**
  * Compact rename field for the editor header.
  * Local draft allows temporary empty input; Enter/blur commit; Escape cancels;
@@ -68,41 +72,42 @@ export function ProjectNameInput({
     }
   }
 
-  if (!editing) {
-    return (
-      <div className="min-w-0 shrink-0">
+  return (
+    <div
+      data-testid="project-name-field"
+      className="flex h-6 min-w-0 shrink-0 items-center"
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          data-testid="header-project-name-input"
+          type="text"
+          value={draft}
+          maxLength={MAX_PROJECT_NAME_LENGTH}
+          aria-label="Project name"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={() => {
+            if (skipBlurRef.current) {
+              skipBlurRef.current = false
+              return
+            }
+            commit()
+          }}
+          className={`${NAME_FIELD_BOX} w-[min(16rem,50vw)] rounded-md border border-ms-border bg-white/90 px-1.5 leading-none`}
+        />
+      ) : (
         <button
           type="button"
           data-testid="btn-rename-project"
           onClick={() => setEditing(true)}
-          className="block max-w-[min(10rem,36vw)] select-none truncate text-left text-sm font-semibold tracking-tight text-slate-900 underline-offset-2 hover:underline sm:max-w-[min(16rem,50vw)]"
+          className={`${NAME_FIELD_BOX} block w-full select-none truncate rounded-md border border-transparent px-1.5 leading-none underline-offset-2 hover:underline`}
           title="Rename project"
           aria-label="Rename project"
         >
           {committedName}
         </button>
-      </div>
-    )
-  }
-
-  return (
-    <input
-      ref={inputRef}
-      data-testid="header-project-name-input"
-      type="text"
-      value={draft}
-      maxLength={MAX_PROJECT_NAME_LENGTH}
-      aria-label="Project name"
-      onChange={(e) => setDraft(e.target.value)}
-      onKeyDown={onKeyDown}
-      onBlur={() => {
-        if (skipBlurRef.current) {
-          skipBlurRef.current = false
-          return
-        }
-        commit()
-      }}
-      className="w-[min(16rem,50vw)] rounded-md border border-ms-border bg-white/90 px-2 py-0.5 text-sm font-semibold tracking-tight text-slate-900"
-    />
+      )}
+    </div>
   )
 }
